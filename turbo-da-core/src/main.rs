@@ -122,9 +122,10 @@ async fn main() -> Result<(), std::io::Error> {
         info!("Running token price update loop....");
         loop {
             update_token_prices(
-                app_config_copy.clone(),
+                app_config_copy.coingecko_api_url.clone(),
+                app_config_copy.coingecko_api_key.clone(),
                 &TOKEN_MAP.keys().cloned().collect::<Vec<String>>(),
-                coin_gecko_store_copy.clone(),
+                &coin_gecko_store_copy.get_ref(),
             )
             .await;
             sleep(Duration::from_secs(300)).await;

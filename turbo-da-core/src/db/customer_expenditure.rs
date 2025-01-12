@@ -97,6 +97,7 @@ pub async fn update_customer_expenditure(
         extrinsic_index.eq(Some(result.extrinsic_index as i32)),
         block_number.eq(Some(result.block_number as i32)),
         payload.eq(None::<Vec<u8>>),
+        error.eq(None::<String>),
     );
 
     let tx = diesel::update(customer_expenditures.filter(id.eq(submission_id)))

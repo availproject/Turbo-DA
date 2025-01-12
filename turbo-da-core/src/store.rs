@@ -1,6 +1,4 @@
-use crate::config::AppConfig;
 use crate::utils::{get_prices, TOKEN_MAP};
-use actix_web::web::Data;
 use bigdecimal::BigDecimal;
 use log::{error, info};
 use reqwest::Client;
@@ -127,29 +125,24 @@ pub struct Price {
 }
 
 pub async fn update_token_prices(
-    config: AppConfig,
+    coin_gecho_api_url: String,
+    coin_gecho_api_key: String,
     tokens: &Vec<String>,
-    store: Data<CoinGeckoStore>,
+    store: &CoinGeckoStore,
 ) {
     let client = Client::new();
 
     for token in tokens {
         info!("Updating token price for: {}", token);
 
-        let (coin_price, avail_price) = match get_prices(
-            &client,
-            &config.coingecko_api_url,
-            &config.coingecko_api_key,
-            token,
-        )
-        .await
-        {
-            Ok(prices) => prices,
-            Err(e) => {
-                error!("Failed to get prices for {}: {}", token, e);
-                continue;
-            }
-        };
+        let (coin_price, avail_price) =
+            match get_prices(&client, &coin_gecho_api_url, &coin_gecho_api_key, token).await {
+                Ok(prices) => prices,
+                Err(e) => {
+                    error!("Failed to get prices for {}: {}", token, e);
+                    continue;
+                }
+            };
 
         info!("New Token price: {}", coin_price);
         info!("New Avail price: {}", avail_price);

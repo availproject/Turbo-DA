@@ -22,8 +22,11 @@ use crate::{
 };
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
-use db::models::customer_expenditure::CustomerExpenditureGetWithPayload;
-use diesel_async::AsyncPgConnection;
+use db::{
+    models::customer_expenditure::CustomerExpenditureGetWithPayload, schema::token_balances::dsl::*,
+};
+use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
 use reqwest::Client;
 use std::str::FromStr;
@@ -104,26 +107,66 @@ async fn process_failed_transactions(
             }
         };
 
+        let token_details = match token_balances
+            .filter(db::schema::token_balances::token_details_id.eq(i.token_details_id))
+            .select(db::models::token_balances::TokenBalances::as_select())
+            .first::<db::models::token_balances::TokenBalances>(connection)
+            .await
+        {
+            Ok(details) => details,
+            Err(e) => {
+                error!("Failed to get token details: {:?}", e);
+                continue;
+            }
+        };
+
+        let reqwest_client = Client::new();
+
+        let Ok((coin_price, avail_price)) = get_prices(
+            &reqwest_client,
+            &config.coingecko_api_url,
+            &config.coingecko_api_key,
+            &i.payment_token,
+        )
+        .await
+        else {
+            error!("Failed to get prices");
+            continue;
+        };
+
+        let token_balance_in_avail = get_token_price_equivalent_to_avail(
+            &BigDecimal::from(&token_details.token_balance - token_details.token_used),
+            &i.payment_token,
+            &avail_price,
+            &coin_price,
+        );
+
+        info!("Token balance in Avail: {}", token_balance_in_avail);
+
+        if token_balance_in_avail > one_avail() {
+            info!(
+                "Balance is sufficient for user_id {}, balance: {}",
+                i.user_id, token_balance_in_avail
+            );
+        } else {
+            error!("Insufficient balance: {}", token_balance_in_avail);
+            continue;
+        }
+
         let submit_data_class = SubmitDataAvail::new(client, account, avail_app_id);
         let submission = submit_data_class.submit_data(&data).await;
 
         match submission {
             Ok(success) => {
-                let client = Client::new();
                 let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
                 info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
 
-                let Ok(fees_as_bigdecimal_in_avail) = get_token_price_equivalent_to_avail(
-                    &client,
-                    &config,
+                let fees_as_bigdecimal_in_avail = get_token_price_equivalent_to_avail(
                     &fees_as_bigdecimal,
                     &i.payment_token,
-                )
-                .await
-                else {
-                    error!("Failed to get fees in Avail");
-                    continue;
-                };
+                    &avail_price,
+                    &coin_price,
+                );
 
                 update_customer_expenditure(
                     success,
@@ -135,7 +178,7 @@ async fn process_failed_transactions(
                 .await;
             }
             Err(e) => {
-                error!("DB Update failed again: id {:?}", e);
+                error!("Tx submission failed again: id {:?}", e);
             }
         }
     }
@@ -155,20 +198,12 @@ async fn process_failed_transactions(
 /// # Description
 /// Fetches current prices from Coingecko API and performs conversion calculations
 /// taking into account different token decimal places
-pub async fn get_token_price_equivalent_to_avail(
-    client: &Client,
-    config: &AppConfig,
+pub fn get_token_price_equivalent_to_avail(
     amount: &BigDecimal,
     token_name: &String,
-) -> Result<BigDecimal, String> {
-    let (coin_price, avail_price) = get_prices(
-        client,
-        &config.coingecko_api_url,
-        &config.coingecko_api_key,
-        token_name,
-    )
-    .await?;
-
+    avail_price: &f64,
+    coin_price: &f64,
+) -> BigDecimal {
     let decimals_token = TOKEN_MAP.get(token_name).unwrap().token_decimals;
     let decimals_avail = TOKEN_MAP.get("avail").unwrap().token_decimals;
 
@@ -178,7 +213,7 @@ pub async fn get_token_price_equivalent_to_avail(
             Ok(amount) => amount,
             Err(e) => {
                 error!("Failed to parse amount to BigDecimal: {}", e);
-                return Ok(BigDecimal::from(0));
+                return BigDecimal::from(0);
             }
         };
 
@@ -187,5 +222,9 @@ pub async fn get_token_price_equivalent_to_avail(
         * BigDecimal::from(10_u64.pow(decimals_token as u32))
         / BigDecimal::from(10_u64.pow(decimals_avail as u32));
 
-    Ok(price.round(0))
+    price.round(0)
+}
+
+fn one_avail() -> BigDecimal {
+    BigDecimal::from(10u64.pow(TOKEN_MAP.get("avail").unwrap().token_decimals as u32))
 }
