@@ -1,0 +1,43 @@
+# Database configuration
+database_url = "postgres://localhost:5432/mydb"
+
+# Number of threads for application
+number_of_threads = 4
+
+# Maximum size of the connection pool
+max_pool_size = 10
+
+# RPC endpoints for Avail service
+avail_rpc_endpoint = [
+    "https://rpc.example.com"
+]
+
+# Private keys for the application (example with placeholders)
+private_keys = [
+    "your_private_key_0",
+    "your_private_key_1"
+]
+
+# Private keys for the application (example with placeholders)
+assigned_wallet = "assigned_public_key"
+
+# Failure private key number (only if feature = "cron" is enabled)
+failure_private_key = "failure_private_key"
+
+# Coingecko API URL
+coingecko_api_url = "https://pro-api.coingecko.com/api/v3/simple/price"
+
+# Coingecko API Key
+coingecko_api_key = "default_api_key"
+
+# Query limit for total users
+total_users_query_limit = 1000
+
+# Size of the tokio broadcast channel
+ broadcast_channel_size = 100000
+
+# Payload size in bytes
+payload_size = 1048576
+
+# Maximum number of pending requests a user can raise
+maximum_pending_requests=50

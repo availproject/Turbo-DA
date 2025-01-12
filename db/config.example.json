@@ -1,0 +1,24 @@
+{
+  "db_host": "localhost",
+  "db_name": "gas_relay",
+  "db_user": "postgres",
+  "db_password": "password",
+  "block_entries": [
+    {
+      "chain_id": 1,
+      "block_number": 12345,
+      "block_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    },
+    {
+      "chain_id": 2,
+      "block_number": 67890,
+      "block_hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+    }
+  ],
+  "signers": [
+    {
+      "address": "0x53Ba580C12745FdFb6b5Ad5f32F33C1bbf26F112",
+      "nonce": "0"
+    }
+  ]
+}

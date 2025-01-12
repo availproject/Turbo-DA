@@ -1,0 +1,21 @@
+database_url = "postgres://user:password@localhost:5432/mydatabase"
+maximum_pending_requests = 1000
+
+[network.sepolia]
+contract_address = 0x1BD2b61d8bc1766b0E9791b2Fe9f5169F180b583
+url = "https://eth-sepolia.g.alchemy.com/v2/API_KEY"
+ws_url = "wss://eth-sepolia.g.alchemy.com/v2/API_KEY"
+chain_id = 11155111
+finalised_threshold = 64
+
+[network.baseSepolia]
+contract_address = 0x1BD2b61d8bc1766b0E9791b2Fe9f5169F180b583
+url = "https://rpc.base.org"
+ws_url = "wss://ws.base.org"
+chain_id = 84532
+
+[network.arbitrumSepolia]
+contract_address = 0x1BD2b61d8bc1766b0E9791b2Fe9f5169F180b583
+url = "https://rpc.arbitrum.org"
+ws_url = "wss://ws.arbitrum.org"
+chain_id = 421614

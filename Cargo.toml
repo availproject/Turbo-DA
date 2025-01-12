@@ -1,0 +1,8 @@
+
+[workspace]
+members = [
+    "db",
+    "turbo-da-core",
+    "funds_monitor",
+    "fallback_monitor"]
+resolver = "2"

@@ -1,0 +1,270 @@
+// This file is part of Avail Gas Relay Service.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/// A collection of utils
+/// - Keygeneration
+/// - Keylist generation
+use crate::{config::AppConfig, store::Price};
+use actix_web::{web, HttpRequest, HttpResponse};
+use alloy::primitives::Address;
+use avail_rust::Keypair;
+use diesel_async::{
+    pooled_connection::deadpool::{Object, Pool},
+    AsyncPgConnection,
+};
+use lazy_static::lazy_static;
+use log::error;
+use rand::Rng;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::{collections::HashMap, str::FromStr};
+use uuid::Uuid;
+use validator::ValidationError;
+
+/// Generates a list of keypairs from provided private keys
+///
+/// # Arguments
+/// * `number_of_threads` - Number of keypairs to generate
+/// * `private_keys` - Array of private key strings to generate keypairs from
+pub async fn generate_keygen_list(number_of_threads: i32, private_keys: &[String]) -> Vec<Keypair> {
+    let mut keypairs = Vec::new();
+
+    for i in 0..number_of_threads {
+        keypairs.push(create_keypair(&private_keys[i as usize]));
+    }
+
+    keypairs
+}
+
+/// Creates a keypair from a private key string
+///
+/// # Arguments
+/// * `private_key` - Private key as a hex string
+pub fn create_keypair(private_key: &String) -> Keypair {
+    let bytes = hex::decode(private_key).expect("Failed to decode hex string");
+    let byte_array: [u8; 32] = bytes.try_into().expect("Slice with incorrect length");
+    Keypair::from_secret_key(byte_array)
+        .unwrap_or_else(|_| panic!("Fatal: Couldn't parse the private key {:?}", private_key))
+}
+
+/// Formats a byte size into a human readable string with appropriate units
+///
+/// # Arguments
+/// * `bytes` - Size in bytes to format
+pub fn format_size(bytes: usize) -> String {
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    format!("{:.2} {}", size, UNITS[unit_index])
+}
+
+/// Generates a new UUID v4 for submission identification
+pub fn generate_submission_id() -> Uuid {
+    Uuid::new_v4()
+}
+
+/// Maps a user ID to a thread number based on the app config
+///
+/// # Arguments
+/// * `config` - Application configuration containing number of threads
+pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
+    rand::thread_rng().gen_range(0..config.number_of_threads)
+}
+
+/// Finds a token address by its key in the token map
+///
+/// # Arguments
+/// * `key` - Token key to look up
+pub fn find_key_by_value(key: &String) -> Option<&String> {
+    if let Some(token) = TOKEN_MAP.get(key) {
+        Some(&token.token_address)
+    } else {
+        None
+    }
+}
+
+/// Validates if a string is a valid Ethereum address
+///
+/// # Arguments
+/// * `address` - Address string to validate
+pub fn is_valid_ethereum_address(address: &str) -> Result<(), ValidationError> {
+    match Address::from_str(address) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(ValidationError::new("Invalid Ethereum address")),
+    }
+}
+
+/// Gets a database connection from the connection pool
+///
+/// # Arguments
+/// * `pool` - Database connection pool
+pub async fn get_connection(
+    pool: &web::Data<Pool<AsyncPgConnection>>,
+) -> Result<Object<AsyncPgConnection>, HttpResponse> {
+    match pool.get().await {
+        Ok(conn) => Ok(conn),
+        Err(err) => {
+            error!("Failed to get a database connection: {}", err);
+            Err(HttpResponse::InternalServerError().json(json!({
+                "status": "error",
+                "message": "Database connection error"
+            })))
+        }
+    }
+}
+
+/// Retrieves user ID from HTTP request headers
+///
+/// # Arguments
+/// * `http_request` - HTTP request to extract user ID from
+pub fn retrieve_user_id(http_request: HttpRequest) -> Option<String> {
+    let headers = http_request.headers();
+
+    for (name, value) in headers.iter() {
+        if name == "user_id" {
+            if let Ok(user_id) = value.to_str() {
+                return Some(user_id.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Retrieves email address from HTTP request headers
+///
+/// # Arguments
+/// * `http_request` - HTTP request to extract email from
+pub fn retrieve_email_address(http_request: &HttpRequest) -> Option<String> {
+    let headers = http_request.headers();
+
+    for (name, value) in headers.iter() {
+        if name == "user_email" {
+            if let Ok(user_email) = value.to_str() {
+                return Some(user_email.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Gets current prices for Avail and specified token from CoinGecko API
+///
+/// # Arguments
+/// * `client` - HTTP client for making requests
+/// * `coingecko_api_url` - CoinGecko API URL
+/// * `coingecko_api_key` - CoinGecko API key
+/// * `token` - Token to get price for
+pub async fn get_prices(
+    client: &Client,
+    coingecko_api_url: &str,
+    coingecko_api_key: &str,
+    token: &str,
+) -> Result<(f64, f64), String> {
+    let params = [
+        ("ids", format!("avail,{}", token)),
+        ("vs_currencies", "usd".to_string()),
+    ];
+
+    let response = match client
+        .get(coingecko_api_url)
+        .query(&params)
+        .header("accept", "application/json")
+        .header("x-cg-pro-api-key", coingecko_api_key)
+        .send()
+        .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    let json = match response.json::<HashMap<String, Price>>().await {
+        Ok(j) => j,
+        Err(e) => {
+            return Err(e.to_string());
+        }
+    };
+
+    let coin_price = match json.get(token) {
+        Some(val) => match val.usd {
+            Some(coin_price) => coin_price,
+            None => {
+                let msg = format!("{:?} price not found from coingecho", token);
+
+                return Err(msg);
+            }
+        },
+        None => {
+            let msg = format!("{:?} price not found from coingecho", token);
+            return Err(msg);
+        }
+    };
+
+    let avail_price = match json.get("avail") {
+        Some(val) => match val.usd {
+            Some(avail_price) => avail_price,
+            None => {
+                let msg = "Avail price not found from coingecho".to_string();
+
+                return Err(msg);
+            }
+        },
+        None => {
+            let msg = "Avail price not found from coingecho".to_string();
+
+            return Err(msg);
+        }
+    };
+
+    Ok((coin_price, avail_price))
+}
+
+/// Token information structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Token {
+    pub token_address: String,
+    pub token_decimals: u32,
+}
+
+lazy_static! {
+    pub static ref TOKEN_MAP: HashMap<String, Token> = {
+        let mut m = HashMap::new();
+        m.insert(
+            "ethereum".to_string(),
+            Token {
+                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
+                token_decimals: 18,
+            },
+        );
+
+        // TODO: remove the following: just for testing
+        m.insert(
+            "avail".to_string(),
+            Token {
+                token_address: "0xb1c3cb9b5e598d4e95a85870e7812b99f350982d".to_string(),
+                token_decimals: 18,
+            },
+        );
+        m
+    };
+}

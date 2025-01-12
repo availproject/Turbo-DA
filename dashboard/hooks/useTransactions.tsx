@@ -1,0 +1,144 @@
+import { useCallback, useEffect } from "react";
+import useWallet from "./useWallet";
+import { useAuth } from "@clerk/nextjs";
+import { fetchTokenBalances, fetchTransactions } from "@/lib/services";
+import { useCommonStore } from "@/store/common";
+import { getToken as getEthToken } from "@wagmi/core";
+import { template } from "@/lib/utils";
+import { config } from "@/app/providers";
+import { Balances, TokenMapEnum, Transaction } from "@/lib/types";
+import { Logger } from "@/lib/logger";
+import { toast } from "@/components/ui/use-toast";
+import { showFailedMessage } from "@/utils/toasts";
+import { pollWithDelay } from "@/lib/poller";
+import { useAccount } from "wagmi";
+import { formatUnits } from "viem";
+
+export default function useTransactions() {
+  const { switchNetwork, activeUserAddress, activeNetworkId, showBalance } =
+    useWallet();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { setTokenBalances, setRecentTransactions } = useCommonStore();
+  const { isConnected } = useAccount();
+
+  /** Poll transactions here every 30 seconds */
+  useEffect(() => {
+    // pollWithDelay(getTransactions, [], 300, () => true);
+  }, [activeNetworkId, isConnected]);
+
+  /**
+   * TODO: we'll implement everything related to the handling incoming transactions here
+   *
+   * 1. getTransactions() -
+   *     a. fetch all transactions for the user from the api
+   *     b. return the transactions in a sorted | desired way
+   *     c. add to transaction store
+   *
+   * 3. getTokenBalances() -
+   *   a. fetch balances for all tokens
+   *   b. update the token store
+   *
+   * poll both every 30 seconds
+   */
+
+  const getTransactions = useCallback(async () => {
+    /**
+     * STEPS
+     *
+     * 0. sanity checks {isConnected, isLoggedIn}
+     * 1. fetch all transactions for the user from fetchTransactions()
+     * 2. sort the transactions + add token images + metadata
+     * 2. add to transaction store(zustand)
+     *
+     */
+
+    try {
+      console.log("fetching transactions");
+      if (!isSignedIn) {
+        throw new Error("User not signed in. Did you forget to sign in?");
+      }
+
+      const token = await getToken({ template });
+      if (!token) {
+        throw new Error("Failed to retrieve authentication token.");
+      }
+
+      const transactions = await fetchTransactions(token);
+      if (!transactions) throw new Error("Error fetching transactions");
+
+      const _recentTransactions: Transaction[] = [];
+
+      //ENHANCE: use supportedtoken array to get the token name instead of hardcoded enum here
+      transactions.requests.forEach(async (transaction) => {
+        const tokenName =
+          TokenMapEnum[
+            transaction.token_address as keyof typeof TokenMapEnum
+          ] || "Unknown Token";
+
+        _recentTransactions.push({
+          ...transaction,
+          token_name: tokenName,
+          token_image: `/tokens/${transaction.token_address}.png`,
+        });
+      });
+
+      setRecentTransactions(
+        _recentTransactions.sort((a, b) =>
+          b.created_at.localeCompare(a.created_at)
+        )
+      );
+    } catch (error: any) {
+      Logger.error(
+        `TRANSACTION_FETCHER_ERROR ${error.message} - ${error.status}`
+      );
+    }
+  }, [getToken, isSignedIn, setRecentTransactions]);
+
+  const getTokenBalances = useCallback(async () => {
+    try {
+      if (!isSignedIn) {
+        throw new Error("User not signed in. Did you forget to sign in?");
+      }
+
+      const token = await getToken({ template });
+      if (!token) {
+        throw new Error("Failed to retrieve authentication token.");
+      }
+
+      const balances = await fetchTokenBalances(token);
+      if (!balances) throw new Error("Error fetching balances");
+
+      const response = balances.results;
+
+      const _balances: Balances[] = [];
+
+      //ENHANCE: use supportedtoken array to get the token name instead of hardcoded enum here
+      response.forEach(async (token) => {
+        const tokenName =
+          TokenMapEnum[token.token_address as keyof typeof TokenMapEnum] ||
+          "Unknown Token";
+
+        _balances.push({
+          token_name: tokenName,
+          token_address: token.token_address,
+          token_image: `/tokens/${token.token_address}.png`,
+          token_balance: formatUnits(BigInt(token.token_balance), 18),
+        });
+      });
+
+      setTokenBalances(_balances);
+      return _balances;
+    } catch (error: any) {
+      Logger.error(`BALANCE_FETCHER_ERROR ${error.message} - ${error.status}`);
+      showFailedMessage({
+        title: "Error",
+        description: "An error occurred while fetching token balances",
+      });
+    }
+  }, [getToken, isSignedIn, setTokenBalances]);
+
+  return {
+    getTransactions,
+    getTokenBalances,
+  };
+}
