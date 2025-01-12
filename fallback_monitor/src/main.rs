@@ -56,22 +56,6 @@ async fn main() {
         }
     };
 
-    // let coin_gecko_store = CoinGeckoStore::new();
-
-    // tokio::spawn(async move {
-    //     info!("Running token price update loop....");
-    //     loop {
-    //         update_token_prices(
-    //             app_config.coingecko_api_url.clone(),
-    //             app_config.coingecko_api_key.clone(),
-    //             &TOKEN_MAP.keys().cloned().collect::<Vec<String>>(),
-    //             &coin_gecko_store,
-    //         )
-    //         .await;
-    //         sleep(Duration::from_secs(300)).await;
-    //     }
-    // });
-
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
