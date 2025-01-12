@@ -1,18 +1,3 @@
-// This file is part of Avail Gas Relay Service.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 /// A consumer that accepts response through a broadcast channel on the spawned threads.
 /// The thread in turn process the request: generate extrinsic and submit it to avail.
 /// Records any failure entry.
@@ -234,21 +219,19 @@ impl<'a> ProcessSubmitResponse<'a> {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
         info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
 
-        let fees_as_bigdecimal_in_avail = self.response.store.get_token_price_equivalent_to_avail(
+        let fees_in_token = self.response.store.get_token_price_equivalent_to_avail(
             &fees_as_bigdecimal,
             self.response.token_name.as_str(),
         );
-        info!("Fees in Avail: {}", fees_as_bigdecimal_in_avail);
         update_customer_expenditure(
             result,
             &fees_as_bigdecimal,
-            &fees_as_bigdecimal_in_avail,
+            &fees_in_token,
             self.response.submission_id,
             self.connection,
         )
         .await;
-        self.update_token_balances(tx_params, &fees_as_bigdecimal)
-            .await;
+        self.update_token_balances(tx_params, &fees_in_token).await;
     }
 
     async fn update_token_balances(
