@@ -27,4 +27,4 @@ FROM runtime AS service
 RUN apt update && apt install -y build-essential
 COPY --from=service-builder /target/debug/ /
 COPY --from=service-builder /public_key.pem /public_key.pem /
-ENTRYPOINT ["/gas_relay_service"]
+ENTRYPOINT ["/turbo_da_core"]

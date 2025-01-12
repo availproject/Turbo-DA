@@ -1,19 +1,4 @@
-// This file is part of Avail Gas Relay Service.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-/// Gas Relay is a service which allows customers to submit transaction to Avail using any token.
+/// Turbo DA is a service which allows customers to submit transaction to Avail using any token.
 /// Customer send the money to us in any ERC20 token, and we fund there user account with equivalant avail.
 /// Customer then directly sends all the payload, in either JSON format or directly as bytes.
 /// The service generates the extrinsic and published it to Avail network.

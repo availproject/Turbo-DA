@@ -30,7 +30,7 @@ The core service provides:
 
     {
     "db_host": "localhost",
-    "db_name": "gas_relay",
+    "db_name": "turbo_da_core",
     "db_user": "postgres",
     "db_password": "password",
     "block_entries": [
