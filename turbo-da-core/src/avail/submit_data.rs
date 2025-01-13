@@ -59,14 +59,11 @@ impl<'a> SubmitDataAvail<'a> {
         match (res, fee) {
             (Ok(tx_in_block), Ok(fee)) => {
                 let data_hash = match tx_in_block
-                    .events
-                    .find_first::<avail::data_availability::events::DataSubmitted>(
-                ) {
-                    Ok(Some(event)) => event.data_hash,
-                    Ok(None) => return Err("DataSubmitted event not found".to_string()),
-                    Err(e) => return Err(format!("Error finding DataSubmitted event: {}", e)),
+                    .find_first_event::<avail::data_availability::events::DataSubmitted>()
+                {
+                    Some(event) => event.data_hash,
+                    None => return Err("Data submitted event not found".to_string()),
                 };
-
                 Ok(TransactionInfo {
                     block_number: tx_in_block.block_number,
                     tx_hash: hex::encode(tx_in_block.tx_hash.as_bytes()),

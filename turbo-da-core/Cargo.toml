@@ -21,7 +21,7 @@ serde_json = "1.0"
 log = "0.4.22"
 env_logger = "0.10"
 unicode-normalization = "=0.1.22"
-avail-rust = { git = "https://github.com/availproject/avail-rust", tag = "v0.1.0-rc2" }
+avail-rust = { git = "https://github.com/availproject/avail-rust", tag = "v0.1.0-rc4" }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
 validator = { version = "0.16", features = ["derive"] }
