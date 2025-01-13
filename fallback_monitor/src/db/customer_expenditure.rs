@@ -9,6 +9,7 @@ pub async fn get_unresolved_transactions(
 ) -> Result<Vec<CustomerExpenditureGetWithPayload>, String> {
     match customer_expenditures
         .filter(error.is_not_null())
+        .or_filter(payload.is_not_null())
         .order(created_at.desc())
         .select(CustomerExpenditureGetWithPayload::as_select())
         .load(connection)
