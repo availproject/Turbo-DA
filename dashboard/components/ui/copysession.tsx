@@ -43,6 +43,7 @@ export default function CopySession() {
             size="icon" 
             onClick={copyToken}
             aria-label="Copy session token"
+            className='!rounded-full'
           >
           <KeyRound className="h-3 w-3 " />
           </Button>

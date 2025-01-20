@@ -20,18 +20,15 @@ export default function Page() {
     })();
   }, [getUserInfo, sessionToken]);
 
-
   return (
     <>
       <SignedIn>
         {userFetched ? (
           <div className="space-y-4 flex flex-col items-center justify-center py-[3vh] lg:w-[70vw] w-[90vw] md:[80vw] mx-auto">
-            <UpdateAppId />
-            <TransferCard />
             <DashboardTabs />
           </div>
         ) : (
-          <Loading/>
+          <Loading />
         )}
       </SignedIn>
       <SignedOut></SignedOut>

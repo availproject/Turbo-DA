@@ -13,9 +13,19 @@ import { mainnet, sepolia } from 'viem/chains';
 const queryClient = new QueryClient();
 
 export const config = getDefaultConfig({
-  appName: 'Vault UI',
+  appName: 'TurboDa',
   projectId: 'ff3e7e095aae4b0550ed934c1539ed07',
-  chains: [sepolia],
+  chains: [{
+    ...sepolia,
+    name: 'Sepolia',
+    default: true,
+    rpcUrls: {
+      default: {
+        http: ['https://black-prettiest-thunder.ethereum-sepolia.quiknode.pro/d019b4c81102cd5eb4ed27042800f51331e5e5a9'],
+      }
+    }
+  }],
+
   ssr: true,
 });
 
