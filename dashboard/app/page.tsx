@@ -31,7 +31,13 @@ export default function Page() {
           <Loading />
         )}
       </SignedIn>
-      <SignedOut></SignedOut>
+      <SignedOut>
+        <div className="h-[70vh] w-screen flex flex-col items-center justify-center space-y-8">
+          <h1 className="text-white text-opacity-70 text-md font-sans font-thin">
+            Please sign in to access the dashboard.
+          </h1>
+        </div>
+      </SignedOut>
     </>
   );
 }
