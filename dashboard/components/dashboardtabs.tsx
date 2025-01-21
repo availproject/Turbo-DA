@@ -33,7 +33,7 @@ export default function DashboardTabs() {
       onValueChange={(value) => setTab(value)}
       className="bg-[#1D1D1D] rounded-2xl p-6 mx-auto text-white lg:w-[70vw] w-[90vw] md:[80vw]"
     >
-      <div className="text-mono text-white text-opacity-90 pt-2 pb-6 flex flex-row items-center justify-start space-x-2"><InfoIcon className="w-4 h-4"/><p>This is where you&apos;ll manage your TurboDa Account, you can set up AppIds, see balances and more</p></div>
+      <div className="text-mono text-white text-opacity-90 pt-2 pb-6 flex flex-row items-start justify-start space-x-2"><InfoIcon className="w-4 h-4 mt-1"/><p>This is the dashboard for your TurboDA Account, you can set up your AppId, copy your api-key and see balances here.</p></div>
           <UpdateAppId/>
       <TabsList className="grid md:w-[40%] grid-cols-2 mb-4">
         <TabsTrigger value="balances" className={`py-3`}>

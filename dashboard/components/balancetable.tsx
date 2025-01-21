@@ -115,7 +115,7 @@ export default function Component() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                <span className="whitespace-nowrap"> {token.token_balance} {token.token_name}</span> 
+                <span className="whitespace-nowrap"> {token.token_balance} {token.token_ticker}</span> 
                 </TableCell>
               </TableRow>
             ))

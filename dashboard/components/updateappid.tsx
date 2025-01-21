@@ -17,6 +17,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Button, Input } from "degen";
 import { Copy, ShieldAlert } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "./ui/badge";
 
 export default function UpdateAppId() {
   const { user } = useCommonStore();
@@ -41,16 +42,15 @@ export default function UpdateAppId() {
     return (
       <>
         <div className="pl-2">
-          <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">AppID</h1>
+          <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">AppID<Badge className="ml-2 text-lg">Current: {user.app_id}</Badge></h1>
           <p className="text-opacity-60 text-white pb-2">
-            This is your AppId, the data would be submitted with this, please
-            choose the correct appID.
+            This is your AppId, the data you submit can be queried with this. <a href="https://docs.availproject.org/docs/appid" target="_blank" className="underline">Read More</a>
           </p>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger>
               <div className="pb-4">
                 <p className="underline text-blue-400 text-mono text-left ">
-                  click here to re-configure.
+                  Click here to re-configure
                 </p>
               </div>
             </DialogTrigger>
@@ -123,7 +123,7 @@ export default function UpdateAppId() {
           </Dialog>
           <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">ApiKey</h1>
           <span className="text-opacity-60 text-white pb-6">
-           You can use this Api key to submit data with the script, can use to submit data with the script. <span className=" text-blue-400 flex flex-row items-center pt-2 pb-8 space-x-2"><p>Copy to clipboard</p> <Copy className="w-4 h-4"/></span>
+           You can use this Api key to submit data, we&apos;ll fund your balances based on this key.<span className=" text-blue-400 flex flex-row items-center pt-2 pb-8 space-x-2"><p>Copy to clipboard</p> <Copy className="w-4 h-4"/></span>
           </span>
         </div>
       </>

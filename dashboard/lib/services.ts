@@ -102,7 +102,6 @@ export async function fetchTokenBalances(auth: string): Promise<BalanceResult> {
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
-
     return await response.json();
   } catch (error: any) {
     Logger.error(`${error.message} - ${error.status}`);
