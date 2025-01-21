@@ -10,8 +10,8 @@ import {
 import { dark } from '@clerk/themes'
 
 export const metadata: Metadata = {
-  title: "Gas Relayer | Dashboard",
-  description: "Dashboard for the Avail Gas Relayer",
+  title: "TurboDA | Dashboard",
+  description: "Dashboard for the Avail TurboDA",
 };
 
 export default function RootLayout({
