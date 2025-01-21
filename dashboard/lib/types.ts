@@ -72,5 +72,6 @@ export type Balances = {
     token_balance: string;
     token_name: string;
     token_image: string;
+    token_used: string;
     token_ticker?: string;
 }

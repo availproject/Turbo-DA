@@ -74,6 +74,7 @@ export default function Component() {
               <TableHead className="whitespace-nowrap">Token Name</TableHead>
               <TableHead>Token Address</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Amount Spent</TableHead>
             </TableRow>
           </TableHeader>
         ) : null}
@@ -116,6 +117,9 @@ export default function Component() {
                 </TableCell>
                 <TableCell className="text-right">
                 <span className="whitespace-nowrap"> {token.token_balance} {token.token_ticker}</span> 
+                </TableCell>
+                <TableCell className="text-right">
+                <span className="whitespace-nowrap"> {token.token_used} {token.token_ticker}</span> 
                 </TableCell>
               </TableRow>
             ))

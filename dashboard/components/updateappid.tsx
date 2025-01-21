@@ -16,17 +16,40 @@ import { showFailedMessage, showSuccessMessage } from "@/utils/toasts";
 import { useAuth } from "@clerk/nextjs";
 import { Button, Input } from "degen";
 import { Copy, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
 
 export default function UpdateAppId() {
   const { user } = useCommonStore();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const { getUserInfo } = useUserInfo();
 
   const [updatedAppID, setUpdatedAppID] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
+  const [token, setToken] = useState<null | string>('')
+  
+    useEffect(() => {
+      (async () => {
+      isSignedIn && setToken(await getToken({ template }))
+      })()
+    }, [getToken, isSignedIn])
+  
+    const copyToken = async () => {
+      try {
+      token &&  await navigator.clipboard.writeText(token)
+        showSuccessMessage({
+          title: "Token Copied",
+          description: "You can use this api-key to get funded and submit data through the script.",
+        })
+      } catch (err) {
+        console.error('Failed to copy token: ', err)
+        showFailedMessage({
+          title: "Error",
+          description: "Failed to copy token",
+        })
+      }
+    }
 
   /**
    *
@@ -49,7 +72,7 @@ export default function UpdateAppId() {
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger>
               <div className="pb-4">
-                <p className="underline text-blue-400 text-mono text-left ">
+                <p className="hover:underline text-blue-400 text-mono text-left ">
                   Click here to re-configure
                 </p>
               </div>
@@ -123,7 +146,7 @@ export default function UpdateAppId() {
           </Dialog>
           <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">ApiKey</h1>
           <span className="text-opacity-60 text-white pb-6">
-           You can use this Api key to submit data, we&apos;ll fund your balances based on this key.<span className=" text-blue-400 flex flex-row items-center pt-2 pb-8 space-x-2"><p>Copy to clipboard</p> <Copy className="w-4 h-4"/></span>
+           You can use this Api key to submit data, we&apos;ll fund your balances based on this key.<span onClick={copyToken} className="hover:cursor-pointer hover:underline text-blue-400 flex flex-row items-center pt-2 pb-8 space-x-2"><p>Copy to clipboard</p> <Copy className="w-4 h-4"/></span>
           </span>
         </div>
       </>

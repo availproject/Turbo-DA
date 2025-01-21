@@ -119,6 +119,7 @@ export default function useTransactions() {
           token_image: `/tokens/${token.token_address}.png`,
           token_balance: formatUnits(BigInt(token.token_balance), tokenDecimals),
           token_ticker: tokenTicker,
+          token_used: formatUnits(BigInt(token.token_used), tokenDecimals),
         });
       });
       

@@ -11,7 +11,7 @@ import { dark } from '@clerk/themes'
 
 export const metadata: Metadata = {
   title: "TurboDA | Dashboard",
-  description: "Dashboard for the Avail TurboDA",
+  description: "Dashboard to manage your TurboDA account",
 };
 
 export default function RootLayout({
