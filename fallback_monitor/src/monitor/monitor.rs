@@ -94,8 +94,8 @@ async fn process_failed_transactions(
 
         let token_details = match token_balances
             .filter(db::schema::token_balances::token_details_id.eq(i.token_details_id))
-            .select(db::models::token_balances::TokenBalances::as_select())
-            .first::<db::models::token_balances::TokenBalances>(connection)
+            .select(db::models::credit_balance::TokenBalances::as_select())
+            .first::<db::models::credit_balance::TokenBalances>(connection)
             .await
         {
             Ok(details) => details,

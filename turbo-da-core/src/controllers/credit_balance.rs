@@ -6,8 +6,8 @@ use crate::{
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use bigdecimal::BigDecimal;
 use db::{
-    models::token_balances::{TokenBalances, TokenBalancesCreate},
-    schema::token_balances::dsl::*,
+    models::credit_balance::{CreditBalance, CreditBalanceCreate},
+    schema::credit_balances::dsl::*,
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
@@ -352,12 +352,11 @@ pub async fn register_new_token(
         return HttpResponse::Conflict().body("Token already exists");
     }
 
-    let tx = diesel::insert_into(token_balances)
-        .values(TokenBalancesCreate {
-            token_address: converted_token_address,
-            token_balance: BigDecimal::from(0), // we fund the wallets
+    let tx = diesel::insert_into(credit_balances)
+        .values(CreditBalanceCreate {
+            credit_balance: BigDecimal::from(0), // we fund the wallets
             user_id: user.clone(),
-            token_used: None,
+            credit_used: None,
         })
         .execute(&mut *connection)
         .await;
@@ -375,10 +374,10 @@ async fn handle_get_token_using_address_query(
     connection: &mut AsyncPgConnection,
     token: &String,
 ) -> HttpResponse {
-    match token_balances
-        .filter(token_address.eq(token))
-        .select(TokenBalances::as_select())
-        .first::<TokenBalances>(connection)
+    match credit_balances
+        .filter(credit_address.eq(token))
+        .select(CreditBalance::as_select())
+        .first::<CreditBalance>(connection)
         .await
     {
         Ok(user) => HttpResponse::Ok().json(user),
@@ -388,10 +387,10 @@ async fn handle_get_token_using_address_query(
 }
 
 async fn handle_gettoken_query(connection: &mut AsyncPgConnection, token: i32) -> HttpResponse {
-    match token_balances
-        .filter(token_details_id.eq(token))
-        .select(TokenBalances::as_select())
-        .first::<TokenBalances>(connection)
+    match credit_balances
+        .filter(credit_details_id.eq(token))
+        .select(CreditBalance::as_select())
+        .first::<CreditBalance>(connection)
         .await
     {
         Ok(user) => HttpResponse::Ok().json(user),

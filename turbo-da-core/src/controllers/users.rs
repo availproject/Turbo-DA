@@ -239,7 +239,6 @@ pub async fn register_new_user(
             name: payload.name.clone(),
             email: user_email.clone(),
             app_id: payload.app_id,
-            assigned_wallet: config.assigned_wallet.clone(),
         })
         .execute(&mut *connection)
         .await;

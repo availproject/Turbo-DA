@@ -4,5 +4,6 @@ CREATE TABLE users (
     name VARCHAR NOT NULL,
     email VARCHAR UNIQUE NOT NULL,
     app_id INTEGER NOT NULL,
-    assigned_wallet VARCHAR NOT NULL
+    credit_balance NUMERIC(39, 0) NOT NULL DEFAULT 0,
+    credit_used NUMERIC(39, 0) NOT NULL DEFAULT 0
 );

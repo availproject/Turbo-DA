@@ -11,8 +11,8 @@ use alloy::{
 
 use bigdecimal::BigDecimal;
 use db::{
-    models::fund::FundRequests,
-    schema::{fund_requests, indexer_block_numbers::dsl::*, token_balances},
+    models::credit_requests::CreditRequests,
+    schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
 use hex;
@@ -95,7 +95,6 @@ impl EVM {
             let finalised_block = header.inner.number - self.finalised_threshold;
 
             self.check_deposits(finalised_block).await;
-            self.check_withdrawals(finalised_block).await;
         }
     }
 
@@ -134,6 +133,10 @@ impl EVM {
                 }
             };
 
+            // 1. compare against the saved transfer requests
+            // 2. if it matches, update the database
+            // 3. if it doesn't match, create an entry and calculate the amount to be credited on the go
+
             let Some(number) = log.block_number else {
                 error!("Block number not found");
                 continue;
@@ -164,57 +167,8 @@ impl EVM {
                     continue;
                 }
             };
+
             self.update_database_on_deposit(
-                &receipt,
-                &tx_hash,
-                &mut connection,
-                &"Processed".to_string(),
-            )
-            .await;
-        }
-    }
-
-    async fn check_withdrawals(&self, number: u64) {
-        let filter = Filter::new()
-            .address(Address::from_str(&self.contract_address).unwrap())
-            .event("Withdrawal(bytes,address,uint256,address)")
-            .from_block(number)
-            .to_block(number);
-
-        let logs = match self.provider.get_logs(&filter).await {
-            Ok(logs) => logs,
-            Err(e) => {
-                error!("Failed to get logs: {}", e);
-                return;
-            }
-        };
-
-        for log in logs {
-            info!("Log from our contract: {:?}", log.block_hash);
-            let receipt = match self.process_withdrawal_event(&log) {
-                Ok(receipt) => receipt,
-                Err(e) => {
-                    println!("Failed to process deposit event: {}", e);
-                    return;
-                }
-            };
-
-            let mut connection = match self.establish_connection() {
-                Ok(conn) => conn,
-                Err(e) => {
-                    error!("Failed to establish database connection: {}", e);
-                    continue;
-                }
-            };
-            let tx_hash = match log.transaction_hash {
-                Some(tx_hash) => tx_hash.to_string(),
-                None => {
-                    error!("Transaction hash not found");
-                    continue;
-                }
-            };
-
-            self.update_database_on_withdrawal(
                 &receipt,
                 &tx_hash,
                 &mut connection,
@@ -231,31 +185,16 @@ impl EVM {
         Ok(event_receipt)
     }
 
-    fn process_withdrawal_event(&self, log: &Log) -> Result<Withdrawal, String> {
-        let event_withdrawal = Withdrawal::decode_log_data(&log.data(), true)
-            .map_err(|e| format!("Failed to decode log data: {}", e))?;
-
-        Ok(event_withdrawal)
-    }
-
     async fn update_token_information_on_deposit(
         &self,
         receipt: &Deposit,
+        amount: &BigDecimal,
         connection: &mut PgConnection,
     ) {
-        let address = receipt.tokenAddress.to_string().to_lowercase();
-        let amount = match BigDecimal::from_str(&receipt.amount.to_string().as_str()) {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount: {}", e);
-                return;
-            }
-        };
-        let updated_rows_query = diesel::update(
-            token_balances::table.filter(token_balances::token_address.eq(&address)),
-        )
-        .set(token_balances::token_balance.eq(token_balances::token_balance + amount))
-        .execute(connection);
+        let updated_rows_query =
+            diesel::update(users::table.filter(users::id.eq(receipt.userID.to_string())))
+                .set(users::credit_balance.eq(users::credit_balance + amount))
+                .execute(connection);
 
         let updated_rows = updated_rows_query.unwrap_or_else(|_| {
             error!("Update token balances query failed");
@@ -264,48 +203,11 @@ impl EVM {
 
         if updated_rows > 0 {
             info!(
-                "Successfully updated token balances with token address {} with amount {}",
-                address, receipt.amount
+                "Successfully updated token balances with user ID {} with amount {}",
+                receipt.userID, receipt.amount
             );
         } else {
-            error!("No rows updated for token address: {}", address);
-        }
-    }
-
-    async fn update_token_information_on_withdrawal(
-        &self,
-        receipt: &Withdrawal,
-        connection: &mut PgConnection,
-    ) {
-        let address = receipt.tokenAddress.to_string().to_lowercase();
-        let amount = match BigDecimal::from_str(&receipt.amount.to_string().as_str()) {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount: {}", e);
-                return;
-            }
-        };
-        let updated_rows_query = diesel::update(
-            token_balances::table.filter(token_balances::token_address.eq(&address)),
-        )
-        .set((
-            token_balances::token_balance.eq(token_balances::token_balance - &amount),
-            token_balances::token_amount_locked.eq(token_balances::token_amount_locked - &amount),
-        ))
-        .execute(connection);
-
-        let updated_rows = updated_rows_query.unwrap_or_else(|_| {
-            error!("Update token balances query failed");
-            0
-        });
-
-        if updated_rows > 0 {
-            info!(
-                "Successfully updated token balances with token address {} with amount {}",
-                address, receipt.amount
-            );
-        } else {
-            error!("No rows updated for token address: {}", address);
+            error!("No rows updated for user ID: {}", receipt.userID);
         }
     }
 
@@ -331,7 +233,10 @@ impl EVM {
         };
         let user_id_local = String::from_utf8_lossy(&original_user_id).into_owned();
         let address = receipt.tokenAddress.to_string().to_lowercase();
-        let amount = match BigDecimal::from_str(&receipt.amount.to_string().as_str()) {
+        let amount = match get_amount_to_be_credited(
+            address,
+            BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
+        ) {
             Ok(amount) => amount,
             Err(e) => {
                 error!("Failed to parse amount: {}", e);
@@ -339,14 +244,13 @@ impl EVM {
             }
         };
 
-        let tx = diesel::insert_into(fund_requests::table)
-            .values(FundRequests {
-                amount_token: amount,
+        let tx = diesel::insert_into(credit_requests::table)
+            .values(CreditRequests {
+                amount_credit: amount.clone(),
                 request_status: status.to_string(),
-                token_address: address,
                 user_id: user_id_local.clone(),
-                chain_id: self.evm_chain_id,
-                tx_hash: transaction_hash.clone(),
+                chain_id: Some(self.evm_chain_id),
+                tx_hash: Some(transaction_hash.clone()),
                 request_type: "DEPOSIT".to_string(),
             })
             .execute(&mut *connection);
@@ -354,61 +258,7 @@ impl EVM {
         match tx {
             Ok(_) => {
                 info!("Success: {} status: {}", user_id_local, status);
-                self.update_token_information_on_deposit(&receipt, connection)
-                    .await;
-            }
-            Err(e) => {
-                error!("Couldn't store fund request: {:?}", e);
-            }
-        }
-    }
-
-    async fn update_database_on_withdrawal(
-        &self,
-        receipt: &Withdrawal,
-        transaction_hash: &String,
-        connection: &mut PgConnection,
-        status: &String,
-    ) {
-        let original_user_id = match receipt.userID.to_string().split("0x").last() {
-            Some(hex_str) => match hex::decode(hex_str) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    error!("Failed to decode hex string: {}", e);
-                    return;
-                }
-            },
-            None => {
-                error!("Failed to parse userID - no hex data found after 0x");
-                return;
-            }
-        };
-        let user_id_local = String::from_utf8_lossy(&original_user_id).into_owned();
-        let address = receipt.tokenAddress.to_string().to_lowercase();
-        let amount = match BigDecimal::from_str(&receipt.amount.to_string().as_str()) {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount: {}", e);
-                return;
-            }
-        };
-
-        let tx = diesel::insert_into(fund_requests::table)
-            .values(FundRequests {
-                amount_token: amount,
-                request_status: status.to_string(),
-                token_address: address,
-                user_id: user_id_local.clone(),
-                chain_id: self.evm_chain_id,
-                tx_hash: transaction_hash.clone(),
-                request_type: "WITHDRAWAL".to_string(),
-            })
-            .execute(&mut *connection);
-
-        match tx {
-            Ok(_) => {
-                info!("Success: {} status: {}", user_id_local, status);
-                self.update_token_information_on_withdrawal(&receipt, connection)
+                self.update_token_information_on_deposit(&receipt, &amount, connection)
                     .await;
             }
             Err(e) => {
@@ -421,6 +271,11 @@ impl EVM {
         PgConnection::establish(&self.database_url)
             .map_err(|e| format!("Error connecting to {}: {}", self.database_url, e))
     }
+}
+
+fn get_amount_to_be_credited(address: String, amount: BigDecimal) -> Result<BigDecimal, String> {
+    // TOOD: Placeholder function
+    Ok(BigDecimal::from_str(&amount.to_string().as_str()).unwrap())
 }
 
 fn update_finalised_block_number(

@@ -1,3 +1,4 @@
+use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +10,8 @@ pub struct User {
     pub name: String,
     pub email: String,
     pub app_id: i32,
-    pub assigned_wallet: String,
+    pub credit_balance: BigDecimal,
+    pub credit_used: BigDecimal,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize)]
@@ -19,7 +21,6 @@ pub struct UserCreate {
     pub name: String,
     pub email: String,
     pub app_id: i32,
-    pub assigned_wallet: String,
 }
 
 #[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]
@@ -30,5 +31,6 @@ pub struct UserLogin {
     pub name: String,
     pub email: String,
     pub app_id: i32,
-    pub assigned_wallet: String,
+    pub credit_balance: BigDecimal,
+    pub credit_used: BigDecimal,
 }
