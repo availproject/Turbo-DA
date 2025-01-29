@@ -50,8 +50,8 @@ jobs:
             echo '${{ secrets.WHITELIST_JSON }}' > whitelist.json
             
             # Remove fallback_monitor service as this is VM2
-            yq eval 'del(.services.fallback_monitor)' docker-compose.yaml > docker-compose.tmp.yaml
-            mv docker-compose.tmp.yaml docker-compose.yaml
+            yq eval 'del(.services.fallback_monitor)' docker-compose.yml > docker-compose.tmp.yml
+            mv docker-compose.tmp.yml docker-compose.yml
             
             docker compose build --no-cache
             docker compose up -d
