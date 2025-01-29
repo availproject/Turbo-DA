@@ -9,23 +9,6 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::avail::submit_data::TransactionInfo;
-pub async fn handle_get_customer_expenditure_using_token_id(
-    connection: &mut AsyncPgConnection,
-    user: String,
-    token: i32,
-) -> HttpResponse {
-    match customer_expenditures
-        .filter(user_id.eq(user))
-        .filter(token_details_id.eq(token))
-        .select(CustomerExpenditureGet::as_select())
-        .first::<CustomerExpenditureGet>(connection)
-        .await
-    {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(Error::NotFound) => HttpResponse::NotFound().body("User not found"),
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
-    }
-}
 pub async fn handle_submission_info(
     connection: &mut AsyncPgConnection,
     submission_id: Uuid,

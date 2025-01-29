@@ -2,9 +2,14 @@
 /// - Keygeneration
 /// - Keylist generation
 use crate::{config::AppConfig, store::Price};
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{
+    web::{self, Bytes},
+    HttpRequest, HttpResponse,
+};
 use alloy::primitives::Address;
-use avail_rust::Keypair;
+use avail_rust::{Keypair, Options, SDK};
+
+use bigdecimal::BigDecimal;
 use diesel_async::{
     pooled_connection::deadpool::{Object, Pool},
     AsyncPgConnection,
@@ -222,6 +227,42 @@ pub async fn get_prices(
     };
 
     Ok((coin_price, avail_price))
+}
+
+pub struct Convertor<'a> {
+    pub(crate) sdk: &'a SDK,
+    pub(crate) account: &'a Keypair,
+}
+
+impl<'a> Convertor<'a> {
+    pub fn new(sdk: &'a SDK, account: &'a Keypair) -> Self {
+        Convertor { sdk, account }
+    }
+    pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
+        let tx = self.sdk.tx.data_availability.submit_data(data);
+
+        let options = Options::new();
+        let query_info = match tx.payment_query_info(self.account, Some(options)).await {
+            Ok(info) => info,
+            Err(e) => panic!("Failed to get payment query info: {:?}", e),
+        };
+        BigDecimal::from(query_info)
+    }
+
+    pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
+        // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
+        let data_posted_amount = data.len() as u128;
+        let one_kb_data = vec![0u8; 1024]; // Create 1 KB of data
+        let one_kb_fee = self.get_gas_price_for_data(one_kb_data).await;
+        let data_posted_fee = self.get_gas_price_for_data(data).await;
+
+        one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount as u128)
+    }
+
+    pub fn convert_avail_price_to_token(self, avail_price: BigDecimal, token: &str) -> BigDecimal {
+        // TODO: Implement this function
+        BigDecimal::from(0)
+    }
 }
 
 /// Token information structure

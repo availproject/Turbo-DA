@@ -1,9 +1,6 @@
 use crate::{
     config::AppConfig,
-    db::customer_expenditure::{
-        handle_get_all_expenditure, handle_get_customer_expenditure_using_token_id,
-        handle_submission_info,
-    },
+    db::customer_expenditure::{handle_get_all_expenditure, handle_submission_info},
     utils::{get_connection, retrieve_user_id},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
@@ -91,68 +88,6 @@ pub async fn get_all_expenditure(
     };
 
     handle_get_all_expenditure(&mut connection, user, final_limit).await
-}
-
-/// Retrieve details about expenditures made using a specific token.
-///
-/// # Description
-/// This endpoint retrieves a list of expenditure records that were made using a given token. It provides information about the transaction, including amounts, fees, and blockchain-related details. The `token_id` parameter is used to filter the expenditures associated with a specific token.
-///
-/// # Route
-/// `GET /user/get_token_expenditure`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user whose expenditure records are being queried.
-///
-/// # URL Parameters
-/// * `token_id` - The ID of the token for which expenditures are being queried. This ID corresponds to the token details in the database.
-///
-/// # Returns
-/// A JSON array of expenditure records related to the specified token, including details such as ID, user ID, transaction data, amounts, fees, addresses, and timestamps.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/get_token_expenditure?token_id=1" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// [
-///   {
-///     "id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a",
-///     "user_id": "user_2lO5zzxhV08hooYiSCOkfWfPxls",
-///     "token_details_id": 1,
-///     "extrinsic_index": 42,
-///     "amount_data": "100.00",
-///     "fees": "0.01",
-///     "to_address": "0x123abc456def789ghi",
-///     "block_hash": "0xabcdef1234567890",
-///     "data_hash": "0xdeadbeef12345678",
-///     "tx_hash": "0xabcdef9876543210",
-///     "created_at": "2024-09-11T12:34:56"
-///   }
-/// ]
-/// ```
-
-#[get("/get_token_expenditure")]
-pub async fn get_token_expenditure(
-    request_payload: web::Query<GetTokenExpenditure>,
-    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
-    http_request: HttpRequest,
-) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
-    let token = &request_payload.token_id;
-    let mut connection = match get_connection(&injected_dependency).await {
-        Ok(conn) => conn,
-        Err(response) => return response,
-    };
-    handle_get_customer_expenditure_using_token_id(&mut connection, user, *token).await
 }
 
 #[derive(Deserialize, Serialize)]

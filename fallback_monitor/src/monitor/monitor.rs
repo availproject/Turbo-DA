@@ -8,17 +8,17 @@ use crate::{
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
 use db::{
-    models::customer_expenditure::CustomerExpenditureGetWithPayload, schema::token_balances::dsl::*,
+    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
+    schema::users::dsl::*,
 };
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use reqwest::Client;
 use std::str::FromStr;
 use turbo_da_core::{
     avail::submit_data::SubmitDataAvail,
     db::customer_expenditure::update_customer_expenditure,
-    utils::{get_prices, TOKEN_MAP},
+    utils::{get_prices, Convertor, TOKEN_MAP},
 };
 
 /// Monitors and processes failed transactions from the database
@@ -92,10 +92,10 @@ async fn process_failed_transactions(
             }
         };
 
-        let token_details = match token_balances
-            .filter(db::schema::token_balances::token_details_id.eq(i.token_details_id))
-            .select(db::models::credit_balance::TokenBalances::as_select())
-            .first::<db::models::credit_balance::TokenBalances>(connection)
+        let credit_details = match users
+            .filter(db::schema::users::id.eq(i.user_id))
+            .select(User::as_select())
+            .first::<User>(connection)
             .await
         {
             Ok(details) => details,
@@ -105,58 +105,24 @@ async fn process_failed_transactions(
             }
         };
 
-        let reqwest_client = Client::new();
+        let convertor = Convertor::new(&client, &account);
+        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        let Ok((coin_price, avail_price)) = get_prices(
-            &reqwest_client,
-            &config.coingecko_api_url,
-            &config.coingecko_api_key,
-            &i.payment_token,
-        )
-        .await
-        else {
-            error!("Failed to get prices");
-            continue;
-        };
-
-        let token_balance_in_avail = get_token_price_equivalent_to_avail(
-            &BigDecimal::from(&token_details.token_balance - token_details.token_used),
-            &i.payment_token,
-            &avail_price,
-            &coin_price,
-        );
-
-        info!("Token balance in Avail: {}", token_balance_in_avail);
-
-        if token_balance_in_avail > one_avail() {
-            info!(
-                "Balance is sufficient for user_id {}, balance: {}",
-                i.user_id, token_balance_in_avail
-            );
-        } else {
-            error!("Insufficient balance: {}", token_balance_in_avail);
+        if credits_used > credit_details.credit_balance {
+            error!("Insufficient credits for user id: {:?}", i.id);
             continue;
         }
-
         let submit_data_class = SubmitDataAvail::new(client, account, avail_app_id);
         let submission = submit_data_class.submit_data(&data).await;
 
         match submission {
             Ok(success) => {
                 let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
-                info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
-
-                let fees_as_bigdecimal_in_avail = get_token_price_equivalent_to_avail(
-                    &fees_as_bigdecimal,
-                    &i.payment_token,
-                    &avail_price,
-                    &coin_price,
-                );
 
                 update_customer_expenditure(
                     success,
                     &fees_as_bigdecimal,
-                    &fees_as_bigdecimal_in_avail,
+                    &credits_used,
                     i.id,
                     connection,
                 )

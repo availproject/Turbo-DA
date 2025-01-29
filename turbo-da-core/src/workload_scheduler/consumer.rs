@@ -7,13 +7,12 @@ use crate::{
     db::customer_expenditure::{add_error_entry, update_customer_expenditure},
     generate_avail_sdk,
     routes::data_submission::TxParams,
-    utils::format_size,
-    utils::get_connection,
+    utils::{format_size, get_connection, Convertor},
 };
 use actix_web::web;
 use avail_rust::Keypair;
 use bigdecimal::BigDecimal;
-use db::{errors::*, schema::token_balances::dsl::*};
+use db::{errors::*, models::user_model::User, schema::users::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
@@ -165,10 +164,10 @@ impl<'a> ProcessSubmitResponse<'a> {
     }
 
     pub async fn process_response(&mut self) -> Result<Response, String> {
-        let token_details = match token_balances
-            .filter(db::schema::token_balances::token_details_id.eq(self.response.token_id))
-            .select(db::models::token_balances::TokenBalances::as_select())
-            .first::<db::models::token_balances::TokenBalances>(&mut self.connection)
+        let credit_details = match users
+            .filter(db::schema::users::id.eq(&self.response.user_id))
+            .select(User::as_select())
+            .first::<User>(&mut self.connection)
             .await
         {
             Ok(details) => details,
@@ -180,21 +179,16 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let data = self.response.raw_payload.clone();
 
-        let token_balance_in_avail = self.response.store.get_avail_price_equivalent_to_token(
-            &BigDecimal::from(&token_details.token_balance - token_details.token_used),
-            self.response.token_name.as_str(),
+        // TODO: Check if user has enough credits, then lock the credits to be used for this transaction and later update the database
+        let convertor = Convertor::new(
+            &self.submit_avail_class.client,
+            &self.submit_avail_class.account,
         );
 
-        info!("Token balance in Avail: {}", token_balance_in_avail);
+        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if token_balance_in_avail > self.response.store.one_avail() {
-            info!(
-                "Balance is sufficient for user_id {}, balance: {}",
-                self.response.user_id, token_balance_in_avail
-            );
-        } else {
-            error!("Insufficient balance: {}", token_balance_in_avail);
-            return Err(ERROR_INSUFFICIENT_BALANCE.to_string());
+        if credits_used > credit_details.credit_balance {
+            return Err("Insufficient credits".to_string());
         }
 
         match self.submit_avail_class.submit_data(&data).await {
@@ -219,19 +213,16 @@ impl<'a> ProcessSubmitResponse<'a> {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
         info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
 
-        let fees_in_token = self.response.store.get_token_price_equivalent_to_avail(
-            &fees_as_bigdecimal,
-            self.response.token_name.as_str(),
-        );
+        let credits_used = BigDecimal::from(0); // TODO: get credits used from result
         update_customer_expenditure(
             result,
             &fees_as_bigdecimal,
-            &fees_in_token,
+            &credits_used,
             self.response.submission_id,
             self.connection,
         )
         .await;
-        self.update_token_balances(tx_params, &fees_in_token).await;
+        self.update_token_balances(tx_params, &credits_used).await;
     }
 
     async fn update_token_balances(
@@ -239,10 +230,10 @@ impl<'a> ProcessSubmitResponse<'a> {
         tx_params: TxParams,
         fees_as_bigdecimal: &BigDecimal,
     ) {
-        let tx = diesel::update(token_balances.find(self.response.token_id))
+        let tx = diesel::update(users.find(&self.response.user_id))
             .set((
-                token_balance.eq(db::schema::token_balances::token_balance - fees_as_bigdecimal),
-                token_used.eq(db::schema::token_balances::token_used + fees_as_bigdecimal),
+                credit_balance.eq(db::schema::users::credit_balance - fees_as_bigdecimal),
+                credit_used.eq(db::schema::users::credit_used + fees_as_bigdecimal),
             ))
             .execute(&mut self.connection)
             .await;
@@ -254,7 +245,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             Err(e) => {
                 error!(
                     "Couldn't insert update fee information entry for token details id {:?}, fee: {:?}. Error {:?}",
-                    self.response.token_id, tx_params.fees, e
+                    self.response.user_id, tx_params.fees, e
                 );
             }
         }

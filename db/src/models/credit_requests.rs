@@ -27,7 +27,7 @@ pub struct CreditRequestsGet {
     pub tx_hash: Option<String>,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::credit_requests)]
 pub struct CreditRequestInfo {
     pub amount_credit: BigDecimal,

@@ -14,12 +14,8 @@ pub mod workload_scheduler;
 
 use crate::{
     controllers::{
-        customer_expenditure::{get_all_expenditure, get_submission_info, get_token_expenditure},
-        fund::{generate_signature_for_fund_retrieval, get_token_map, request_funds_status},
-        token_balances::{
-            get_all_tokens, get_all_tokens_with_chain_id, get_token, get_token_using_address,
-            register_new_token,
-        },
+        customer_expenditure::{get_all_expenditure, get_submission_info},
+        fund::{get_token_map, request_funds_status},
         users::{get_all_users, get_user, register_new_user, update_app_id},
     },
     utils::TOKEN_MAP,
@@ -185,21 +181,14 @@ async fn main() -> Result<(), std::io::Error> {
             .service(
                 scope
                     .service(get_user)
-                    .service(get_all_tokens)
-                    .service(get_token)
-                    .service(get_token_using_address)
                     .service(get_all_expenditure)
-                    .service(get_token_expenditure)
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(request_funds_status)
-                    .service(register_new_token)
                     .service(register_new_user)
                     .service(get_submission_info)
                     .service(get_pre_image)
-                    .service(get_all_tokens_with_chain_id)
-                    .service(update_app_id)
-                    .service(generate_signature_for_fund_retrieval),
+                    .service(update_app_id),
             )
             .service(
                 web::scope("/admin")

@@ -1,8 +1,7 @@
 use crate::{
     config::AppConfig,
     db::{
-        customer_expenditure::create_customer_expenditure_entry,
-        token_balances::validate_and_get_entries,
+        customer_expenditure::create_customer_expenditure_entry, users::validate_and_get_entries,
     },
     store::CoinGeckoStore,
     utils::{find_key_by_value, format_size, generate_submission_id, map_user_id_to_thread},
@@ -103,8 +102,8 @@ pub async fn submit_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, token_id) =
-        match validate_and_get_entries(&mut connection, &user, token_addr).await {
+    let (avail_app_id, credit_balance) =
+        match validate_and_get_entries(&mut connection, &user).await {
             Ok(app) => app,
             Err(e) => {
                 return HttpResponse::InternalServerError().body(e);
@@ -117,22 +116,19 @@ pub async fn submit_data(
     let response = Response {
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload.data.as_bytes().to_vec().into(),
-        token_id,
         submission_id,
         user_id: user.clone(),
         app_id: avail_app_id,
         store: store.clone(),
-        token_name: request_payload.token.clone(),
+        credit_balance,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.data.as_bytes().len()),
         user_id: user,
         id: submission_id,
-        token_details_id: token_id,
         error: None,
         payload: Some(request_payload.data.as_bytes().to_vec()),
-        payment_token: request_payload.token.clone(),
     };
 
     tokio::spawn(async move {
@@ -218,9 +214,8 @@ pub async fn submit_raw_data(
         Some(val) => val,
         None => return HttpResponse::BadRequest().body("Invalid token passed".to_string()),
     };
-
-    let (avail_app_id, token_id) =
-        match validate_and_get_entries(&mut connection, &user, token_addr).await {
+    let (avail_app_id, credit_balance) =
+        match validate_and_get_entries(&mut connection, &user).await {
             Ok(app) => app,
             Err(e) => {
                 return HttpResponse::InternalServerError().body(e);
@@ -235,21 +230,18 @@ pub async fn submit_raw_data(
         amount_data: format_size(request_payload.len()),
         user_id: user.clone(),
         id: submission_id,
-        token_details_id: token_id,
         error: None,
         payload: Some(request_payload.to_vec()),
-        payment_token: query.token.clone(),
     };
 
     let response = Response {
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload,
-        token_id,
         submission_id,
         user_id: user,
         app_id: avail_app_id,
         store: store.clone(),
-        token_name: query.token.clone(),
+        credit_balance,
     };
 
     tokio::spawn(async move {

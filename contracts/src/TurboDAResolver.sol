@@ -6,7 +6,6 @@ import {UUPSUpgradeable} from "openzeppelin-contracts/contracts/proxy/utils/UUPS
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
@@ -179,55 +178,6 @@ contract TurboDAResolver is
             )
         {} catch {}
         _depositERC20(userID, amount, tokenAddress);
-    }
-
-    /**
-     * @dev Allows withdrawal of deposits with a valid signature
-     * @param userID The unique identifier of the user
-     * @param tokenAddress The address of the token to withdraw
-     * @param amount The amount to withdraw
-     * @param recipient The address to receive the withdrawal
-     * @param signature The signature authorizing the withdrawal
-     */
-    function withdrawWithSignature(
-        bytes calldata userID,
-        address tokenAddress,
-        uint256 amount,
-        address recipient,
-        uint256 nonce,
-        bytes calldata signature
-    ) public whenNotPaused nonReentrant {
-        if (usedNonce[nonce]) {
-            revert NonceAlreadyUsed();
-        }
-        usedNonce[nonce] = true;
-        // Create message hash that was signed
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(userID, tokenAddress, amount, recipient, nonce)
-        );
-
-        address recovery = ECDSA.recover(messageHash, signature);
-
-        if (recovery != signer) {
-            revert InvalidSignature();
-        }
-
-        if (userDeposits[userID][tokenAddress][recipient] < amount) {
-            revert InsufficientDeposit();
-        }
-
-        userDeposits[userID][tokenAddress][recipient] -= amount;
-
-        if (tokenAddress == address(0)) {
-            (bool sent, ) = recipient.call{value: amount}("");
-            if (!sent) revert FailedToSendEther();
-        } else {
-            if (!validTokenAddresses[tokenAddress])
-                revert InvalidTokenAddress();
-            IERC20(tokenAddress).transfer(recipient, amount);
-        }
-
-        emit Withdrawal(userID, tokenAddress, amount, recipient);
     }
 
     /**

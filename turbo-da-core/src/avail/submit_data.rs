@@ -32,9 +32,9 @@ pub struct SubmitDataTxSuccess {
 }
 
 pub struct SubmitDataAvail<'a> {
-    client: &'a SDK,
-    account: &'a Keypair,
-    app_id: i32,
+    pub(crate) client: &'a SDK,
+    pub(crate) account: &'a Keypair,
+    pub(crate) app_id: i32,
 }
 
 impl<'a> SubmitDataAvail<'a> {
