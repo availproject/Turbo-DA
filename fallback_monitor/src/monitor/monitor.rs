@@ -14,7 +14,6 @@ use db::{
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use std::str::FromStr;
 use turbo_da_core::{
     avail::submit_data::SubmitDataAvail,
     db::customer_expenditure::update_customer_expenditure,
@@ -133,49 +132,4 @@ async fn process_failed_transactions(
             }
         }
     }
-}
-
-/// Calculates the equivalent price in AVAIL tokens for a given amount of another token
-///
-/// # Arguments
-/// * `client` - HTTP client for making API requests
-/// * `config` - Application configuration containing API endpoints
-/// * `amount` - Amount to convert
-/// * `token_name` - Name of the token to convert from
-///
-/// # Returns
-/// * `Result<BigDecimal, String>` - The equivalent amount in AVAIL tokens, rounded to 0 decimal places
-///
-/// # Description
-/// Fetches current prices from Coingecko API and performs conversion calculations
-/// taking into account different token decimal places
-pub fn get_token_price_equivalent_to_avail(
-    amount: &BigDecimal,
-    token_name: &String,
-    avail_price: &f64,
-    coin_price: &f64,
-) -> BigDecimal {
-    let decimals_token = TOKEN_MAP.get(token_name).unwrap().token_decimals;
-    let decimals_avail = TOKEN_MAP.get("avail").unwrap().token_decimals;
-
-    let avail_price_per_token = avail_price / coin_price;
-    let avail_price_per_token_bigdecimal =
-        match BigDecimal::from_str(&avail_price_per_token.to_string()) {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount to BigDecimal: {}", e);
-                return BigDecimal::from(0);
-            }
-        };
-
-    let price = avail_price_per_token_bigdecimal
-        * amount
-        * BigDecimal::from(10_u64.pow(decimals_token as u32))
-        / BigDecimal::from(10_u64.pow(decimals_avail as u32));
-
-    price.round(0)
-}
-
-fn one_avail() -> BigDecimal {
-    BigDecimal::from(10u64.pow(TOKEN_MAP.get("avail").unwrap().token_decimals as u32))
 }
