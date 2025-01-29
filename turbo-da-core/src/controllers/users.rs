@@ -8,13 +8,17 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder,
 };
 use db::{
-    models::user_model::{User, UserCreate},
-    schema::users::dsl::*,
+    models::{
+        api::{ApiKey, ApiKeyCreate},
+        user_model::{User, UserCreate},
+    },
+    schema::{api_keys::dsl::*, users::dsl::*},
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use uuid::Uuid;
 use validator::Validate;
 
 #[derive(Deserialize, Serialize)]
@@ -203,7 +207,6 @@ pub async fn get_user(
 #[post("/register_new_user")]
 pub async fn register_new_user(
     payload: web::Json<RegisterUser>,
-    config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
@@ -247,6 +250,63 @@ pub async fn register_new_user(
         Ok(_) => HttpResponse::Ok().body(format!("Success: {}", payload.name)),
         Err(e) => HttpResponse::NotAcceptable().body(format!("Error: {}", e)),
     }
+}
+
+#[post("/generate_api_key")]
+async fn generate_api_key(
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id(http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let key = Uuid::new_v4().to_string().replace("-", "");
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx = diesel::insert_into(api_keys)
+        .values(ApiKeyCreate {
+            api_key: key.clone(),
+            user_id: user,
+        })
+        .execute(&mut *connection)
+        .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({ "api_key": key })),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+#[get("/get_api_keys")]
+async fn get_api_keys(
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id(http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    match api_keys
+        .filter(user_id.eq(user))
+        .select(ApiKey::as_select())
+        .load(&mut *connection)
+        .await
+    {
+        Ok(keys) => return HttpResponse::Ok().json(json!({ "api_keys": keys })),
+        Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
+    };
 }
 
 #[put("/update_app_id")]

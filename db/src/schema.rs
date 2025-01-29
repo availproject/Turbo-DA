@@ -1,6 +1,16 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    api_keys (api_key) {
+        #[max_length = 255]
+        api_key -> Varchar,
+        created_at -> Timestamp,
+        #[max_length = 255]
+        user_id -> Varchar,
+    }
+}
+
+diesel::table! {
     credit_requests (id) {
         id -> Int4,
         user_id -> Varchar,
@@ -63,10 +73,12 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(api_keys -> users (user_id));
 diesel::joinable!(credit_requests -> users (user_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    api_keys,
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
