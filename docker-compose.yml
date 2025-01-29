@@ -1,77 +1,12 @@
 version: "3.8"
 services:
-  db:
-    container_name: db
-    image: postgres:15
-    restart: always
-    ports:
-      - 5432:5432
-    environment:
-      POSTGRES_PASSWORD: mysecretpassword
-    volumes:
-      - ./data/db:/var/lib/postgresql/data
-    command: postgres -c 'max_connections=1000'
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - net
-
-  migration:
-    container_name: migration
-    image: rust:latest
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - net
-    volumes:
-      - ./db:/scripts
-    entrypoint: bash -c "apt update && apt install -y jq && cd scripts && chmod +x /scripts/migration.sh && /scripts/migration.sh"
-
-  pgweb:
-    container_name: pgweb
-    image: sosedoff/pgweb
-    restart: always
-    ports:
-      - 8081:8081
-    environment:
-      - PGWEB_DATABASE_URL=postgres://postgres:mysecretpassword@db:5432?sslmode=disable
-    depends_on:
-      - db
-      - migration
-    networks:
-      - net
-
-  funds_monitor:
-    container_name: funds_monitor
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: funds_monitor
-    networks:
-      - net
-    depends_on:
-      db:
-        condition: service_healthy
-      migration:
-        condition: service_completed_successfully
-    env_file:
-      - ./funds_monitor/.env
-
   fallback_monitor:
     container_name: fallback_monitor
     build:
       context: .
       dockerfile: Dockerfile
       target: fallback_monitor
-    depends_on:
-      db:
-        condition: service_healthy
-      migration:
-        condition: service_completed_successfully
+    restart: unless-stopped
     networks:
       - net
     env_file:
@@ -85,15 +20,20 @@ services:
       context: .
       dockerfile: Dockerfile
       target: turbo-da-core
-    depends_on:
-      db:
-        condition: service_healthy
-      migration:
-        condition: service_completed_successfully
+    restart: unless-stopped
     networks:
       - net
+    volumes:
+      - ./whitelist.json:/whitelist.json
+      - ./public_key.pem:/public_key.pem
     env_file:
       - ./turbo-da-core/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   net:

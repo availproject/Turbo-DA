@@ -276,18 +276,9 @@ lazy_static! {
     pub static ref TOKEN_MAP: HashMap<String, Token> = {
         let mut m = HashMap::new();
         m.insert(
-            "ethereum".to_string(),
-            Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
-                token_decimals: 18,
-            },
-        );
-
-        // TODO: remove the following: just for testing
-        m.insert(
             "avail".to_string(),
             Token {
-                token_address: "0xb1c3cb9b5e598d4e95a85870e7812b99f350982d".to_string(),
+                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
                 token_decimals: 18,
             },
         );
