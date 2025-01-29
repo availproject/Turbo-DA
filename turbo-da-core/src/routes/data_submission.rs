@@ -13,6 +13,7 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
+use bigdecimal::BigDecimal;
 use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::error;
@@ -24,12 +25,12 @@ use uuid::Uuid;
 #[derive(Deserialize, Serialize, Clone)]
 pub struct SubmitData {
     pub data: String,
-    pub token: String,
 }
 
 #[derive(Clone)]
 pub struct TxParams {
     pub amount_data: String,
+    pub amount_data_billed: BigDecimal,
     pub fees: u128,
 }
 
@@ -93,10 +94,6 @@ pub async fn submit_data(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let token_addr = match find_key_by_value(&request_payload.token) {
-        Some(val) => val,
-        None => return HttpResponse::BadRequest().body("Invalid token passed".to_string()),
-    };
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -194,7 +191,6 @@ struct Info {
 pub async fn submit_raw_data(
     request_payload: Bytes,
     sender: web::Data<Sender<Response>>,
-    query: web::Query<Info>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
@@ -210,10 +206,6 @@ pub async fn submit_raw_data(
         Err(response) => return response,
     };
 
-    let token_addr = match find_key_by_value(&query.token) {
-        Some(val) => val,
-        None => return HttpResponse::BadRequest().body("Invalid token passed".to_string()),
-    };
     let (avail_app_id, credit_balance) =
         match validate_and_get_entries(&mut connection, &user).await {
             Ok(app) => app,

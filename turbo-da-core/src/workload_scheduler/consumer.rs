@@ -15,7 +15,7 @@ use bigdecimal::BigDecimal;
 use db::{errors::*, models::user_model::User, schema::users::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::{error, info};
+use log::{debug, error, info};
 use std::sync::Arc;
 use tokio::{
     sync::broadcast::Sender,
@@ -195,6 +195,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             Ok(result) => {
                 let params = TxParams {
                     amount_data: format_size(data.len()),
+                    amount_data_billed: credits_used,
                     fees: result.gas_fee,
                 };
 
@@ -211,36 +212,34 @@ impl<'a> ProcessSubmitResponse<'a> {
 
     pub async fn update_database(&mut self, result: TransactionInfo, tx_params: TxParams) {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
-        info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
 
-        let credits_used = BigDecimal::from(0); // TODO: get credits used from result
         update_customer_expenditure(
             result,
             &fees_as_bigdecimal,
-            &credits_used,
+            &tx_params.amount_data_billed,
             self.response.submission_id,
             self.connection,
         )
         .await;
-        self.update_token_balances(tx_params, &credits_used).await;
+        self.update_credit_balance(tx_params).await;
     }
 
-    async fn update_token_balances(
-        &mut self,
-        tx_params: TxParams,
-        fees_as_bigdecimal: &BigDecimal,
-    ) {
+    async fn update_credit_balance(&mut self, tx_params: TxParams) {
         let tx = diesel::update(users.find(&self.response.user_id))
             .set((
-                credit_balance.eq(db::schema::users::credit_balance - fees_as_bigdecimal),
-                credit_used.eq(db::schema::users::credit_used + fees_as_bigdecimal),
+                credit_balance
+                    .eq(db::schema::users::credit_balance - &tx_params.amount_data_billed),
+                credit_used.eq(db::schema::users::credit_used + &tx_params.amount_data_billed),
             ))
             .execute(&mut self.connection)
             .await;
 
         match tx {
             Ok(_) => {
-                info!("Entry updated with fee deduction {:?} ", tx_params.fees);
+                info!(
+                    "Entry updated with credits deduction {:?} ",
+                    tx_params.amount_data_billed
+                );
             }
             Err(e) => {
                 error!(
