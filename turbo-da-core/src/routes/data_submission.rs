@@ -116,7 +116,6 @@ pub async fn submit_data(
         submission_id,
         user_id: user.clone(),
         app_id: avail_app_id,
-        store: store.clone(),
         credit_balance,
     };
 
@@ -143,11 +142,6 @@ pub async fn submit_data(
     let _ = sender.send(response);
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
-}
-
-#[derive(Deserialize)]
-struct Info {
-    token: String,
 }
 
 /// Submit raw byte data to Avail.
@@ -226,13 +220,13 @@ pub async fn submit_raw_data(
         payload: Some(request_payload.to_vec()),
     };
 
-    let response = Response {
+    let consumer_response = Response {
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload,
         submission_id,
         user_id: user,
         app_id: avail_app_id,
-        store: store.clone(),
+
         credit_balance,
     };
 
@@ -248,7 +242,7 @@ pub async fn submit_raw_data(
         create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
     });
 
-    let _ = sender.send(response);
+    let _ = sender.send(consumer_response);
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
 }

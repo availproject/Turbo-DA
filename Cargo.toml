@@ -4,5 +4,5 @@ members = [
     "db",
     "turbo-da-core",
     "funds_monitor",
-    "fallback_monitor"]
+    "fallback_monitor", "data_submission"]
 resolver = "2"

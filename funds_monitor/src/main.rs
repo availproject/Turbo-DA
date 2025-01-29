@@ -7,11 +7,6 @@ use evm::EVM;
 use log::{error, info};
 #[tokio::main]
 async fn main() {
-    // 1. Get the state information from TURBO DA Contract
-    // 2. Montior events on Turbo DA Contract for deposits. -- done
-    // 3. On detection of deposit, update the funds information in the database.
-    // 4. Detection would be multip chain
-    // 5. Maintain request fund db for the UI to remain consisten with the new design.Update this table on finding deposit receipt
     let cfg = match Config::default().load_config() {
         Ok(c) => c,
         Err(e) => {

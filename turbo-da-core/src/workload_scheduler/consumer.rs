@@ -94,12 +94,11 @@ impl Consumer {
                             response.submission_id, response.thread_id
                         );
 
-                        let response_clone = response.clone();
                         let submit_data_class =
                             SubmitDataAvail::new(&sdk, &keygen[i as usize], response.app_id);
 
                         let mut process_response = ProcessSubmitResponse::new(
-                            response,
+                            &response,
                             &mut connection,
                             submit_data_class,
                         );
@@ -118,18 +117,14 @@ impl Consumer {
                                     );
                                 }
                                 Err(e) => {
-                                    update_error_entry(
-                                        response_clone,
-                                        &mut connection,
-                                        e.to_string(),
-                                    )
-                                    .await;
+                                    update_error_entry(response, &mut connection, e.to_string())
+                                        .await;
                                     error!("Failed to process the request with error: {:?}", e);
                                 }
                             },
                             Err(_) => {
                                 update_error_entry(
-                                    response_clone,
+                                    response,
                                     &mut connection,
                                     TIMEOUT_ERROR.to_string(),
                                 )
@@ -145,14 +140,14 @@ impl Consumer {
 }
 
 struct ProcessSubmitResponse<'a> {
-    response: Response,
+    response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
 }
 
 impl<'a> ProcessSubmitResponse<'a> {
     pub fn new(
-        response: Response,
+        response: &'a Response,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
     ) -> Self {
@@ -163,7 +158,7 @@ impl<'a> ProcessSubmitResponse<'a> {
         }
     }
 
-    pub async fn process_response(&mut self) -> Result<Response, String> {
+    pub async fn process_response(&mut self) -> Result<&'a Response, String> {
         let credit_details = match users
             .filter(db::schema::users::id.eq(&self.response.user_id))
             .select(User::as_select())
@@ -201,7 +196,7 @@ impl<'a> ProcessSubmitResponse<'a> {
 
                 self.update_database(result, params).await;
 
-                Ok(self.response.clone())
+                Ok(self.response)
             }
             Err(submit_err) => {
                 error!("Failed to submit data to avail: {:?}", submit_err);

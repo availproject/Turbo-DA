@@ -7,7 +7,7 @@ pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
     user: &String,
 ) -> Result<(i32, BigDecimal), String> {
-    let query: Result<(User), diesel::result::Error> = users
+    let query: Result<User, diesel::result::Error> = users
         .filter(db::schema::users::id.eq(user))
         .select(User::as_select())
         .first::<User>(connection)

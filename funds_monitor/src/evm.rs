@@ -149,10 +149,6 @@ impl EVM {
                 }
             };
 
-            // 1. compare against the saved transfer requests
-            // 2. if it matches, update the database
-            // 3. if it doesn't match, create an entry and calculate the amount to be credited on the go
-
             let Some(number) = log.block_number else {
                 error!("Block number not found");
                 continue;

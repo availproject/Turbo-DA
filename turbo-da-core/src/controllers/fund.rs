@@ -3,20 +3,19 @@ use crate::{
     generate_avail_sdk,
     utils::{get_connection, retrieve_user_id, Convertor, TOKEN_MAP},
 };
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use actix_web::{
-    get, post,
+    get,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
 
-use avail_rust::{Keypair, SDK};
+use avail_rust::SDK;
 use bigdecimal::BigDecimal;
 use db::{models::credit_requests::CreditRequestInfo, schema::credit_requests::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::{error, info, warn};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;

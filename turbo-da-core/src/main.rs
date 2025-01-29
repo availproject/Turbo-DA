@@ -173,10 +173,7 @@ async fn main() -> Result<(), std::io::Error> {
             .app_data(shared_pool.clone())
             .app_data(shared_keypair.clone())
             .app_data(shared_producer_send)
-            // .app_data(header.clone())
-            // .app_data(limiter.clone())
             .app_data(coin_gecko_store.clone())
-            // .wrap(RateLimiter)
             .wrap(Logger::default())
             .service(
                 scope
