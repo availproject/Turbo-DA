@@ -10,7 +10,6 @@
 /contracts/out
 /contracts/cache
 /contracts/broadcast
-/contracts/lib
 /contracts/github
 /contracts/out
 /contracts/cache
@@ -24,6 +23,5 @@
 /turbo-da-core/.env
 /dashboard/.env
 /dashboard/node_modules
-/turbo-da-core/public_key.pem
 .vscode
 .env
