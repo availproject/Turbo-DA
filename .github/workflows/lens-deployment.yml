@@ -127,7 +127,7 @@ jobs:
             exit 1
 
   verify-deployment:
-    needs: deploy-LVM1
+    needs: deploy-vm1
     runs-on: ubuntu-latest
     steps:
       - name: Verify all services are healthy
