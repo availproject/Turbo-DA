@@ -24,8 +24,8 @@ services:
     networks:
       - net
     volumes:
-      - ./whitelist.json:/whitelist.json
-      - ./public_key.pem:/public_key.pem
+      - ./turbo-da-core/whitelist.json:/whitelist.json
+      - ./turbo-da-core/public_key.pem:/public_key.pem
     env_file:
       - ./turbo-da-core/.env
     healthcheck:
