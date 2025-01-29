@@ -15,7 +15,7 @@ use bigdecimal::BigDecimal;
 use db::{errors::*, models::user_model::User, schema::users::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::{debug, error, info};
+use log::{error, info};
 use std::sync::Arc;
 use tokio::{
     sync::broadcast::Sender,

@@ -1,11 +1,18 @@
-use std::str::FromStr;
-
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_user_id, TOKEN_MAP},
+    generate_avail_sdk,
+    utils::{get_connection, retrieve_user_id, Convertor, TOKEN_MAP},
 };
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use std::{str::FromStr, sync::Arc};
 
+use actix_web::{
+    get, post,
+    web::{self, Bytes},
+    HttpRequest, HttpResponse, Responder,
+};
+
+use avail_rust::{Keypair, SDK};
+use bigdecimal::BigDecimal;
 use db::{models::credit_requests::CreditRequestInfo, schema::credit_requests::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
@@ -72,6 +79,45 @@ pub async fn request_funds_status(
         .expect("Error loading users");
 
     HttpResponse::Ok().json(json!({"requests": tx}))
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct EstimateCreditsParams {
+    pub data: BigDecimal,
+}
+
+#[get("/estimate_credits")]
+pub async fn estimate_credits(
+    query: web::Query<EstimateCreditsParams>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
+
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .calculate_credit_utlisation(query.0.data.to_string().as_bytes().to_vec())
+        .await;
+
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+}
+
+#[get("/estimate_credits_for_bytes")]
+pub async fn estimate_credits_for_bytes(
+    request_payload: Bytes,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
+
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .calculate_credit_utlisation(request_payload.to_vec())
+        .await;
+
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
 }
 
 /// Retrieve the list of supported tokens and their corresponding addresses.

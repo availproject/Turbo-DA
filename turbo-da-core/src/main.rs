@@ -15,7 +15,7 @@ pub mod workload_scheduler;
 use crate::{
     controllers::{
         customer_expenditure::{get_all_expenditure, get_submission_info},
-        fund::{get_token_map, request_funds_status},
+        fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
         users::{get_all_users, get_user, register_new_user, update_app_id},
     },
     utils::TOKEN_MAP,
@@ -188,7 +188,9 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(register_new_user)
                     .service(get_submission_info)
                     .service(get_pre_image)
-                    .service(update_app_id),
+                    .service(update_app_id)
+                    .service(estimate_credits_for_bytes)
+                    .service(estimate_credits),
             )
             .service(
                 web::scope("/admin")

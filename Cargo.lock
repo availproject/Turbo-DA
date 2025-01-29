@@ -3573,9 +3573,11 @@ dependencies = [
  "futures-util",
  "hex",
  "log",
+ "reqwest",
  "serde",
  "tokio",
  "toml 0.8.19",
+ "turbo-da-core",
 ]
 
 [[package]]

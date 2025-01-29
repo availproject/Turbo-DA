@@ -29,6 +29,8 @@ async fn main() {
         let network_ws_url = network_config.ws_url.clone();
         let contract_address = network_config.contract_address.clone();
         let finalised_threshold = network_config.finalised_threshold.clone();
+        let coin_gecho_api_url = cfg.coin_gecho_api_url.clone();
+        let coin_gecho_api_key = cfg.coin_gecho_api_key.clone();
 
         info!("Task for network: {}", network_name);
 
@@ -56,6 +58,8 @@ async fn main() {
                 network_config.chain_id,
                 finalised_threshold,
                 finalised_block_number.block_number as u64,
+                coin_gecho_api_url,
+                coin_gecho_api_key,
             )
             .await
             {

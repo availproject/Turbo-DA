@@ -232,11 +232,16 @@ pub async fn get_prices(
 pub struct Convertor<'a> {
     pub(crate) sdk: &'a SDK,
     pub(crate) account: &'a Keypair,
+    pub(crate) one_kb: Vec<u8>,
 }
 
 impl<'a> Convertor<'a> {
     pub fn new(sdk: &'a SDK, account: &'a Keypair) -> Self {
-        Convertor { sdk, account }
+        Convertor {
+            sdk,
+            account,
+            one_kb: vec![0u8; 1024],
+        }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
         let tx = self.sdk.tx.data_availability.submit_data(data);
@@ -252,8 +257,8 @@ impl<'a> Convertor<'a> {
     pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
         // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
         let data_posted_amount = data.len() as u128;
-        let one_kb_data = vec![0u8; 1024]; // Create 1 KB of data
-        let one_kb_fee = self.get_gas_price_for_data(one_kb_data).await;
+
+        let one_kb_fee = self.get_gas_price_for_data(self.one_kb.clone()).await;
         let data_posted_fee = self.get_gas_price_for_data(data).await;
 
         one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount as u128)

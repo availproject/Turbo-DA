@@ -8,6 +8,8 @@ use alloy::{
     sol,
     sol_types::SolEvent,
 };
+use reqwest::Client;
+use turbo_da_core::utils::{get_prices, TOKEN_MAP};
 
 use bigdecimal::BigDecimal;
 use db::{
@@ -40,6 +42,14 @@ sol! {
     );
 }
 
+#[derive(Debug, Clone)]
+pub struct Price {
+    pub btc: Option<f64>,
+    pub btc_market_cap: Option<f64>,
+    pub eth: Option<f64>,
+    pub usd: Option<f64>,
+}
+
 pub(crate) struct EVM {
     provider: RootProvider<PubSubFrontend>,
     database_url: String,
@@ -47,6 +57,8 @@ pub(crate) struct EVM {
     contract_address: String,
     finalised_threshold: u64,
     start_block: u64,
+    coin_gecho_api_url: String,
+    coin_gecho_api_key: String,
 }
 
 impl EVM {
@@ -57,6 +69,8 @@ impl EVM {
         evm_chain_id: i32,
         finalised_threshold: u64,
         start_block: u64,
+        coin_gecho_api_url: String,
+        coin_gecho_api_key: String,
     ) -> Result<Self, String> {
         info!("Network ws url: {:?}", ws_url);
         let ws = WsConnect::new(ws_url);
@@ -75,6 +89,8 @@ impl EVM {
             contract_address: contract_adress,
             finalised_threshold,
             start_block,
+            coin_gecho_api_url,
+            coin_gecho_api_key,
         })
     }
 
@@ -146,12 +162,10 @@ impl EVM {
                 continue;
             };
 
-            match update_finalised_block_number(
-                self.evm_chain_id,
-                number as i32,
-                hash.to_string(),
-                &mut connection,
-            ) {
+            match self
+                .update_finalised_block_number(number as i32, hash.to_string(), &mut connection)
+                .await
+            {
                 Ok(_) => {
                     info!("Updated finalised block number: {}", number);
                 }
@@ -233,10 +247,13 @@ impl EVM {
         };
         let user_id_local = String::from_utf8_lossy(&original_user_id).into_owned();
         let address = receipt.tokenAddress.to_string().to_lowercase();
-        let amount = match get_amount_to_be_credited(
-            address,
-            BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
-        ) {
+        let amount = match self
+            .get_amount_to_be_credited(
+                address,
+                BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
+            )
+            .await
+        {
             Ok(amount) => amount,
             Err(e) => {
                 error!("Failed to parse amount: {}", e);
@@ -267,44 +284,117 @@ impl EVM {
         }
     }
 
+    async fn update_finalised_block_number(
+        &self,
+        number: i32,
+        hash: String,
+        connection: &mut PgConnection,
+    ) -> Result<(), String> {
+        let row = diesel::update(indexer_block_numbers)
+            .set((
+                chain_id.eq(self.evm_chain_id),
+                block_number.eq(number),
+                block_hash.eq(hash),
+            ))
+            .execute(connection);
+
+        match row {
+            Ok(row) => {
+                if row > 0 {
+                    info!("Updated finalised block number: {}", row);
+                    Ok(())
+                } else {
+                    error!("No rows updated for finalised block number");
+                    Err(format!("No rows updated for finalised block number"))
+                }
+            }
+            Err(e) => {
+                error!("Failed to update finalised block number: {}", e);
+                Err(format!("Failed to update finalised block number: {}", e))
+            }
+        }
+    }
+
+    async fn get_amount_to_be_credited(
+        &self,
+        address: String,
+        amount: BigDecimal,
+    ) -> Result<BigDecimal, String> {
+        let price = match get_avail_price_equivalent_to_token(
+            &self.coin_gecho_api_url,
+            &self.coin_gecho_api_key,
+            &amount,
+            &address,
+        )
+        .await
+        {
+            Ok(price) => price,
+            Err(e) => {
+                error!("Failed to get price for {}: {}", address, e);
+                return Err(format!("Failed to get price for {}: {}", address, e));
+            }
+        };
+
+        Ok(price)
+    }
+
     pub fn establish_connection(&self) -> Result<PgConnection, String> {
         PgConnection::establish(&self.database_url)
             .map_err(|e| format!("Error connecting to {}: {}", self.database_url, e))
     }
 }
 
-fn get_amount_to_be_credited(address: String, amount: BigDecimal) -> Result<BigDecimal, String> {
-    // TOOD: Placeholder function
-    Ok(BigDecimal::from_str(&amount.to_string().as_str()).unwrap())
-}
+pub async fn get_avail_price_equivalent_to_token(
+    coin_gecho_api_url: &str,
+    coin_gecho_api_key: &str,
+    amount: &BigDecimal,
+    token_address: &str,
+) -> Result<BigDecimal, String> {
+    let client = Client::new();
 
-fn update_finalised_block_number(
-    evm_chain_id: i32,
-    number: i32,
-    hash: String,
-    connection: &mut PgConnection,
-) -> Result<(), String> {
-    let row = diesel::update(indexer_block_numbers)
-        .set((
-            chain_id.eq(evm_chain_id),
-            block_number.eq(number),
-            block_hash.eq(hash),
-        ))
-        .execute(connection);
+    info!("Updating token price for: {}", token_address);
+    let token_name = TOKEN_MAP
+        .iter()
+        .find(|(_, token)| token.token_address == token_address)
+        .map(|(key, _)| key.clone())
+        .ok_or_else(|| {
+            error!("Token not found in TOKEN_MAP");
+            String::from("Token not found in TOKEN_MAP")
+        })?;
 
-    match row {
-        Ok(row) => {
-            if row > 0 {
-                info!("Updated finalised block number: {}", row);
-                Ok(())
-            } else {
-                error!("No rows updated for finalised block number");
-                Err(format!("No rows updated for finalised block number"))
-            }
-        }
+    let (coin_price, avail_price) = match get_prices(
+        &client,
+        &coin_gecho_api_url,
+        &coin_gecho_api_key,
+        token_name.as_str(),
+    )
+    .await
+    {
+        Ok(prices) => prices,
         Err(e) => {
-            error!("Failed to update finalised block number: {}", e);
-            Err(format!("Failed to update finalised block number: {}", e))
+            error!("Failed to get prices for {}: {}", token_name, e);
+            return Err(format!("Failed to get prices for {}: {}", token_name, e));
         }
-    }
+    };
+
+    info!("New Token price: {}", coin_price);
+    info!("New Avail price: {}", avail_price);
+
+    let price = coin_price / avail_price;
+    let decimals_token = TOKEN_MAP.get(token_name.as_str()).unwrap().token_decimals;
+    let decimals_avail = TOKEN_MAP.get("avail").unwrap().token_decimals;
+    let token_price_per_avail_bigdecimal = match BigDecimal::from_str(price.to_string().as_str()) {
+        Ok(amount) => amount,
+        Err(e) => {
+            error!("Failed to parse amount to BigDecimal: {}", e);
+            return Err(format!("Failed to parse amount to BigDecimal: {}", e));
+        }
+    };
+
+    let price = token_price_per_avail_bigdecimal
+        * amount
+        * BigDecimal::from(10_u64.pow(decimals_avail as u32))
+        / BigDecimal::from(10_u64.pow(decimals_token as u32));
+
+    Ok(price.round(0))
 }
