@@ -210,10 +210,7 @@ export async function registerUser(auth: string, email:string, name:string): Pro
     const body = {
       name: name,
       email: email,
-      address: "",
       app_id: 0,
-      ethereum_address: "0xDEf1F7C203c3E9Dda5E733C61d9Cc57dcf4e9b24",
-      password: "password",
     };
 
     const response = await fetch(
