@@ -3,19 +3,20 @@ use crate::{
     utils::{get_connection, retrieve_email_address, retrieve_user_id},
 };
 use actix_web::{
-    get, post, put,
+    delete, get, post, put,
     web::{self},
     HttpRequest, HttpResponse, Responder,
 };
 use db::{
     models::{
-        api::{ApiKey, ApiKeyCreate},
+        api::ApiKeyCreate,
         user_model::{User, UserCreate},
     },
     schema::{api_keys::dsl::*, users::dsl::*},
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use password_hash::PasswordHash;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -269,10 +270,13 @@ async fn generate_api_key(
         Err(response) => return response,
     };
 
+    let hashed_password = PasswordHash::new(key.as_str()).unwrap();
+
     let tx = diesel::insert_into(api_keys)
         .values(ApiKeyCreate {
-            api_key: key.clone(),
+            api_key: hashed_password.to_string(),
             user_id: user,
+            identifier: key[key.len() - 5..].to_string(),
         })
         .execute(&mut *connection)
         .await;
@@ -283,8 +287,14 @@ async fn generate_api_key(
     }
 }
 
-#[get("/get_api_keys")]
-async fn get_api_keys(
+#[derive(Deserialize, Serialize, Validate)]
+pub struct DeleteApiKey {
+    pub identifier: String,
+}
+
+#[delete("/delete_api_key")]
+async fn delete_api_key(
+    payload: web::Json<DeleteApiKey>,
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
@@ -298,13 +308,16 @@ async fn get_api_keys(
         Err(response) => return response,
     };
 
-    match api_keys
-        .filter(user_id.eq(user))
-        .select(ApiKey::as_select())
-        .load(&mut *connection)
-        .await
-    {
-        Ok(keys) => return HttpResponse::Ok().json(json!({ "api_keys": keys })),
+    let query = diesel::delete(
+        api_keys
+            .filter(user_id.eq(user))
+            .filter(identifier.eq(&payload.identifier)),
+    )
+    .execute(&mut *connection)
+    .await;
+
+    match query {
+        Ok(keys) => return HttpResponse::Ok().json(json!({ "api_key": payload.identifier })),
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
 }

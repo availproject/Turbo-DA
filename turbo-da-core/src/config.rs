@@ -10,6 +10,7 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
+    pub redis_url: String,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
@@ -23,6 +24,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             database_url: String::new(),
+            redis_url: String::new(),
             max_pool_size: 10,
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
@@ -82,6 +84,7 @@ impl AppConfig {
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL")?;
+        let redis_url = env::var("REDIS_URL")?;
 
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
@@ -148,6 +151,7 @@ impl AppConfig {
 
         Ok(AppConfig {
             database_url,
+            redis_url,
             max_pool_size,
             coingecko_api_url,
             coingecko_api_key,

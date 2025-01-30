@@ -29,7 +29,6 @@ jsonwebtoken = "9"
 chrono = { version = "0.4", features=["serde"] }
 thiserror = "1.0"
 lazy_static = "1.4"
-futures-util = "0.3.30"
 bcrypt = "0.15.1"
 diesel-async = { workspace = true }
 futures = { workspace = true }
@@ -41,6 +40,7 @@ hex = { workspace = true }
 reqwest = { version = "0.12.9", features = ["blocking", "json"] }
 cron = { version = "0.8", optional = true }
 toml = { workspace = true }
+password-hash = {workspace = true}
 confy = {version = "0.3.1"}
 db = {path = "../db" }
 rand = {workspace = true}

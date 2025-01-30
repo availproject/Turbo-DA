@@ -8,6 +8,7 @@ pub struct ApiKey {
     pub api_key: String,
     pub created_at: chrono::NaiveDateTime,
     pub user_id: String,
+    pub identifier: String,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]
@@ -15,4 +16,5 @@ pub struct ApiKey {
 pub struct ApiKeyCreate {
     pub api_key: String,
     pub user_id: String,
+    pub identifier: String,
 }

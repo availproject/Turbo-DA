@@ -1,7 +1,6 @@
 /// A collection of utils
 /// - Keygeneration
 /// - Keylist generation
-use crate::store::Price;
 use actix_web::{
     web::{self},
     HttpRequest, HttpResponse,
@@ -148,6 +147,13 @@ pub fn retrieve_email_address(http_request: &HttpRequest) -> Option<String> {
     None
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Price {
+    pub btc: Option<f64>,
+    pub btc_market_cap: Option<f64>,
+    pub eth: Option<f64>,
+    pub usd: Option<f64>,
+}
 /// Gets current prices for Avail and specified token from CoinGecko API
 ///
 /// # Arguments

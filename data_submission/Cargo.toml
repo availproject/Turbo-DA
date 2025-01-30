@@ -21,6 +21,11 @@ dotenv.workspace = true
 toml.workspace = true
 diesel.workspace = true
 rand.workspace = true
+password-hash.workspace = true
 actix-extensible-rate-limit.workspace = true
+futures-util = "0.3.30"
+r2d2 = "*"
+r2d2_redis = "*"
+redis = { version = "0.28.2", features = ["r2d2"]}
 db = { path = "../db" }
 turbo-da-core = {path = "../turbo-da-core"}

@@ -1,14 +1,15 @@
+use crate::redis::Redis;
 use actix_cors::Cors;
 use actix_extensible_rate_limit::{
     backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
     RateLimiter,
 };
 use actix_web::{
-    dev::Service,
     middleware::Logger,
     web::{self},
     App, HttpServer,
 };
+use auth::Auth;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
@@ -21,10 +22,11 @@ use routes::{
 use std::sync::Arc;
 use tokio::{sync::broadcast, time::Duration};
 use turbo_da_core::utils::generate_keygen_list;
-
+mod auth;
 mod avail;
 mod config;
 mod db;
+mod redis;
 mod routes;
 mod utils;
 mod workload_scheduler;
@@ -75,7 +77,7 @@ async fn main() -> Result<(), std::io::Error> {
             Duration::from_secs(shared_config.rate_limit_window_size),
             shared_config.rate_limit_max_requests,
         )
-        .custom_key("authorization")
+        .custom_key("X-API-KEY")
         .build();
         let rate_limiter = RateLimiter::builder(backend.clone(), input)
             .add_headers()
@@ -84,6 +86,11 @@ async fn main() -> Result<(), std::io::Error> {
         App::new()
             .wrap(Cors::permissive())
             .wrap(rate_limiter)
+            .wrap(Auth::new(
+                Redis::new(shared_config.redis_url.as_str()),
+                shared_config.database_url.clone(),
+            ))
+            .wrap(Logger::default())
             .app_data(web::PayloadConfig::new(shared_config.payload_size))
             .app_data(shared_producer_send.clone())
             .app_data(shared_pool.clone())

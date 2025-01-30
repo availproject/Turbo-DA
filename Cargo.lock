@@ -81,14 +81,14 @@ dependencies = [
  "http 0.2.12",
  "httparse",
  "httpdate",
- "itoa",
+ "itoa 1.0.14",
  "language-tags",
  "local-channel",
  "mime",
  "percent-encoding",
  "pin-project-lite",
  "rand",
- "sha1",
+ "sha1 0.10.6",
  "smallvec",
  "tokio",
  "tokio-util",
@@ -194,7 +194,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "impl-more",
- "itoa",
+ "itoa 1.0.14",
  "language-tags",
  "log",
  "mime",
@@ -419,7 +419,7 @@ dependencies = [
  "alloy-sol-type-parser",
  "alloy-sol-types",
  "const-hex",
- "itoa",
+ "itoa 1.0.14",
  "serde",
  "serde_json",
  "winnow",
@@ -558,7 +558,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "hex-literal",
  "indexmap 2.7.0",
- "itoa",
+ "itoa 1.0.14",
  "k256",
  "keccak-asm",
  "paste",
@@ -1032,6 +1032,12 @@ dependencies = [
  "quote",
  "syn 2.0.90",
 ]
+
+[[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "ark-bls12-377"
@@ -2640,9 +2646,14 @@ dependencies = [
  "dotenv",
  "env_logger 0.10.2",
  "futures",
+ "futures-util",
  "hex",
  "log",
+ "password-hash",
+ "r2d2",
+ "r2d2_redis",
  "rand",
+ "redis 0.28.2",
  "serde",
  "serde_json",
  "tokio",
@@ -2799,7 +2810,7 @@ dependencies = [
  "byteorder",
  "chrono",
  "diesel_derives",
- "itoa",
+ "itoa 1.0.14",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -2971,6 +2982,12 @@ dependencies = [
  "quote",
  "syn 2.0.90",
 ]
+
+[[package]]
+name = "dtoa"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 
 [[package]]
 name = "dunce"
@@ -3992,7 +4009,7 @@ checksum = "601cbb57e577e2f5ef5be8e7b83f0f63994f25aa94d673e54a92d5c516d101f1"
 dependencies = [
  "bytes",
  "fnv",
- "itoa",
+ "itoa 1.0.14",
 ]
 
 [[package]]
@@ -4003,7 +4020,7 @@ checksum = "f16ca2af56261c99fba8bac40a10251ce8188205a4c448fbb745a2e4daa76fea"
 dependencies = [
  "bytes",
  "fnv",
- "itoa",
+ "itoa 1.0.14",
 ]
 
 [[package]]
@@ -4060,7 +4077,7 @@ dependencies = [
  "http 1.2.0",
  "http-body",
  "httparse",
- "itoa",
+ "itoa 1.0.14",
  "pin-project-lite",
  "smallvec",
  "tokio",
@@ -4508,6 +4525,12 @@ checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
+
+[[package]]
+name = "itoa"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "itoa"
@@ -5164,7 +5187,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a652d9771a63711fd3c3deb670acfbe5c30a4072e664d7a3bf5a9e1056ac72c3"
 dependencies = [
  "arrayvec 0.7.6",
- "itoa",
+ "itoa 1.0.14",
 ]
 
 [[package]]
@@ -5818,6 +5841,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "r2d2"
+version = "0.8.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
+dependencies = [
+ "log",
+ "parking_lot",
+ "scheduled-thread-pool",
+]
+
+[[package]]
+name = "r2d2_redis"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "182473b876b0b93e353682ec58e207dd1cb4a62278bbe0045fe52b86b74363bb"
+dependencies = [
+ "r2d2",
+ "redis 0.20.2",
+]
+
+[[package]]
 name = "radium"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5888,6 +5932,39 @@ name = "recvmsg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3edd4d5d42c92f0a659926464d4cce56b562761267ecf0f469d85b7de384175"
+
+[[package]]
+name = "redis"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4f0ceb2ec0dd769483ecd283f6615aa83dcd0be556d5294c6e659caefe7cc54"
+dependencies = [
+ "async-trait",
+ "combine",
+ "dtoa",
+ "itoa 0.4.8",
+ "percent-encoding",
+ "sha1 0.6.1",
+ "url",
+]
+
+[[package]]
+name = "redis"
+version = "0.28.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e37ec3fd44bea2ec947ba6cc7634d7999a6590aca7c35827c250bc0de502bda6"
+dependencies = [
+ "arc-swap",
+ "combine",
+ "itoa 1.0.14",
+ "num-bigint",
+ "percent-encoding",
+ "r2d2",
+ "ryu",
+ "sha1_smol",
+ "socket2",
+ "url",
+]
 
 [[package]]
 name = "redox_syscall"
@@ -6435,6 +6512,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scheduled-thread-pool"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cbc66816425a074528352f5789333ecff06ca41b36b0b0efdfbb29edc391a19"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "schnellru"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6672,7 +6758,7 @@ version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
 dependencies = [
- "itoa",
+ "itoa 1.0.14",
  "memchr",
  "ryu",
  "serde",
@@ -6694,9 +6780,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3491c14715ca2294c4d6a88f15e84739788c1d030eed8c110436aafdaa2f3fd"
 dependencies = [
  "form_urlencoded",
- "itoa",
+ "itoa 1.0.14",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "sha1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1da05c97445caa12d05e848c4a4fcbbea29e748ac28f7e80e9b010392063770"
+dependencies = [
+ "sha1_smol",
 ]
 
 [[package]]
@@ -6709,6 +6804,12 @@ dependencies = [
  "cpufeatures",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"
@@ -6964,7 +7065,7 @@ dependencies = [
  "httparse",
  "log",
  "rand",
- "sha1",
+ "sha1 0.10.6",
 ]
 
 [[package]]
@@ -8026,7 +8127,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35e7868883861bd0e56d9ac6efcaaca0d6d5d82a2a7ec8209ff492c07cf37b21"
 dependencies = [
  "deranged",
- "itoa",
+ "itoa 1.0.14",
  "num-conv",
  "powerfmt",
  "serde",
@@ -8440,7 +8541,7 @@ dependencies = [
  "rand",
  "rustls",
  "rustls-pki-types",
- "sha1",
+ "sha1 0.10.6",
  "thiserror 1.0.69",
  "utf-8",
 ]
@@ -8468,12 +8569,12 @@ dependencies = [
  "dotenv",
  "env_logger 0.10.2",
  "futures",
- "futures-util",
  "hex",
  "jsonwebtoken",
  "lazy_static",
  "log",
  "num-bigint",
+ "password-hash",
  "rand",
  "rayon",
  "reqwest",

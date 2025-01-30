@@ -10,6 +10,7 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
+    pub redis_url: String,
     pub number_of_threads: i32,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
@@ -25,6 +26,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             database_url: String::new(),
+            redis_url: String::new(),
             number_of_threads: 3,
             max_pool_size: 10,
             avail_rpc_endpoint: vec![],
@@ -86,7 +88,7 @@ impl AppConfig {
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL")?;
-
+        let redis_url = env::var("REDIS_URL")?;
         let number_of_threads = env::var("NUMBER_OF_THREADS")
             .map_err(|e| {
                 error!(
@@ -195,6 +197,7 @@ impl AppConfig {
 
         Ok(AppConfig {
             database_url,
+            redis_url,
             number_of_threads,
             max_pool_size,
             avail_rpc_endpoint,

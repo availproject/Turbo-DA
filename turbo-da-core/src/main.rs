@@ -7,7 +7,6 @@ pub mod config;
 pub mod controllers;
 pub mod db;
 pub mod routes;
-pub mod store;
 pub mod utils;
 
 use crate::controllers::{
