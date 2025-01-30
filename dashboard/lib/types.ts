@@ -19,14 +19,9 @@ export interface TokenMap {
 
 export const TOKEN_MAP: TokenMap = {
   "avail": {
-    token_address: "0xb1c3cb9b5e598d4e95a85870e7812b99f350982d",
-    token_decimals: 18,
-    token_ticker: 'AVAIL'
-  },
-  "ethereum": {
     token_address: "0x99a907545815c289fb6de86d55fe61d996063a94",
     token_decimals: 18,
-    token_ticker: 'ETH'
+    token_ticker: 'AVAIL'
   }
 };
 

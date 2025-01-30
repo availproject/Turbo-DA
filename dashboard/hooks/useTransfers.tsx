@@ -2,7 +2,6 @@ import { Logger } from "@/lib/logger";
 import useWallet from "./useWallet";
 import { SupportedChains, TOKEN_MAP, Tokens } from "@/lib/types";
 import { writeContract } from "wagmi/actions";
-import { config } from "@/app/providers";
 import { erc20Abi, parseUnits } from "viem";
 import { useCommonStore } from "@/store/common";
 import { enrollToken, fetchSupportedTokens, requestFunds, T } from "@/lib/services";
@@ -10,6 +9,7 @@ import { getToken as getEthToken } from "@wagmi/core";
 import { useAuth } from "@clerk/nextjs";
 import { template } from "@/lib/utils";
 import useTransactions from "./useTransactions";
+import { config } from "@/app/providers";
 
 export default function useTransfers() {
   const { switchNetwork, activeUserAddress, activeNetworkId, showBalance } =

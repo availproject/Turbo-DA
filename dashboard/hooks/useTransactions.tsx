@@ -5,7 +5,6 @@ import { fetchTokenBalances, fetchTransactions } from "@/lib/services";
 import { useCommonStore } from "@/store/common";
 import { getToken as getEthToken } from "@wagmi/core";
 import { capitalizeFirstLetter, getTokenDecimals, getTokenNameByAddress, getTokenTicker, template } from "@/lib/utils";
-import { config } from "@/app/providers";
 import { Balances, Transaction } from "@/lib/types";
 import { Logger } from "@/lib/logger";
 import { toast } from "@/components/ui/use-toast";
