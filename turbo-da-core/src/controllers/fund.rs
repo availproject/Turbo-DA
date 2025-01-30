@@ -1,7 +1,6 @@
 use crate::{
     config::AppConfig,
-    generate_avail_sdk,
-    utils::{get_connection, retrieve_user_id, Convertor, TOKEN_MAP},
+    utils::{generate_avail_sdk, get_connection, retrieve_user_id, Convertor, TOKEN_MAP},
 };
 use std::sync::Arc;
 

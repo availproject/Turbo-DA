@@ -1,13 +1,6 @@
-use crate::{
-    config::AppConfig,
-    db::{
-        customer_expenditure::create_customer_expenditure_entry, users::validate_and_get_entries,
-    },
-    store::CoinGeckoStore,
-    utils::{find_key_by_value, format_size, generate_submission_id, map_user_id_to_thread},
-    utils::{get_connection, retrieve_user_id},
-    workload_scheduler::common::Response,
-};
+use crate::utils::map_user_id_to_thread;
+use crate::workload_scheduler::common::Response;
+use crate::{config::AppConfig, db::customer_expenditure::create_customer_expenditure_entry};
 use actix_web::{
     post,
     web::{self, Bytes},
@@ -20,6 +13,10 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
+use turbo_da_core::{
+    db::users::validate_and_get_entries,
+    utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
+};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -87,7 +84,6 @@ pub async fn submit_data(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
-    store: web::Data<CoinGeckoStore>,
 ) -> impl Responder {
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,
@@ -188,7 +184,6 @@ pub async fn submit_raw_data(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
-    store: web::Data<CoinGeckoStore>,
 ) -> impl Responder {
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,

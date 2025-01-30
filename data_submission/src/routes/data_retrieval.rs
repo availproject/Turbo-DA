@@ -1,7 +1,4 @@
-use crate::{
-    avail::retrieve_data::retrieve_data, config::AppConfig, generate_avail_sdk,
-    utils::get_connection,
-};
+use crate::{avail::retrieve_data::retrieve_data, config::AppConfig};
 use actix_web::{get, web, HttpResponse};
 use avail_rust::H256;
 use db::{
@@ -13,6 +10,7 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
+use turbo_da_core::utils::{generate_avail_sdk, get_connection};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]

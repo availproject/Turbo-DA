@@ -194,7 +194,6 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
         let payload = RegisterUser {
             name: "Jane Doe".to_string(),
             app_id: 20,
@@ -241,7 +240,6 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
         let payload = RegisterUser {
             name: "Jane Doe".to_string(),
             app_id: 20,

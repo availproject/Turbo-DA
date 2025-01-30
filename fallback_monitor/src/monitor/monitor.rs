@@ -7,6 +7,9 @@ use crate::{
 };
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
+use data_submission::{
+    avail::submit_data::SubmitDataAvail, db::customer_expenditure::update_customer_expenditure,
+};
 use db::{
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
     schema::users::dsl::*,
@@ -14,11 +17,7 @@ use db::{
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use turbo_da_core::{
-    avail::submit_data::SubmitDataAvail,
-    db::customer_expenditure::update_customer_expenditure,
-    utils::{get_prices, Convertor, TOKEN_MAP},
-};
+use turbo_da_core::utils::Convertor;
 
 /// Monitors and processes failed transactions from the database
 ///

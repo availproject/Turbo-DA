@@ -3,7 +3,7 @@
 /// - Keylist generation
 use crate::{config::AppConfig, store::Price};
 use actix_web::{
-    web::{self, Bytes},
+    web::{self},
     HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
@@ -15,12 +15,13 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use lazy_static::lazy_static;
-use log::error;
+use log::{error, info};
 use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
+use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
 
@@ -70,14 +71,6 @@ pub fn format_size(bytes: usize) -> String {
 /// Generates a new UUID v4 for submission identification
 pub fn generate_submission_id() -> Uuid {
     Uuid::new_v4()
-}
-
-/// Maps a user ID to a thread number based on the app config
-///
-/// # Arguments
-/// * `config` - Application configuration containing number of threads
-pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
-    rand::thread_rng().gen_range(0..config.number_of_threads)
 }
 
 /// Finds a token address by its key in the token map
@@ -289,4 +282,31 @@ lazy_static! {
         );
         m
     };
+}
+
+const WAIT_TIME: u64 = 5;
+pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+    let mut attempts = 0;
+
+    loop {
+        if attempts < endpoints.len() {
+            attempts = 0;
+        }
+        let endpoint = &endpoints[attempts];
+        info!("Attempting to connect endpoint: {:?}", endpoint);
+        match SDK::new(endpoint).await {
+            Ok(sdk) => {
+                info!("Connected successfully to endpoint: {}", endpoint);
+
+                return sdk;
+            }
+            Err(e) => {
+                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                attempts += 1;
+            }
+        }
+
+        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        sleep(Duration::from_secs(WAIT_TIME)).await;
+    }
 }

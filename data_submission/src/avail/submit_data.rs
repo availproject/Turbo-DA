@@ -1,4 +1,4 @@
-use alloy::hex::ToHexExt;
+use avail_rust::hex::ToHex;
 /// Core logic of generating extrinsic and submitting to Avail DA.
 use avail_rust::{
     avail::{self},
@@ -7,6 +7,7 @@ use avail_rust::{
     Nonce::BestBlockAndTxPool,
     Options, H256, SDK,
 };
+use hex;
 use log::error;
 use tokio::sync::Mutex;
 

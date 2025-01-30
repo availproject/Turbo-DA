@@ -1,4 +1,7 @@
 /target
+/data_submission/target
+/data_submission/data
+/data_submission/.env
 /db/target
 /db/cache
 /db/config.toml

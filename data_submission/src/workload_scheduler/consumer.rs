@@ -2,13 +2,6 @@
 /// The thread in turn process the request: generate extrinsic and submit it to avail.
 /// Records any failure entry.
 use super::common::Response;
-use crate::{
-    avail::submit_data::{SubmitDataAvail, TransactionInfo},
-    db::customer_expenditure::{add_error_entry, update_customer_expenditure},
-    generate_avail_sdk,
-    routes::data_submission::TxParams,
-    utils::{format_size, get_connection, Convertor},
-};
 use actix_web::web;
 use avail_rust::Keypair;
 use bigdecimal::BigDecimal;
@@ -20,6 +13,16 @@ use std::sync::Arc;
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
+};
+use turbo_da_core::{
+    db::customer_expenditure::add_error_entry,
+    utils::{format_size, generate_avail_sdk, get_connection, Convertor},
+};
+
+use crate::{
+    avail::submit_data::{SubmitDataAvail, TransactionInfo},
+    db::customer_expenditure::update_customer_expenditure,
+    routes::data_submission::TxParams,
 };
 
 pub struct Consumer {

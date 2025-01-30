@@ -3,23 +3,19 @@
 /// Customer then directly sends all the payload, in either JSON format or directly as bytes.
 /// The service generates the extrinsic and published it to Avail network.
 pub mod auth;
-pub mod avail;
 pub mod config;
 pub mod controllers;
 pub mod db;
 pub mod routes;
 pub mod store;
 pub mod utils;
-pub mod workload_scheduler;
 
-use crate::{
-    controllers::{
-        customer_expenditure::{get_all_expenditure, get_submission_info},
-        fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
-        users::{get_all_users, get_user, register_new_user, update_app_id},
-    },
-    utils::TOKEN_MAP,
+use crate::controllers::{
+    customer_expenditure::{get_all_expenditure, get_submission_info},
+    fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
+    users::{get_all_users, get_user, register_new_user, update_app_id},
 };
+
 use actix_cors::Cors;
 use actix_extensible_rate_limit::{
     backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
@@ -32,44 +28,28 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::AuthMiddleware;
-use avail_rust::SDK;
 use config::AppConfig;
-use store::{update_token_prices, CoinGeckoStore};
+use tokio::time::Duration;
 
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::{error, info};
-use routes::{
-    data_retrieval::get_pre_image,
-    data_submission::{submit_data, submit_raw_data},
-    health::health_check,
-};
-use std::sync::Arc;
-use tokio::{
-    sync::broadcast,
-    time::{sleep, Duration},
-};
+use log::info;
+use routes::health::health_check;
+
 use utils::generate_keygen_list;
-use workload_scheduler::consumer::Consumer;
 
 #[cfg(feature = "permissioned")]
 mod whitelist;
 #[cfg(feature = "permissioned")]
 use crate::whitelist::WhitelistMiddleware;
 
-const WAIT_TIME: u64 = 5;
-
-#[cfg(not(feature = "cron"))]
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     info!("Starting API server....");
 
     let app_config = AppConfig::default().load_config()?;
-    let accounts =
-        generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
-    let shared_keypair = web::Data::new(accounts);
 
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
@@ -80,44 +60,12 @@ async fn main() -> Result<(), std::io::Error> {
         .expect("Failed to create pool");
 
     let shared_pool = web::Data::new(pool);
-    let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
-    let consumer_server = Consumer::new(
-        sender.clone(),
-        shared_keypair.clone(),
-        shared_pool.clone(),
-        Arc::new(app_config.avail_rpc_endpoint.clone()),
-        app_config.number_of_threads,
-    );
-
-    tokio::spawn(async move {
-        consumer_server.start_workers().await;
-    });
-
-    let coin_gecko_store = web::Data::new(CoinGeckoStore::new());
-
-    let coin_gecko_store_copy = coin_gecko_store.clone();
     let app_config_copy = app_config.clone();
 
-    tokio::spawn(async move {
-        info!("Running token price update loop....");
-        loop {
-            update_token_prices(
-                app_config_copy.coingecko_api_url.clone(),
-                app_config_copy.coingecko_api_key.clone(),
-                &TOKEN_MAP.keys().cloned().collect::<Vec<String>>(),
-                &coin_gecko_store_copy.get_ref(),
-            )
-            .await;
-            sleep(Duration::from_secs(300)).await;
-        }
-    });
-
-    let payload_size = app_config.payload_size;
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {
-        let shared_producer_send = web::Data::new(sender.clone());
         let backend = InMemoryBackend::builder().build();
         let input = SimpleInputFunctionBuilder::new(
             Duration::from_secs(shared_config.rate_limit_window_size),
@@ -168,23 +116,16 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(rate_limiter)
             .service(health_check)
             .wrap(Cors::permissive())
-            .app_data(web::PayloadConfig::new(payload_size))
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
-            .app_data(shared_keypair.clone())
-            .app_data(shared_producer_send)
-            .app_data(coin_gecko_store.clone())
             .wrap(Logger::default())
             .service(
                 scope
                     .service(get_user)
                     .service(get_all_expenditure)
-                    .service(submit_data)
-                    .service(submit_raw_data)
                     .service(request_funds_status)
                     .service(register_new_user)
                     .service(get_submission_info)
-                    .service(get_pre_image)
                     .service(update_app_id)
                     .service(estimate_credits_for_bytes)
                     .service(estimate_credits),
@@ -199,30 +140,4 @@ async fn main() -> Result<(), std::io::Error> {
     .bind("0.0.0.0:8000")?
     .run()
     .await
-}
-
-pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
-    let mut attempts = 0;
-
-    loop {
-        if attempts < endpoints.len() {
-            attempts = 0;
-        }
-        let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
-        match SDK::new(endpoint).await {
-            Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
-
-                return sdk;
-            }
-            Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
-                attempts += 1;
-            }
-        }
-
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
-        sleep(Duration::from_secs(WAIT_TIME)).await;
-    }
 }

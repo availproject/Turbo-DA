@@ -14,11 +14,5 @@
       "block_number": 67890,
       "block_hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
     }
-  ],
-  "signers": [
-    {
-      "address": "0x53Ba580C12745FdFb6b5Ad5f32F33C1bbf26F112",
-      "nonce": "0"
-    }
   ]
 }

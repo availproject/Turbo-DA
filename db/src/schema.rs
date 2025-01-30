@@ -82,6 +82,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
-    signer_nonce,
     users,
 );

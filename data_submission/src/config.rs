@@ -10,11 +10,13 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
+    pub number_of_threads: i32,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
-    pub coingecko_api_url: String,
-    pub coingecko_api_key: String,
-    pub total_users_query_limit: i64,
+    pub private_keys: Vec<String>,
+    pub broadcast_channel_size: usize,
+    pub payload_size: usize,
+    pub maximum_pending_requests: i64,
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
 }
@@ -23,13 +25,15 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             database_url: String::new(),
+            number_of_threads: 3,
             max_pool_size: 10,
-            coingecko_api_url: String::new(),
-            coingecko_api_key: String::new(),
-            total_users_query_limit: 100,
+            avail_rpc_endpoint: vec![],
+            broadcast_channel_size: 100000,
+            private_keys: vec![],
+            payload_size: 1024 * 1024, // in bytes
+            maximum_pending_requests: 50,
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
-            avail_rpc_endpoint: vec![],
         }
     }
 }
@@ -83,6 +87,20 @@ impl AppConfig {
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL")?;
 
+        let number_of_threads = env::var("NUMBER_OF_THREADS")
+            .map_err(|e| {
+                error!(
+                    "Failed to get NUMBER_OF_THREADS environment variable: {:?}",
+                    e
+                );
+                e
+            })?
+            .parse::<i32>()
+            .map_err(|e| {
+                error!("Invalid NUMBER_OF_THREADS value. Error: {:?}", e);
+                e.to_string()
+            })?;
+
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
                 error!("Failed to get MAX_POOL_SIZE environment variable: {:?}", e);
@@ -94,17 +112,42 @@ impl AppConfig {
                 e.to_string()
             })?;
 
-        let total_users_query_limit = env::var("TOTAL_USERS_QUERY_LIMIT")
+        let broadcast_channel_size = env::var("BROADCAST_CHANNEL_SIZE")
             .map_err(|e| {
                 error!(
-                    "Failed to get TOTAL_USERS_QUERY_LIMIT environment variable: {:?}",
+                    "Failed to get BROADCAST_CHANNEL_SIZE environment variable: {:?}",
+                    e
+                );
+                e
+            })?
+            .parse::<usize>()
+            .map_err(|e| {
+                error!("Invalid BROADCAST_CHANNEL_SIZE value. Error: {:?}", e);
+                e.to_string()
+            })?;
+
+        let payload_size = env::var("PAYLOAD_SIZE")
+            .map_err(|e| {
+                error!("Failed to get PAYLOAD_SIZE environment variable: {:?}", e);
+                e
+            })?
+            .parse::<usize>()
+            .map_err(|e| {
+                error!("Invalid PAYLOAD_SIZE value. Error: {:?}", e);
+                e.to_string()
+            })?;
+
+        let maximum_pending_requests = env::var("MAXIMUM_PENDING_REQUESTS")
+            .map_err(|e| {
+                error!(
+                    "Failed to get MAXIMUM_PENDING_REQUESTS environment variable: {:?}",
                     e
                 );
                 e
             })?
             .parse::<i64>()
             .map_err(|e| {
-                error!("Invalid TOTAL_USERS_QUERY_LIMIT value. Error: {:?}", e);
+                error!("Invalid MAXIMUM_PENDING_REQUESTS value. Error: {:?}", e);
                 e.to_string()
             })?;
 
@@ -143,18 +186,24 @@ impl AppConfig {
             index += 1;
         }
 
-        let coingecko_api_url = env::var("COINGECKO_API_URL")?;
-        let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
+        let mut private_keys = Vec::new();
+        let mut index = 0;
+        while let Ok(key) = env::var(format!("PRIVATE_KEY_{}", index)) {
+            private_keys.push(key);
+            index += 1;
+        }
 
         Ok(AppConfig {
             database_url,
+            number_of_threads,
             max_pool_size,
-            coingecko_api_url,
-            coingecko_api_key,
-            total_users_query_limit,
+            avail_rpc_endpoint,
+            private_keys,
+            broadcast_channel_size,
+            payload_size,
+            maximum_pending_requests,
             rate_limit_window_size,
             rate_limit_max_requests,
-            avail_rpc_endpoint,
         })
     }
 }

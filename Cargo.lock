@@ -2628,6 +2628,28 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "data_submission"
 version = "0.1.0"
+dependencies = [
+ "actix-cors",
+ "actix-extensible-rate-limit",
+ "actix-web",
+ "avail-rust",
+ "bigdecimal",
+ "db",
+ "diesel",
+ "diesel-async",
+ "dotenv",
+ "env_logger 0.10.2",
+ "futures",
+ "hex",
+ "log",
+ "rand",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.19",
+ "turbo-da-core",
+ "uuid",
+]
 
 [[package]]
 name = "db"
@@ -3286,6 +3308,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "cron",
+ "data_submission",
  "db",
  "diesel",
  "diesel-async",
