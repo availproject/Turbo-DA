@@ -4,11 +4,8 @@ use actix_web::{
     error as actix_error, Error,
 };
 use db::{
-    models::{api::ApiKey, user_model::User},
-    schema::{
-        api_keys::{self, dsl::*},
-        users::{self, dsl::*},
-    },
+    models::api::ApiKey,
+    schema::api_keys::{self, dsl::*},
 };
 use diesel::prelude::*;
 use diesel::QueryDsl;
@@ -114,11 +111,10 @@ where
                     }
                 };
                 // 2. If there is no entry in redis, make a call to db and update redis
-                let api_key_info: Result<User, diesel::result::Error> = api_keys
-                    .inner_join(users)
+                let api_key_info: Result<ApiKey, diesel::result::Error> = api_keys
                     .filter(api_keys::api_key.eq(api_key_hash.as_str()))
-                    .select(User::as_select())
-                    .first::<User>(&mut conn);
+                    .select(ApiKey::as_select())
+                    .first::<ApiKey>(&mut conn);
 
                 match api_key_info {
                     Err(_) => {
@@ -128,11 +124,11 @@ where
                             ))
                         });
                     }
-                    Ok(user_entry) => {
+                    Ok(entry) => {
                         if let (Ok(user_id_key), Ok(user_id_value)) = (
                             "user_id".parse::<actix_web::http::header::HeaderName>(),
-                            user_entry
-                                .id
+                            entry
+                                .user_id
                                 .to_string()
                                 .parse::<actix_web::http::header::HeaderValue>(),
                         ) {
@@ -147,10 +143,10 @@ where
                         }
                         match self
                             .redis
-                            .set(api_key_hash.as_str(), user_entry.id.to_string().as_str())
+                            .set(api_key_hash.as_str(), entry.user_id.to_string().as_str())
                         {
                             Ok(_) => {
-                                info!("API key set in redis for user {}", user_entry.id);
+                                info!("API key set in redis for user {}", entry.user_id);
                             }
                             Err(e) => {
                                 error!("Failed to set API key in redis: {}", e);

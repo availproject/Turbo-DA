@@ -16,6 +16,8 @@ use db::{
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use log::{error, info};
+use redis::Commands;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha3::{Digest, Keccak256};
@@ -42,46 +44,35 @@ pub(crate) struct UpdateAppID {
 /// Retrieves details about all users.
 ///
 /// # Description
-/// This function retrieves a list of user details, with the number of users limited by the `limit` query parameter. The request must be authenticated via a Bearer token.
+/// This function retrieves a list of user details, with the number of users limited by the `limit` query parameter.
 ///
 /// # Route
 /// `GET /admin/get_all_users`
 ///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request.
-///
-/// # URL Parameters
-/// * `limit` (required) - The maximum number of users to retrieve. This parameter controls the pagination of the result set.
+/// # Query Parameters
+/// * `limit` (optional) - The maximum number of users to retrieve. If not provided, uses the configured default limit.
 ///
 /// # Returns
-/// An `HttpResponse` containing a JSON array of user details. Each user object includes the user's ID, name, email, `app_id`, and assigned wallet. If the request fails or no users are found, an appropriate error response will be returned.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/admin/get_all_users?limit=10" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
+/// An `HttpResponse` containing a JSON object with a "results" array of user details. Each user object includes:
+/// - id: User's unique identifier
+/// - name: User's name
+/// - email: User's email address  
+/// - app_id: User's application ID
+/// - assigned_wallet: User's assigned wallet address
 ///
 /// # Example Response
-///
 /// ```json
-/// [
-///   {
-///     "id": "1",
-///     "name": "John Doe",
-///     "email": "john@example.com",
-///     "app_id": 1001,
-///     "assigned_wallet": "0x123abc456def789ghi"
-///   },
-///   {
-///     "id": "2",
-///     "name": "Jane Doe",
-///     "email": "jane@example.com",
-///     "app_id": 1002,
-///     "assigned_wallet": "0xabc456def789ghi123"
-///   }
-/// ]
+/// {
+///   "results": [
+///     {
+///       "id": "1",
+///       "name": "John Doe",
+///       "email": "john@example.com",
+///       "app_id": 1001,
+///       "assigned_wallet": "0x123..."
+///     }
+///   ]
+/// }
 /// ```
 
 #[get("/get_all_users")]
@@ -109,43 +100,26 @@ pub async fn get_all_users(
 
     HttpResponse::Ok().json(json!({"results":results}))
 }
-/// Retrieves an existing user's details.
+
+/// Retrieves details for the authenticated user.
 ///
 /// # Description
-/// This function retrieves the details of a user based on the provided `name` and `email` in the request body. The request must be authenticated via a Bearer token.
+/// Gets user details based on the email address from the authentication token.
 ///
 /// # Route
-/// `POST /users/get_user`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request.
-/// * `Content-Type: application/json` - Specifies that the request body is in JSON format.
-///
-/// # Request Body Parameters
-/// * `name` (required) - The name of the user to be retrieved.
-/// * `email` (required) - The email address of the user.
+/// `GET /users/get_user`
 ///
 /// # Returns
-/// An `HttpResponse` with the user's details, including their ID, name, email, `app_id`, and assigned wallet, or an error message if the user is not found.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X POST "https://api.example.com/v1/user/get_user" \
-///      -H "Authorization: Bearer YOUR_TOKEN" \
-///      -H "Content-Type: application/json" \
-///      -d '{ "name": "John Doe", "email": "john@example.com" }'
-/// ```
+/// An `HttpResponse` containing the user's details or an appropriate error message.
 ///
 /// # Example Response
-///
 /// ```json
 /// {
 ///   "id": "1",
 ///   "name": "John Doe",
 ///   "email": "john@example.com",
 ///   "app_id": 1001,
-///   "assigned_wallet": "0x123abc456def789ghi"
+///   "assigned_wallet": "0x123..."
 /// }
 /// ```
 
@@ -170,41 +144,26 @@ pub async fn get_user(
 /// Registers a new user in the system.
 ///
 /// # Description
-/// This function handles the registration of a new user by accepting the user's `name` and `app_id` in the request body. It uses the provided authentication token to verify the request and then creates a new user with an assigned wallet.
+/// Creates a new user account with the provided name and app_id. The email address is extracted from
+/// the authentication token.
 ///
 /// # Route
 /// `POST /users/register_new_user`
 ///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request.
-///
-/// # Request Body Parameters
-/// * `name` - The name of the user to be registered.
-/// * `app_id` - The App ID associated with the user on Avail.
-///
-/// # Returns
-/// An `HttpResponse` with the newly created user’s details, including an assigned wallet address, or an error message if registration fails.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X POST "https://api.example.com/v1/users/register_new_user" \
-///      -H "Authorization: Bearer YOUR_TOKEN" \
-///      -H "Content-Type: application/json" \
-///      -d '{ "name": "John Doe", "app_id": 1001 }'
-/// ```
-///
-/// # Example Response
-///
+/// # Request Body
 /// ```json
 /// {
-///   "id": "1",
 ///   "name": "John Doe",
-///   "email": "john@example.com",
-///   "app_id": 1001,
-///   "assigned_wallet": "0x123abc456def789ghi"
+///   "app_id": 1001
 /// }
 /// ```
+///
+/// # Returns
+/// - 200 OK with success message if registration succeeds
+/// - 409 Conflict if user already exists
+/// - 400 Bad Request if validation fails
+/// - 500 Internal Server Error if user info cannot be retrieved
+
 #[post("/register_new_user")]
 pub async fn register_new_user(
     payload: web::Json<RegisterUser>,
@@ -253,6 +212,26 @@ pub async fn register_new_user(
     }
 }
 
+/// Generates a new API key for the authenticated user.
+///
+/// # Description
+/// Creates a new API key associated with the authenticated user's account.
+/// The key is hashed using Keccak256 before storage.
+///
+/// # Route
+/// `POST /users/generate_api_key`
+///
+/// # Returns
+/// - 200 OK with the generated API key
+/// - 500 Internal Server Error if user ID cannot be retrieved or key generation fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "api_key": "550e8400-e29b-41d4-a716-446655440000"
+/// }
+/// ```
+
 #[post("/generate_api_key")]
 async fn generate_api_key(
     http_request: HttpRequest,
@@ -288,6 +267,18 @@ async fn generate_api_key(
     }
 }
 
+/// Retrieves all API keys for the authenticated user.
+///
+/// # Description
+/// Gets a list of all API keys associated with the authenticated user's account.
+///
+/// # Route
+/// `GET /users/get_api_key`
+///
+/// # Returns
+/// - 200 OK with array of API keys
+/// - 500 Internal Server Error if user ID cannot be retrieved
+
 #[get("/get_api_key")]
 pub async fn get_api_key(
     http_request: HttpRequest,
@@ -320,11 +311,32 @@ pub struct DeleteApiKey {
     pub identifier: String,
 }
 
+/// Deletes an API key for the authenticated user.
+///
+/// # Description
+/// Removes the specified API key from both the database and Redis cache.
+///
+/// # Route
+/// `DELETE /users/delete_api_key`
+///
+/// # Request Body
+/// ```json
+/// {
+///   "identifier": "abc12"
+/// }
+/// ```
+///
+/// # Returns
+/// - 200 OK with deleted key identifier
+/// - 404 Not Found if key doesn't exist
+/// - 500 Internal Server Error if deletion fails
+
 #[delete("/delete_api_key")]
 async fn delete_api_key(
     payload: web::Json<DeleteApiKey>,
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,
@@ -341,18 +353,48 @@ async fn delete_api_key(
             .filter(user_id.eq(user))
             .filter(identifier.eq(&payload.identifier)),
     )
-    .execute(&mut *connection)
+    .load::<ApiKey>(&mut *connection)
     .await;
 
     match query {
-        Ok(_) => {
-            // TODO: fix known bug. If api gets deleted the Redis cache is not updated.
-
+        Ok(row) => {
+            if row.is_empty() {
+                return HttpResponse::NotFound().body("API key not found");
+            }
+            let hashed_key = &row[0].api_key;
+            match redis::Client::open(config.redis_url.clone().as_str()) {
+                Ok(mut client) => {
+                    let _result: Result<(), redis::RedisError> = client.del(hashed_key);
+                    info!("Deleted API key from Redis: {}", hashed_key);
+                }
+                Err(e) => {
+                    error!("Error connecting to Redis: {}", e);
+                }
+            }
             return HttpResponse::Ok().json(json!({ "api_key": payload.identifier }));
         }
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
 }
+
+/// Updates the app_id for the authenticated user.
+///
+/// # Description
+/// Changes the app_id associated with the user's account.
+///
+/// # Route
+/// `PUT /users/update_app_id`
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": 1002
+/// }
+/// ```
+///
+/// # Returns
+/// - 200 OK with success message
+/// - 500 Internal Server Error if update fails
 
 #[put("/update_app_id")]
 async fn update_app_id(
@@ -382,6 +424,15 @@ async fn update_app_id(
     }
 }
 
+/// Helper function to retrieve user details by email.
+///
+/// # Arguments
+/// * `connection` - Database connection
+/// * `mail` - Email address to look up
+///
+/// # Returns
+/// HttpResponse containing user details or appropriate error
+
 async fn handle_getuser_query(connection: &mut AsyncPgConnection, mail: String) -> HttpResponse {
     match users
         .filter(email.eq(mail))
@@ -394,6 +445,15 @@ async fn handle_getuser_query(connection: &mut AsyncPgConnection, mail: String) 
         Err(_) => HttpResponse::InternalServerError().body("Database error"),
     }
 }
+
+/// Checks if a user exists by email address.
+///
+/// # Arguments
+/// * `connection` - Database connection
+/// * `user_email` - Email address to check
+///
+/// # Returns
+/// Result containing boolean indicating if user exists
 
 pub async fn user_exists(
     connection: &mut AsyncPgConnection,

@@ -8576,6 +8576,7 @@ dependencies = [
  "num-bigint",
  "rand",
  "rayon",
+ "redis 0.28.2",
  "reqwest",
  "serde",
  "serde_json",
