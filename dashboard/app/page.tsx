@@ -1,9 +1,7 @@
 "use client";
 
-import TransferCard from "@/components/transfercard";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import DashboardTabs from "@/components/dashboardtabs";
-import UpdateAppId from "@/components/updateappid";
 import { useCommonStore } from "@/store/common";
 import Loading from "@/components/loading";
 import { useEffect } from "react";
