@@ -80,6 +80,30 @@ pub async fn request_funds_status(
 }
 
 #[derive(Deserialize, Serialize, Clone)]
+struct PurchaseCostParams {
+    pub data_size: u128, // in bytes
+}
+
+#[get("/purchase_cost")]
+pub async fn purchase_cost(
+    query: web::Query<PurchaseCostParams>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
+
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .get_gas_price_for_data(convertor.one_kb.clone())
+        .await;
+
+    let credits_cost = credits_cost * BigDecimal::from(query.0.data_size as u128);
+
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct EstimateCreditsParams {
     pub data: BigDecimal,
 }

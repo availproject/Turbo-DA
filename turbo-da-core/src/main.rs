@@ -28,6 +28,7 @@ use actix_web::{
 };
 use auth::AuthMiddleware;
 use config::AppConfig;
+use controllers::users::{delete_api_key, generate_api_key, get_api_key};
 use tokio::time::Duration;
 
 use diesel_async::{
@@ -122,6 +123,9 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(get_all_expenditure)
                     .service(request_funds_status)
                     .service(register_new_user)
+                    .service(generate_api_key)
+                    .service(delete_api_key)
+                    .service(get_api_key)
                     .service(get_submission_info)
                     .service(update_app_id)
                     .service(estimate_credits_for_bytes)

@@ -253,9 +253,13 @@ impl<'a> Convertor<'a> {
     }
 
     pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
-        // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
         let data_posted_amount = data.len() as u128;
 
+        if data_posted_amount < self.one_kb.len() as u128 {
+            return BigDecimal::from(self.one_kb.len() as u128);
+        }
+
+        // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
         let one_kb_fee = self.get_gas_price_for_data(self.one_kb.clone()).await;
         let data_posted_fee = self.get_gas_price_for_data(data).await;
 

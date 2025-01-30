@@ -9,16 +9,16 @@ use actix_web::{
 };
 use db::{
     models::{
-        api::ApiKeyCreate,
+        api::{ApiKey, ApiKeyCreate},
         user_model::{User, UserCreate},
     },
     schema::{api_keys::dsl::*, users::dsl::*},
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use password_hash::PasswordHash;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha3::{Digest, Keccak256};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -270,11 +270,12 @@ async fn generate_api_key(
         Err(response) => return response,
     };
 
-    let hashed_password = PasswordHash::new(key.as_str()).unwrap();
-
+    let mut hasher = Keccak256::new();
+    hasher.update(key.as_bytes());
+    let hashed_password = hasher.finalize();
     let tx = diesel::insert_into(api_keys)
         .values(ApiKeyCreate {
-            api_key: hashed_password.to_string(),
+            api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
         })
@@ -283,6 +284,33 @@ async fn generate_api_key(
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "api_key": key })),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+#[get("/get_api_key")]
+pub async fn get_api_key(
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id(http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let query = api_keys
+        .filter(user_id.eq(user))
+        .select(ApiKey::as_select())
+        .load(&mut *connection)
+        .await;
+
+    match query {
+        Ok(key) => HttpResponse::Ok().json(key),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
 }
@@ -317,7 +345,11 @@ async fn delete_api_key(
     .await;
 
     match query {
-        Ok(keys) => return HttpResponse::Ok().json(json!({ "api_key": payload.identifier })),
+        Ok(_) => {
+            // TODO: fix known bug. If api gets deleted the Redis cache is not updated.
+
+            return HttpResponse::Ok().json(json!({ "api_key": payload.identifier }));
+        }
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
 }
