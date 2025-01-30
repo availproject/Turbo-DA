@@ -61,8 +61,6 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_pool = web::Data::new(pool);
 
-    let app_config_copy = app_config.clone();
-
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {

@@ -1,11 +1,9 @@
-use actix_web::HttpResponse;
 use bigdecimal::BigDecimal;
 use customer_expenditure::CreateCustomerExpenditure;
 use db::{models::*, schema::customer_expenditures::dsl::*};
-use diesel::{prelude::*, result::Error};
+use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::avail::submit_data::TransactionInfo;

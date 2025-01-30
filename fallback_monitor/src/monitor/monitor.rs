@@ -1,10 +1,7 @@
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
-use crate::{
-    config::AppConfig,
-    db::{customer_expenditure::get_unresolved_transactions, users::get_app_id},
-};
+use crate::db::{customer_expenditure::get_unresolved_transactions, users::get_app_id};
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
 use data_submission::{
@@ -32,7 +29,6 @@ use turbo_da_core::utils::Convertor;
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
     connection: &mut AsyncPgConnection,
-    config: &AppConfig,
     client: &SDK,
     account: &Keypair,
 ) {
@@ -40,14 +36,8 @@ pub async fn monitor_failed_transactions(
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {
-            process_failed_transactions(
-                connection,
-                config,
-                client,
-                account,
-                failed_transactions_list,
-            )
-            .await;
+            process_failed_transactions(connection, client, account, failed_transactions_list)
+                .await;
         }
         Err(_) => {
             error!("Couldn't fetch unresolved transactions from db")
@@ -71,7 +61,6 @@ pub async fn monitor_failed_transactions(
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
     connection: &mut AsyncPgConnection,
-    config: &AppConfig,
     client: &SDK,
     account: &Keypair,
     failed_transactions_list: Vec<CustomerExpenditureGetWithPayload>,

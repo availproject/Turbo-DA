@@ -42,14 +42,6 @@ sol! {
     );
 }
 
-#[derive(Debug, Clone)]
-pub struct Price {
-    pub btc: Option<f64>,
-    pub btc_market_cap: Option<f64>,
-    pub eth: Option<f64>,
-    pub usd: Option<f64>,
-}
-
 pub(crate) struct EVM {
     provider: RootProvider<PubSubFrontend>,
     database_url: String,

@@ -5,13 +5,10 @@ use avail_rust::{
     prelude::WebSocket,
     Keypair,
     Nonce::BestBlockAndTxPool,
-    Options, H256, SDK,
+    Options, SDK,
 };
 use hex;
 use log::error;
-use tokio::sync::Mutex;
-
-pub static LOCK: Mutex<()> = Mutex::const_new(());
 
 #[derive(Debug)]
 pub struct TransactionInfo {
@@ -22,14 +19,6 @@ pub struct TransactionInfo {
     pub gas_fee: u128,
     pub extrinsic_index: u32,
     pub block_number: u32,
-}
-
-pub struct SubmitDataTxSuccess {
-    pub block_number: u32,
-    pub tx_hash: H256,
-    pub block_hash: H256,
-    pub extrinsic_index: u32,
-    pub fee: u128,
 }
 
 pub struct SubmitDataAvail<'a> {

@@ -17,7 +17,6 @@ use turbo_da_core::{
     db::users::validate_and_get_entries,
     utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
 };
-use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct SubmitData {
@@ -29,14 +28,6 @@ pub struct TxParams {
     pub amount_data: String,
     pub amount_data_billed: BigDecimal,
     pub fees: u128,
-}
-
-pub struct SpawedThreadParams {
-    pub id: Uuid,
-    pub user_id: String,
-    pub token_details_id: i32,
-    pub amount_data: String,
-    pub token_address: String,
 }
 
 /// Submit data to Avail using a JSON payload.
@@ -95,13 +86,12 @@ pub async fn submit_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, credit_balance) =
-        match validate_and_get_entries(&mut connection, &user).await {
-            Ok(app) => app,
-            Err(e) => {
-                return HttpResponse::InternalServerError().body(e);
-            }
-        };
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+        Ok(app) => app,
+        Err(e) => {
+            return HttpResponse::InternalServerError().body(e);
+        }
+    };
 
     drop(connection);
 
@@ -112,7 +102,6 @@ pub async fn submit_data(
         submission_id,
         user_id: user.clone(),
         app_id: avail_app_id,
-        credit_balance,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
@@ -195,13 +184,12 @@ pub async fn submit_raw_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, credit_balance) =
-        match validate_and_get_entries(&mut connection, &user).await {
-            Ok(app) => app,
-            Err(e) => {
-                return HttpResponse::InternalServerError().body(e);
-            }
-        };
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+        Ok(app) => app,
+        Err(e) => {
+            return HttpResponse::InternalServerError().body(e);
+        }
+    };
 
     drop(connection);
 
@@ -221,8 +209,6 @@ pub async fn submit_raw_data(
         submission_id,
         user_id: user,
         app_id: avail_app_id,
-
-        credit_balance,
     };
 
     tokio::spawn(async move {

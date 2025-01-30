@@ -177,7 +177,6 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let data = self.response.raw_payload.clone();
 
-        // TODO: Check if user has enough credits, then lock the credits to be used for this transaction and later update the database
         let convertor = Convertor::new(
             &self.submit_avail_class.client,
             &self.submit_avail_class.account,

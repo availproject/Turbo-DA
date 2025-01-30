@@ -1,7 +1,7 @@
 /// A collection of utils
 /// - Keygeneration
 /// - Keylist generation
-use crate::{config::AppConfig, store::Price};
+use crate::store::Price;
 use actix_web::{
     web::{self},
     HttpRequest, HttpResponse,
@@ -16,7 +16,6 @@ use diesel_async::{
 };
 use lazy_static::lazy_static;
 use log::{error, info};
-use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -255,11 +254,6 @@ impl<'a> Convertor<'a> {
         let data_posted_fee = self.get_gas_price_for_data(data).await;
 
         one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount as u128)
-    }
-
-    pub fn convert_avail_price_to_token(self, avail_price: BigDecimal, token: &str) -> BigDecimal {
-        // TODO: Implement this function
-        BigDecimal::from(0)
     }
 }
 
