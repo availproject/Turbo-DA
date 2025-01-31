@@ -26,7 +26,10 @@ use actix_web::{
     App, HttpMessage, HttpServer,
 };
 use config::AppConfig;
-use controllers::users::{delete_api_key, generate_api_key, get_api_key};
+use controllers::{
+    fund::purchase_cost,
+    users::{delete_api_key, generate_api_key, get_api_key},
+};
 use tokio::time::Duration;
 
 use clerk_rs::{
@@ -147,6 +150,7 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(delete_api_key)
                     .service(get_api_key)
                     .service(update_app_id)
+                    .service(purchase_cost)
                     .service(estimate_credits_for_bytes)
                     .service(estimate_credits),
             )
