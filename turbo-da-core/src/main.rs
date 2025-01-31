@@ -2,7 +2,6 @@
 /// Customer send the money to us in any ERC20 token, and we fund there user account with equivalant avail.
 /// Customer then directly sends all the payload, in either JSON format or directly as bytes.
 /// The service generates the extrinsic and published it to Avail network.
-pub mod auth;
 pub mod config;
 pub mod controllers;
 pub mod db;
@@ -24,13 +23,17 @@ use actix_web::{
     dev::Service,
     middleware::Logger,
     web::{self},
-    App, HttpServer,
+    App, HttpMessage, HttpServer,
 };
-use auth::AuthMiddleware;
 use config::AppConfig;
 use controllers::users::{delete_api_key, generate_api_key, get_api_key};
 use tokio::time::Duration;
 
+use clerk_rs::{
+    clerk::Clerk,
+    validators::{actix::ClerkMiddleware, authorizer::ClerkJwt, jwks::MemoryCacheJwksProvider},
+    ClerkConfiguration,
+};
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
@@ -57,6 +60,14 @@ async fn main() -> Result<(), std::io::Error> {
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {
+        let config = ClerkConfiguration::new(
+            None,
+            None,
+            Some(shared_config.clerk_secret_key.clone()),
+            None,
+        );
+        let clerk = Clerk::new(config);
+
         let backend = InMemoryBackend::builder().build();
         let input = SimpleInputFunctionBuilder::new(
             Duration::from_secs(shared_config.rate_limit_window_size),
@@ -67,15 +78,6 @@ async fn main() -> Result<(), std::io::Error> {
         let rate_limiter = RateLimiter::builder(backend.clone(), input)
             .add_headers()
             .build();
-
-        let scope = {
-            let base_scope = web::scope("/user").wrap(AuthMiddleware::new(auth::Role::User));
-
-            #[cfg(feature = "permissioned")]
-            let base_scope = base_scope.wrap(WhitelistMiddleware::new());
-
-            base_scope
-        };
 
         App::new()
             .wrap_fn(|req, srv| {
@@ -110,8 +112,33 @@ async fn main() -> Result<(), std::io::Error> {
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
             .wrap(Logger::default())
+            .wrap(ClerkMiddleware::new(
+                MemoryCacheJwksProvider::new(clerk),
+                None,
+                true,
+            ))
             .service(
-                scope
+                web::scope("/user")
+                    .wrap_fn(|mut req, srv| {
+                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                        let fut = srv.call(req);
+                        async move {
+                            let res = fut.await?;
+                            if let Some(jwt) = jwt {
+                                if !jwt.other.get("role").map_or(false, |r| r == "member") {
+                                    return Err(actix_web::error::ErrorUnauthorized(
+                                        "Unauthorized",
+                                    ));
+                                }
+                            } else {
+                                return Err(actix_web::error::ErrorUnauthorized(
+                                    "Invalid Authorization header",
+                                ));
+                            }
+
+                            Ok(res)
+                        }
+                    })
                     .service(get_user)
                     .service(get_all_expenditure)
                     .service(request_funds_status)
@@ -126,7 +153,26 @@ async fn main() -> Result<(), std::io::Error> {
             )
             .service(
                 web::scope("/admin")
-                    .wrap(AuthMiddleware::new(auth::Role::Admin))
+                    .wrap_fn(|req, srv| {
+                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                        let fut = srv.call(req);
+                        async move {
+                            let res = fut.await?;
+                            if let Some(jwt) = jwt {
+                                if !jwt.other.get("role").map_or(false, |r| r == "admin") {
+                                    return Err(actix_web::error::ErrorUnauthorized(
+                                        "Unauthorized",
+                                    ));
+                                }
+                            } else {
+                                return Err(actix_web::error::ErrorUnauthorized(
+                                    "Invalid Authorization header",
+                                ));
+                            }
+
+                            Ok(res)
+                        }
+                    })
                     .service(get_all_users),
             )
             .service(get_token_map)

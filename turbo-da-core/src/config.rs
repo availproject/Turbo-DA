@@ -19,6 +19,7 @@ pub struct AppConfig {
     pub total_users_query_limit: i64,
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
+    pub clerk_secret_key: String,
 }
 
 impl Default for AppConfig {
@@ -34,6 +35,7 @@ impl Default for AppConfig {
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
             avail_rpc_endpoint: vec![],
+            clerk_secret_key: String::new(),
         }
     }
 }
@@ -110,6 +112,7 @@ impl AppConfig {
                 e.to_string()
             })?;
 
+        let clerk_secret_key = env::var("CLERK_SECRET_KEY")?;
         let total_users_query_limit = env::var("TOTAL_USERS_QUERY_LIMIT")
             .map_err(|e| {
                 error!(
@@ -167,6 +170,7 @@ impl AppConfig {
             database_url,
             redis_url,
             max_pool_size,
+            clerk_secret_key,
             coingecko_api_url,
             coingecko_api_key,
             total_users_query_limit,

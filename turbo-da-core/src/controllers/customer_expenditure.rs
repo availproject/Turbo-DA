@@ -1,7 +1,7 @@
 use crate::{
     config::AppConfig,
     db::customer_expenditure::{handle_get_all_expenditure, handle_submission_info},
-    utils::{get_connection, retrieve_user_id},
+    utils::{get_connection, retrieve_user_id_from_jwt},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -40,7 +40,7 @@ pub async fn get_all_expenditure(
     http_request: HttpRequest,
 ) -> impl Responder {
     let limit = request_payload.limit;
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };

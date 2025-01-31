@@ -1,6 +1,6 @@
 use crate::{
     config::AppConfig,
-    utils::{generate_avail_sdk, get_connection, retrieve_user_id, Convertor, TOKEN_MAP},
+    utils::{generate_avail_sdk, get_connection, retrieve_user_id_from_jwt, Convertor, TOKEN_MAP},
 };
 use std::sync::Arc;
 
@@ -60,7 +60,7 @@ pub async fn request_funds_status(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };

@@ -13,6 +13,7 @@ diesel = { workspace = true }
 bigdecimal = { workspace = true }
 dotenv = { workspace = true }
 alloy = { version = "0.7.2", features = ["full"] }
+clerk-rs = { version = "0.4.0", features = ["actix"] }
 actix-web = { workspace = true }
 actix-cors = { workspace = true }
 serde = { workspace = true }

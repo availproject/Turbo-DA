@@ -1,7 +1,7 @@
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_email_address, retrieve_user_id},
+    utils::{get_connection, retrieve_user_email_from_jwt, retrieve_user_id_from_jwt},
 };
 /// Web framework dependencies for handling HTTP requests and responses
 use actix_web::{
@@ -116,7 +116,7 @@ pub async fn get_user(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let user_email = match retrieve_email_address(&http_request) {
+    let user_email = match retrieve_user_email_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
     };
@@ -167,7 +167,7 @@ pub async fn register_new_user(
         Err(response) => return response,
     };
 
-    let mut user_email = match retrieve_email_address(&http_request) {
+    let mut user_email = match retrieve_user_email_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
     };
@@ -179,7 +179,7 @@ pub async fn register_new_user(
         return HttpResponse::Conflict().body("User already exists");
     }
 
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -213,7 +213,7 @@ async fn generate_api_key(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -256,7 +256,7 @@ pub async fn get_api_key(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -311,7 +311,7 @@ async fn delete_api_key(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -380,7 +380,7 @@ async fn update_app_id(
         Err(response) => return response,
     };
 
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
