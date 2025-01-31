@@ -2,11 +2,11 @@
 
 apt-get update && apt-get install -y \
     postgresql-client \
-    jq \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    jq &&
+    apt-get clean &&
+    rm -rf /var/lib/apt/lists/*
 
-CONFIG_FILE="${1:-/scripts/config.json}"
+CONFIG_FILE="${1:-./config.json}"
 
 echo -e "\n📄 Using config file: $CONFIG_FILE"
 
@@ -29,7 +29,7 @@ DB_USER=$(jq -r '.db_user' "$CONFIG_FILE")
 DB_PASSWORD=$(jq -r '.db_password // ""' "$CONFIG_FILE")
 
 # Construct DATABASE_URL
-export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}?sslmode=disable"
+export DATABASE_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
 # Check if Diesel CLI is installed
 if ! command -v diesel &>/dev/null; then
@@ -75,7 +75,7 @@ validate_input() {
 }
 
 # Prepare psql connection command with additional parameters
-PSQL_CMD="psql -h $DB_HOST -p $DB_PORT -U $DB_USER"
+PSQL_CMD="psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
 
 # Add password if provided
 if [[ -n "$DB_PASSWORD" ]]; then
@@ -116,49 +116,6 @@ jq -c '.block_entries[] | select(.chain_id and .block_number and .block_hash)' "
 done
 
 echo "✅ Block entries processing completed"
-
-validate_signer_input() {
-    local signer_address="$1"
-    local last_nonce="$2"
-
-    # Validate Ethereum-like address (starts with 0x, followed by 40 hex characters)
-    if [[ ! "$signer_address" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
-        echo "❌ Invalid signer address: $signer_address"
-        return 1
-    fi
-
-    # Validate nonce (must be a non-negative integer)
-    if [[ ! "$last_nonce" =~ ^[0-9]+$ ]]; then
-        echo "❌ Invalid nonce: $last_nonce"
-        return 1
-    fi
-
-    return 0
-}
-
-echo -e "\n🔄 Processing signer entries..."
-
-# Process signer entries
-jq -c '.signers[] | select(.address and .nonce)' "$CONFIG_FILE" | while read -r entry; do
-    signer_address=$(echo "$entry" | jq -r '.address')
-    last_nonce=$(echo "$entry" | jq -r '.nonce')
-
-    # Validate inputs
-    if validate_signer_input "$signer_address" "$last_nonce"; then
-        # Insert into database with error handling
-        if ! $PSQL_CMD -c \
-            "INSERT INTO signer_nonce (signer_address, last_nonce) 
-             VALUES ('$signer_address', $last_nonce);" 2>&1; then
-            echo "❌ Failed to insert signer entry: $entry"
-        else
-            echo "✅ Successfully inserted signer entry for address $signer_address"
-        fi
-    else
-        echo "⚠️  Skipping invalid signer entry: $entry"
-    fi
-done
-
-echo "✅ Signer entries processing completed"
 
 unset PGPASSWORD
 echo -e "\n🎉 Script completed successfully!"

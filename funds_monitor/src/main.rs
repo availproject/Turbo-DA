@@ -26,6 +26,7 @@ async fn main() {
         let finalised_threshold = network_config.finalised_threshold.clone();
         let coin_gecho_api_url = cfg.coin_gecho_api_url.clone();
         let coin_gecho_api_key = cfg.coin_gecho_api_key.clone();
+        let avail_rpc_url = cfg.avail_rpc_url.clone();
 
         info!("Task for network: {}", network_name);
 
@@ -49,6 +50,7 @@ async fn main() {
             let mut evm = match EVM::new(
                 contract_address,
                 database_url,
+                avail_rpc_url,
                 network_ws_url,
                 network_config.chain_id,
                 finalised_threshold,

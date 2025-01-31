@@ -3606,6 +3606,7 @@ name = "funds_monitor"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "avail-rust",
  "bigdecimal",
  "chrono",
  "db",

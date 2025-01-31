@@ -89,8 +89,6 @@ contract TurboDAResolver is
 
     /// @notice Address where admin withdrawals are sent
     address public withdrawalAddress;
-    /// @notice Address authorized to sign withdrawal messages
-    address public signer;
     mapping(uint256 => bool) public usedNonce;
 
     /**
@@ -104,7 +102,6 @@ contract TurboDAResolver is
         __ReentrancyGuard_init();
         _setRoleAdmin(OPERATOR_ROLE, DEFAULT_ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        signer = _owner;
     }
 
     /**
@@ -254,16 +251,6 @@ contract TurboDAResolver is
 
         userDeposits[userID][tokenAddress][msg.sender] += amount;
         emit Deposit(userID, tokenAddress, amount, msg.sender);
-    }
-
-    /**
-     * @dev Updates the signer address
-     * @param _signer The new signer address
-     */
-    function configureSigner(
-        address _signer
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        signer = _signer;
     }
 
     /**

@@ -228,9 +228,9 @@ pub async fn get_prices(
 }
 
 pub struct Convertor<'a> {
-    pub(crate) sdk: &'a SDK,
-    pub(crate) account: &'a Keypair,
-    pub(crate) one_kb: Vec<u8>,
+    pub sdk: &'a SDK,
+    pub account: &'a Keypair,
+    pub one_kb: Vec<u8>,
 }
 
 impl<'a> Convertor<'a> {
@@ -277,6 +277,13 @@ pub struct Token {
 lazy_static! {
     pub static ref TOKEN_MAP: HashMap<String, Token> = {
         let mut m = HashMap::new();
+        m.insert(
+            "ethereum".to_string(),
+            Token {
+                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
+                token_decimals: 18,
+            },
+        );
         m.insert(
             "avail".to_string(),
             Token {
