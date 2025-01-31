@@ -1,7 +1,10 @@
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
-use crate::db::{customer_expenditure::get_unresolved_transactions, users::get_app_id};
+use crate::db::{
+    customer_expenditure::{get_unresolved_transactions, increase_retry_count},
+    users::get_app_id,
+};
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
 use data_submission::{
@@ -31,13 +34,20 @@ pub async fn monitor_failed_transactions(
     connection: &mut AsyncPgConnection,
     client: &SDK,
     account: &Keypair,
+    retry_count: i32,
 ) {
-    let unresolved_transactions = get_unresolved_transactions(connection).await;
+    let unresolved_transactions = get_unresolved_transactions(connection, retry_count).await;
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {
-            process_failed_transactions(connection, client, account, failed_transactions_list)
-                .await;
+            process_failed_transactions(
+                connection,
+                client,
+                account,
+                retry_count,
+                failed_transactions_list,
+            )
+            .await;
         }
         Err(_) => {
             error!("Couldn't fetch unresolved transactions from db")
@@ -63,10 +73,20 @@ async fn process_failed_transactions(
     connection: &mut AsyncPgConnection,
     client: &SDK,
     account: &Keypair,
+    retry_count: i32,
     failed_transactions_list: Vec<CustomerExpenditureGetWithPayload>,
 ) {
     for i in failed_transactions_list {
         info!("Processing failed transaction submission id: {:?} ", i.id);
+        let result = increase_retry_count(i.id, connection).await;
+        if result.is_err() {
+            error!("Failed to increase retry count for entry id: {:?}", i.id);
+            continue;
+        }
+        if i.retry_count > retry_count {
+            error!("Retry count exceeded for transaction id: {:?}", i.id);
+            continue;
+        }
         let Some(data) = i.payload else {
             error!("No payload found for transaction id: {:?}", i.id);
             continue;

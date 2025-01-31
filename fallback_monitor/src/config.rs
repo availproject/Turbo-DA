@@ -11,6 +11,7 @@ use toml;
 pub struct AppConfig {
     pub database_url: String,
     pub private_key: String,
+    pub retry_count: i32,
     pub avail_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
@@ -21,6 +22,7 @@ impl Default for AppConfig {
         Self {
             database_url: String::new(),
             private_key: String::new(),
+            retry_count: 0,
             avail_rpc_endpoint: vec![],
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
@@ -83,11 +85,13 @@ impl AppConfig {
             avail_rpc_endpoint.push(endpoint);
             index += 1;
         }
+        let retry_count = env::var("RETRY_COUNT")?;
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
         Ok(AppConfig {
             database_url,
             private_key,
+            retry_count: retry_count.parse::<i32>().unwrap(),
             avail_rpc_endpoint,
             coingecko_api_url,
             coingecko_api_key,

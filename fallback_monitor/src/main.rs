@@ -64,7 +64,7 @@ async fn main() {
 
         info!("Checking Failed Transactions at {} .....", Utc::now());
 
-        monitor_failed_transactions(&mut connection, &sdk, &keypair).await;
+        monitor_failed_transactions(&mut connection, &sdk, &keypair, app_config.retry_count).await;
     }
 }
 

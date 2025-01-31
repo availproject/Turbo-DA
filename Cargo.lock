@@ -3340,6 +3340,7 @@ dependencies = [
  "tokio",
  "toml 0.8.19",
  "turbo-da-core",
+ "uuid",
 ]
 
 [[package]]

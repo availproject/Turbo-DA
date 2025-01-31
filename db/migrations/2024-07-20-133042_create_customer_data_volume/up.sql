@@ -12,6 +12,7 @@ CREATE TABLE customer_expenditures (
     data_hash VARCHAR,
     tx_hash VARCHAR,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
     error VARCHAR,
     payload BYTEA,
     FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE

@@ -41,6 +41,7 @@ diesel::table! {
         data_hash -> Nullable<Varchar>,
         tx_hash -> Nullable<Varchar>,
         created_at -> Timestamp,
+        retry_count -> Int4,
         error -> Nullable<Varchar>,
         payload -> Nullable<Bytea>,
     }
@@ -53,14 +54,6 @@ diesel::table! {
         block_number -> Int4,
         block_hash -> Varchar,
         created_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    signer_nonce (id) {
-        id -> Int4,
-        signer_address -> Varchar,
-        last_nonce -> Int4,
     }
 }
 
@@ -84,6 +77,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
-    signer_nonce,
     users,
 );

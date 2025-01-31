@@ -56,6 +56,7 @@ pub struct CustomerExpenditureGetWithPayload {
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub converted_fees: Option<BigDecimal>,
     pub payload: Option<Vec<u8>>,
+    pub retry_count: i32,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize, Debug)]
