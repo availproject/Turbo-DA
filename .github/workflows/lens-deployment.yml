@@ -39,25 +39,27 @@ jobs:
             # Clone/pull latest code
             if [ -d "$REPO_NAME" ]; then
               cd $REPO_NAME
+              echo "Pulling latest changes in existing repository"
               git fetch
               git checkout $BRANCH
               git pull origin $BRANCH
             else
+              echo "Cloning fresh repository"
               git clone -b $BRANCH $REPO_URL $REPO_NAME
               cd $REPO_NAME
             fi
             
             echo '${{ secrets.WHITELIST_JSON }}' > whitelist.json
             
-            # Remove fallback_monitor service as this is LVM2
-            yq eval 'del(.services.fallback_monitor)' docker-compose.yaml > docker-compose.tmp.yaml
-            mv docker-compose.tmp.yaml docker-compose.yaml
+            echo "Building and starting turbo-da-core service on LVM2"
+            docker compose build --no-cache turbo-da-core
+            docker compose up -d turbo-da-core
             
-            docker compose build --no-cache
-            docker compose up -d
+            echo "Cleaning up old images"
             docker image prune -f
             
             # Wait for service to be healthy
+            echo "Waiting for service to become healthy..."
             for i in {1..30}; do
               if curl -s http://localhost:8000/health | grep -q "ok"; then
                 echo "Service is healthy"
@@ -100,21 +102,27 @@ jobs:
             # Clone/pull latest code
             if [ -d "$REPO_NAME" ]; then
               cd $REPO_NAME
+              echo "Pulling latest changes in existing repository"
               git fetch
               git checkout $BRANCH
               git pull origin $BRANCH
             else
+              echo "Cloning fresh repository"
               git clone -b $BRANCH $REPO_URL $REPO_NAME
               cd $REPO_NAME
             fi
             
             echo '${{ secrets.WHITELIST_JSON }}' > whitelist.json
             
+            echo "Building and starting all services on LVM1"
             docker compose build --no-cache
             docker compose up -d
+            
+            echo "Cleaning up old images"
             docker image prune -f
             
             # Wait for service to be healthy
+            echo "Waiting for service to become healthy..."
             for i in {1..30}; do
               if curl -s http://localhost:8000/health | grep -q "ok"; then
                 echo "Service is healthy"
