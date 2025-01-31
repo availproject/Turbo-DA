@@ -27,3 +27,8 @@
 /dashboard/node_modules
 .vscode
 .env
+.DS_Store
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
