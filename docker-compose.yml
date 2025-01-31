@@ -35,6 +35,14 @@ services:
       retries: 3
       start_period: 40s
 
+  redis:
+    image: "redis:alpine"
+    command: redis-server --save "" --appendonly no 
+    networks:
+      - net
+    ports:
+      - 6379:6379
+
 networks:
   net:
     driver: bridge
