@@ -38,19 +38,12 @@ use diesel_async::{
 use log::info;
 use routes::health::health_check;
 
-use utils::generate_keygen_list;
-
-#[cfg(feature = "permissioned")]
-mod whitelist;
-#[cfg(feature = "permissioned")]
-use crate::whitelist::WhitelistMiddleware;
-
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     info!("Starting API server....");
 
     let app_config = AppConfig::default().load_config()?;
-
+    let port = app_config.port;
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
 
@@ -138,7 +131,7 @@ async fn main() -> Result<(), std::io::Error> {
             )
             .service(get_token_map)
     })
-    .bind("0.0.0.0:8000")?
+    .bind(format!("0.0.0.0:{}", port))?
     .run()
     .await
 }

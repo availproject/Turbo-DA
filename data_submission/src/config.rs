@@ -9,6 +9,7 @@ use toml;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
+    pub port: u16,
     pub database_url: String,
     pub redis_url: String,
     pub number_of_threads: i32,
@@ -25,6 +26,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            port: 8080,
             database_url: String::new(),
             redis_url: String::new(),
             number_of_threads: 3,
@@ -87,6 +89,16 @@ impl AppConfig {
     }
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
+        let port = env::var("PORT")
+            .map_err(|e| {
+                error!("Failed to get PORT environment variable: {:?}", e);
+                e
+            })?
+            .parse::<u16>()
+            .map_err(|e| {
+                error!("Invalid PORT value. Error: {:?}", e);
+                e.to_string()
+            })?;
         let database_url = env::var("DATABASE_URL")?;
         let redis_url = env::var("REDIS_URL")?;
         let number_of_threads = env::var("NUMBER_OF_THREADS")
@@ -196,6 +208,7 @@ impl AppConfig {
         }
 
         Ok(AppConfig {
+            port,
             database_url,
             redis_url,
             number_of_threads,

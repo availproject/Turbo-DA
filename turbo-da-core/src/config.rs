@@ -10,6 +10,7 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
+    pub port: u16,
     pub redis_url: String,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
@@ -23,6 +24,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            port: 8000,
             database_url: String::new(),
             redis_url: String::new(),
             max_pool_size: 10,
@@ -83,6 +85,17 @@ impl AppConfig {
     }
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
+        let port = env::var("PORT")
+            .map_err(|e| {
+                error!("Failed to get PORT environment variable: {:?}", e);
+                e
+            })?
+            .parse::<u16>()
+            .map_err(|e| {
+                error!("Invalid PORT value. Error: {:?}", e);
+                e.to_string()
+            })?;
+
         let database_url = env::var("DATABASE_URL")?;
         let redis_url = env::var("REDIS_URL")?;
 
@@ -150,6 +163,7 @@ impl AppConfig {
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
 
         Ok(AppConfig {
+            port,
             database_url,
             redis_url,
             max_pool_size,

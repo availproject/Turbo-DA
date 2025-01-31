@@ -57,6 +57,7 @@ The core service provides:
 You can use a `config.toml` or a `.env`:
 
 ```env
+PORT=8080                  # PORT is the port on which the server will run
 DATABASE_URL=              # DATABASE_URL is the connection string to the database
 REDIS_URL=                 # REDIS_URL is the connection string to the redis database
 MAX_POOL_SIZE=             # MAX_POOL_SIZE is the maximum number of connections in the connection pool. Ideally, try not to keep it too low for increased throughput.
@@ -122,6 +123,7 @@ RETRY_COUNT=          # The retry count to try a particular transaction before g
   This service used to actually submit data.
 
 ```env
+PORT=8080                  # PORT is the port on which the server will run
 DATABASE_URL=         # DATABASE_URL is the connection string to the database
 REDIS_URL=            # REDIS_URL is the connection string to the redis database
 NUMBER_OF_THREADS=    # NUMBER_OF_THREADS is the number of threads to be used for the workload scheduler. This is used to vertically scale the workload scheduler.

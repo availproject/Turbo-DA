@@ -64,6 +64,8 @@ async fn main() -> Result<(), std::io::Error> {
         app_config.number_of_threads,
     );
 
+    let port = app_config.port;
+
     let shared_config = web::Data::new(app_config);
 
     tokio::spawn(async move {
@@ -100,7 +102,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(submit_raw_data)
             .service(get_pre_image)
     })
-    .bind("0.0.0.0:8080")?
+    .bind(format!("0.0.0.0:{}", port))?
     .run()
     .await
 }
