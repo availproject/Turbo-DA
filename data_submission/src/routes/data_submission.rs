@@ -18,11 +18,13 @@ use turbo_da_core::{
     utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
 };
 
+/// Request payload for submitting string data
 #[derive(Deserialize, Serialize, Clone)]
 pub struct SubmitData {
     pub data: String,
 }
 
+/// Parameters for transaction details
 #[derive(Clone)]
 pub struct TxParams {
     pub amount_data: String,
@@ -30,44 +32,18 @@ pub struct TxParams {
     pub fees: u128,
 }
 
-/// Submit data to Avail using a JSON payload.
+/// Handles submission of string data
 ///
-/// # Description
-/// This endpoint allows users to submit data to the Avail system along with a token for payment. The data should be provided as a JSON payload, and the associated token is used for processing the payment.
-///
-/// # Route
-/// `POST /user/submit_data`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user making the request.
-///
-/// # Body Parameters
-/// * `data` - The stringified JSON payload that you want to submit. This should contain the data you wish to process.
-/// * `token` - The token used to make the payment. This should correspond to a whitelisted token in the system.
+/// # Arguments
+/// * `request_payload` - JSON payload containing the data string
+/// * `sender` - Channel sender for broadcasting responses
+/// * `injected_dependency` - Database connection pool
+/// * `config` - Application configuration
+/// * `http_request` - HTTP request containing user authentication
 ///
 /// # Returns
-/// A JSON object indicating the status of the submission. The response will confirm whether the data was successfully processed or if there were any errors.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X POST "https://api.example.com/v1/user/submit_data" \
-///      -H "Authorization: Bearer YOUR_TOKEN" \
-///      -H "Content-Type: application/json" \
-///      -d '{
-///            "data": "Test",
-///            "token": "ethereum"
-///          }'
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// {
-///   "submission_id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a"
-/// }
-/// ```
-
+/// * JSON response with submission ID on success
+/// * Error response if user validation or database operations fail
 #[post("/submit_data")]
 pub async fn submit_data(
     request_payload: web::Json<SubmitData>,
@@ -129,43 +105,18 @@ pub async fn submit_data(
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
 }
 
-/// Submit raw byte data to Avail.
+/// Handles submission of raw binary data
 ///
-/// # Description
-/// This endpoint allows users to submit raw byte data to the Avail system. The byte data is sent in the request body and the associated token is specified as a URL parameter.
-///
-/// # Route
-/// `POST /user/submit_raw_data`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. This token must belong to the user making the request.
-///
-/// # URL Parameters
-/// * `token` - The name of the token, as determined by the `token_map` endpoint. This token is used to process the payment.
-///
-/// # Body Parameters
-/// * The body of the request should contain the raw byte data that you want to submit. The data should be formatted as a byte string.
+/// # Arguments
+/// * `request_payload` - Raw bytes payload
+/// * `sender` - Channel sender for broadcasting responses
+/// * `injected_dependency` - Database connection pool
+/// * `config` - Application configuration
+/// * `http_request` - HTTP request containing user authentication
 ///
 /// # Returns
-/// A JSON object indicating the status of the data submission. The response will provide information about whether the submission was successful or if any errors occurred.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X POST "https://api.example.com/v1/user/submit_raw_data?token=ethereum" \
-///      -H "Authorization: Bearer YOUR_TOKEN" \
-///      -H "Content-Type: application/json" \
-///      -d '011010101010101010100101'
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// {
-///   "submission_id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a"
-/// }
-/// ```
-
+/// * JSON response with submission ID on success
+/// * Error response if user validation or database operations fail
 #[post("/submit_raw_data")]
 pub async fn submit_raw_data(
     request_payload: Bytes,

@@ -3,6 +3,20 @@ use db::{models::user_model::User, schema::users::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
+/// Validates user existence and retrieves their app ID and credit balance
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `user` - User ID to look up
+///
+/// # Returns
+/// * `Ok((i32, BigDecimal))` - Tuple containing app_id and credit_balance if user exists
+/// * `Err(String)` - Error message if user not found or database error occurs
+///
+/// # Description
+/// Queries the database for a user record and returns their associated app ID
+/// and current credit balance. Used for validating users and checking balances
+/// before processing transactions.
 pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
     user: &String,

@@ -1,12 +1,15 @@
+/// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
     utils::{get_connection, retrieve_email_address, retrieve_user_id},
 };
+/// Web framework dependencies for handling HTTP requests and responses
 use actix_web::{
     delete, get, post, put,
     web::{self},
     HttpRequest, HttpResponse, Responder,
 };
+/// Database models and schema definitions
 use db::{
     models::{
         api::{ApiKey, ApiKeyCreate},
@@ -14,21 +17,30 @@ use db::{
     },
     schema::{api_keys::dsl::*, users::dsl::*},
 };
+/// Database and async connection handling
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+/// Logging utilities
 use log::{error, info};
+/// Redis caching functionality
 use redis::Commands;
+/// Serialization/deserialization
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+/// Cryptographic hashing
 use sha3::{Digest, Keccak256};
+/// UUID generation
 use uuid::Uuid;
+/// Input validation
 use validator::Validate;
 
+/// Query parameters for retrieving users with optional limit
 #[derive(Deserialize, Serialize)]
 struct GetAllUsersParams {
     limit: Option<i64>,
 }
 
+/// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
     #[validate(length(min = 1))]
@@ -36,45 +48,21 @@ pub(crate) struct RegisterUser {
     pub app_id: i32,
 }
 
+/// Request payload for updating a user's app ID
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct UpdateAppID {
     pub app_id: i32,
 }
 
-/// Retrieves details about all users.
+/// Retrieves a list of all users with optional limit
 ///
-/// # Description
-/// This function retrieves a list of user details, with the number of users limited by the `limit` query parameter.
-///
-/// # Route
-/// `GET /admin/get_all_users`
-///
-/// # Query Parameters
-/// * `limit` (optional) - The maximum number of users to retrieve. If not provided, uses the configured default limit.
+/// # Arguments
+/// * `payload` - Query parameters containing optional limit
+/// * `config` - Application configuration
+/// * `injected_dependency` - Database connection pool
 ///
 /// # Returns
-/// An `HttpResponse` containing a JSON object with a "results" array of user details. Each user object includes:
-/// - id: User's unique identifier
-/// - name: User's name
-/// - email: User's email address  
-/// - app_id: User's application ID
-/// - assigned_wallet: User's assigned wallet address
-///
-/// # Example Response
-/// ```json
-/// {
-///   "results": [
-///     {
-///       "id": "1",
-///       "name": "John Doe",
-///       "email": "john@example.com",
-///       "app_id": 1001,
-///       "assigned_wallet": "0x123..."
-///     }
-///   ]
-/// }
-/// ```
-
+/// JSON response containing list of users or error
 #[get("/get_all_users")]
 pub async fn get_all_users(
     payload: web::Query<GetAllUsersParams>,
@@ -107,7 +95,7 @@ pub async fn get_all_users(
 /// Gets user details based on the email address from the authentication token.
 ///
 /// # Route
-/// `GET /users/get_user`
+/// `GET /user/get_user`
 ///
 /// # Returns
 /// An `HttpResponse` containing the user's details or an appropriate error message.
@@ -212,26 +200,14 @@ pub async fn register_new_user(
     }
 }
 
-/// Generates a new API key for the authenticated user.
+/// Generates a new API key for the authenticated user
 ///
-/// # Description
-/// Creates a new API key associated with the authenticated user's account.
-/// The key is hashed using Keccak256 before storage.
-///
-/// # Route
-/// `POST /users/generate_api_key`
+/// # Arguments
+/// * `http_request` - The HTTP request containing user authentication
+/// * `injected_dependency` - Database connection pool
 ///
 /// # Returns
-/// - 200 OK with the generated API key
-/// - 500 Internal Server Error if user ID cannot be retrieved or key generation fails
-///
-/// # Example Response
-/// ```json
-/// {
-///   "api_key": "550e8400-e29b-41d4-a716-446655440000"
-/// }
-/// ```
-
+/// JSON response containing the new API key or error message
 #[post("/generate_api_key")]
 async fn generate_api_key(
     http_request: HttpRequest,
@@ -267,18 +243,14 @@ async fn generate_api_key(
     }
 }
 
-/// Retrieves all API keys for the authenticated user.
+/// Retrieves all API keys for the authenticated user
 ///
-/// # Description
-/// Gets a list of all API keys associated with the authenticated user's account.
-///
-/// # Route
-/// `GET /users/get_api_key`
+/// # Arguments
+/// * `http_request` - The HTTP request containing user authentication
+/// * `injected_dependency` - Database connection pool
 ///
 /// # Returns
-/// - 200 OK with array of API keys
-/// - 500 Internal Server Error if user ID cannot be retrieved
-
+/// JSON response containing list of API keys or error message
 #[get("/get_api_key")]
 pub async fn get_api_key(
     http_request: HttpRequest,
@@ -306,6 +278,7 @@ pub async fn get_api_key(
     }
 }
 
+/// Request payload for deleting an API key
 #[derive(Deserialize, Serialize, Validate)]
 pub struct DeleteApiKey {
     pub identifier: String,

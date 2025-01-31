@@ -38,7 +38,7 @@ struct RetrievePreImage {
 /// # Example Request
 ///
 /// ```bash
-/// curl -X GET "https://api.example.com/v1/user/get_pre_image?submission_id=<SUBMISSION_ID>" \
+/// curl -X GET "https://api.example.com/v1/get_pre_image?submission_id=<SUBMISSION_ID>" \
 ///      -H "Authorization: Bearer YOUR_TOKEN" \
 ///      -H "Content-Type: application/json"
 /// ```

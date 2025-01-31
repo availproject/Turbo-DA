@@ -7,6 +7,20 @@ use log::{error, info};
 use serde_json::json;
 use uuid::Uuid;
 
+/// Retrieves information about a specific customer expenditure submission
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `submission_id` - UUID of the submission to retrieve
+///
+/// # Returns
+/// * `HttpResponse` - JSON response containing submission details or error message
+///
+/// # Description
+/// Queries the database for a specific customer expenditure entry and returns:
+/// - 200 OK with submission details if found
+/// - 404 Not Found if submission ID doesn't exist
+/// - 500 Internal Server Error for database errors
 pub async fn handle_submission_info(
     connection: &mut AsyncPgConnection,
     submission_id: Uuid,
@@ -25,6 +39,21 @@ pub async fn handle_submission_info(
     }
 }
 
+/// Retrieves all expenditure entries for a specific user
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `user` - User ID string
+/// * `final_limit` - Maximum number of entries to return
+///
+/// # Returns
+/// * `HttpResponse` - JSON response containing list of expenditures or error message
+///
+/// # Description
+/// Queries the database for all expenditure entries belonging to the specified user,
+/// limited by the provided count. Returns:
+/// - 200 OK with list of expenditures if successful
+/// - 500 Internal Server Error if database query fails
 pub async fn handle_get_all_expenditure(
     connection: &mut AsyncPgConnection,
     user: String,
@@ -43,6 +72,16 @@ pub async fn handle_get_all_expenditure(
     }
 }
 
+/// Adds or updates an error entry for a specific submission
+///
+/// # Arguments
+/// * `sub_id` - UUID of the submission to update
+/// * `e` - Error message string to store
+/// * `connection` - Database connection handle
+///
+/// # Description
+/// Updates the error field of a customer expenditure entry with the provided error message.
+/// Logs success or failure of the update operation.
 pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgConnection) {
     let update_values = (error.eq(e.to_string()),);
 
