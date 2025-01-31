@@ -236,42 +236,6 @@ curl -X GET "https://api.example.com/user/get_all_expenditure" \
 ]
 ```
 
-### 14. GET /user/get_submission_info
-
-Retrieve details about a expenditure done using a given token.
-
-- **URL**: `/user/get_submission_info`
-- **Method**: `GET`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-- **URL Parameters**:
-  - `submission_id`: Submission id to get info for.
-
-#### Example Request:
-
-```bash
-curl -X GET "https://api.example.com/user/get_submission_info?submission_id=b9a3f58e-0f49-4e3b-9466-f28d73d75e0a" \
-     -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-#### Example Response:
-
-```json
-{
-  "id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a",
-  "user_id": "user_2lO5zzxhV08hooYiSCOkfWfPxls",
-  "token_details_id": 1,
-  "extrinsic_index": 42,
-  "amount_data": "100.00",
-  "fees": "0.01",
-  "to_address": "0x123abc456def789ghi",
-  "block_hash": "0xabcdef1234567890",
-  "data_hash": "0xdeadbeef12345678",
-  "tx_hash": "0xabcdef9876543210",
-  "created_at": "2024-09-11T12:34:56"
-}
-```
-
 ## Error Handling
 
 - **401 Unauthorized**: Invalid or missing token.

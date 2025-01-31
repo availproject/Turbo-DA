@@ -10,7 +10,10 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
-use turbo_da_core::utils::{generate_avail_sdk, get_connection};
+use turbo_da_core::{
+    db::customer_expenditure::handle_submission_info,
+    utils::{generate_avail_sdk, get_connection},
+};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -101,6 +104,42 @@ pub async fn get_pre_image(
         }
         Err(_) => HttpResponse::InternalServerError().body("Database error"),
     }
+}
+
+/// Query parameters for retrieving submission information
+#[derive(Deserialize, Serialize)]
+struct GetSubmissionInfo {
+    submission_id: String,
+}
+
+/// Retrieves information about a specific submission
+///
+/// # Arguments
+/// * `request_payload` - Query parameters containing submission ID
+/// * `injected_dependency` - Database connection pool
+///
+/// # Returns
+/// * `HttpResponse` - JSON response containing submission details or error
+///
+/// # Description
+/// Validates the submission ID as a UUID and retrieves associated information
+/// from the database. Returns error responses for invalid UUIDs or failed queries.
+#[get("/get_submission_info")]
+pub async fn get_submission_info(
+    request_payload: web::Query<GetSubmissionInfo>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> HttpResponse {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+    let submission_id = match Uuid::from_str(&request_payload.submission_id) {
+        Ok(val) => val,
+        Err(e) => {
+            return HttpResponse::NotAcceptable().body(e.to_string());
+        }
+    };
+    handle_submission_info(&mut connection, submission_id).await
 }
 
 use hex;

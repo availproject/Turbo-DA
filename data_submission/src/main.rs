@@ -16,7 +16,7 @@ use diesel_async::{
 };
 use log::info;
 use routes::{
-    data_retrieval::get_pre_image,
+    data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
 };
 use std::sync::Arc;
@@ -101,6 +101,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(submit_data)
             .service(submit_raw_data)
             .service(get_pre_image)
+            .service(get_submission_info)
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()
