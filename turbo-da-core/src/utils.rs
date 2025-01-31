@@ -1,21 +1,26 @@
 /// A collection of utils
 /// - Keygeneration
 /// - Keylist generation
-use crate::{config::AppConfig, store::Price};
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{
+    web::{self},
+    HttpMessage, HttpRequest, HttpResponse,
+};
 use alloy::primitives::Address;
-use avail_rust::Keypair;
+use avail_rust::{Keypair, Options, SDK};
+
+use bigdecimal::BigDecimal;
+use clerk_rs::validators::authorizer::ClerkJwt;
 use diesel_async::{
     pooled_connection::deadpool::{Object, Pool},
     AsyncPgConnection,
 };
 use lazy_static::lazy_static;
-use log::error;
-use rand::Rng;
+use log::{error, info};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
+use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
 
@@ -65,14 +70,6 @@ pub fn format_size(bytes: usize) -> String {
 /// Generates a new UUID v4 for submission identification
 pub fn generate_submission_id() -> Uuid {
     Uuid::new_v4()
-}
-
-/// Maps a user ID to a thread number based on the app config
-///
-/// # Arguments
-/// * `config` - Application configuration containing number of threads
-pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
-    rand::thread_rng().gen_range(0..config.number_of_threads)
 }
 
 /// Finds a token address by its key in the token map
@@ -133,6 +130,37 @@ pub fn retrieve_user_id(http_request: HttpRequest) -> Option<String> {
     }
     None
 }
+/// Retrieves user ID from JWT in HTTP request
+///
+/// # Arguments
+/// * `http_request` - HTTP request containing JWT with user ID
+///
+/// # Returns
+/// * `Option<String>` - User ID if found in JWT, None otherwise
+pub fn retrieve_user_id_from_jwt(http_request: &HttpRequest) -> Option<String> {
+    let jwt = http_request.extensions().get::<ClerkJwt>().cloned();
+    if let Some(jwt) = jwt {
+        jwt.other.get("user_id").map(|id| id.to_string())
+    } else {
+        None
+    }
+}
+
+/// Retrieves user email from JWT in HTTP request
+///
+/// # Arguments
+/// * `http_request` - HTTP request containing JWT with user email
+///
+/// # Returns
+/// * `Option<String>` - User email if found in JWT, None otherwise
+pub fn retrieve_user_email_from_jwt(http_request: &HttpRequest) -> Option<String> {
+    let jwt = http_request.extensions().get::<ClerkJwt>().cloned();
+    if let Some(jwt) = jwt {
+        jwt.other.get("user_email").map(|id| id.to_string())
+    } else {
+        None
+    }
+}
 
 /// Retrieves email address from HTTP request headers
 ///
@@ -151,6 +179,13 @@ pub fn retrieve_email_address(http_request: &HttpRequest) -> Option<String> {
     None
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Price {
+    pub btc: Option<f64>,
+    pub btc_market_cap: Option<f64>,
+    pub eth: Option<f64>,
+    pub usd: Option<f64>,
+}
 /// Gets current prices for Avail and specified token from CoinGecko API
 ///
 /// # Arguments
@@ -224,6 +259,46 @@ pub async fn get_prices(
     Ok((coin_price, avail_price))
 }
 
+pub struct Convertor<'a> {
+    pub sdk: &'a SDK,
+    pub account: &'a Keypair,
+    pub one_kb: Vec<u8>,
+}
+
+impl<'a> Convertor<'a> {
+    pub fn new(sdk: &'a SDK, account: &'a Keypair) -> Self {
+        Convertor {
+            sdk,
+            account,
+            one_kb: vec![0u8; 1024],
+        }
+    }
+    pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
+        let tx = self.sdk.tx.data_availability.submit_data(data);
+
+        let options = Options::new();
+        let query_info = match tx.payment_query_info(self.account, Some(options)).await {
+            Ok(info) => info,
+            Err(e) => panic!("Failed to get payment query info: {:?}", e),
+        };
+        BigDecimal::from(query_info)
+    }
+
+    pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
+        let data_posted_amount = data.len() as u128;
+
+        if data_posted_amount < self.one_kb.len() as u128 {
+            return BigDecimal::from(self.one_kb.len() as u128);
+        }
+
+        // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
+        let one_kb_fee = self.get_gas_price_for_data(self.one_kb.clone()).await;
+        let data_posted_fee = self.get_gas_price_for_data(data).await;
+
+        one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount as u128)
+    }
+}
+
 /// Token information structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
@@ -235,6 +310,13 @@ lazy_static! {
     pub static ref TOKEN_MAP: HashMap<String, Token> = {
         let mut m = HashMap::new();
         m.insert(
+            "ethereum".to_string(),
+            Token {
+                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
+                token_decimals: 18,
+            },
+        );
+        m.insert(
             "avail".to_string(),
             Token {
                 token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
@@ -243,4 +325,31 @@ lazy_static! {
         );
         m
     };
+}
+
+const WAIT_TIME: u64 = 5;
+pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+    let mut attempts = 0;
+
+    loop {
+        if attempts < endpoints.len() {
+            attempts = 0;
+        }
+        let endpoint = &endpoints[attempts];
+        info!("Attempting to connect endpoint: {:?}", endpoint);
+        match SDK::new(endpoint).await {
+            Ok(sdk) => {
+                info!("Connected successfully to endpoint: {}", endpoint);
+
+                return sdk;
+            }
+            Err(e) => {
+                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                attempts += 1;
+            }
+        }
+
+        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        sleep(Duration::from_secs(WAIT_TIME)).await;
+    }
 }

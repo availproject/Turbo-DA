@@ -1,44 +1,23 @@
-use std::str::FromStr;
-
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_user_id, TOKEN_MAP},
+    utils::{generate_avail_sdk, get_connection, retrieve_user_id_from_jwt, Convertor, TOKEN_MAP},
 };
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use std::sync::Arc;
+
+use actix_web::{
+    get,
+    web::{self, Bytes},
+    HttpRequest, HttpResponse, Responder,
+};
+
+use avail_rust::SDK;
 use bigdecimal::BigDecimal;
-use db::{
-    models::{fund::FundRequestsGet, signer_nonce::SignerNonce, token_balances::TokenBalances},
-    schema::{fund_requests::dsl::*, signer_nonce::dsl::*, token_balances::dsl::*},
-};
+use db::{models::credit_requests::CreditRequestInfo, schema::credit_requests::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::{error, info, warn};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-use alloy::{
-    primitives::{keccak256, Address, Bytes, U256},
-    signers::{local::PrivateKeySigner, SignerSync},
-    sol,
-    sol_types::SolValue,
-};
-
-sol!(
-    #[allow(missing_docs)]
-    #[sol(rpc)]
-    TurboDAResolver,
-    "../contracts/out/TurboDAResolver.sol/TurboDAResolver.json"
-);
-
-sol! {
-    struct Encoder{bytes userID; address tokenAddress; uint256 amount; address recipient; uint256 nonce;}
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-struct TransferFunds {
-    fund_id: i32,
-}
 
 /// Retrieve the status and details of a user's fund request.
 ///
@@ -81,7 +60,7 @@ pub async fn request_funds_status(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -90,224 +69,77 @@ pub async fn request_funds_status(
         Err(response) => return response,
     };
 
-    let tx = fund_requests
-        .filter(db::schema::fund_requests::user_id.eq(user))
-        .select(FundRequestsGet::as_select())
+    let tx: Vec<CreditRequestInfo> = credit_requests
+        .filter(db::schema::credit_requests::user_id.eq(user))
+        .select(CreditRequestInfo::as_select())
         .load(&mut *connection)
         .await
         .expect("Error loading users");
 
     HttpResponse::Ok().json(json!({"requests": tx}))
 }
-/// Represents the request payload for generating a signature for fund retrieval
-///
-/// # Fields
-/// * `token` - The token identifier/symbol
-/// * `amount` - The amount of tokens to retrieve
-/// * `wallet_address` - The wallet address to send the funds to
+
 #[derive(Deserialize, Serialize, Clone)]
-struct GenerateSignatureForFundRetrieval {
-    token: String,
-    amount: BigDecimal,
-    wallet_address: String,
+struct PurchaseCostParams {
+    pub data_size: u128, // in bytes
 }
 
-/// Generates a signature for retrieving funds from the system
-///
-/// # Description
-/// This endpoint generates a cryptographic signature that authorizes the withdrawal
-/// of funds from the user's balance. The signature can be used to prove authorization
-/// when making the actual withdrawal transaction.
-///
-/// # Route
-/// `POST /generate_signature_for_fund_retrieval`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
-///
-/// # Request Body
-/// ```json
-/// {
-///   "token": "ETH",
-///   "amount": "1.5",
-///   "wallet_address": "0x123..."
-/// }
-/// ```
-///
-/// # Returns
-/// A signature that can be used to authorize the fund withdrawal if successful,
-/// or an error response if the request fails (e.g., insufficient balance)
-#[post("/generate_signature_for_fund_retrieval")]
-pub async fn generate_signature_for_fund_retrieval(
-    payload: web::Json<GenerateSignatureForFundRetrieval>,
-    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
-    http_request: HttpRequest,
+#[get("/purchase_cost")]
+pub async fn purchase_cost(
+    query: web::Query<PurchaseCostParams>,
     config: web::Data<AppConfig>,
 ) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
-    let mut connection = match get_connection(&injected_dependency).await {
-        Ok(conn) => conn,
-        Err(response) => return response,
-    };
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
 
-    let address = TOKEN_MAP.get(&payload.token).unwrap();
-    let query = token_balances
-        .filter(db::schema::token_balances::user_id.eq(&user))
-        .filter(db::schema::token_balances::token_address.eq(&address.token_address.to_lowercase()))
-        .select(TokenBalances::as_select())
-        .first(&mut *connection)
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .get_gas_price_for_data(convertor.one_kb.clone())
         .await;
 
-    match query {
-        Ok(result) => {
-            let amount_available =
-                &result.token_balance - &result.token_amount_locked - &result.token_used;
-            if &amount_available < &payload.amount {
-                return HttpResponse::BadRequest().body("Insufficient balance");
-            }
+    let credits_cost = credits_cost * BigDecimal::from(query.0.data_size as u128);
 
-            let amount = &payload.amount;
-
-            let private_key = match PrivateKeySigner::from_str(&config.signing_key) {
-                Ok(key) => key,
-                Err(e) => {
-                    warn!("Error parsing signing key: {}", e);
-                    return HttpResponse::InternalServerError().body(e.to_string());
-                }
-            };
-
-            let nonce = match signer_nonce
-                .filter(signer_address.eq(private_key.address().to_string().to_lowercase()))
-                .select(SignerNonce::as_select())
-                .first(&mut *connection)
-                .await
-            {
-                Ok(nonce) => nonce,
-                Err(e) => {
-                    warn!("Error fetching signer nonce: {}", e);
-                    return HttpResponse::InternalServerError().body(e.to_string());
-                }
-            };
-
-            let signature = match generate_signature(
-                &address.token_address,
-                &amount,
-                &user,
-                nonce.last_nonce,
-                &payload.wallet_address,
-                &config,
-            )
-            .await
-            {
-                Ok(signature) => {
-                    let updated_rows = diesel::update(signer_nonce)
-                        .filter(signer_address.eq(private_key.address().to_string().to_lowercase()))
-                        .set(db::schema::signer_nonce::last_nonce.eq(nonce.last_nonce + 1))
-                        .execute(&mut *connection)
-                        .await;
-
-                    match updated_rows {
-                        Ok(_) => signature,
-                        Err(e) => {
-                            warn!("Error updating signer nonce: {}", e);
-                            return HttpResponse::InternalServerError().body(e.to_string());
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("Error generating signature: {}", e);
-                    return HttpResponse::InternalServerError().body(e.to_string());
-                }
-            };
-            match lock_fund_amount(
-                &amount,
-                &user,
-                &address.token_address.to_lowercase(),
-                &mut *connection,
-            )
-            .await
-            {
-                Ok(_) => HttpResponse::Ok().json(json!({"signature": signature, "nonce": nonce})),
-                Err(e) => {
-                    warn!("Error locking fund amount: {}", e);
-                    return HttpResponse::InternalServerError().body(e.to_string());
-                }
-            }
-        }
-        Err(e) => {
-            warn!("Error fetching token details: {}", e);
-            return HttpResponse::InternalServerError().body(e.to_string());
-        }
-    }
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
 }
 
-async fn lock_fund_amount(
-    amount: &BigDecimal,
-    user: &String,
-    address: &String,
-    connection: &mut AsyncPgConnection,
-) -> Result<(), String> {
-    let updated_rows_query = diesel::update(
-        db::schema::token_balances::table
-            .filter(db::schema::token_balances::token_address.eq(&address))
-            .filter(db::schema::token_balances::user_id.eq(&user)),
-    )
-    .set(
-        db::schema::token_balances::token_amount_locked
-            .eq(db::schema::token_balances::token_amount_locked + amount),
-    )
-    .execute(connection)
-    .await;
-
-    let updated_rows = updated_rows_query.unwrap_or_else(|_| {
-        error!("Update token balances query failed");
-        0
-    });
-
-    if updated_rows > 0 {
-        info!(
-            "Successfully updated token balances with token address {} with amount {}",
-            address, amount
-        );
-        Ok(())
-    } else {
-        error!("No rows updated for token address: {}", address);
-        Err(format!("No rows updated for token address: {}", address))
-    }
+#[derive(Deserialize, Serialize, Clone)]
+pub struct EstimateCreditsParams {
+    pub data: BigDecimal,
 }
 
-async fn generate_signature(
-    address: &String,
-    amount: &BigDecimal,
-    user: &String,
-    nonce: i32,
-    wallet_address: &String,
-    config: &web::Data<AppConfig>,
-) -> Result<String, String> {
-    let signer = PrivateKeySigner::from_str(config.signing_key.as_str()).unwrap();
-    let user: Bytes = Bytes::from_str(hex::encode(user).as_str()).unwrap();
-    let amount: U256 = U256::from(amount.to_string().parse::<u128>().unwrap());
-    let token_addr: Address = Address::from_str(address.as_str()).unwrap();
-    let nonce: U256 = U256::from(nonce);
-    let recipient: Address = Address::from_str(wallet_address.as_str()).unwrap();
+#[get("/estimate_credits")]
+pub async fn estimate_credits(
+    query: web::Query<EstimateCreditsParams>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
 
-    let data = Encoder {
-        userID: user,
-        tokenAddress: token_addr,
-        amount,
-        recipient,
-        nonce,
-    };
-    let abi_encoded = data.abi_encode_packed();
-    let hash = keccak256(&abi_encoded);
-    let signature = signer.sign_hash_sync(&hash);
-    match signature {
-        Ok(signature) => Ok(hex::encode(signature.as_bytes())),
-        Err(e) => Err(e.to_string()),
-    }
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .calculate_credit_utlisation(query.0.data.to_string().as_bytes().to_vec())
+        .await;
+
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+}
+
+#[get("/estimate_credits_for_bytes")]
+pub async fn estimate_credits_for_bytes(
+    request_payload: Bytes,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = SDK::alice().unwrap();
+
+    let convertor = Convertor::new(&sdk, &account);
+
+    let credits_cost = convertor
+        .calculate_credit_utlisation(request_payload.to_vec())
+        .await;
+
+    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
 }
 
 /// Retrieve the list of supported tokens and their corresponding addresses.

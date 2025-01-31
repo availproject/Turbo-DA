@@ -1,10 +1,7 @@
 use crate::{
     config::AppConfig,
-    db::customer_expenditure::{
-        handle_get_all_expenditure, handle_get_customer_expenditure_using_token_id,
-        handle_submission_info,
-    },
-    utils::{get_connection, retrieve_user_id},
+    db::customer_expenditure::{handle_get_all_expenditure, handle_submission_info},
+    utils::{get_connection, retrieve_user_id_from_jwt},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -13,60 +10,28 @@ use std::str::FromStr;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Query parameters for retrieving expenditures with optional limit
 #[derive(Deserialize, Serialize)]
 struct GetAllExpenditures {
     limit: Option<i64>,
 }
 
+/// Request payload for retrieving token expenditure details
 #[derive(Deserialize, Serialize, Validate)]
 struct GetTokenExpenditure {
     token_id: i32,
 }
 
-/// Retrieve details about all expenditures made by a user.
+/// Retrieves all expenditures for an authenticated user
 ///
-/// # Description
-/// This endpoint allows a user to retrieve a list of all their expenditure records. It provides details such as the amount spent, transaction fees, and associated blockchain information. The response can be limited by the `limit` parameter if provided.
-///
-/// # Route
-/// `GET /user/get_all_expenditure`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user whose expenditure records are being queried.
-///
-/// # URL Parameters
-/// * `limit` (optional) - The maximum number of entries to return in the response. If not provided, the server may return a default number of records.
+/// # Arguments
+/// * `request_payload` - Query parameters containing optional limit
+/// * `config` - Application configuration
+/// * `injected_dependency` - Database connection pool
+/// * `http_request` - HTTP request containing user authentication
 ///
 /// # Returns
-/// A JSON array of expenditure records, each including details such as ID, user ID, token details, transaction data, fees, addresses, and timestamps.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/get_all_expenditure" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// [
-///   {
-///     "id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a",
-///     "user_id": "user_2lO5zzxhV08hooYiSCOkfWfPxls",
-///     "token_details_id": 1,
-///     "extrinsic_index": 42,
-///     "amount_data": "100.00",
-///     "fees": "0.01",
-///     "to_address": "0x123abc456def789ghi",
-///     "block_hash": "0xabcdef1234567890",
-///     "data_hash": "0xdeadbeef12345678",
-///     "tx_hash": "0xabcdef9876543210",
-///     "created_at": "2024-09-11T12:34:56"
-///   }
-/// ]
-/// ```
-
+/// JSON response containing list of expenditures or error
 #[get("/get_all_expenditure")]
 pub async fn get_all_expenditure(
     request_payload: web::Query<GetAllExpenditures>,
@@ -75,7 +40,7 @@ pub async fn get_all_expenditure(
     http_request: HttpRequest,
 ) -> impl Responder {
     let limit = request_payload.limit;
-    let user = match retrieve_user_id(http_request) {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -93,115 +58,24 @@ pub async fn get_all_expenditure(
     handle_get_all_expenditure(&mut connection, user, final_limit).await
 }
 
-/// Retrieve details about expenditures made using a specific token.
-///
-/// # Description
-/// This endpoint retrieves a list of expenditure records that were made using a given token. It provides information about the transaction, including amounts, fees, and blockchain-related details. The `token_id` parameter is used to filter the expenditures associated with a specific token.
-///
-/// # Route
-/// `GET /user/get_token_expenditure`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user whose expenditure records are being queried.
-///
-/// # URL Parameters
-/// * `token_id` - The ID of the token for which expenditures are being queried. This ID corresponds to the token details in the database.
-///
-/// # Returns
-/// A JSON array of expenditure records related to the specified token, including details such as ID, user ID, transaction data, amounts, fees, addresses, and timestamps.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/get_token_expenditure?token_id=1" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// [
-///   {
-///     "id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a",
-///     "user_id": "user_2lO5zzxhV08hooYiSCOkfWfPxls",
-///     "token_details_id": 1,
-///     "extrinsic_index": 42,
-///     "amount_data": "100.00",
-///     "fees": "0.01",
-///     "to_address": "0x123abc456def789ghi",
-///     "block_hash": "0xabcdef1234567890",
-///     "data_hash": "0xdeadbeef12345678",
-///     "tx_hash": "0xabcdef9876543210",
-///     "created_at": "2024-09-11T12:34:56"
-///   }
-/// ]
-/// ```
-
-#[get("/get_token_expenditure")]
-pub async fn get_token_expenditure(
-    request_payload: web::Query<GetTokenExpenditure>,
-    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
-    http_request: HttpRequest,
-) -> impl Responder {
-    let user = match retrieve_user_id(http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
-    let token = &request_payload.token_id;
-    let mut connection = match get_connection(&injected_dependency).await {
-        Ok(conn) => conn,
-        Err(response) => return response,
-    };
-    handle_get_customer_expenditure_using_token_id(&mut connection, user, *token).await
-}
-
+/// Query parameters for retrieving submission information
 #[derive(Deserialize, Serialize)]
 struct GetSubmissionInfo {
     submission_id: String,
 }
 
-/// Retrieve details about a specific expenditure using a given submission ID.
+/// Retrieves information about a specific submission
 ///
-/// # Description
-/// This endpoint retrieves detailed information about a specific expenditure record based on the provided `submission_id`. It includes details such as amounts, fees, blockchain-related data, and timestamps.
-///
-/// # Route
-/// `GET /user/get_submission_info`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user making the request.
-///
-/// # URL Parameters
-/// * `submission_id` - The unique ID of the expenditure record to retrieve. This ID corresponds to the submission record in the database.
+/// # Arguments
+/// * `request_payload` - Query parameters containing submission ID
+/// * `injected_dependency` - Database connection pool
 ///
 /// # Returns
-/// A JSON object containing detailed information about the specified expenditure record.
+/// * `HttpResponse` - JSON response containing submission details or error
 ///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/get_submission_info?submission_id=b9a3f58e-0f49-4e3b-9466-f28d73d75e0a" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
-///
-/// # Example Response
-///
-/// ```json
-/// {
-///   "id": "b9a3f58e-0f49-4e3b-9466-f28d73d75e0a",
-///   "user_id": "user_2lO5zzxhV08hooYiSCOkfWfPxls",
-///   "token_details_id": 1,
-///   "extrinsic_index": 42,
-///   "amount_data": "100.00",
-///   "fees": "0.01",
-///   "to_address": "0x123abc456def789ghi",
-///   "block_hash": "0xabcdef1234567890",
-///   "data_hash": "0xdeadbeef12345678",
-///   "tx_hash": "0xabcdef9876543210",
-///   "created_at": "2024-09-11T12:34:56"
-/// }
-/// ```
-
+/// # Description
+/// Validates the submission ID as a UUID and retrieves associated information
+/// from the database. Returns error responses for invalid UUIDs or failed queries.
 #[get("/get_submission_info")]
 pub async fn get_submission_info(
     request_payload: web::Query<GetSubmissionInfo>,

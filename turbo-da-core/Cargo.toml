@@ -6,46 +6,47 @@ edition = "2021"
 [features]
 permissioned=[]
 
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
-bigdecimal = { version = "0.4.6", features = ["serde"] }
-dotenv = "0.15"
+diesel = { workspace = true }
+bigdecimal = { workspace = true }
+dotenv = { workspace = true }
 alloy = { version = "0.7.2", features = ["full"] }
-actix-web = "4.8"
-actix-cors = "0.7"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4.22"
-env_logger = "0.10"
+clerk-rs = { version = "0.4.0", features = ["actix"] }
+actix-web = { workspace = true }
+actix-cors = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
 unicode-normalization = "=0.1.22"
-avail-rust = { git = "https://github.com/availproject/avail-rust", tag = "v0.1.0-rc4" }
-tokio = { version = "1", features = ["full"] }
-uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
+avail-rust = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
 validator = { version = "0.16", features = ["derive"] }
 num-bigint = "0.4"
 jsonwebtoken = "9"
 chrono = { version = "0.4", features=["serde"] }
 thiserror = "1.0"
 lazy_static = "1.4"
-futures-util = "0.3.30"
-bcrypt = "0.15.1"
-diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
-futures = "0.3"
+bcrypt = {workspace = true}
+sha3 = {workspace = true}
+diesel-async = { workspace = true }
+futures = { workspace = true }
 threadpool = "1.8"
 crossbeam-channel = "0.5.13"
 worker = "0.3.3"
+redis = {workspace = true}
 rayon = "1.10.0"
-hex = "0.4"
+hex = { workspace = true }
 reqwest = { version = "0.12.9", features = ["blocking", "json"] }
 cron = { version = "0.8", optional = true }
-toml = {version ="0.8.19"}
+toml = { workspace = true }
 confy = {version = "0.3.1"}
 db = {path = "../db" }
-rand = "0.8.5"
-actix-extensible-rate-limit = "0.4.0"
+rand = {workspace = true}
+actix-extensible-rate-limit = { workspace = true }
 
 [dev-dependencies]
 actix-http = "3.9.0"

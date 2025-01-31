@@ -1,13 +1,10 @@
 #[cfg(test)]
 pub mod test {
     use crate::config::AppConfig;
-    use crate::controllers::{
-        token_balances::{get_token, register_new_token, RegisterToken},
-        users::{get_all_users, get_user, register_new_user, RegisterUser},
-    };
+    use crate::controllers::users::{get_all_users, get_user, register_new_user, RegisterUser};
     use actix_http::Request;
     use actix_web::{dev::ServiceResponse, test, web, App};
-    use db::models::{token_balances::TokenBalances, user_model::User};
+    use db::models::user_model::User;
     use serde::Deserialize;
 
     use std::env;
@@ -197,7 +194,6 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
         let payload = RegisterUser {
             name: "Jane Doe".to_string(),
             app_id: 20,
@@ -238,14 +234,12 @@ pub mod test {
         assert_eq!(user.app_id, 20);
         assert!(!user.id.is_empty());
         assert!(!user.email.is_empty());
-        assert!(!user.assigned_wallet.is_empty());
     }
     #[test]
     async fn test_get_all_users() {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
         let payload = RegisterUser {
             name: "Jane Doe".to_string(),
             app_id: 20,
@@ -289,185 +283,6 @@ pub mod test {
         assert_eq!(user.results[0].app_id, 20);
         assert!(!user.results[0].id.is_empty());
         assert!(!user.results[0].email.is_empty());
-        assert!(!user.results[0].assigned_wallet.is_empty());
-    }
-
-    #[test]
-    async fn test_register_new_token_success() {
-        let db = TestDB::init();
-        let mut app_config = AppConfig::default();
-        app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
-        let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
-            app_id: 20,
-        };
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(app_config.clone()))
-                .app_data(web::Data::new(db.dbc.postgres.clone()))
-                .service(register_new_user)
-                .service(register_new_token),
-        )
-        .await;
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_user")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        insert_user_email(&mut req);
-
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let payload = RegisterToken {
-            token: "ethereum".to_string(),
-        };
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_token")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-        let body = test::read_body(response).await;
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-
-        assert_eq!(
-            body_str,
-            "Success: user: test_user, token: ethereum".to_string()
-        );
-    }
-
-    #[test]
-    async fn test_register_new_token_fails_when_already_registered() {
-        let db = TestDB::init();
-        let mut app_config = AppConfig::default();
-        app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
-        let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
-            app_id: 20,
-        };
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(app_config.clone()))
-                .app_data(web::Data::new(db.dbc.postgres.clone()))
-                .service(register_new_user)
-                .service(register_new_token),
-        )
-        .await;
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_user")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        insert_user_email(&mut req);
-
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let payload = RegisterToken {
-            token: "ethereum".to_string(),
-        };
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_token")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        insert_user_email(&mut req);
-
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_token")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        insert_user_email(&mut req);
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "409 Conflict".to_string());
-    }
-
-    #[test]
-    async fn test_get_token() {
-        let db = TestDB::init();
-        let mut app_config = AppConfig::default();
-        app_config.database_url = db.db_url.clone();
-        app_config.assigned_wallet = "0x01".to_string();
-        let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
-            app_id: 20,
-        };
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(app_config.clone()))
-                .app_data(web::Data::new(db.dbc.postgres.clone()))
-                .service(register_new_user)
-                .service(register_new_token)
-                .service(get_token),
-        )
-        .await;
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_user")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-
-        insert_user_email(&mut req);
-
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let payload = RegisterToken {
-            token: "ethereum".to_string(),
-        };
-
-        let mut req = test::TestRequest::post()
-            .uri("/register_new_token")
-            .set_json(&payload)
-            .to_request();
-
-        insert_user_id(&mut req);
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let mut req = test::TestRequest::get()
-            .uri("/get_token?token_details_id=1")
-            .to_request();
-
-        insert_user_id(&mut req);
-        let response: ServiceResponse = test::call_service(&app, req).await;
-        assert_eq!(response.status().to_string(), "200 OK".to_string());
-
-        let body = test::read_body(response).await;
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-
-        let token: TokenBalances = serde_json::from_str(&body_str).expect("Failed to parse JSON");
-        assert_eq!(
-            token.token_address,
-            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string()
-        );
     }
 
     fn insert_user_id(req: &mut Request) {

@@ -7,11 +7,6 @@ use evm::EVM;
 use log::{error, info};
 #[tokio::main]
 async fn main() {
-    // 1. Get the state information from TURBO DA Contract
-    // 2. Montior events on Turbo DA Contract for deposits. -- done
-    // 3. On detection of deposit, update the funds information in the database.
-    // 4. Detection would be multip chain
-    // 5. Maintain request fund db for the UI to remain consisten with the new design.Update this table on finding deposit receipt
     let cfg = match Config::default().load_config() {
         Ok(c) => c,
         Err(e) => {
@@ -29,6 +24,9 @@ async fn main() {
         let network_ws_url = network_config.ws_url.clone();
         let contract_address = network_config.contract_address.clone();
         let finalised_threshold = network_config.finalised_threshold.clone();
+        let coin_gecho_api_url = cfg.coin_gecho_api_url.clone();
+        let coin_gecho_api_key = cfg.coin_gecho_api_key.clone();
+        let avail_rpc_url = cfg.avail_rpc_url.clone();
 
         info!("Task for network: {}", network_name);
 
@@ -52,10 +50,13 @@ async fn main() {
             let mut evm = match EVM::new(
                 contract_address,
                 database_url,
+                avail_rpc_url,
                 network_ws_url,
                 network_config.chain_id,
                 finalised_threshold,
                 finalised_block_number.block_number as u64,
+                coin_gecho_api_url,
+                coin_gecho_api_key,
             )
             .await
             {

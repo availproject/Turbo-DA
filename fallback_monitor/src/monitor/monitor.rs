@@ -1,25 +1,23 @@
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
-use crate::{
-    config::AppConfig,
-    db::{customer_expenditure::get_unresolved_transactions, users::get_app_id},
+use crate::db::{
+    customer_expenditure::{get_unresolved_transactions, increase_retry_count},
+    users::get_app_id,
 };
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
+use data_submission::{
+    avail::submit_data::SubmitDataAvail, db::customer_expenditure::update_customer_expenditure,
+};
 use db::{
-    models::customer_expenditure::CustomerExpenditureGetWithPayload, schema::token_balances::dsl::*,
+    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
+    schema::users::dsl::*,
 };
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use reqwest::Client;
-use std::str::FromStr;
-use turbo_da_core::{
-    avail::submit_data::SubmitDataAvail,
-    db::customer_expenditure::update_customer_expenditure,
-    utils::{get_prices, TOKEN_MAP},
-};
+use turbo_da_core::utils::Convertor;
 
 /// Monitors and processes failed transactions from the database
 ///
@@ -34,19 +32,19 @@ use turbo_da_core::{
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
     connection: &mut AsyncPgConnection,
-    config: &AppConfig,
     client: &SDK,
     account: &Keypair,
+    retry_count: i32,
 ) {
-    let unresolved_transactions = get_unresolved_transactions(connection).await;
+    let unresolved_transactions = get_unresolved_transactions(connection, retry_count).await;
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {
             process_failed_transactions(
                 connection,
-                config,
                 client,
                 account,
+                retry_count,
                 failed_transactions_list,
             )
             .await;
@@ -73,13 +71,22 @@ pub async fn monitor_failed_transactions(
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
     connection: &mut AsyncPgConnection,
-    config: &AppConfig,
     client: &SDK,
     account: &Keypair,
+    retry_count: i32,
     failed_transactions_list: Vec<CustomerExpenditureGetWithPayload>,
 ) {
     for i in failed_transactions_list {
         info!("Processing failed transaction submission id: {:?} ", i.id);
+        let result = increase_retry_count(i.id, connection).await;
+        if result.is_err() {
+            error!("Failed to increase retry count for entry id: {:?}", i.id);
+            continue;
+        }
+        if i.retry_count > retry_count {
+            error!("Retry count exceeded for transaction id: {:?}", i.id);
+            continue;
+        }
         let Some(data) = i.payload else {
             error!("No payload found for transaction id: {:?}", i.id);
             continue;
@@ -92,10 +99,10 @@ async fn process_failed_transactions(
             }
         };
 
-        let token_details = match token_balances
-            .filter(db::schema::token_balances::token_details_id.eq(i.token_details_id))
-            .select(db::models::token_balances::TokenBalances::as_select())
-            .first::<db::models::token_balances::TokenBalances>(connection)
+        let credit_details = match users
+            .filter(db::schema::users::id.eq(i.user_id))
+            .select(User::as_select())
+            .first::<User>(connection)
             .await
         {
             Ok(details) => details,
@@ -105,58 +112,24 @@ async fn process_failed_transactions(
             }
         };
 
-        let reqwest_client = Client::new();
+        let convertor = Convertor::new(&client, &account);
+        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        let Ok((coin_price, avail_price)) = get_prices(
-            &reqwest_client,
-            &config.coingecko_api_url,
-            &config.coingecko_api_key,
-            &i.payment_token,
-        )
-        .await
-        else {
-            error!("Failed to get prices");
-            continue;
-        };
-
-        let token_balance_in_avail = get_token_price_equivalent_to_avail(
-            &BigDecimal::from(&token_details.token_balance - token_details.token_used),
-            &i.payment_token,
-            &avail_price,
-            &coin_price,
-        );
-
-        info!("Token balance in Avail: {}", token_balance_in_avail);
-
-        if token_balance_in_avail > one_avail() {
-            info!(
-                "Balance is sufficient for user_id {}, balance: {}",
-                i.user_id, token_balance_in_avail
-            );
-        } else {
-            error!("Insufficient balance: {}", token_balance_in_avail);
+        if credits_used > credit_details.credit_balance {
+            error!("Insufficient credits for user id: {:?}", i.id);
             continue;
         }
-
         let submit_data_class = SubmitDataAvail::new(client, account, avail_app_id);
         let submission = submit_data_class.submit_data(&data).await;
 
         match submission {
             Ok(success) => {
                 let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
-                info!("Fees as BigDecimal: {}", fees_as_bigdecimal);
-
-                let fees_as_bigdecimal_in_avail = get_token_price_equivalent_to_avail(
-                    &fees_as_bigdecimal,
-                    &i.payment_token,
-                    &avail_price,
-                    &coin_price,
-                );
 
                 update_customer_expenditure(
                     success,
                     &fees_as_bigdecimal,
-                    &fees_as_bigdecimal_in_avail,
+                    &credits_used,
                     i.id,
                     connection,
                 )
@@ -167,49 +140,4 @@ async fn process_failed_transactions(
             }
         }
     }
-}
-
-/// Calculates the equivalent price in AVAIL tokens for a given amount of another token
-///
-/// # Arguments
-/// * `client` - HTTP client for making API requests
-/// * `config` - Application configuration containing API endpoints
-/// * `amount` - Amount to convert
-/// * `token_name` - Name of the token to convert from
-///
-/// # Returns
-/// * `Result<BigDecimal, String>` - The equivalent amount in AVAIL tokens, rounded to 0 decimal places
-///
-/// # Description
-/// Fetches current prices from Coingecko API and performs conversion calculations
-/// taking into account different token decimal places
-pub fn get_token_price_equivalent_to_avail(
-    amount: &BigDecimal,
-    token_name: &String,
-    avail_price: &f64,
-    coin_price: &f64,
-) -> BigDecimal {
-    let decimals_token = TOKEN_MAP.get(token_name).unwrap().token_decimals;
-    let decimals_avail = TOKEN_MAP.get("avail").unwrap().token_decimals;
-
-    let avail_price_per_token = avail_price / coin_price;
-    let avail_price_per_token_bigdecimal =
-        match BigDecimal::from_str(&avail_price_per_token.to_string()) {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount to BigDecimal: {}", e);
-                return BigDecimal::from(0);
-            }
-        };
-
-    let price = avail_price_per_token_bigdecimal
-        * amount
-        * BigDecimal::from(10_u64.pow(decimals_token as u32))
-        / BigDecimal::from(10_u64.pow(decimals_avail as u32));
-
-    price.round(0)
-}
-
-fn one_avail() -> BigDecimal {
-    BigDecimal::from(10u64.pow(TOKEN_MAP.get("avail").unwrap().token_decimals as u32))
 }

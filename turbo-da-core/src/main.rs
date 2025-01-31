@@ -2,28 +2,18 @@
 /// Customer send the money to us in any ERC20 token, and we fund there user account with equivalant avail.
 /// Customer then directly sends all the payload, in either JSON format or directly as bytes.
 /// The service generates the extrinsic and published it to Avail network.
-pub mod auth;
-pub mod avail;
 pub mod config;
 pub mod controllers;
 pub mod db;
 pub mod routes;
-pub mod store;
 pub mod utils;
-pub mod workload_scheduler;
 
-use crate::{
-    controllers::{
-        customer_expenditure::{get_all_expenditure, get_submission_info, get_token_expenditure},
-        fund::{generate_signature_for_fund_retrieval, get_token_map, request_funds_status},
-        token_balances::{
-            get_all_tokens, get_all_tokens_with_chain_id, get_token, get_token_using_address,
-            register_new_token,
-        },
-        users::{get_all_users, get_user, register_new_user, update_app_id},
-    },
-    utils::TOKEN_MAP,
+use crate::controllers::{
+    customer_expenditure::{get_all_expenditure, get_submission_info},
+    fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
+    users::{get_all_users, get_user, register_new_user, update_app_id},
 };
+
 use actix_cors::Cors;
 use actix_extensible_rate_limit::{
     backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
@@ -33,48 +23,30 @@ use actix_web::{
     dev::Service,
     middleware::Logger,
     web::{self},
-    App, HttpServer,
+    App, HttpMessage, HttpServer,
 };
-use auth::AuthMiddleware;
-use avail_rust::SDK;
 use config::AppConfig;
-use store::{update_token_prices, CoinGeckoStore};
+use controllers::users::{delete_api_key, generate_api_key, get_api_key};
+use tokio::time::Duration;
 
+use clerk_rs::{
+    clerk::Clerk,
+    validators::{actix::ClerkMiddleware, authorizer::ClerkJwt, jwks::MemoryCacheJwksProvider},
+    ClerkConfiguration,
+};
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::{error, info};
-use routes::{
-    data_retrieval::get_pre_image,
-    data_submission::{submit_data, submit_raw_data},
-    health::health_check,
-};
-use std::sync::Arc;
-use tokio::{
-    sync::broadcast,
-    time::{sleep, Duration},
-};
-use utils::generate_keygen_list;
-use workload_scheduler::consumer::Consumer;
+use log::info;
+use routes::health::health_check;
 
-#[cfg(feature = "permissioned")]
-mod whitelist;
-#[cfg(feature = "permissioned")]
-use crate::whitelist::WhitelistMiddleware;
-
-const WAIT_TIME: u64 = 5;
-
-#[cfg(not(feature = "cron"))]
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     info!("Starting API server....");
 
     let app_config = AppConfig::default().load_config()?;
-    let accounts =
-        generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
-    let shared_keypair = web::Data::new(accounts);
-
+    let port = app_config.port;
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
 
@@ -84,44 +56,18 @@ async fn main() -> Result<(), std::io::Error> {
         .expect("Failed to create pool");
 
     let shared_pool = web::Data::new(pool);
-    let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
-    let consumer_server = Consumer::new(
-        sender.clone(),
-        shared_keypair.clone(),
-        shared_pool.clone(),
-        Arc::new(app_config.avail_rpc_endpoint.clone()),
-        app_config.number_of_threads,
-    );
-
-    tokio::spawn(async move {
-        consumer_server.start_workers().await;
-    });
-
-    let coin_gecko_store = web::Data::new(CoinGeckoStore::new());
-
-    let coin_gecko_store_copy = coin_gecko_store.clone();
-    let app_config_copy = app_config.clone();
-
-    tokio::spawn(async move {
-        info!("Running token price update loop....");
-        loop {
-            update_token_prices(
-                app_config_copy.coingecko_api_url.clone(),
-                app_config_copy.coingecko_api_key.clone(),
-                &TOKEN_MAP.keys().cloned().collect::<Vec<String>>(),
-                &coin_gecko_store_copy.get_ref(),
-            )
-            .await;
-            sleep(Duration::from_secs(300)).await;
-        }
-    });
-
-    let payload_size = app_config.payload_size;
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {
-        let shared_producer_send = web::Data::new(sender.clone());
+        let config = ClerkConfiguration::new(
+            None,
+            None,
+            Some(shared_config.clerk_secret_key.clone()),
+            None,
+        );
+        let clerk = Clerk::new(config);
+
         let backend = InMemoryBackend::builder().build();
         let input = SimpleInputFunctionBuilder::new(
             Duration::from_secs(shared_config.rate_limit_window_size),
@@ -132,15 +78,6 @@ async fn main() -> Result<(), std::io::Error> {
         let rate_limiter = RateLimiter::builder(backend.clone(), input)
             .add_headers()
             .build();
-
-        let scope = {
-            let base_scope = web::scope("/user").wrap(AuthMiddleware::new(auth::Role::User));
-
-            #[cfg(feature = "permissioned")]
-            let base_scope = base_scope.wrap(WhitelistMiddleware::new());
-
-            base_scope
-        };
 
         App::new()
             .wrap_fn(|req, srv| {
@@ -172,69 +109,75 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(rate_limiter)
             .service(health_check)
             .wrap(Cors::permissive())
-            .app_data(web::PayloadConfig::new(payload_size))
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
-            .app_data(shared_keypair.clone())
-            .app_data(shared_producer_send)
-            // .app_data(header.clone())
-            // .app_data(limiter.clone())
-            .app_data(coin_gecko_store.clone())
-            // .wrap(RateLimiter)
             .wrap(Logger::default())
+            .wrap(ClerkMiddleware::new(
+                MemoryCacheJwksProvider::new(clerk),
+                None,
+                true,
+            ))
             .service(
-                scope
+                web::scope("/user")
+                    .wrap_fn(|mut req, srv| {
+                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                        let fut = srv.call(req);
+                        async move {
+                            let res = fut.await?;
+                            if let Some(jwt) = jwt {
+                                if !jwt.other.get("role").map_or(false, |r| r == "member") {
+                                    return Err(actix_web::error::ErrorUnauthorized(
+                                        "Unauthorized",
+                                    ));
+                                }
+                            } else {
+                                return Err(actix_web::error::ErrorUnauthorized(
+                                    "Invalid Authorization header",
+                                ));
+                            }
+
+                            Ok(res)
+                        }
+                    })
                     .service(get_user)
-                    .service(get_all_tokens)
-                    .service(get_token)
-                    .service(get_token_using_address)
                     .service(get_all_expenditure)
-                    .service(get_token_expenditure)
-                    .service(submit_data)
-                    .service(submit_raw_data)
                     .service(request_funds_status)
-                    .service(register_new_token)
                     .service(register_new_user)
+                    .service(generate_api_key)
+                    .service(delete_api_key)
+                    .service(get_api_key)
                     .service(get_submission_info)
-                    .service(get_pre_image)
-                    .service(get_all_tokens_with_chain_id)
                     .service(update_app_id)
-                    .service(generate_signature_for_fund_retrieval),
+                    .service(estimate_credits_for_bytes)
+                    .service(estimate_credits),
             )
             .service(
                 web::scope("/admin")
-                    .wrap(AuthMiddleware::new(auth::Role::Admin))
+                    .wrap_fn(|req, srv| {
+                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                        let fut = srv.call(req);
+                        async move {
+                            let res = fut.await?;
+                            if let Some(jwt) = jwt {
+                                if !jwt.other.get("role").map_or(false, |r| r == "admin") {
+                                    return Err(actix_web::error::ErrorUnauthorized(
+                                        "Unauthorized",
+                                    ));
+                                }
+                            } else {
+                                return Err(actix_web::error::ErrorUnauthorized(
+                                    "Invalid Authorization header",
+                                ));
+                            }
+
+                            Ok(res)
+                        }
+                    })
                     .service(get_all_users),
             )
             .service(get_token_map)
     })
-    .bind("0.0.0.0:8000")?
+    .bind(format!("0.0.0.0:{}", port))?
     .run()
     .await
-}
-
-pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
-    let mut attempts = 0;
-
-    loop {
-        if attempts < endpoints.len() {
-            attempts = 0;
-        }
-        let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
-        match SDK::new(endpoint).await {
-            Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
-
-                return sdk;
-            }
-            Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
-                attempts += 1;
-            }
-        }
-
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
-        sleep(Duration::from_secs(WAIT_TIME)).await;
-    }
 }

@@ -1,4 +1,7 @@
 /target
+/data_submission/target
+/data_submission/data
+/data_submission/.env
 /db/target
 /db/cache
 /db/config.toml
@@ -11,7 +14,6 @@
 /contracts/cache
 /contracts/broadcast
 /contracts/github
-/contracts/out
 /contracts/cache
 /contracts/broadcast
 /fallback_monitor/.env
@@ -25,3 +27,8 @@
 /dashboard/node_modules
 .vscode
 .env
+.DS_Store
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store

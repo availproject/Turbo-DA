@@ -4,5 +4,29 @@ members = [
     "db",
     "turbo-da-core",
     "funds_monitor",
-    "fallback_monitor"]
+    "fallback_monitor", "data_submission"]
 resolver = "2"
+
+[workspace.dependencies]
+actix-web = "4.8"
+actix-cors = "0.7"
+hex = "0.4"
+dotenv = "0.15"
+sha3 = "0.10.8"
+redis = { version = "0.28.2", features = ["r2d2"]}
+bcrypt = "0.15.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4.22"
+rand = "0.8.5"
+env_logger = "0.10"
+avail-rust = { git = "https://github.com/availproject/avail-rust", tag = "v0.1.0-rc4" }
+tokio = { version = "1", features = ["full"] }
+uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
+diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
+futures = "0.3"
+bigdecimal = { version = "0.4.6", features = ["serde"] }
+actix-extensible-rate-limit = "0.4.0"
+diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
+toml = {version ="0.8.19"}
+password-hash = {version = "0.5.0"}

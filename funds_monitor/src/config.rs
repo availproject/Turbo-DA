@@ -18,6 +18,9 @@ pub struct Network {
 pub struct Config {
     pub(crate) network: HashMap<String, Network>,
     pub(crate) database_url: String,
+    pub(crate) coin_gecho_api_url: String,
+    pub(crate) coin_gecho_api_key: String,
+    pub(crate) avail_rpc_url: String,
 }
 
 impl Default for Config {
@@ -38,6 +41,9 @@ impl Default for Config {
         Self {
             network,
             database_url: String::new(),
+            coin_gecho_api_url: String::new(),
+            coin_gecho_api_key: String::new(),
+            avail_rpc_url: String::new(),
         }
     }
 }
@@ -93,6 +99,27 @@ impl Config {
             e
         })?;
 
+        let avail_rpc_url = env::var("AVAIL_RPC_URL").map_err(|e| {
+            error!("Failed to get AVAIL_RPC_URL environment variable: {:?}", e);
+            e
+        })?;
+
+        let coin_gecho_api_url = env::var("COINGECKO_API_URL").map_err(|e| {
+            error!(
+                "Failed to get COINGECKO_API_URL environment variable: {:?}",
+                e
+            );
+            e
+        })?;
+
+        let coin_gecho_api_key = env::var("COINGECKO_API_KEY").map_err(|e| {
+            error!(
+                "Failed to get COINGECKO_API_KEY environment variable: {:?}",
+                e
+            );
+            e
+        })?;
+
         let mut network = HashMap::new();
 
         // Collect all environment variables
@@ -144,6 +171,9 @@ impl Config {
         Ok(Config {
             network,
             database_url,
+            coin_gecho_api_url,
+            coin_gecho_api_key,
+            avail_rpc_url,
         })
     }
 }

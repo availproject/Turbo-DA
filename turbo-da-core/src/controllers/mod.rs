@@ -3,5 +3,4 @@
 pub mod customer_expenditure;
 pub mod fund;
 mod test;
-pub mod token_balances;
 pub mod users;

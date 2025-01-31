@@ -7,6 +7,7 @@ edition = "2021"
 alloy = { version = "0.7.2", features = ["full"] }
 dotenv = "0.15.0"
 env_logger = "0.11.5"
+avail-rust = {workspace = true}
 log = "0.4.22"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
@@ -19,3 +20,5 @@ diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 chrono = { version = "0.4", features=["serde"] }
 db = { path = "../db"}
 hex = "0.4.3"
+turbo-da-core = {path= "../turbo-da-core"}
+reqwest = { version = "0.12.9", features = ["blocking", "json"] }

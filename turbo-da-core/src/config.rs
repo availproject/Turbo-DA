@@ -10,42 +10,32 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
-    pub number_of_threads: i32,
+    pub port: u16,
+    pub redis_url: String,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
-    pub private_keys: Vec<String>,
-    pub signing_key: String,
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
-    pub broadcast_channel_size: usize,
-    pub payload_size: usize,
-    pub assigned_wallet: String,
     pub total_users_query_limit: i64,
-    pub maximum_pending_requests: i64,
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
+    pub clerk_secret_key: String,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            port: 8000,
             database_url: String::new(),
-            number_of_threads: 3,
+            redis_url: String::new(),
             max_pool_size: 10,
-            avail_rpc_endpoint: vec![],
-            private_keys: vec![],
-            signing_key: String::new(),
-            #[cfg(feature = "cron")]
-            failure_private_key: String::new(),
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
-            broadcast_channel_size: 100000,
-            payload_size: 1024 * 1024, // in bytes
-            assigned_wallet: String::new(),
             total_users_query_limit: 100,
-            maximum_pending_requests: 50,
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
+            avail_rpc_endpoint: vec![],
+            clerk_secret_key: String::new(),
         }
     }
 }
@@ -97,21 +87,19 @@ impl AppConfig {
     }
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
-        let database_url = env::var("DATABASE_URL")?;
-
-        let number_of_threads = env::var("NUMBER_OF_THREADS")
+        let port = env::var("PORT")
             .map_err(|e| {
-                error!(
-                    "Failed to get NUMBER_OF_THREADS environment variable: {:?}",
-                    e
-                );
+                error!("Failed to get PORT environment variable: {:?}", e);
                 e
             })?
-            .parse::<i32>()
+            .parse::<u16>()
             .map_err(|e| {
-                error!("Invalid NUMBER_OF_THREADS value. Error: {:?}", e);
+                error!("Invalid PORT value. Error: {:?}", e);
                 e.to_string()
             })?;
+
+        let database_url = env::var("DATABASE_URL")?;
+        let redis_url = env::var("REDIS_URL")?;
 
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
@@ -124,31 +112,7 @@ impl AppConfig {
                 e.to_string()
             })?;
 
-        let broadcast_channel_size = env::var("BROADCAST_CHANNEL_SIZE")
-            .map_err(|e| {
-                error!(
-                    "Failed to get BROADCAST_CHANNEL_SIZE environment variable: {:?}",
-                    e
-                );
-                e
-            })?
-            .parse::<usize>()
-            .map_err(|e| {
-                error!("Invalid BROADCAST_CHANNEL_SIZE value. Error: {:?}", e);
-                e.to_string()
-            })?;
-
-        let payload_size = env::var("PAYLOAD_SIZE")
-            .map_err(|e| {
-                error!("Failed to get PAYLOAD_SIZE environment variable: {:?}", e);
-                e
-            })?
-            .parse::<usize>()
-            .map_err(|e| {
-                error!("Invalid PAYLOAD_SIZE value. Error: {:?}", e);
-                e.to_string()
-            })?;
-
+        let clerk_secret_key = env::var("CLERK_SECRET_KEY")?;
         let total_users_query_limit = env::var("TOTAL_USERS_QUERY_LIMIT")
             .map_err(|e| {
                 error!(
@@ -160,20 +124,6 @@ impl AppConfig {
             .parse::<i64>()
             .map_err(|e| {
                 error!("Invalid TOTAL_USERS_QUERY_LIMIT value. Error: {:?}", e);
-                e.to_string()
-            })?;
-
-        let maximum_pending_requests = env::var("MAXIMUM_PENDING_REQUESTS")
-            .map_err(|e| {
-                error!(
-                    "Failed to get MAXIMUM_PENDING_REQUESTS environment variable: {:?}",
-                    e
-                );
-                e
-            })?
-            .parse::<i64>()
-            .map_err(|e| {
-                error!("Invalid MAXIMUM_PENDING_REQUESTS value. Error: {:?}", e);
                 e.to_string()
             })?;
 
@@ -212,36 +162,21 @@ impl AppConfig {
             index += 1;
         }
 
-        let signing_key = env::var("SIGNING_KEY")?;
-
-        let mut private_keys = Vec::new();
-        let mut index = 0;
-        while let Ok(key) = env::var(format!("PRIVATE_KEY_{}", index)) {
-            private_keys.push(key);
-            index += 1;
-        }
-
-        let wallet_assigned = env::var("ASSIGNED_WALLET")?;
-
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
 
         Ok(AppConfig {
+            port,
             database_url,
-            number_of_threads,
+            redis_url,
             max_pool_size,
-            avail_rpc_endpoint,
-            private_keys,
-            signing_key,
+            clerk_secret_key,
             coingecko_api_url,
             coingecko_api_key,
-            broadcast_channel_size,
-            payload_size,
-            assigned_wallet: wallet_assigned,
             total_users_query_limit,
-            maximum_pending_requests,
             rate_limit_window_size,
             rate_limit_max_requests,
+            avail_rpc_endpoint,
         })
     }
 }

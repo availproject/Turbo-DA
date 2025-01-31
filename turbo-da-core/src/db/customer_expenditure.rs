@@ -1,6 +1,5 @@
 use actix_web::HttpResponse;
-use bigdecimal::BigDecimal;
-use customer_expenditure::{CreateCustomerExpenditure, CustomerExpenditureGet};
+use customer_expenditure::CustomerExpenditureGet;
 use db::{models::*, schema::customer_expenditures::dsl::*};
 use diesel::{prelude::*, result::Error};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -8,24 +7,20 @@ use log::{error, info};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::avail::submit_data::TransactionInfo;
-pub async fn handle_get_customer_expenditure_using_token_id(
-    connection: &mut AsyncPgConnection,
-    user: String,
-    token: i32,
-) -> HttpResponse {
-    match customer_expenditures
-        .filter(user_id.eq(user))
-        .filter(token_details_id.eq(token))
-        .select(CustomerExpenditureGet::as_select())
-        .first::<CustomerExpenditureGet>(connection)
-        .await
-    {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(Error::NotFound) => HttpResponse::NotFound().body("User not found"),
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
-    }
-}
+/// Retrieves information about a specific customer expenditure submission
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `submission_id` - UUID of the submission to retrieve
+///
+/// # Returns
+/// * `HttpResponse` - JSON response containing submission details or error message
+///
+/// # Description
+/// Queries the database for a specific customer expenditure entry and returns:
+/// - 200 OK with submission details if found
+/// - 404 Not Found if submission ID doesn't exist
+/// - 500 Internal Server Error for database errors
 pub async fn handle_submission_info(
     connection: &mut AsyncPgConnection,
     submission_id: Uuid,
@@ -44,6 +39,21 @@ pub async fn handle_submission_info(
     }
 }
 
+/// Retrieves all expenditure entries for a specific user
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `user` - User ID string
+/// * `final_limit` - Maximum number of entries to return
+///
+/// # Returns
+/// * `HttpResponse` - JSON response containing list of expenditures or error message
+///
+/// # Description
+/// Queries the database for all expenditure entries belonging to the specified user,
+/// limited by the provided count. Returns:
+/// - 200 OK with list of expenditures if successful
+/// - 500 Internal Server Error if database query fails
 pub async fn handle_get_all_expenditure(
     connection: &mut AsyncPgConnection,
     user: String,
@@ -62,6 +72,16 @@ pub async fn handle_get_all_expenditure(
     }
 }
 
+/// Adds or updates an error entry for a specific submission
+///
+/// # Arguments
+/// * `sub_id` - UUID of the submission to update
+/// * `e` - Error message string to store
+/// * `connection` - Database connection handle
+///
+/// # Description
+/// Updates the error field of a customer expenditure entry with the provided error message.
+/// Logs success or failure of the update operation.
 pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgConnection) {
     let update_values = (error.eq(e.to_string()),);
 
@@ -78,66 +98,4 @@ pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgC
             error!("Couldn't insert error log value. Error: {:?}", e);
         }
     }
-}
-
-pub async fn update_customer_expenditure(
-    result: TransactionInfo,
-    fees_as_bigdecimal: &BigDecimal,
-    fees_as_bigdecimal_in_avail: &BigDecimal,
-    submission_id: Uuid,
-    connection: &mut AsyncPgConnection,
-) {
-    let update_values = (
-        fees.eq(fees_as_bigdecimal),
-        converted_fees.eq(fees_as_bigdecimal_in_avail),
-        to_address.eq(Some(result.to_address)),
-        block_hash.eq(Some(result.block_hash)),
-        data_hash.eq(Some(result.data_hash)),
-        tx_hash.eq(Some(result.tx_hash)),
-        extrinsic_index.eq(Some(result.extrinsic_index as i32)),
-        block_number.eq(Some(result.block_number as i32)),
-        payload.eq(None::<Vec<u8>>),
-        error.eq(None::<String>),
-    );
-
-    let tx = diesel::update(customer_expenditures.filter(id.eq(submission_id)))
-        .set(update_values.clone())
-        .execute(connection)
-        .await;
-
-    match tx {
-        Ok(_) => {
-            info!("Entry updated for submission id {:?} ", submission_id);
-        }
-        Err(e) => {
-            error!(
-                "Couldn't insert customer expenditure entry {:?}. Error: {:?}",
-                update_values, e
-            );
-        }
-    }
-}
-
-pub async fn create_customer_expenditure_entry(
-    connection: &mut AsyncPgConnection,
-    customer_expendire_entry: CreateCustomerExpenditure,
-) {
-    match diesel::insert_into(customer_expenditures)
-        .values(&customer_expendire_entry)
-        .execute(connection)
-        .await
-    {
-        Ok(_) => {
-            info!(
-                "Customer Expenditure entry created {}",
-                &customer_expendire_entry.id
-            );
-        }
-        Err(e) => {
-            error!(
-                "Couldn't create a new customer expenditure entry with submission id {}. Error {:?}",
-                customer_expendire_entry.id, e
-            );
-        }
-    };
 }

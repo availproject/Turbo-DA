@@ -1,0 +1,31 @@
+[package]
+name = "data_submission"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web.workspace = true
+serde.workspace = true
+tokio.workspace = true
+actix-cors.workspace = true
+serde_json.workspace = true
+log.workspace = true
+env_logger.workspace = true
+avail-rust.workspace = true
+uuid.workspace = true
+diesel-async.workspace = true
+futures.workspace = true
+hex.workspace = true
+bigdecimal.workspace = true
+dotenv.workspace = true
+toml.workspace = true
+diesel.workspace = true
+rand.workspace = true
+sha3.workspace = true
+actix-extensible-rate-limit.workspace = true
+futures-util = "0.3.30"
+r2d2 = "*"
+r2d2_redis = "*"
+redis.workspace = true
+db = { path = "../db" }
+turbo-da-core = {path = "../turbo-da-core"}
