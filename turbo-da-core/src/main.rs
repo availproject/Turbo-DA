@@ -122,6 +122,7 @@ async fn main() -> Result<(), std::io::Error> {
                         None,
                         true,
                     ))
+                    .service(get_token_map)
                     .service(
                         web::scope("/user")
                             .wrap_fn(|req, srv| {
@@ -179,8 +180,7 @@ async fn main() -> Result<(), std::io::Error> {
                                 }
                             })
                             .service(get_all_users),
-                    )
-                    .service(get_token_map),
+                    ),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?
