@@ -19,7 +19,7 @@ Key features:
 
 ## API Reference
 
-### 1. POST /submit_data
+### 1. POST v1/submit_data
 
 Submit data to avail using JSON payload.
 
@@ -45,7 +45,7 @@ curl -X POST "https://api.example.com/submit_data
 
 ```
 
-### 2. POST /submit_raw_data
+### 2. POST v1/submit_raw_data
 
 Submit data to avail using JSON payload.
 
@@ -69,7 +69,7 @@ curl -X POST "https://api.example.com/user/submit_raw_data?token=ethereum
 
 ```
 
-### 3. GET /get_pre_image
+### 3. GET v1/get_pre_image
 
 Submit data to avail using JSON payload.
 
@@ -90,7 +90,7 @@ curl -X POST "https://api.example.com/user/get_pre_image?submission_id="<SUBMISS
 
 ```
 
-### 4. GET /get_submission_info
+### 4. GET v1/get_submission_info
 
 Retrieve details about a expenditure done using a given token.
 

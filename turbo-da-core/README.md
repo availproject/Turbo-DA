@@ -67,7 +67,7 @@ Authorization: Bearer <YOUR_TOKEN>
 
 ## Endpoints
 
-### 1. POST /user/register_new_user
+### 1. POST v1/user/register_new_user
 
 Register a new User.
 
@@ -104,7 +104,7 @@ curl -X POST "https://api.example.com/user/register_new_user" \
 }
 ```
 
-### 2. GET /user/get_user
+### 2. GET v1/user/get_user
 
 Create a new user.
 
@@ -137,11 +137,11 @@ curl -X GET "https://api.example.com/user/get_user" \
 }
 ```
 
-### 3. GET /admin/get_all_users
+### 3. GET /v1/admin/get_all_users
 
 Retrieve details about all users.
 
-- **URL**: `/admin/get_all_users`
+- **URL**: `/v1/admin/get_all_users`
 - **Method**: `GET`
 - **Headers**:
   - `Authorization: Bearer <token>`
@@ -151,7 +151,7 @@ Retrieve details about all users.
 #### Example Request:
 
 ```bash
-curl -X GET "https://api.example.com/admin/get_all_users" \
+curl -X GET "https://api.example.com/v1/admin/get_all_users" \
      -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -180,7 +180,7 @@ curl -X GET "https://api.example.com/admin/get_all_users" \
 
 Retrieve supported token lists.
 
-- **URL**: `/token_map`
+- **URL**: `/v1/token_map`
 - **Method**: `GET`
 
 #### Example Request:
@@ -198,11 +198,11 @@ curl -X GET "https://api.example.com/token_map"
 }
 ```
 
-### 12. GET /user/get_all_expenditure
+### 12. GET v1/user/get_all_expenditure
 
 Retrieve details about a expenditures done by a user.
 
-- **URL**: `/user/get_all_expenditure`
+- **URL**: `v1/user/get_all_expenditure`
 - **Method**: `GET`
 - **Headers**:
   - `Authorization: Bearer <token>`
@@ -212,7 +212,7 @@ Retrieve details about a expenditures done by a user.
 #### Example Request:
 
 ```bash
-curl -X GET "https://api.example.com/user/get_all_expenditure" \
+curl -X GET "https://api.example.com/v1/user/get_all_expenditure" \
      -H "Authorization: Bearer YOUR_TOKEN"
 ```
 

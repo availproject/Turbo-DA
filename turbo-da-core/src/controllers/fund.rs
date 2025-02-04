@@ -25,7 +25,7 @@ use serde_json::json;
 /// This endpoint allows a user to retrieve the status and details of their fund request. The response includes information about the amount deposited, the amount of Avail approved, and the current status of the request.
 ///
 /// # Route
-/// `GET /user/request_fund_status`
+/// `GET v1/user/request_fund_status`
 ///
 /// # Headers
 /// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user whose fund request status is being queried.
