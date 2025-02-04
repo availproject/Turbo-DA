@@ -21,7 +21,7 @@ use routes::{
 };
 use std::sync::Arc;
 use tokio::{sync::broadcast, time::Duration};
-use turbo_da_core::utils::generate_keygen_list;
+use turbo_da_core::{routes::health::health_check, utils::generate_keygen_list};
 mod auth;
 mod avail;
 mod config;
@@ -88,13 +88,14 @@ async fn main() -> Result<(), std::io::Error> {
         App::new()
             .wrap(Cors::permissive())
             .wrap(rate_limiter)
-            .wrap(Auth::new(
-                Redis::new(shared_config.redis_url.as_str()),
-                shared_config.database_url.clone(),
-            ))
             .wrap(Logger::default())
+            .service(health_check)
             .service(
                 web::scope("/v1")
+                    .wrap(Auth::new(
+                        Redis::new(shared_config.redis_url.as_str()),
+                        shared_config.database_url.clone(),
+                    ))
                     .app_data(web::PayloadConfig::new(shared_config.payload_size))
                     .app_data(shared_producer_send.clone())
                     .app_data(shared_config.clone())

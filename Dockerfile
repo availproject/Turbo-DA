@@ -4,8 +4,8 @@
 
 FROM --platform=linux/x86_64 ghcr.io/foundry-rs/foundry:master AS foundry-builder
 RUN apt-get update && apt-get install -y git
-COPY contracts /contracts
-WORKDIR /contracts
+COPY . /contracts
+WORKDIR /contracts/contracts
 RUN forge install
 RUN forge build
 
