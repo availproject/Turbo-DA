@@ -83,6 +83,7 @@ async fn main() -> Result<(), std::io::Error> {
             .build();
 
         App::new()
+            .service(health_check)
             .wrap_fn(|req, srv| {
                 let fut = srv.call(req);
                 async move {
@@ -110,75 +111,77 @@ async fn main() -> Result<(), std::io::Error> {
                 }
             })
             .wrap(rate_limiter)
-            .service(health_check)
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
             .wrap(Logger::default())
-            .wrap(ClerkMiddleware::new(
-                MemoryCacheJwksProvider::new(clerk),
-                None,
-                true,
-            ))
             .service(
-                web::scope("/user")
-                    .wrap_fn(|mut req, srv| {
-                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
-                        let fut = srv.call(req);
-                        async move {
-                            let res = fut.await?;
-                            if let Some(jwt) = jwt {
-                                if !jwt.other.get("role").map_or(false, |r| r == "member") {
-                                    return Err(actix_web::error::ErrorUnauthorized(
-                                        "Unauthorized",
-                                    ));
-                                }
-                            } else {
-                                return Err(actix_web::error::ErrorUnauthorized(
-                                    "Invalid Authorization header",
-                                ));
-                            }
+                web::scope("/v1")
+                    .wrap(ClerkMiddleware::new(
+                        MemoryCacheJwksProvider::new(clerk.clone()),
+                        None,
+                        true,
+                    ))
+                    .service(get_token_map)
+                    .service(
+                        web::scope("/user")
+                            .wrap_fn(|req, srv| {
+                                let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                                let fut = srv.call(req);
+                                async move {
+                                    let res = fut.await?;
+                                    if let Some(jwt) = jwt {
+                                        if !jwt.other.get("role").map_or(false, |r| r == "member") {
+                                            return Err(actix_web::error::ErrorUnauthorized(
+                                                "Unauthorized",
+                                            ));
+                                        }
+                                    } else {
+                                        return Err(actix_web::error::ErrorUnauthorized(
+                                            "Invalid Authorization header",
+                                        ));
+                                    }
 
-                            Ok(res)
-                        }
-                    })
-                    .service(get_user)
-                    .service(get_all_expenditure)
-                    .service(request_funds_status)
-                    .service(register_new_user)
-                    .service(generate_api_key)
-                    .service(delete_api_key)
-                    .service(get_api_key)
-                    .service(update_app_id)
-                    .service(purchase_cost)
-                    .service(estimate_credits_for_bytes)
-                    .service(estimate_credits),
-            )
-            .service(
-                web::scope("/admin")
-                    .wrap_fn(|req, srv| {
-                        let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
-                        let fut = srv.call(req);
-                        async move {
-                            let res = fut.await?;
-                            if let Some(jwt) = jwt {
-                                if !jwt.other.get("role").map_or(false, |r| r == "admin") {
-                                    return Err(actix_web::error::ErrorUnauthorized(
-                                        "Unauthorized",
-                                    ));
+                                    Ok(res)
                                 }
-                            } else {
-                                return Err(actix_web::error::ErrorUnauthorized(
-                                    "Invalid Authorization header",
-                                ));
-                            }
+                            })
+                            .service(get_user)
+                            .service(get_all_expenditure)
+                            .service(request_funds_status)
+                            .service(register_new_user)
+                            .service(generate_api_key)
+                            .service(delete_api_key)
+                            .service(get_api_key)
+                            .service(update_app_id)
+                            .service(purchase_cost)
+                            .service(estimate_credits_for_bytes)
+                            .service(estimate_credits),
+                    )
+                    .service(
+                        web::scope("/admin")
+                            .wrap_fn(|req, srv| {
+                                let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
+                                let fut = srv.call(req);
+                                async move {
+                                    let res = fut.await?;
+                                    if let Some(jwt) = jwt {
+                                        if !jwt.other.get("role").map_or(false, |r| r == "admin") {
+                                            return Err(actix_web::error::ErrorUnauthorized(
+                                                "Unauthorized",
+                                            ));
+                                        }
+                                    } else {
+                                        return Err(actix_web::error::ErrorUnauthorized(
+                                            "Invalid Authorization header",
+                                        ));
+                                    }
 
-                            Ok(res)
-                        }
-                    })
-                    .service(get_all_users),
+                                    Ok(res)
+                                }
+                            })
+                            .service(get_all_users),
+                    ),
             )
-            .service(get_token_map)
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()

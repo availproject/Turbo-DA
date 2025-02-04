@@ -95,7 +95,7 @@ pub async fn get_all_users(
 /// Gets user details based on the email address from the authentication token.
 ///
 /// # Route
-/// `GET /user/get_user`
+/// `GET v1/user/get_user`
 ///
 /// # Returns
 /// An `HttpResponse` containing the user's details or an appropriate error message.
@@ -136,7 +136,7 @@ pub async fn get_user(
 /// the authentication token.
 ///
 /// # Route
-/// `POST /users/register_new_user`
+/// `POST v1/users/register_new_user`
 ///
 /// # Request Body
 /// ```json
@@ -290,7 +290,7 @@ pub struct DeleteApiKey {
 /// Removes the specified API key from both the database and Redis cache.
 ///
 /// # Route
-/// `DELETE /users/delete_api_key`
+/// `DELETE v1/users/delete_api_key`
 ///
 /// # Request Body
 /// ```json
@@ -356,7 +356,7 @@ async fn delete_api_key(
 /// Changes the app_id associated with the user's account.
 ///
 /// # Route
-/// `PUT /users/update_app_id`
+/// `PUT v1/users/update_app_id`
 ///
 /// # Request Body
 /// ```json

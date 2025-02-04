@@ -1,13 +1,11 @@
 use crate::{
     config::AppConfig,
-    db::customer_expenditure::{handle_get_all_expenditure, handle_submission_info},
+    db::customer_expenditure::handle_get_all_expenditure,
     utils::{get_connection, retrieve_user_id_from_jwt},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use uuid::Uuid;
 use validator::Validate;
 
 /// Query parameters for retrieving expenditures with optional limit
