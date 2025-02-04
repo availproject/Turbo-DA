@@ -7,10 +7,23 @@ export type Tokens = {
     logo: string;
 }
 
-export enum TokenMapEnum {
-  "0xb1c3cb9b5e598d4e95a85870e7812b99f350982d" = "AVAIL",
-  "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" = "ethereum"
+interface TokenInfo {
+  token_address: string;
+  token_decimals: number;
+  token_ticker?: string;
 }
+
+export interface TokenMap {
+  [key: string]: TokenInfo;
+}
+
+export const TOKEN_MAP: TokenMap = {
+  "avail": {
+    token_address: "0x99a907545815c289fb6de86d55fe61d996063a94",
+    token_decimals: 18,
+    token_ticker: 'AVAIL'
+  }
+};
 
 export type Transaction = {
   amount_avail_approved: string | null;
@@ -30,17 +43,13 @@ export enum SupportedChains {
     Sepolia = 11155111,
   }
 
-
-  export type TokenMap = {
-    "token_map": Record<string, string>;
-  };
-
   export type BalanceResult = {
     results: {
         token_address: string;
         token_balance: string;
         token_details_id: number;
         user_id: string;
+        token_used: string
       }[];
   }
 
@@ -58,4 +67,6 @@ export type Balances = {
     token_balance: string;
     token_name: string;
     token_image: string;
+    token_used: string;
+    token_ticker?: string;
 }

@@ -7,15 +7,16 @@ import { WagmiProvider } from 'wagmi';
 import { darkTheme, getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { ThemeProvider } from 'degen'
 import 'degen/styles'
-import { mainnet, sepolia } from 'viem/chains';
+import { mainnet } from 'viem/chains';
 
 
 const queryClient = new QueryClient();
 
+// THIS IS NOT NEEDED FOR LENS
 export const config = getDefaultConfig({
-  appName: 'Vault UI',
+  appName: 'TurboDa',
   projectId: 'ff3e7e095aae4b0550ed934c1539ed07',
-  chains: [sepolia],
+  chains: [mainnet],
   ssr: true,
 });
 
