@@ -93,15 +93,18 @@ async fn main() -> Result<(), std::io::Error> {
                 shared_config.database_url.clone(),
             ))
             .wrap(Logger::default())
-            .app_data(web::PayloadConfig::new(shared_config.payload_size))
-            .app_data(shared_producer_send.clone())
-            .app_data(shared_config.clone())
-            .app_data(shared_pool.clone())
-            .app_data(shared_keypair.clone())
-            .service(submit_data)
-            .service(submit_raw_data)
-            .service(get_pre_image)
-            .service(get_submission_info)
+            .service(
+                web::scope("/v1")
+                    .app_data(web::PayloadConfig::new(shared_config.payload_size))
+                    .app_data(shared_producer_send.clone())
+                    .app_data(shared_config.clone())
+                    .app_data(shared_pool.clone())
+                    .app_data(shared_keypair.clone())
+                    .service(submit_data)
+                    .service(submit_raw_data)
+                    .service(get_pre_image)
+                    .service(get_submission_info),
+            )
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()

@@ -3,8 +3,10 @@
 #############################################################
 
 FROM --platform=linux/x86_64 ghcr.io/foundry-rs/foundry:master AS foundry-builder
+RUN apt-get update && apt-get install -y git
 COPY contracts /contracts
 WORKDIR /contracts
+RUN forge install
 RUN forge build
 
 FROM docker.io/library/rust:1.82.0-bookworm AS base
