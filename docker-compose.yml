@@ -9,6 +9,13 @@ services:
     restart: unless-stopped
     networks:
       - net
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - net
   fallback_monitor:
     container_name: fallback_monitor
     build:
@@ -39,6 +46,25 @@ services:
       - ./turbo-da-core/.env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  data_submission:
+    container_name: data_submission
+    ports:
+      - 8080:8080
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: data_submission
+    restart: unless-stopped
+    networks:
+      - net
+    env_file:
+      - ./data_submission/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

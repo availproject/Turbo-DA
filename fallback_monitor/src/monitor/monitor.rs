@@ -8,7 +8,11 @@ use crate::db::{
 use avail_rust::{Keypair, SDK};
 use bigdecimal::BigDecimal;
 use data_submission::{
-    avail::submit_data::SubmitDataAvail, db::customer_expenditure::update_customer_expenditure,
+    avail::submit_data::SubmitDataAvail,
+    db::{
+        customer_expenditure::update_customer_expenditure,
+        users::{update_credit_balance, TxParams},
+    },
 };
 use db::{
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
@@ -17,7 +21,7 @@ use db::{
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use turbo_da_core::utils::Convertor;
+use turbo_da_core::utils::{format_size, Convertor};
 
 /// Monitors and processes failed transactions from the database
 ///
@@ -100,7 +104,7 @@ async fn process_failed_transactions(
         };
 
         let credit_details = match users
-            .filter(db::schema::users::id.eq(i.user_id))
+            .filter(db::schema::users::id.eq(&i.user_id))
             .select(User::as_select())
             .first::<User>(connection)
             .await
@@ -126,14 +130,20 @@ async fn process_failed_transactions(
             Ok(success) => {
                 let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
 
+                let tx_params = TxParams {
+                    amount_data: format_size(data.len()),
+                    amount_data_billed: credits_used,
+                    fees: success.gas_fee,
+                };
                 update_customer_expenditure(
                     success,
                     &fees_as_bigdecimal,
-                    &credits_used,
+                    &tx_params.amount_data_billed,
                     i.id,
                     connection,
                 )
                 .await;
+                update_credit_balance(connection, &i.user_id, &tx_params).await;
             }
             Err(e) => {
                 error!("Tx submission failed again: id {:?}", e);
