@@ -171,7 +171,7 @@ pub async fn register_new_user(
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
     };
-    println!("user: {}", user);
+
     if user_exists(&mut connection, user.as_mut_str())
         .await
         .is_ok_and(|exists| exists)

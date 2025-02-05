@@ -4,8 +4,8 @@
 
 FROM --platform=linux/x86_64 ghcr.io/foundry-rs/foundry:master AS foundry-builder
 RUN apt-get update && apt-get install -y git
-COPY . /contracts
-WORKDIR /contracts/contracts
+COPY . .
+WORKDIR ./contracts
 RUN forge install
 RUN forge build
 
@@ -55,3 +55,12 @@ FROM runtime AS turbo-da-core
 COPY --from=turbo-da-core-builder /target/debug/turbo-da-core /
 COPY ./turbo-da-core/.env /
 ENTRYPOINT ["/turbo-da-core"]
+
+
+FROM builder AS data_submission-builder
+RUN cargo build --bin data_submission
+
+FROM runtime AS data_submission
+COPY --from=data_submission-builder /target/debug/data_submission /
+COPY ./data_submission/.env /
+ENTRYPOINT ["/data_submission"]

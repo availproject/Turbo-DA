@@ -52,55 +52,55 @@ services:
     networks:
       - net
 
-  # funds_monitor:
-  #   container_name: funds_monitor
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #     target: funds_monitor
-  #   networks:
-  #     - net
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     migration:
-  #       condition: service_completed_successfully
-  #   env_file:
-  #     - ./funds_monitor/.env
+  funds_monitor:
+    container_name: funds_monitor
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: funds_monitor
+    networks:
+      - net
+    depends_on:
+      db:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    env_file:
+      - ./funds_monitor/.env
 
-  # fallback_monitor:
-  #   container_name: fallback_monitor
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #     target: fallback_monitor
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     migration:
-  #       condition: service_completed_successfully
-  #   networks:
-  #     - net
-  #   env_file:
-  #     - ./fallback_monitor/.env
+  fallback_monitor:
+    container_name: fallback_monitor
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fallback_monitor
+    depends_on:
+      db:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - net
+    env_file:
+      - ./fallback_monitor/.env
 
-  # turbo-da-core:
-  #   container_name: turbo-da-core
-  #   ports:
-  #     - 8000:8000
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #     target: turbo-da-core
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     migration:
-  #       condition: service_completed_successfully
-  #   networks:
-  #     - net
-  #   env_file:
-  #     - ./turbo-da-core/.env
+  turbo-da-core:
+    container_name: turbo-da-core
+    ports:
+      - 8000:8000
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: turbo-da-core
+    depends_on:
+      db:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - net
+    env_file:
+      - ./turbo-da-core/.env
 
 networks:
   net:
