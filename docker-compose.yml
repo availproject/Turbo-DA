@@ -10,12 +10,12 @@ services:
     networks:
       - net
   redis:
-    image: redis
-    container_name: redis
-    ports:
-      - "6379:6379"
+    image: "redis:alpine"
+    command: redis-server --save "" --appendonly no
     networks:
       - net
+    ports:
+      - 6379:6379
   fallback_monitor:
     container_name: fallback_monitor
     build:
