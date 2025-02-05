@@ -21,8 +21,10 @@ use turbo_da_core::{
 
 use crate::{
     avail::submit_data::{SubmitDataAvail, TransactionInfo},
-    db::customer_expenditure::update_customer_expenditure,
-    routes::data_submission::TxParams,
+    db::{
+        customer_expenditure::update_customer_expenditure, users::update_credit_balance,
+        users::TxParams,
+    },
 };
 
 pub struct Consumer {
@@ -218,33 +220,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             self.connection,
         )
         .await;
-        self.update_credit_balance(tx_params).await;
-    }
-
-    async fn update_credit_balance(&mut self, tx_params: TxParams) {
-        let tx = diesel::update(users.find(&self.response.user_id))
-            .set((
-                credit_balance
-                    .eq(db::schema::users::credit_balance - &tx_params.amount_data_billed),
-                credit_used.eq(db::schema::users::credit_used + &tx_params.amount_data_billed),
-            ))
-            .execute(&mut self.connection)
-            .await;
-
-        match tx {
-            Ok(_) => {
-                info!(
-                    "Entry updated with credits deduction {:?} ",
-                    tx_params.amount_data_billed
-                );
-            }
-            Err(e) => {
-                error!(
-                    "Couldn't insert update fee information entry for token details id {:?}, fee: {:?}. Error {:?}",
-                    self.response.user_id, tx_params.fees, e
-                );
-            }
-        }
+        update_credit_balance(self.connection, &self.response.user_id, &tx_params).await;
     }
 }
 

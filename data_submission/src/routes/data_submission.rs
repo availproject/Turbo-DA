@@ -6,7 +6,6 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use bigdecimal::BigDecimal;
 use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::error;
@@ -22,14 +21,6 @@ use turbo_da_core::{
 #[derive(Deserialize, Serialize, Clone)]
 pub struct SubmitData {
     pub data: String,
-}
-
-/// Parameters for transaction details
-#[derive(Clone)]
-pub struct TxParams {
-    pub amount_data: String,
-    pub amount_data_billed: BigDecimal,
-    pub fees: u128,
 }
 
 /// Handles submission of string data

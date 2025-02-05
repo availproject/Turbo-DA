@@ -9,5 +9,5 @@ CREATE TABLE credit_requests (
     tx_hash VARCHAR,
     request_type VARCHAR(50) NOT NULL,
     UNIQUE(chain_id, tx_hash),
-    FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
+    FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );

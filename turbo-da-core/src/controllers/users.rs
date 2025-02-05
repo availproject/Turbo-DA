@@ -1,7 +1,7 @@
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_user_email_from_jwt, retrieve_user_id_from_jwt},
+    utils::{get_connection, retrieve_user_id_from_jwt},
 };
 /// Web framework dependencies for handling HTTP requests and responses
 use actix_web::{
@@ -116,7 +116,7 @@ pub async fn get_user(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let user_email = match retrieve_user_email_from_jwt(&http_request) {
+    let user_email = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
     };
@@ -167,28 +167,22 @@ pub async fn register_new_user(
         Err(response) => return response,
     };
 
-    let mut user_email = match retrieve_user_email_from_jwt(&http_request) {
+    let mut user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
     };
 
-    if user_exists(&mut connection, user_email.as_mut_str())
+    if user_exists(&mut connection, user.as_mut_str())
         .await
         .is_ok_and(|exists| exists)
     {
         return HttpResponse::Conflict().body("User already exists");
     }
 
-    let user = match retrieve_user_id_from_jwt(&http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
-
     let tx = diesel::insert_into(users)
         .values(UserCreate {
-            id: user,
+            id: user.clone(),
             name: payload.name.clone(),
-            email: user_email.clone(),
             app_id: payload.app_id,
         })
         .execute(&mut *connection)
@@ -408,7 +402,7 @@ async fn update_app_id(
 
 async fn handle_getuser_query(connection: &mut AsyncPgConnection, mail: String) -> HttpResponse {
     match users
-        .filter(email.eq(mail))
+        .filter(id.eq(mail))
         .select(User::as_select())
         .first::<User>(connection)
         .await
@@ -432,7 +426,7 @@ pub async fn user_exists(
     connection: &mut AsyncPgConnection,
     user_email: &str,
 ) -> Result<bool, Error> {
-    diesel::select(diesel::dsl::exists(users.filter(email.eq(user_email))))
+    diesel::select(diesel::dsl::exists(users.filter(id.eq(user_email))))
         .get_result(connection)
         .await
 }

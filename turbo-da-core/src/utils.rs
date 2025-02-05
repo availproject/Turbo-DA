@@ -140,23 +140,9 @@ pub fn retrieve_user_id(http_request: HttpRequest) -> Option<String> {
 pub fn retrieve_user_id_from_jwt(http_request: &HttpRequest) -> Option<String> {
     let jwt = http_request.extensions().get::<ClerkJwt>().cloned();
     if let Some(jwt) = jwt {
-        jwt.other.get("user_id").map(|id| id.to_string())
-    } else {
-        None
-    }
-}
-
-/// Retrieves user email from JWT in HTTP request
-///
-/// # Arguments
-/// * `http_request` - HTTP request containing JWT with user email
-///
-/// # Returns
-/// * `Option<String>` - User email if found in JWT, None otherwise
-pub fn retrieve_user_email_from_jwt(http_request: &HttpRequest) -> Option<String> {
-    let jwt = http_request.extensions().get::<ClerkJwt>().cloned();
-    if let Some(jwt) = jwt {
-        jwt.other.get("user_email").map(|id| id.to_string())
+        jwt.other
+            .get("user_email")
+            .map(|id| id.to_string().trim_matches('"').to_string())
     } else {
         None
     }

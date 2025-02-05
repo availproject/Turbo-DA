@@ -31,6 +31,13 @@ services:
       - ./db:/scripts
     entrypoint: bash -c "apt update && apt install -y jq && cd scripts && chmod +x /scripts/migration.sh && /scripts/migration.sh"
 
+  redis:
+    image: "redis:alpine"
+    command: redis-server --save "" --appendonly no
+    networks:
+      - net
+    ports:
+      - 6379:6379
   pgweb:
     container_name: pgweb
     image: sosedoff/pgweb
