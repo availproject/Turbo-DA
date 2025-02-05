@@ -11,7 +11,7 @@ export default function Header() {
         </p>
       </h1>
       <img
-        src="/tokens/0xb1c3cb9b5e598d4e95a85870e7812b99f350982d.png"
+        src="/favicon.ico"
         className="md:hidden flex w-8"
         alt="Logo"
       ></img>
@@ -20,12 +20,12 @@ export default function Header() {
         <FaGithub className="w-6 h-6" />
         </a>
         <SignedOut>
-          <button className="bg-[#1D1D1D] rounded-lg p-2 text-white text-opacity-80 hover:text-opacity-100">
+          <button className="bg-[#1D1D1D] font-sans font-thin rounded-lg p-2 text-white text-opacity-80 hover:text-opacity-100">
             <SignInButton mode="modal" />
           </button>
         </SignedOut>
         <SignedIn>
-          <CopySession />
+          {/* <CopySession /> */}
           <UserButton />
         </SignedIn>
       </div>

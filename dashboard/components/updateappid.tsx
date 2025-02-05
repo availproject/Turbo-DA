@@ -9,7 +9,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import useUserInfo from "@/hooks/useUserInfo";
-import { updateAppID } from "@/lib/services";
+import {
+  ApiKey,
+  generateApikey,
+  getAllApiKeys,
+  updateAppID,
+} from "@/lib/services";
 import { template } from "@/lib/utils";
 import { useCommonStore } from "@/store/common";
 import { showFailedMessage, showSuccessMessage } from "@/utils/toasts";
@@ -18,38 +23,67 @@ import { Button, Input } from "degen";
 import { Copy, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
+import ApiKeysTable from "./apikeytable";
+import Loader from "./loader";
+import { Alert, AlertDescription } from "./ui/alert";
 
 export default function UpdateAppId() {
   const { user } = useCommonStore();
   const { getToken, isSignedIn } = useAuth();
+  const [token, setToken] = useState<null | string>("");
   const { getUserInfo } = useUserInfo();
 
   const [updatedAppID, setUpdatedAppID] = useState<number>(0);
+  const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [generatingKey, setGeneratingKey] = useState<boolean>(false);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
-  const [token, setToken] = useState<null | string>('')
-  
-    useEffect(() => {
-      (async () => {
-      isSignedIn && setToken(await getToken({ template }))
-      })()
-    }, [getToken, isSignedIn])
-  
-    const copyToken = async () => {
-      try {
-      token &&  await navigator.clipboard.writeText(token)
-        showSuccessMessage({
-          title: "Token Copied",
-          description: "You can use this api-key to get funded and submit data through the script.",
-        })
-      } catch (err) {
-        console.error('Failed to copy token: ', err)
-        showFailedMessage({
-          title: "Error",
-          description: "Failed to copy token",
-        })
-      }
+  const [showCopyAlert, setShowCopyAlert] = useState<boolean>(false);
+
+  useEffect(() => {
+    (async () => {
+      isSignedIn && setToken(await getToken({ template }));
+    })();
+  }, [getToken, isSignedIn]);
+
+  const generateKey = async () => {
+    try {
+      setGeneratingKey(true);
+      if (!token) throw new Error("Token not found");
+      const key = await generateApikey(token);
+      setGeneratedApiKey(key.api_key);
+      setShowCopyAlert(true);
+      showSuccessMessage({
+        title: "API Key Generated",
+        description: "New API key has been generated successfully.",
+      });
+    } catch (err) {
+      console.error("Failed to generate API key: ", err);
+      showFailedMessage({
+        title: "Error",
+        description: "Failed to generate new API key",
+      });
+    } finally {
+      setGeneratingKey(false);
     }
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showSuccessMessage({
+        title: "Copied!",
+        description: "API key copied to clipboard",
+      });
+    } catch (err) {
+      showFailedMessage({
+        title: "Error",
+        description: "Failed to copy API key",
+      });
+    }
+  };
+
 
   /**
    *
@@ -63,11 +97,20 @@ export default function UpdateAppId() {
 
   if (user) {
     return (
-      <>
+
         <div className="pl-2">
-          <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">AppID<Badge className="ml-2 text-lg">Current: {user.app_id}</Badge></h1>
+          <h1 className="text-left text-2xl font-mono text-white pb-2 pt-4 ">
+            AppID<Badge className="ml-2 text-lg">Current: {user.app_id}</Badge>
+          </h1>
           <p className="text-opacity-60 text-white pb-2">
-            This is your AppId, the data you submit can be queried with this. <a href="https://docs.availproject.org/docs/appid" target="_blank" className="underline">Read More</a>
+            This is your AppId, the data you submit can be queried with this.{" "}
+            <a
+              href="https://docs.availproject.org/docs/appid"
+              target="_blank"
+              className="underline"
+            >
+              Read More
+            </a>
           </p>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger>
@@ -79,13 +122,13 @@ export default function UpdateAppId() {
             </DialogTrigger>
             <DialogContent className="bg-[#131313] border-0 flex flex-col items-center justify-center !rounded-xl !bg-opacity-100">
               <DialogHeader>
-                <DialogTitle className="!text-white !text-left text-2xl !text-opacity-80 py-3">
+                <DialogTitle className="!text-white !text-left font-thin text-2xl !text-opacity-80 py-3">
                   Configure AppID
                 </DialogTitle>
                 <DialogDescription>
                   <p className="mb-4">
-                    Update your AppID to enable the gas relayer to work with
-                    your specific app.
+                    Update your AppID to enable the data submission script to
+                    work with your specific app.
                   </p>
                   <div className="flex flex-row space-x-2 items-center justify-center">
                     {" "}
@@ -144,13 +187,56 @@ export default function UpdateAppId() {
               </DialogHeader>
             </DialogContent>
           </Dialog>
-          <h1 className="text-left text-4xl font-mono text-white pb-2 pt-4 ">ApiKey</h1>
-          <span className="text-opacity-60 text-white pb-6">
-           You can use this Api key to submit data, we&apos;ll fund your balances based on this key.<span onClick={copyToken} className="hover:cursor-pointer hover:underline text-blue-400 flex flex-row items-center pt-2 pb-8 space-x-2"><p>Copy to clipboard</p> <Copy className="w-4 h-4"/></span>
-          </span>
+          <h1 className="text-left text-2xl font-mono text-white pb-2 pt-4 ">
+            API Keys
+          </h1>
+        <div className="text-opacity-60 text-white pb-6">
+          <p className="mb-4">
+            You can use this API key to submit data. We'll fund your data credit based on this key.
+          </p>
+          
+          <div className="flex flex-col space-y-4">
+            <button
+              onClick={generateKey}
+              disabled={generatingKey}
+              className="inline-flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              {generatingKey ? (
+                <span className="flex items-center space-x-2">
+                  <Loader />
+                  <span>Generating new key...</span>
+                </span>
+              ) : (
+                <span className="underline">Generate new key</span>
+              )}
+            </button>
+
+            {generatedApiKey && (
+              <div className="space-y-4">
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertDescription className="text-yellow-200">
+                    Important: This API key will only be shown once. Please copy it now and store it securely.
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="flex items-center space-x-2 bg-black/30 p-3 rounded-lg">
+                  <code className="font-mono flex-1 break-all">
+                    {generatedApiKey}
+                  </code>
+                  <button
+                    onClick={() => handleCopy(generatedApiKey)}
+                    className="p-2 hover:bg-white/10 rounded-md transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+            {token && <ApiKeysTable token={token} />}
         </div>
-      </>
-    );
+      </div>
+);
   }
 
   return <>...</>;

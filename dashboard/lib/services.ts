@@ -26,10 +26,12 @@ export type T = {
  * @returns {Promise} - a promise that resolves to the transactions for the user
  *
  */
-export async function fetchTransactions(auth: string): Promise<{requests: Transaction[]}> {
+export async function fetchTransactions(
+  auth: string
+): Promise<{ requests: Transaction[] }> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/request_fund_status`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/request_fund_status`,
       {
         method: "GET",
         headers: {
@@ -63,7 +65,7 @@ export async function fetchTransactions(auth: string): Promise<{requests: Transa
 export async function fetchSupportedTokens(): Promise<TokenMap> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/token_map`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/token_map`,
       {
         method: "GET",
         headers: {
@@ -89,7 +91,7 @@ export async function fetchSupportedTokens(): Promise<TokenMap> {
 export async function fetchTokenBalances(auth: string): Promise<BalanceResult> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/get_all_tokens`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_all_tokens`,
       {
         method: "GET",
         headers: {
@@ -120,7 +122,7 @@ export async function requestFunds(
 ): Promise<T> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/request_funds`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/request_funds`,
       {
         method: "POST",
         headers: {
@@ -155,7 +157,7 @@ export async function enrollToken(
 ): Promise<T> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/register_new_token`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_new_token`,
       {
         method: "POST",
         headers: {
@@ -186,7 +188,7 @@ export async function enrollToken(
 export async function fetchUser(auth: string): Promise<User | undefined> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/get_user`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_user`,
       {
         method: "GET",
         headers: {
@@ -205,7 +207,97 @@ export async function fetchUser(auth: string): Promise<User | undefined> {
   }
 }
 
-export async function registerUser(auth: string, email:string, name:string): Promise<String> {
+export interface ApiKey {
+  api_key: string;
+  created_at: string;
+  identifier: string;
+  user_id: string;
+}
+
+export async function generateApikey(
+  auth: string
+): Promise<{ api_key: string }> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/generate_api_key`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    Logger.error(`GENERATE_API_KEY ${error.message} - ${error.status}`);
+    throw new Error(
+      "An error occurred while generating api key from backend",
+      error
+    );
+  }
+}
+
+export async function getAllApiKeys(auth: string): Promise<ApiKey[]> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_api_key`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const keys = await response.json();
+    console.log(keys, "response");
+    return keys;
+  } catch (error: any) {
+    Logger.error(`GET_ALL_API_KEYS ${error.message} - ${error.status}`);
+    throw new Error(
+      "An error occurred while fetching all api keys from backend",
+      error
+    );
+  }
+}
+
+interface DeleteApiKeyResponse {
+  message: string;
+  success: boolean;
+}
+
+export async function deleteApiKey(auth: string, identifier: string): Promise<DeleteApiKeyResponse> {
+  const response = await fetch( `${process.env.NEXT_PUBLIC_API_URL}/v1/user/delete_api_key`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth}`
+    },
+    body: JSON.stringify({ identifier })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete API key: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function registerUser(
+  auth: string,
+  email: string,
+  name: string
+): Promise<String> {
   try {
     const body = {
       name: name,
@@ -214,7 +306,7 @@ export async function registerUser(auth: string, email:string, name:string): Pro
     };
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/register_new_user`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_new_user`,
       {
         method: "POST",
         headers: {
@@ -242,14 +334,14 @@ export async function registerUser(auth: string, email:string, name:string): Pro
 export async function updateAppID(auth: string, app_id: number): Promise<T> {
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/user/update_app_id`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/update_app_id`,
       {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth}`,
         },
-        body: JSON.stringify({ app_id: Number(app_id) })
+        body: JSON.stringify({ app_id: Number(app_id) }),
       }
     );
 
