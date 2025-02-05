@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub id: String,
     pub name: String,
-    pub email: String,
     pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
@@ -19,7 +18,6 @@ pub struct User {
 pub struct UserCreate {
     pub id: String,
     pub name: String,
-    pub email: String,
     pub app_id: i32,
 }
 
@@ -29,7 +27,6 @@ pub struct UserCreate {
 pub struct UserLogin {
     pub id: String,
     pub name: String,
-    pub email: String,
     pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,

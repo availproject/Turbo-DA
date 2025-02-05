@@ -15,6 +15,6 @@ CREATE TABLE customer_expenditures (
     retry_count INTEGER NOT NULL DEFAULT 0,
     error VARCHAR,
     payload BYTEA,
-    FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
+    FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 

@@ -61,7 +61,6 @@ diesel::table! {
     users (id) {
         id -> Varchar,
         name -> Varchar,
-        email -> Varchar,
         app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,

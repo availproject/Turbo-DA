@@ -128,8 +128,6 @@ pub mod test {
             .set_json(&payload)
             .to_request();
 
-        insert_user_id(&mut req);
-
         insert_user_email(&mut req);
 
         let response: ServiceResponse = test::call_service(&app, req).await;
@@ -144,8 +142,6 @@ pub mod test {
             .uri("/register_new_user")
             .set_json(&payload)
             .to_request();
-
-        insert_user_id(&mut req);
 
         insert_user_email(&mut req);
 
@@ -179,8 +175,6 @@ pub mod test {
             .set_json(&payload)
             .to_request();
 
-        insert_user_id(&mut req);
-
         insert_user_email(&mut req);
 
         let response: ServiceResponse = test::call_service(&app, req).await;
@@ -213,7 +207,6 @@ pub mod test {
             .set_json(&payload)
             .to_request();
 
-        insert_user_id(&mut req);
         insert_user_email(&mut req);
 
         let response: ServiceResponse = test::call_service(&app, req).await;
@@ -221,7 +214,6 @@ pub mod test {
 
         let mut req_get = test::TestRequest::get().uri("/get_user").to_request();
 
-        insert_user_id(&mut req_get);
         insert_user_email(&mut req_get);
 
         let response: ServiceResponse = test::call_service(&app, req_get).await;
@@ -233,7 +225,6 @@ pub mod test {
         assert_eq!(user.name, "Jane Doe");
         assert_eq!(user.app_id, 20);
         assert!(!user.id.is_empty());
-        assert!(!user.email.is_empty());
     }
     #[test]
     async fn test_get_all_users() {
@@ -259,8 +250,6 @@ pub mod test {
             .set_json(&payload)
             .to_request();
 
-        insert_user_id(&mut req);
-
         insert_user_email(&mut req);
 
         let response: ServiceResponse = test::call_service(&app, req).await;
@@ -282,20 +271,6 @@ pub mod test {
         assert_eq!(user.results[0].name, "Jane Doe");
         assert_eq!(user.results[0].app_id, 20);
         assert!(!user.results[0].id.is_empty());
-        assert!(!user.results[0].email.is_empty());
-    }
-
-    fn insert_user_id(req: &mut Request) {
-        let headers = req.headers_mut();
-
-        headers.insert(
-            "user_id"
-                .parse::<actix_web::http::header::HeaderName>()
-                .unwrap(),
-            "test_user"
-                .parse::<actix_web::http::header::HeaderValue>()
-                .unwrap(),
-        );
     }
 
     fn insert_user_email(req: &mut Request) {
