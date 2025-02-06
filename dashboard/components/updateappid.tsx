@@ -192,7 +192,7 @@ export default function UpdateAppId() {
           </h1>
         <div className="text-opacity-60 text-white pb-6">
           <p className="mb-4">
-            You can use this API key to submit data. We'll fund your data credit based on this key.
+            You can use this API key to submit data. We&apos;ll fund your data credit based on this key.
           </p>
           
           <div className="flex flex-col space-y-4">
