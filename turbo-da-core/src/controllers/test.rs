@@ -81,7 +81,7 @@ pub mod test {
         app_config.database_url = db.db_url.clone();
 
         let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
+            name: Some("Jane Doe".to_string()),
             app_id: 20,
         };
 
@@ -111,7 +111,7 @@ pub mod test {
         app_config.database_url = db.db_url.clone();
 
         let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
+            name: Some("Jane Doe".to_string()),
             app_id: 20,
         };
 
@@ -158,7 +158,7 @@ pub mod test {
         app_config.database_url = db.db_url.clone();
 
         let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
+            name: Some("Jane Doe".to_string()),
             app_id: 20,
         };
 
@@ -189,7 +189,7 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
         let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
+            name: Some("Jane Doe".to_string()),
             app_id: 20,
         };
 
@@ -232,7 +232,7 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
         let payload = RegisterUser {
-            name: "Jane Doe".to_string(),
+            name: Some("Jane Doe".to_string()),
             app_id: 20,
         };
 

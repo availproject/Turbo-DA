@@ -43,8 +43,7 @@ struct GetAllUsersParams {
 /// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
-    #[validate(length(min = 1))]
-    pub name: String,
+    pub name: Option<String>,
     pub app_id: i32,
 }
 
@@ -179,17 +178,22 @@ pub async fn register_new_user(
         return HttpResponse::Conflict().body("User already exists");
     }
 
+    let username = match payload.name.clone() {
+        Some(val) => val,
+        None => user.split("@").next().unwrap().to_string(),
+    };
+
     let tx = diesel::insert_into(users)
         .values(UserCreate {
             id: user.clone(),
-            name: payload.name.clone(),
+            name: username,
             app_id: payload.app_id,
         })
         .execute(&mut *connection)
         .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().body(format!("Success: {}", payload.name)),
+        Ok(_) => HttpResponse::Ok().body(format!("Success: {}", user)),
         Err(e) => HttpResponse::NotAcceptable().body(format!("Error: {}", e)),
     }
 }
