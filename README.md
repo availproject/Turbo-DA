@@ -1,4 +1,4 @@
-# Turbo Data
+# Turbo DA
 
 TurboDA is a service that posts data on users’ behalf. Users can buy “credits” which allow them to post data via the service at a guaranteed rate. It handles all the error logic internally, and can respond immediately with a “pre-confirmation” even before the data is finalized on the Avail chain.
 
