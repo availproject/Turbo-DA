@@ -39,9 +39,6 @@ services:
     restart: unless-stopped
     networks:
       - net
-    volumes:
-      - ./turbo-da-core/whitelist.json:/whitelist.json
-      - ./turbo-da-core/public_key.pem:/public_key.pem
     env_file:
       - ./turbo-da-core/.env
     healthcheck:
