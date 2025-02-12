@@ -4,9 +4,8 @@ import { useAuth } from "@clerk/nextjs";
 import { fetchTokenBalances, fetchTransactions } from "@/lib/services";
 import { useCommonStore } from "@/store/common";
 import { getToken as getEthToken } from "@wagmi/core";
-import { template } from "@/lib/utils";
-import { config } from "@/app/providers";
-import { Balances, TokenMapEnum, Transaction } from "@/lib/types";
+import { capitalizeFirstLetter, getTokenDecimals, getTokenNameByAddress, getTokenTicker, template } from "@/lib/utils";
+import { Balances, Transaction } from "@/lib/types";
 import { Logger } from "@/lib/logger";
 import { toast } from "@/components/ui/use-toast";
 import { showFailedMessage } from "@/utils/toasts";
@@ -68,13 +67,9 @@ export default function useTransactions() {
 
       const _recentTransactions: Transaction[] = [];
 
-      //ENHANCE: use supportedtoken array to get the token name instead of hardcoded enum here
       transactions.requests.forEach(async (transaction) => {
-        const tokenName =
-          TokenMapEnum[
-            transaction.token_address as keyof typeof TokenMapEnum
-          ] || "Unknown Token";
-
+        const tokenName = getTokenNameByAddress(transaction.token_address);
+      
         _recentTransactions.push({
           ...transaction,
           token_name: tokenName,
@@ -112,19 +107,22 @@ export default function useTransactions() {
 
       const _balances: Balances[] = [];
 
-      //ENHANCE: use supportedtoken array to get the token name instead of hardcoded enum here
       response.forEach(async (token) => {
-        const tokenName =
-          TokenMapEnum[token.token_address as keyof typeof TokenMapEnum] ||
-          "Unknown Token";
-
+        const tokenName = getTokenNameByAddress(token.token_address);
+        const tokenDecimals = getTokenDecimals(tokenName);
+        const tokenTicker = getTokenTicker(tokenName);
+      
         _balances.push({
-          token_name: tokenName,
+          token_name: capitalizeFirstLetter(tokenName),
           token_address: token.token_address,
           token_image: `/tokens/${token.token_address}.png`,
-          token_balance: formatUnits(BigInt(token.token_balance), 18),
+          token_balance: formatUnits(BigInt(token.token_balance), tokenDecimals),
+          token_ticker: tokenTicker,
+          token_used: formatUnits(BigInt(token.token_used), tokenDecimals),
         });
       });
+      
+      setTokenBalances(_balances);
 
       setTokenBalances(_balances);
       return _balances;

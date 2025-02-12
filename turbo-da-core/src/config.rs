@@ -43,7 +43,7 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn load_config(&self) -> Result<AppConfig, std::io::Error> {
         dotenv().ok();
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
+        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
         if let Ok(config) = self.load_from_toml() {
             return Ok(config);
         }

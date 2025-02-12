@@ -23,7 +23,7 @@ export default function CopySession() {
     token &&  await navigator.clipboard.writeText(token)
       showSuccessMessage({
         title: "Token Copied",
-        description: "You can use this token to submit data to through the script.",
+        description: "You can use this api-key to get funded and submit data through the script.",
       })
     } catch (err) {
       console.error('Failed to copy token: ', err)
@@ -43,12 +43,13 @@ export default function CopySession() {
             size="icon" 
             onClick={copyToken}
             aria-label="Copy session token"
+            className='!rounded-full w-7 h-7'
           >
           <KeyRound className="h-3 w-3 " />
           </Button>
         </TooltipTrigger>
         <TooltipContent  align='center' side='bottom' className="bg-black text-secondary-foreground !border-0 mt-2 mr-12">
-          <p className="text-xs">This is the token you&apos;ll use<br/> when submitting data through<br/> the script.</p>
+          <p className="text-xs font-sans font-thin">This is the api-key you&apos;ll use<br/> when submitting data through<br/> the script.</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

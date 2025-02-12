@@ -1,19 +1,15 @@
 import { Logger } from "@/lib/logger";
 import useWallet from "./useWallet";
-import { sepolia } from "viem/chains";
-import { SupportedChains, Tokens } from "@/lib/types";
-import { readContract, writeContract } from "wagmi/actions";
-import { config } from "@/app/providers";
-import { useCallback, useEffect } from "react";
+import { SupportedChains, TOKEN_MAP, Tokens } from "@/lib/types";
+import { writeContract } from "wagmi/actions";
 import { erc20Abi, parseUnits } from "viem";
-import BigNumber from "bignumber.js";
-import { pollWithDelay } from "@/lib/poller";
 import { useCommonStore } from "@/store/common";
 import { enrollToken, fetchSupportedTokens, requestFunds, T } from "@/lib/services";
 import { getToken as getEthToken } from "@wagmi/core";
 import { useAuth } from "@clerk/nextjs";
 import { template } from "@/lib/utils";
 import useTransactions from "./useTransactions";
+import { config } from "@/app/providers";
 
 export default function useTransfers() {
   const { switchNetwork, activeUserAddress, activeNetworkId, showBalance } =
@@ -48,33 +44,33 @@ export default function useTransfers() {
 
       const _supportedTokens: Tokens[] = [];
 
-      for (const address of Object.keys(tokenMap)) {
+      for (const [tokenName, tokenInfo] of Object.entries(TOKEN_MAP)) {
         try {
           // TOFIX: replace with using multicall to get all token details
           const tokenDetails = await getEthToken(config, {
-            address: address as `0x${string}`,
+            address: tokenInfo.token_address as `0x${string}`,
             chainId: activeNetworkId,
           });
-
+      
           if (
             !tokenDetails ||
             !tokenDetails.name ||
             !tokenDetails.symbol ||
             !tokenDetails.decimals
           ) {
-            console.warn(`Skipping address ${address} due to missing details.`);
+            console.warn(`Skipping token ${tokenName} due to missing details.`);
             continue;
           }
-
+      
           _supportedTokens.push({
             name: tokenDetails.name,
             symbol: tokenDetails.symbol,
-            address: address,
-            decimals: tokenDetails.decimals,
-            logo: `/tokens/${address}.png`,
+            address: tokenInfo.token_address,
+            decimals: tokenInfo.token_decimals,
+            logo: `/tokens/${tokenInfo.token_address}.png`,
           });
         } catch (error) {
-          console.error(`Error fetching details for ${address}:`, error);
+          console.error(`Error fetching details for ${tokenName}:`, error);
           continue;
         }
       }
