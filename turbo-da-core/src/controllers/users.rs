@@ -182,6 +182,11 @@ pub async fn register_new_user(
         None => user.split('@').next().unwrap_or("").to_string(),
     };
 
+    let username = match payload.name.clone() {
+        Some(val) => val,
+        None => user.split("@").next().unwrap().to_string(),
+    };
+
     let tx = diesel::insert_into(users)
         .values(UserCreate {
             id: user,
