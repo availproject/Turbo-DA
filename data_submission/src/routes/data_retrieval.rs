@@ -68,7 +68,7 @@ pub async fn get_pre_image(
     let submission_id = match Uuid::from_str(&request_payload.submission_id) {
         Ok(val) => val,
         Err(e) => {
-            return HttpResponse::NotAcceptable().body(e.to_string());
+            return HttpResponse::NotAcceptable().json(json!({ "error": e.to_string() }));
         }
     };
 
@@ -88,7 +88,7 @@ pub async fn get_pre_image(
             let b_hash = match hex_string_to_fixed_bytes(sub.block_hash.unwrap().as_str()) {
                 Ok(hash) => hash,
                 Err(e) => {
-                    return HttpResponse::NotImplemented().body(e);
+                    return HttpResponse::NotImplemented().json(json!({ "error": e }));
                 }
             };
 
@@ -99,10 +99,9 @@ pub async fn get_pre_image(
                     .json(json!(format!("Failed to retrieve data. Error {:?}", e))),
             }
         }
-        Err(Error::NotFound) => {
-            HttpResponse::NotFound().body("Customer Expenditure entry not found")
-        }
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
+        Err(Error::NotFound) => HttpResponse::NotFound()
+            .json(json!({ "error": "Customer Expenditure entry not found" })),
+        Err(_) => HttpResponse::InternalServerError().json(json!({ "error": "Database error" })),
     }
 }
 
@@ -136,7 +135,7 @@ pub async fn get_submission_info(
     let submission_id = match Uuid::from_str(&request_payload.submission_id) {
         Ok(val) => val,
         Err(e) => {
-            return HttpResponse::NotAcceptable().body(e.to_string());
+            return HttpResponse::NotAcceptable().json(json!({ "error": e.to_string() }));
         }
     };
     handle_submission_info(&mut connection, submission_id).await

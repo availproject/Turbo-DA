@@ -172,8 +172,11 @@ impl<'a> ProcessSubmitResponse<'a> {
         {
             Ok(details) => details,
             Err(e) => {
-                error!("Failed to get token details: {:?}", e);
-                return Err(INVALID_TOKEN_ID.to_string());
+                error!(
+                    "Failed to get user information: {:?} {:?}",
+                    self.response.user_id, e
+                );
+                return Err("INVALID USER".to_string());
             }
         };
 
