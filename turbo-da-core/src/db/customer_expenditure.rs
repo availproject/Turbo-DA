@@ -31,11 +31,33 @@ pub async fn handle_submission_info(
         .first::<CustomerExpenditureGet>(connection)
         .await
     {
-        Ok(sub) => HttpResponse::Ok().json(json!({"submission": sub})),
-        Err(Error::NotFound) => {
-            HttpResponse::NotFound().body("Customer Expenditure entry not found")
+        Ok(sub) => {
+            let response = json!({
+                "id": sub.id,
+                "state": if sub.error.is_some() { "Error" } else if sub.block_hash.is_some() { "Finalized" } else { "Pending" },
+                "error": sub.error,
+                "data": if sub.error.is_some() {
+                    None
+                } else {
+                    Some(json!({
+                        "user_id": sub.user_id,
+                        "amount_data": sub.amount_data,
+                        "fees": sub.fees.map(|f| f.to_string()),
+                        "block_number": sub.block_number,
+                        "block_hash": sub.block_hash.map(|h| format!("0x{}", h)),
+                        "tx_hash": sub.tx_hash.map(|h| format!("0x{}", h)),
+                        "data_hash": sub.data_hash.map(|h| format!("0x{}", h)),
+                        "tx_index": sub.extrinsic_index,
+                        "data_billed": sub.converted_fees.map(|f| f.to_string()),
+                        "created_at": sub.created_at
+                    }))
+                }
+            });
+            HttpResponse::Ok().json(response)
         }
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
+        Err(Error::NotFound) => HttpResponse::NotFound()
+            .json(json!({ "error": "Customer Expenditure entry not found" })),
+        Err(_) => HttpResponse::InternalServerError().json(json!({ "error": "Database error" })),
     }
 }
 
