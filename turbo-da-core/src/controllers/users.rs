@@ -177,6 +177,10 @@ pub async fn register_new_user(
     {
         return HttpResponse::Conflict().body("User already exists");
     }
+    let username = match &payload.name {
+        Some(val) => val.clone(),
+        None => user.split('@').next().unwrap_or("").to_string(),
+    };
 
     let username = match payload.name.clone() {
         Some(val) => val,
@@ -185,16 +189,16 @@ pub async fn register_new_user(
 
     let tx = diesel::insert_into(users)
         .values(UserCreate {
-            id: user.clone(),
-            name: username,
+            id: user,
+            name: username.clone(),
             app_id: payload.app_id,
         })
         .execute(&mut *connection)
         .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().body(format!("Success: {}", user)),
-        Err(e) => HttpResponse::NotAcceptable().body(format!("Error: {}", e)),
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success: {}", username) })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
     }
 }
 
