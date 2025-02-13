@@ -118,7 +118,10 @@ pub async fn submit_raw_data(
 ) -> impl Responder {
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "User Id not retrieved" }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -129,7 +132,7 @@ pub async fn submit_raw_data(
     let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
         Ok(app) => app,
         Err(e) => {
-            return HttpResponse::InternalServerError().body(e);
+            return HttpResponse::InternalServerError().json(json!({ "error": e }));
         }
     };
 
