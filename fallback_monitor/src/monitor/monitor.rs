@@ -116,7 +116,7 @@ async fn process_failed_transactions(
             }
         };
 
-        let convertor = Convertor::new(&client, &account);
+        let convertor = Convertor::new(client, account);
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
         if credits_used > credit_details.credit_balance {
