@@ -134,6 +134,8 @@ impl Consumer {
                                     TIMEOUT_ERROR.to_string(),
                                 )
                                 .await;
+
+                                error!("Request processing timed out after 2 minutes");
                             }
                         }
                         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -233,6 +235,4 @@ async fn update_error_entry(
     err: String,
 ) {
     add_error_entry(&response_clone.submission_id, err, injected_dependency).await;
-
-    error!("Request processing timed out after 2 minutes");
 }

@@ -1,14 +1,8 @@
 use avail_rust::hex::ToHex;
 /// Core logic of generating extrinsic and submitting to Avail DA.
-use avail_rust::{
-    avail::{self},
-    prelude::WebSocket,
-    Keypair,
-    Nonce::BestBlockAndTxPool,
-    Options, SDK,
-};
+use avail_rust::prelude::*;
+use avail_rust::transactions::SystemEvents::ExtrinsicFailed;
 use hex;
-use log::error;
 
 #[derive(Debug)]
 pub struct TransactionInfo {
@@ -36,42 +30,47 @@ impl<'a> SubmitDataAvail<'a> {
         }
     }
     pub async fn submit_data(&self, data: &[u8]) -> Result<TransactionInfo, String> {
-        let options = Some(
-            Options::new()
-                .nonce(BestBlockAndTxPool)
-                .app_id(self.app_id as u32),
-        );
+        let options = Options::new().app_id(self.app_id as u32);
         let tx = self.client.tx.data_availability.submit_data(data.to_vec());
 
-        let res = tx.execute_and_watch_inclusion(&self.account, options).await;
-        let fee = tx.payment_query_fee_details(&self.account, options).await;
+        let res = tx
+            .execute_and_watch_inclusion(&self.account, options)
+            .await
+            .map_err(|e| e.to_string())?;
+        let fee = tx
+            .payment_query_fee_details(&self.account, Some(options))
+            .await
+            .map_err(|e| e.to_string())?;
 
-        match (res, fee) {
-            (Ok(tx_in_block), Ok(fee)) => {
-                let data_hash = match tx_in_block
-                    .find_first_event::<avail::data_availability::events::DataSubmitted>()
-                {
-                    Some(event) => event.data_hash,
-                    None => return Err("Data submitted event not found".to_string()),
-                };
-                Ok(TransactionInfo {
-                    block_number: tx_in_block.block_number,
-                    tx_hash: hex::encode(tx_in_block.tx_hash.as_bytes()),
-                    block_hash: hex::encode(tx_in_block.block_hash.as_bytes()),
-                    extrinsic_index: tx_in_block.tx_index,
-                    gas_fee: fee.final_fee(),
-                    to_address: self.account.public_key().encode_hex(),
-                    data_hash: hex::encode(data_hash.as_bytes()),
-                })
-            }
-            (Err(e), _) => {
-                error!("Couldn't submit data with error {:?}", e);
-                Err(e.to_string())
-            }
-            (Ok(_), Err(e)) => {
-                error!("Couldn't submit data with error {:?}", e);
-                Err("Couldn't submit data".to_string())
-            }
+        let success = res
+            .is_successful()
+            .ok_or_else(|| "Couldn't determine if tx failed".to_string())?;
+
+        let events = res.events.ok_or_else(|| "No events found".to_string())?;
+
+        if !success {
+            let failure_event = events
+                .find_first::<ExtrinsicFailed>()
+                .ok_or_else(|| "Transaction failed but no failure event found".to_string())?
+                .ok_or_else(|| "Event found but failed to decode it")?;
+            return Err(format!(
+                "Transaction failed: {:?}",
+                failure_event.dispatch_error
+            ));
         }
+        let event = events
+            .find_first::<avail::data_availability::events::DataSubmitted>()
+            .ok_or_else(|| "Data submitted event not found".to_string())?
+            .ok_or_else(|| "Event found but failed to decode it")?;
+
+        Ok(TransactionInfo {
+            block_number: res.block_number,
+            tx_hash: hex::encode(res.tx_hash.as_bytes()),
+            block_hash: hex::encode(res.block_hash.as_bytes()),
+            extrinsic_index: res.tx_index,
+            gas_fee: fee.final_fee(),
+            to_address: self.account.public_key().encode_hex(),
+            data_hash: hex::encode(event.data_hash.as_bytes()),
+        })
     }
 }
