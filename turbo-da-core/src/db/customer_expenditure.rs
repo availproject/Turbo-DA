@@ -33,6 +33,7 @@ pub async fn handle_submission_info(
     {
         Ok(sub) => {
             let response = json!({
+                "submission": sub,
                 "id": sub.id,
                 "state": if sub.error.is_some() { "Error" } else if sub.block_hash.is_some() { "Finalized" } else { "Pending" },
                 "error": sub.error,

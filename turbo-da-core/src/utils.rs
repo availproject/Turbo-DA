@@ -268,7 +268,10 @@ impl<'a> Convertor<'a> {
             .await
         {
             Ok(info) => info,
-            Err(e) => panic!("Failed to get payment query info: {:?}", e),
+            Err(e) => {
+                error!("Failed to get payment query info: {:?}", e);
+                return BigDecimal::from(u128::MAX);
+            }
         };
         BigDecimal::from(query_info.final_fee())
     }
