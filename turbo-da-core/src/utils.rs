@@ -263,11 +263,17 @@ impl<'a> Convertor<'a> {
         let tx = self.sdk.tx.data_availability.submit_data(data);
 
         let options = Options::new();
-        let query_info = match tx.payment_query_info(self.account, Some(options)).await {
+        let query_info = match tx
+            .payment_query_fee_details(self.account, Some(options))
+            .await
+        {
             Ok(info) => info,
-            Err(e) => panic!("Failed to get payment query info: {:?}", e),
+            Err(e) => {
+                error!("Failed to get payment query info: {:?}", e);
+                return BigDecimal::from(u128::MAX);
+            }
         };
-        BigDecimal::from(query_info)
+        BigDecimal::from(query_info.final_fee())
     }
 
     pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
