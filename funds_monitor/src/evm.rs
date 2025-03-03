@@ -11,7 +11,7 @@ use alloy::{
 use reqwest::Client;
 use turbo_da_core::utils::{get_prices, TOKEN_MAP};
 
-use avail_rust::SDK;
+use avail_rust::{account, SDK};
 use bigdecimal::BigDecimal;
 use db::{
     models::credit_requests::CreditRequests,
@@ -337,13 +337,7 @@ impl EVM {
             }
         };
 
-        let account = match SDK::alice() {
-            Ok(account) => account,
-            Err(e) => {
-                error!("Failed to get account: {:?}", e);
-                return Err(format!("Failed to get account: {:?}", e));
-            }
-        };
+        let account = account::alice();
         let converter = Convertor::new(&client, &account);
         let price_per_kb = converter
             .get_gas_price_for_data(converter.one_kb.clone())

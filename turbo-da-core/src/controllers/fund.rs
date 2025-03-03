@@ -10,7 +10,7 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder,
 };
 
-use avail_rust::SDK;
+use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
 use db::{models::credit_requests::CreditRequestInfo, schema::credit_requests::dsl::*};
 use diesel::prelude::*;
@@ -81,7 +81,7 @@ pub async fn request_funds_status(
 
 #[derive(Deserialize, Serialize, Clone)]
 struct PurchaseCostParams {
-    pub data_size: u128, // in bytes
+    pub data_size: u64, // in Bytes
 }
 
 #[get("/purchase_cost")]
@@ -90,7 +90,7 @@ pub async fn purchase_cost(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = SDK::alice().unwrap();
+    let account = account::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -98,7 +98,7 @@ pub async fn purchase_cost(
         .get_gas_price_for_data(convertor.one_kb.clone())
         .await;
 
-    let credits_cost = credits_cost * BigDecimal::from(query.0.data_size as u128);
+    let credits_cost = credits_cost * BigDecimal::from(query.0.data_size as u128) / 1024.0;
 
     HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
 }
@@ -114,7 +114,7 @@ pub async fn estimate_credits(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = SDK::alice().unwrap();
+    let account = account::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -131,7 +131,7 @@ pub async fn estimate_credits_for_bytes(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = SDK::alice().unwrap();
+    let account = account::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
