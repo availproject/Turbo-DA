@@ -22,6 +22,11 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
     );
     info!("SDK initialized with local endpoint");
 
+    // TODO:
+    // get the latest queried block number from the database
+    // get the latest blockchain block number
+    // sync the database to the latest blockchain block number
+
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
         match avail_block {
