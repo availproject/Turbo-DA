@@ -1,12 +1,16 @@
 mod avail;
 mod config;
 mod evm;
+mod utils;
+use std::sync::Arc;
 
 use avail::run;
 use config::Config;
 use diesel::PgConnection;
 use evm::EVM;
 use log::{error, info};
+
+// TODO: Clean up the code
 #[tokio::main]
 async fn main() {
     let cfg = match Config::default().load_config() {
@@ -16,43 +20,47 @@ async fn main() {
             return;
         }
     };
+    let cfg_ref = Arc::new(cfg);
+    let cfg_ref_2 = cfg_ref.clone();
+    let cfg_ref_3 = cfg_ref.clone();
 
-    for (network_name, network_config) in &cfg.network {
-        let database_url = cfg.database_url.clone();
+    tokio::spawn(async move {
+        info!("Starting Avail Chain Monitor");
+        let result = run(cfg_ref.clone()).await;
+        if let Err(e) = result {
+            error!("Error running Avail Chain Monitor: {:?}", e);
+        }
+    });
 
+    for (network_name, network_config) in &cfg_ref_2.network {
         let network_name = network_name.clone();
         let network_config = network_config.clone();
 
         let network_ws_url = network_config.ws_url.clone();
         let contract_address = network_config.contract_address.clone();
         let finalised_threshold = network_config.finalised_threshold.clone();
-        let coin_gecho_api_url = cfg.coin_gecho_api_url.clone();
-        let coin_gecho_api_key = cfg.coin_gecho_api_key.clone();
-        let avail_rpc_url = cfg.avail_rpc_url.clone();
-        let avail_rpc_url_2 = cfg.avail_rpc_url.clone();
 
+        let cfg_ref_4 = cfg_ref_3.clone();
         info!("Task for network: {}", network_name);
-
-        tokio::spawn(async move {
-            info!("Starting Avail Chain Monitor");
-            let result = run(avail_rpc_url_2).await;
-            if let Err(e) = result {
-                error!("Error running Avail Chain Monitor: {:?}", e);
-            }
-        });
 
         tokio::spawn(async move {
             info!("Spawning new task");
 
-            let mut connection = match PgConnection::establish(database_url.as_str())
-                .map_err(|e| format!("Error connecting to {}: {}", database_url, e))
-            {
-                Ok(conn) => conn,
-                Err(e) => {
-                    error!("Failed to establish database connection: {}", e);
-                    return;
-                }
-            };
+            let mut connection =
+                match PgConnection::establish(cfg_ref_4.clone().database_url.as_str().clone())
+                    .map_err(|e| {
+                        format!(
+                            "Error connecting to {}: {}",
+                            cfg_ref_4.clone().database_url.clone(),
+                            e
+                        )
+                    }) {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        error!("Failed to establish database connection: {}", e);
+                        return;
+                    }
+                };
 
             let finalised_block_number =
                 query_finalised_block_number(network_config.chain_id, &mut connection);
@@ -60,14 +68,11 @@ async fn main() {
             drop(connection);
             let mut evm = match EVM::new(
                 contract_address,
-                database_url,
-                avail_rpc_url,
                 network_ws_url,
                 network_config.chain_id,
                 finalised_threshold,
                 finalised_block_number.block_number as u64,
-                coin_gecho_api_url,
-                coin_gecho_api_key,
+                cfg_ref_4.clone(),
             )
             .await
             {

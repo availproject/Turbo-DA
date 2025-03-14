@@ -4881,6 +4881,7 @@ dependencies = [
  "log",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
  "toml 0.8.19",
  "turbo-da-core",
