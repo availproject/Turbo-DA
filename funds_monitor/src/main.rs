@@ -1,6 +1,8 @@
+mod avail;
 mod config;
 mod evm;
 
+use avail::run;
 use config::Config;
 use diesel::PgConnection;
 use evm::EVM;
@@ -27,8 +29,17 @@ async fn main() {
         let coin_gecho_api_url = cfg.coin_gecho_api_url.clone();
         let coin_gecho_api_key = cfg.coin_gecho_api_key.clone();
         let avail_rpc_url = cfg.avail_rpc_url.clone();
+        let avail_rpc_url_2 = cfg.avail_rpc_url.clone();
 
         info!("Task for network: {}", network_name);
+
+        tokio::spawn(async move {
+            info!("Starting Avail Chain Monitor");
+            let result = run(avail_rpc_url_2).await;
+            if let Err(e) = result {
+                error!("Error running Avail Chain Monitor: {:?}", e);
+            }
+        });
 
         tokio::spawn(async move {
             info!("Spawning new task");
