@@ -9,7 +9,7 @@ use config::Config;
 use diesel::PgConnection;
 use evm::EVM;
 use log::{error, info};
-
+use utils::Utils;
 // TODO: Clean up the code
 #[tokio::main]
 async fn main() {
@@ -26,6 +26,7 @@ async fn main() {
 
     tokio::spawn(async move {
         info!("Starting Avail Chain Monitor");
+
         let result = run(cfg_ref.clone()).await;
         if let Err(e) = result {
             error!("Error running Avail Chain Monitor: {:?}", e);
