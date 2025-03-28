@@ -43,6 +43,9 @@ pub async fn submit_data(
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
 ) -> impl Responder {
+    if request_payload.data.len() == 0 {
+        return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
+    }
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
@@ -116,6 +119,9 @@ pub async fn submit_raw_data(
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
 ) -> impl Responder {
+    if request_payload.len() == 0 {
+        return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
+    }
     let user = match retrieve_user_id(http_request) {
         Some(val) => val,
         None => {
