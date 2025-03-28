@@ -47,12 +47,8 @@ async fn main() {
     info!("Cron is starting...");
 
     let mut interval = schedule.upcoming(Utc);
-    let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
-    let keypair = create_keypair(&app_config.private_key);
 
-    let mut connection = AsyncPgConnection::establish(&app_config.database_url)
-        .await
-        .expect("Failed to connect to db");
+    let keypair = create_keypair(&app_config.private_key);
 
     while let Some(next_time) = interval.next() {
         let now = Utc::now();
@@ -64,6 +60,10 @@ async fn main() {
 
         info!("Checking Failed Transactions at {} .....", Utc::now());
 
+        let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
+        let mut connection = AsyncPgConnection::establish(&app_config.database_url)
+            .await
+            .expect("Failed to connect to db");
         monitor_failed_transactions(&mut connection, &sdk, &keypair, app_config.retry_count).await;
     }
 }
