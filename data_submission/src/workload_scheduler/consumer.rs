@@ -138,7 +138,7 @@ impl Consumer {
                                 error!("Request processing timed out after 2 minutes");
                             }
                         }
-                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     }
                 });
             });
