@@ -34,7 +34,7 @@ impl<'a> SubmitDataAvail<'a> {
         let tx = self.client.tx.data_availability.submit_data(data.to_vec());
 
         let res = tx
-            .execute_and_watch_inclusion(&self.account, options)
+            .execute_and_watch_finalization(&self.account, options)
             .await
             .map_err(|e| e.to_string())?;
         let fee = tx
