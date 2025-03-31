@@ -5,6 +5,11 @@
   "db_password": "password",
   "block_entries": [
     {
+      "chain_id": 0,
+      "block_number": 12345,
+      "block_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    },
+    {
       "chain_id": 1,
       "block_number": 12345,
       "block_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

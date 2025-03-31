@@ -11,6 +11,7 @@
 /funds_monitor/config.toml
 /funds_monitor/.env
 /contracts/out
+/*/dump.rdb
 /contracts/cache
 /contracts/broadcast
 /contracts/github
