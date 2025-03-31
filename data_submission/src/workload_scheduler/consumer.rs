@@ -75,22 +75,22 @@ impl Consumer {
                 let endpoints = arc_endpoints.clone();
 
                 runtime.block_on(async move {
-                    let mut connection = match get_connection(&injected_dependency).await {
-                        Ok(conn) => conn,
-                        Err(e) => {
-                            error!(
-                                "Couldn't establish db connection while processing response: {:?}",
-                                e
-                            );
-                            return;
-                        }
-                    };
-
                     while let Ok(response) = receiver.recv().await {
                         if response.thread_id != i {
                             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                             continue;
                         }
+
+                        let mut connection = match get_connection(&injected_dependency).await {
+                            Ok(conn) => conn,
+                            Err(e) => {
+                                error!(
+                                    "Couldn't establish db connection while processing response: {:?}",
+                                    e
+                                );
+                                return;
+                            }
+                        };
 
                         let sdk = generate_avail_sdk(&endpoints).await;
 
@@ -138,7 +138,7 @@ impl Consumer {
                                 error!("Request processing timed out after 2 minutes");
                             }
                         }
-                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     }
                 });
             });

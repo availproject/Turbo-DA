@@ -28,7 +28,11 @@ pub async fn get_unresolved_transactions(
 ) -> Result<Vec<CustomerExpenditureGetWithPayload>, String> {
     match customer_expenditures
         .filter(error.is_not_null())
-        .or_filter(payload.is_not_null())
+        .or_filter(payload.is_not_null().and(created_at.gt(diesel::dsl::sql::<
+            diesel::sql_types::Timestamp,
+        >(
+            "NOW() - INTERVAL '15 minutes'"
+        ))))
         .filter(retry_count.lt(retry))
         .order(created_at.desc())
         .select(CustomerExpenditureGetWithPayload::as_select())
