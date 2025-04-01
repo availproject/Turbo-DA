@@ -18,6 +18,10 @@ services:
       - 6379:6379
   fallback_monitor:
     container_name: fallback_monitor
+    environment:
+      OTLP_RECEIVER_URL: http://otc:4317
+      ENABLE_OTEL_METRICS: true
+      ENABLE_OTEL_TRACING: false
     build:
       context: .
       dockerfile: Dockerfile
@@ -47,6 +51,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
   data_submission:
     container_name: data_submission
     ports:
@@ -56,6 +61,10 @@ services:
       dockerfile: Dockerfile
       target: data_submission
     restart: unless-stopped
+    environment:
+      OTLP_RECEIVER_URL: http://otc:4317
+      ENABLE_OTEL_METRICS: true
+      ENABLE_OTEL_TRACING: false
     networks:
       - net
     env_file:
@@ -67,6 +76,43 @@ services:
       retries: 3
       start_period: 40s
 
+  otc:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    volumes:
+      - ./observability/config/otel-collector-config.yaml:/etc/otelcol/config.yaml
+    command: --config /etc/otelcol/config.yaml
+    ports:
+      - 1888:1888 
+      - 8888:8888 
+      - 8889:8889 
+      - 13133:13133 
+      - 4317:4317 
+      - 4318:4318
+      - 55679:55679 
+    networks:
+      - net
+    depends_on:
+      - jaeger
+  
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./observability/config/prometheus.yaml:/etc/prometheus/prometheus.yml
+    networks:
+      - net
+
+  jaeger:
+    networks:
+      - net
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=true
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
+    ports:
+      - "16686:16686"
 networks:
   net:
     driver: bridge

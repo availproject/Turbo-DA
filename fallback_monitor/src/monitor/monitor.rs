@@ -21,6 +21,7 @@ use db::{
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
+use observability::{log_fallback_txn_error, log_retry_count};
 use turbo_da_core::utils::{format_size, Convertor};
 
 /// Monitors and processes failed transactions from the database
@@ -84,20 +85,30 @@ async fn process_failed_transactions(
         info!("Processing failed transaction submission id: {:?} ", i.id);
         let result = increase_retry_count(i.id, connection).await;
         if result.is_err() {
+            log_fallback_txn_error(
+                &i.id.to_string(),
+                "Failed to increase retry count for entry id",
+            );
             error!("Failed to increase retry count for entry id: {:?}", i.id);
             continue;
         }
+
+        log_retry_count(&i.id.to_string(), i.retry_count as usize);
+
         if i.retry_count > retry_count {
+            log_fallback_txn_error(&i.id.to_string(), "Retry count exceeded for transaction id");
             error!("Retry count exceeded for transaction id: {:?}", i.id);
             continue;
         }
         let Some(data) = i.payload else {
+            log_fallback_txn_error(&i.id.to_string(), "No payload found for transaction id");
             error!("No payload found for transaction id: {:?}", i.id);
             continue;
         };
         let avail_app_id = match get_app_id(connection, &i.user_id).await {
             Ok(app) => app,
             Err(e) => {
+                log_fallback_txn_error(&i.id.to_string(), &e);
                 error!("Couldn't fetch app id. Error: {:?}", e);
                 return;
             }
@@ -111,6 +122,7 @@ async fn process_failed_transactions(
         {
             Ok(details) => details,
             Err(e) => {
+                log_fallback_txn_error(&i.id.to_string(), &format!("{:?}", e));
                 error!("Failed to get token details: {:?}", e);
                 continue;
             }
@@ -120,6 +132,7 @@ async fn process_failed_transactions(
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
         if credits_used > credit_details.credit_balance {
+            log_fallback_txn_error(&i.id.to_string(), "Insufficient credits for user id");
             error!("Insufficient credits for user id: {:?}", i.id);
             continue;
         }
@@ -146,6 +159,7 @@ async fn process_failed_transactions(
                 update_credit_balance(connection, &i.user_id, &tx_params).await;
             }
             Err(e) => {
+                log_fallback_txn_error(&i.id.to_string(), &e);
                 error!("Tx submission failed again: id {:?}", e);
             }
         }
