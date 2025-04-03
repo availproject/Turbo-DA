@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+  otc:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    container_name: otc
+    volumes:
+      - ./observability/config/otel-collector-config.yaml:/etc/otelcol/config.yaml
+    command: --config /etc/otelcol/config.yaml
+    environment:
+      - DATADOG_API_KEY=${DATADOG_API_KEY}
+    ports:
+      - 1888:1888 
+      - 8888:8888 
+      - 8889:8889 
+      - 13133:13133 
+      - 4317:4317 
+      - 4318:4318
+      - 55679:55679 
+    networks:
+      - net
+    depends_on:
+      - jaeger
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./observability/config/prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    networks:
+      - net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=true
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
+    ports:
+      - "16686:16686"
+    networks:
+      - net
+
+networks:
+  net:
+    external: true

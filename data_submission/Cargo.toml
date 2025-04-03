@@ -29,3 +29,6 @@ r2d2_redis = "*"
 redis.workspace = true
 db = { path = "../db" }
 turbo-da-core = {path = "../turbo-da-core"}
+observability = { path = "../observability" }
+tracing-subscriber = { workspace = true, features = ["json"] }
+tracing = { workspace = true }
