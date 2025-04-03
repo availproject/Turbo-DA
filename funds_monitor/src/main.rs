@@ -10,6 +10,7 @@ use diesel::PgConnection;
 use evm::EVM;
 use log::{error, info};
 use utils::Utils;
+
 // TODO: Clean up the code
 #[tokio::main]
 async fn main() {
