@@ -26,21 +26,19 @@ Submit data to avail using JSON payload.
 - **URL**: `/submit_data`
 - **Method**: `POST`
 - **Headers**:
-  - `Authorization: Bearer <token>`
+  - `x-api-key <API-KEY>`
 - **Body Parameters**:
   - `data` : Stringified payload.
-  - `token`: The token corresponding to which you wanna make the payment.
-
+  - 
 #### Example Request:
 
 ```bash
-curl -X POST "https://api.example.com/submit_data
+curl -X POST "https://api.example.com/v1/submit_data
 " \
-     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "x-api-key: <API KEY>" \
      -H "Content-Type: application/json" \
      -d '{
            "data": "Test",
-           "token": "ethereum"
          }'
 
 ```
@@ -52,18 +50,16 @@ Submit data to avail using JSON payload.
 - **URL**: `/submit_raw_data`
 - **Method**: `POST`
 - **Headers**:
-  - `Authorization: Bearer <token>`
-- **URL Parameters**:
-  - `token`: Token name based on `token_map` endpoint result.
+  - `x-api-key <API-KEY>`
 - **Body Parameters**:
   - Payload as raw byte data
 
 #### Example Request:
 
 ```bash
-curl -X POST "https://api.example.com/user/submit_raw_data?token=ethereum
+curl -X POST "https://api.example.com/v1/submit_raw_data
 " \
-     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "x-api-key <API-KEY>" \
      -H "Content-Type: application/json" \
      -d '011010101010101010100101'
 
@@ -76,16 +72,16 @@ Submit data to avail using JSON payload.
 - **URL**: `/get_pre_image`
 - **Method**: `GET`
 - **Headers**:
-  - `Authorization: Bearer <token>`
+  - `x-api-key <API-KEY>`
 - **URL Parameters**:
   - `submission_id`: Submission ID value.
 
 #### Example Request:
 
 ```bash
-curl -X POST "https://api.example.com/user/get_pre_image?submission_id="<SUBMISSION_ID>"
+curl -X POST "https://api.example.com/v1/get_pre_image?submission_id="<SUBMISSION_ID>"
 " \
-     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "x-api-key <API-KEY>" \
      -H "Content-Type: application/json"
 
 ```
@@ -97,14 +93,14 @@ Retrieve details about a expenditure done using a given token.
 - **URL**: `/get_submission_info`
 - **Method**: `GET`
 - **Headers**:
-  - `Authorization: Bearer <token>`
+  - `x-api-key <API-KEY>`
 - **URL Parameters**:
   - `submission_id`: Submission id to get info for.
 
 #### Example Request:
 
 ```bash
-curl -X GET "https://api.example.com/user/get_submission_info?submission_id=b9a3f58e-0f49-4e3b-9466-f28d73d75e0a" \
+curl -X GET "https://api.example.com/v1/get_submission_info?submission_id=b9a3f58e-0f49-4e3b-9466-f28d73d75e0a" \
      -H "Authorization: Bearer YOUR_TOKEN"
 ```
 

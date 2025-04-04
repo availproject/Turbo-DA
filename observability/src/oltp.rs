@@ -112,12 +112,22 @@ fn log(counter_name: String, attributes: Option<&[KeyValue]>) {
     counter.add(1, attributes.unwrap_or_default());
 }
 
-pub fn log_failed_txn(reason: &str) {
-    let attributes = [KeyValue::new(
-        "reason",
-        Value::String(reason.to_string().into()),
-    )];
-    log("turboDA.failed_txn".into(), Some(&attributes))
+pub fn log_txn(submission_id: &str, thread_id: i32, reason: &str) {
+    let attributes = [
+        KeyValue::new("reason", Value::String(reason.to_string().into())),
+        KeyValue::new("thread_id", Value::String(thread_id.to_string().into())),
+        KeyValue::new(
+            "submission_id",
+            Value::String(submission_id.to_string().into()),
+        ),
+    ];
+    let counter_name = if reason == "success" {
+        "turbDA.success_txn"
+    } else {
+        "turboDA.failed_txn"
+    };
+
+    log(counter_name.into(), Some(&attributes))
 }
 
 pub fn log_retry_count(submission_id: &str, retry_count: usize) {

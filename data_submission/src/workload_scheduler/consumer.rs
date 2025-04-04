@@ -9,7 +9,7 @@ use db::{errors::*, models::user_model::User, schema::users::dsl::*};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
-use observability::log_failed_txn;
+use observability::log_txn;
 use std::sync::Arc;
 use tokio::{
     sync::broadcast::Sender,
@@ -117,20 +117,21 @@ impl Consumer {
                         {
                             Ok(result) => match result {
                                 Ok(response) => {
+                                    log_txn(&response.submission_id.to_string(), response.thread_id, "success");
                                     info!(
                                         "Successfully submitted response for submission_id {}",
                                         response.submission_id
                                     );
                                 }
                                 Err(e) => {
-                                    log_failed_txn(&e);
+                                    log_txn(&response.submission_id.to_string(), response.thread_id, &e);
                                     update_error_entry(response, &mut connection, e.to_string())
                                         .await;
                                     error!("Failed to process the request with error: {:?}", e);
                                 }
                             },
                             Err(_) => {
-                                log_failed_txn("timeout");
+                                log_txn(&response.submission_id.to_string(), response.thread_id, "timeout");
                                 update_error_entry(
                                     response,
                                     &mut connection,
@@ -168,7 +169,6 @@ impl<'a> ProcessSubmitResponse<'a> {
         }
     }
 
-    #[tracing::instrument(name = "process_response", skip(self))]
     pub async fn process_response(&mut self) -> Result<&'a Response, String> {
         let credit_details = match users
             .filter(db::schema::users::id.eq(&self.response.user_id))
