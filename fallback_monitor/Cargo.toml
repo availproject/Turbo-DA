@@ -24,3 +24,5 @@ db = {path = "../db" }
 turbo-da-core = {path= "../turbo-da-core"}
 reqwest = "0.12.9"
 data_submission = {path = "../data_submission"}
+observability = { path = "../observability" }
+

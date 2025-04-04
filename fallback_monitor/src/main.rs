@@ -5,6 +5,7 @@ use cron::Schedule;
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 use log::{error, info};
 use monitor::monitor::monitor_failed_transactions;
+use observability::init_meter;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::{
@@ -40,6 +41,7 @@ async fn main() {
             return;
         }
     };
+    init_meter("fallback service");
 
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();

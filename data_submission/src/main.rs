@@ -32,11 +32,15 @@ mod utils;
 mod workload_scheduler;
 
 use config::AppConfig;
+use observability::{init_meter, init_tracer};
 use workload_scheduler::consumer::Consumer;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     info!("Starting Data Submission server....");
+
+    init_meter("data_submission");
+    init_tracer("data_submission");
 
     let app_config = AppConfig::default().load_config()?;
 

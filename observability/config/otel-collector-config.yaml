@@ -1,0 +1,30 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+
+exporters:
+  datadog:
+    api:
+      site: datadoghq.com
+      key: "${DATADOG_API_KEY}"
+    host_metadata:
+      enabled: true
+      tags: ["service:turbo-da-${NETWORK}"]
+    metrics:
+      resource_attributes_as_tags: true
+
+extensions:
+  health_check:
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics/datadog:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [datadog]
