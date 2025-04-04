@@ -26,6 +26,7 @@
 /turbo-da-core/.env
 /dashboard/.env
 /dashboard/node_modules
+/observability/config/.env
 .vscode
 .env
 .DS_Store
