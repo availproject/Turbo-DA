@@ -60,4 +60,5 @@ services:
 
 networks:
   net:
+    name: turboda-net
     driver: bridge
