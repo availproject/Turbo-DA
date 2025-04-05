@@ -1,14 +1,5 @@
 version: "3.8"
 services:
-  contracts:
-    container_name: foundry-builder
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: foundry-builder
-    restart: unless-stopped
-    networks:
-      - net
   redis:
     image: "redis:alpine"
     command: redis-server --save "" --appendonly no
@@ -69,4 +60,5 @@ services:
 
 networks:
   net:
+    name: turboda-net
     driver: bridge
