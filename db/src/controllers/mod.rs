@@ -1,2 +1,2 @@
+pub mod credit_balance;
 pub mod customer_expenditure;
-pub mod users;

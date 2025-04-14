@@ -4,7 +4,6 @@
 /// The service generates the extrinsic and published it to Avail network.
 pub mod config;
 pub mod controllers;
-pub mod db;
 pub mod routes;
 pub mod utils;
 

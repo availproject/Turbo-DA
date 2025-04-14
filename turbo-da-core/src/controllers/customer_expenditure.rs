@@ -1,11 +1,12 @@
 use crate::{
     config::AppConfig,
-    db::customer_expenditure::handle_get_all_expenditure,
     utils::{get_connection, retrieve_user_id_from_jwt},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
+use db::controllers::customer_expenditure::handle_get_all_expenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use validator::Validate;
 
 /// Query parameters for retrieving expenditures with optional limit
@@ -53,5 +54,8 @@ pub async fn get_all_expenditure(
         None => config.total_users_query_limit,
     };
 
-    handle_get_all_expenditure(&mut connection, user, final_limit).await
+    match handle_get_all_expenditure(&mut connection, user, final_limit).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+    }
 }

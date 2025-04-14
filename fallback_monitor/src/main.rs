@@ -15,7 +15,6 @@ use tokio::{
 use turbo_da_core::utils::create_keypair;
 
 mod config;
-mod db;
 mod monitor;
 
 const WAIT_TIME: u64 = 5;

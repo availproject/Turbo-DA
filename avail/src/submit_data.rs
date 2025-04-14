@@ -16,9 +16,9 @@ pub struct TransactionInfo {
 }
 
 pub struct SubmitDataAvail<'a> {
-    pub(crate) client: &'a SDK,
-    pub(crate) account: &'a Keypair,
-    pub(crate) app_id: i32,
+    pub client: &'a SDK,
+    pub account: &'a Keypair,
+    pub app_id: i32,
 }
 
 impl<'a> SubmitDataAvail<'a> {

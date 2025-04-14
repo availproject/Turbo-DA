@@ -6,7 +6,8 @@ members = [
     "funds_monitor",
     "observability",
     "fallback_monitor", 
-    "data_submission"
+    "data_submission", 
+    "avail"
 ]
 resolver = "2"
 

@@ -51,3 +51,4 @@ actix-extensible-rate-limit = { workspace = true }
 [dev-dependencies]
 actix-http = "3.9.0"
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
+

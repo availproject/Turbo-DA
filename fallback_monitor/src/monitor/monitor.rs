@@ -1,20 +1,18 @@
+use avail_rust::{Keypair, SDK};
+use avail_utils::submit_data::SubmitDataAvail;
+use bigdecimal::BigDecimal;
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
-use crate::db::{
+use db::controllers::{
+    credit_balance::get_app_id,
     customer_expenditure::{get_unresolved_transactions, increase_retry_count},
-    users::get_app_id,
-};
-use avail_rust::{Keypair, SDK};
-use bigdecimal::BigDecimal;
-use data_submission::{
-    avail::submit_data::SubmitDataAvail,
-    db::{
-        customer_expenditure::update_customer_expenditure,
-        users::{update_credit_balance, TxParams},
-    },
 };
 use db::{
+    controllers::{
+        credit_balance::{update_credit_balance, TxParams},
+        customer_expenditure::update_customer_expenditure,
+    },
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
     schema::users::dsl::*,
 };

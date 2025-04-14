@@ -177,10 +177,6 @@ pub async fn register_new_user(
     {
         return HttpResponse::Conflict().body("User already exists");
     }
-    let username = match &payload.name {
-        Some(val) => val.clone(),
-        None => user.split('@').next().unwrap_or("").to_string(),
-    };
 
     let username = match payload.name.clone() {
         Some(val) => val,

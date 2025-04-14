@@ -5,7 +5,12 @@ use super::common::Response;
 use actix_web::web;
 use avail_rust::Keypair;
 use bigdecimal::BigDecimal;
-use db::{errors::*, models::user_model::User, schema::users::dsl::*};
+use db::{
+    controllers::customer_expenditure::{add_error_entry, update_customer_expenditure},
+    errors::*,
+    models::user_model::User,
+    schema::users::dsl::*,
+};
 use diesel::prelude::*;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
@@ -15,18 +20,11 @@ use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
-use turbo_da_core::{
-    db::customer_expenditure::add_error_entry,
-    utils::{format_size, generate_avail_sdk, get_connection, Convertor},
-};
+use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
-use crate::{
-    avail::submit_data::{SubmitDataAvail, TransactionInfo},
-    db::{
-        customer_expenditure::update_customer_expenditure, users::update_credit_balance,
-        users::TxParams,
-    },
-};
+use db::controllers::credit_balance::{update_credit_balance, TxParams};
+
+use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
 
 pub struct Consumer {
     sender: Sender<Response>,

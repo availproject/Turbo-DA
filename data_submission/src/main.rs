@@ -18,14 +18,13 @@ use log::info;
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
+    health::health_check,
 };
 use std::sync::Arc;
 use tokio::{sync::broadcast, time::Duration};
-use turbo_da_core::{routes::health::health_check, utils::generate_keygen_list};
+use turbo_da_core::utils::generate_keygen_list;
 mod auth;
-mod avail;
 mod config;
-mod db;
 mod redis;
 mod routes;
 mod utils;

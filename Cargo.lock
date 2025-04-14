@@ -1839,6 +1839,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "avail-utils"
+version = "0.1.0"
+dependencies = [
+ "avail-rust",
+ "hex",
+]
+
+[[package]]
 name = "axum"
 version = "0.6.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3580,6 +3588,7 @@ dependencies = [
  "actix-extensible-rate-limit",
  "actix-web",
  "avail-rust",
+ "avail-utils",
  "bigdecimal",
  "db",
  "diesel",
@@ -3610,11 +3619,15 @@ dependencies = [
 name = "db"
 version = "0.1.0"
 dependencies = [
+ "avail-utils",
  "bigdecimal",
  "chrono",
  "diesel",
+ "diesel-async",
  "dotenv",
+ "log",
  "serde",
+ "serde_json",
  "uuid",
 ]
 
@@ -4336,10 +4349,10 @@ name = "fallback_monitor"
 version = "0.1.0"
 dependencies = [
  "avail-rust",
+ "avail-utils",
  "bigdecimal",
  "chrono",
  "cron",
- "data_submission",
  "db",
  "diesel",
  "diesel-async",

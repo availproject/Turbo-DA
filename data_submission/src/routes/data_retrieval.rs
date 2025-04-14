@@ -1,6 +1,8 @@
-use crate::{avail::retrieve_data::retrieve_data, config::AppConfig};
+use crate::config::AppConfig;
 use actix_web::{get, web, HttpResponse};
 use avail_rust::H256;
+use avail_utils::retrieve_data::retrieve_data;
+use db::controllers::customer_expenditure::handle_submission_info;
 use db::{
     models::customer_expenditure::CustomerExpenditureGet, schema::customer_expenditures::dsl::*,
 };
@@ -10,10 +12,7 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
-use turbo_da_core::{
-    db::customer_expenditure::handle_submission_info,
-    utils::{generate_avail_sdk, get_connection},
-};
+use turbo_da_core::utils::{generate_avail_sdk, get_connection};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -138,7 +137,10 @@ pub async fn get_submission_info(
             return HttpResponse::NotAcceptable().json(json!({ "error": e.to_string() }));
         }
     };
-    handle_submission_info(&mut connection, submission_id).await
+    match handle_submission_info(&mut connection, submission_id).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+    }
 }
 
 use hex;

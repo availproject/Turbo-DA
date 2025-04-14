@@ -30,5 +30,6 @@ redis.workspace = true
 db = { path = "../db" }
 turbo-da-core = {path = "../turbo-da-core"}
 observability = { path = "../observability" }
+avail-utils = {path = "../avail"}
 tracing-subscriber = { workspace = true, features = ["json"] }
 tracing = { workspace = true }
