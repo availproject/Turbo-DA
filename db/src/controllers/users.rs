@@ -1,4 +1,7 @@
-use crate::{models::user_model::User, schema::users::dsl::*};
+use crate::{
+    models::user_model::{User, UserCreate},
+    schema::users::dsl::*,
+};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -81,4 +84,76 @@ pub async fn get_app_id(connection: &mut AsyncPgConnection, user: &String) -> Re
         Ok(user) => Ok(user.app_id),
         Err(_) => Err("DB Call Error".to_string()),
     }
+}
+
+pub async fn get_all_users(
+    connection: &mut AsyncPgConnection,
+    final_limit: i64,
+) -> Result<Vec<User>, String> {
+    let result = users
+        .limit(final_limit)
+        .select(User::as_select())
+        .load(&mut *connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(result)
+}
+
+pub async fn register_new_user(
+    connection: &mut AsyncPgConnection,
+    user: UserCreate,
+) -> Result<(), String> {
+    diesel::insert_into(users)
+        .values(user)
+        .execute(&mut *connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn allocate_global_credit_balance(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    amount: &BigDecimal,
+) -> Result<(), String> {
+    diesel::update(users.filter(id.eq(user)))
+        .set((credit_balance.eq(credit_balance + amount)))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn get_user(connection: &mut AsyncPgConnection, user: &String) -> Result<User, String> {
+    let query = users
+        .filter(id.eq(user))
+        .select(User::as_select())
+        .first::<User>(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(query)
+}
+
+pub async fn user_exists(
+    connection: &mut AsyncPgConnection,
+    user_email: &str,
+) -> Result<bool, String> {
+    let query = diesel::select(diesel::dsl::exists(users.filter(id.eq(user_email))))
+        .get_result(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(query)
+}
+
+pub async fn update_app_id(
+    connection: &mut AsyncPgConnection,
+    user_id: &String,
+    new_app_id: i32,
+) -> Result<(), String> {
+    diesel::update(users.filter(id.eq(user_id)))
+        .set(app_id.eq(new_app_id))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

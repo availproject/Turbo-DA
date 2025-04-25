@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1.82.0-bookworm AS foundry-builder
+FROM docker.io/library/rust:1.85.1-bookworm AS foundry-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y git curl cmake
 RUN curl -L https://foundry.paradigm.xyz | bash

@@ -5,13 +5,13 @@ use bigdecimal::BigDecimal;
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
 use db::controllers::{
-    credit_balance::get_app_id,
     customer_expenditure::{get_unresolved_transactions, increase_retry_count},
+    users::get_app_id,
 };
 use db::{
     controllers::{
-        credit_balance::{update_credit_balance, TxParams},
         customer_expenditure::update_customer_expenditure,
+        users::{update_credit_balance, TxParams},
     },
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
     schema::users::dsl::*,

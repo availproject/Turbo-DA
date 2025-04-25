@@ -11,6 +11,8 @@ pub struct User {
     pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
+    pub free_credit_balance: BigDecimal,
+    pub allocated_credit_balance: BigDecimal,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize)]
@@ -30,4 +32,6 @@ pub struct UserLogin {
     pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
+    pub free_credit_balance: BigDecimal,
+    pub allocated_credit_balance: BigDecimal,
 }

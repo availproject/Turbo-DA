@@ -1,6 +1,18 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    accounts (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        credit_balance -> Numeric,
+        credit_used -> Numeric,
+        fallback_enabled -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
         api_key -> Varchar,
@@ -9,6 +21,7 @@ diesel::table! {
         user_id -> Varchar,
         #[max_length = 255]
         identifier -> Varchar,
+        account_id -> Uuid,
     }
 }
 
@@ -64,14 +77,16 @@ diesel::table! {
         app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,
+        free_credit_balance -> Numeric,
+        allocated_credit_balance -> Numeric,
     }
 }
 
-diesel::joinable!(api_keys -> users (user_id));
 diesel::joinable!(credit_requests -> users (user_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    accounts,
     api_keys,
     credit_requests,
     customer_expenditures,

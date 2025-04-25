@@ -9,17 +9,17 @@ use actix_web::{
     web::{self},
     HttpRequest, HttpResponse, Responder,
 };
+use bigdecimal::BigDecimal;
 /// Database models and schema definitions
 use db::{
-    models::{
-        api::{ApiKey, ApiKeyCreate},
-        user_model::{User, UserCreate},
+    controllers::{
+        accounts::{create_account, delete_account_by_user_id},
+        users::user_exists,
     },
-    schema::{api_keys::dsl::*, users::dsl::*},
+    models::{accounts::AccountCreate, api::ApiKeyCreate, user_model::UserCreate},
 };
 /// Database and async connection handling
-use diesel::{prelude::*, result::Error};
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 /// Logging utilities
 use log::{error, info};
 /// Redis caching functionality
@@ -45,6 +45,13 @@ struct GetAllUsersParams {
 pub(crate) struct RegisterUser {
     pub name: Option<String>,
     pub app_id: i32,
+}
+
+/// Request payload for user registration
+#[derive(Deserialize, Serialize, Validate)]
+pub(crate) struct RegisterAccount {
+    pub app_id: i32,
+    pub fallback_enabled: bool,
 }
 
 /// Request payload for updating a user's app ID
@@ -78,12 +85,7 @@ pub async fn get_all_users(
         Some(l) => l,
         None => config.total_users_query_limit,
     };
-    let results = users
-        .limit(final_limit)
-        .select(User::as_select())
-        .load(&mut *connection)
-        .await
-        .expect("Error loading users");
+    let results = db::controllers::users::get_all_users(&mut connection, final_limit).await;
 
     HttpResponse::Ok().json(json!({"results":results}))
 }
@@ -125,7 +127,11 @@ pub async fn get_user(
         Err(response) => return response,
     };
 
-    handle_getuser_query(&mut connection, user_email).await
+    let user = db::controllers::users::get_user(&mut connection, &user_email).await;
+    match user {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+    }
 }
 
 /// Registers a new user in the system.
@@ -183,18 +189,153 @@ pub async fn register_new_user(
         None => user.split("@").next().unwrap().to_string(),
     };
 
-    let tx = diesel::insert_into(users)
-        .values(UserCreate {
+    let tx = db::controllers::users::register_new_user(
+        &mut connection,
+        UserCreate {
             id: user,
             name: username.clone(),
             app_id: payload.app_id,
-        })
-        .execute(&mut *connection)
-        .await;
+        },
+    )
+    .await;
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success: {}", username) })),
         Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
+    }
+}
+/// Generate an app account for a user in the system.
+///
+/// # Description
+/// Creates a new account with the provided app_id and fallback settings. The user ID is extracted from
+/// the authentication token.
+///
+/// # Route
+/// `POST v1/users/generate_app_account`
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": 1001,
+///   "fallback_enabled": true
+/// }
+/// ```
+///
+/// # Returns
+/// - 200 OK with success message if account creation succeeds
+/// - 400 Bad Request if validation fails
+/// - 406 Not Acceptable if account creation fails
+/// - 500 Internal Server Error if user info cannot be retrieved
+
+#[post("/generate_app_account")]
+pub async fn generate_app_account(
+    payload: web::Json<RegisterAccount>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    if let Err(errors) = payload.validate() {
+        return HttpResponse::BadRequest().json(errors);
+    }
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let tx = create_account(
+        &mut connection,
+        AccountCreate {
+            user_id: user,
+            credit_balance: BigDecimal::from(0),
+            credit_used: BigDecimal::from(0),
+            fallback_enabled: payload.fallback_enabled,
+        },
+    )
+    .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success") })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
+    }
+}
+
+/// Delete an account for the authenticated user.
+///
+/// # Description
+/// Deletes the account associated with the user ID extracted from the authentication token.
+///
+/// # Route
+/// `DELETE v1/users/delete_account`
+///
+/// # Returns
+/// - 200 OK with success message if account deletion succeeds
+/// - 404 Not Found if account doesn't exist
+/// - 500 Internal Server Error if user info cannot be retrieved or deletion fails
+
+#[delete("/delete_account")]
+pub async fn delete_account(
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    // Delete the account
+    let tx = delete_account_by_user_id(&mut connection, user.clone()).await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": "Account successfully deleted" })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Error deleting account: {}", e) })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct AllocateCreditBalance {
+    pub amount: BigDecimal,
+    pub account_id: Uuid,
+}
+#[post("/allocate_credit_balance")]
+pub async fn allocate_credit(
+    payload: web::Json<AllocateCreditBalance>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let tx = db::controllers::accounts::allocate_credit_balance(
+        &mut connection,
+        &payload.account_id,
+        &user,
+        &payload.amount,
+    )
+    .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": "Credit balance allocated" })),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(json!({ "error": format!("Error: {}", e) }))
+        }
     }
 }
 
@@ -226,14 +367,15 @@ async fn generate_api_key(
     let mut hasher = Keccak256::new();
     hasher.update(key.as_bytes());
     let hashed_password = hasher.finalize();
-    let tx = diesel::insert_into(api_keys)
-        .values(ApiKeyCreate {
+    let tx = db::controllers::api_keys::create_api_key(
+        &mut connection,
+        &ApiKeyCreate {
             api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
-        })
-        .execute(&mut *connection)
-        .await;
+        },
+    )
+    .await;
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "api_key": key })),
@@ -264,11 +406,7 @@ pub async fn get_api_key(
         Err(response) => return response,
     };
 
-    let query = api_keys
-        .filter(user_id.eq(user))
-        .select(ApiKey::as_select())
-        .load(&mut *connection)
-        .await;
+    let query = db::controllers::api_keys::get_api_key(&mut connection, &user).await;
 
     match query {
         Ok(key) => HttpResponse::Ok().json(key),
@@ -319,13 +457,9 @@ async fn delete_api_key(
         Err(response) => return response,
     };
 
-    let query = diesel::delete(
-        api_keys
-            .filter(user_id.eq(user))
-            .filter(identifier.eq(&payload.identifier)),
-    )
-    .load::<ApiKey>(&mut *connection)
-    .await;
+    let query =
+        db::controllers::api_keys::delete_api_key(&mut connection, &user, &payload.identifier)
+            .await;
 
     match query {
         Ok(row) => {
@@ -383,54 +517,10 @@ async fn update_app_id(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let query = diesel::update(users)
-        .filter(id.eq(user))
-        .set(app_id.eq(payload.app_id))
-        .execute(&mut *connection)
-        .await;
+    let query = db::controllers::users::update_app_id(&mut connection, &user, payload.app_id).await;
 
     match query {
-        Ok(result) => HttpResponse::Ok().json(format!("Success: {}", result)),
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": "App ID updated" })),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
-}
-
-/// Helper function to retrieve user details by email.
-///
-/// # Arguments
-/// * `connection` - Database connection
-/// * `mail` - Email address to look up
-///
-/// # Returns
-/// HttpResponse containing user details or appropriate error
-
-async fn handle_getuser_query(connection: &mut AsyncPgConnection, mail: String) -> HttpResponse {
-    match users
-        .filter(id.eq(mail))
-        .select(User::as_select())
-        .first::<User>(connection)
-        .await
-    {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(Error::NotFound) => HttpResponse::NotFound().body("User not found"),
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
-    }
-}
-
-/// Checks if a user exists by email address.
-///
-/// # Arguments
-/// * `connection` - Database connection
-/// * `user_email` - Email address to check
-///
-/// # Returns
-/// Result containing boolean indicating if user exists
-
-pub async fn user_exists(
-    connection: &mut AsyncPgConnection,
-    user_email: &str,
-) -> Result<bool, Error> {
-    diesel::select(diesel::dsl::exists(users.filter(id.eq(user_email))))
-        .get_result(connection)
-        .await
 }
