@@ -4,6 +4,7 @@ diesel::table! {
     accounts (id) {
         id -> Uuid,
         user_id -> Varchar,
+        app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,
         fallback_enabled -> Bool,
@@ -57,6 +58,7 @@ diesel::table! {
         retry_count -> Int4,
         error -> Nullable<Varchar>,
         payload -> Nullable<Bytea>,
+        account_id -> Uuid,
     }
 }
 
@@ -74,15 +76,17 @@ diesel::table! {
     users (id) {
         id -> Varchar,
         name -> Varchar,
-        app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,
-        free_credit_balance -> Numeric,
         allocated_credit_balance -> Numeric,
     }
 }
 
+diesel::joinable!(accounts -> users (user_id));
+diesel::joinable!(api_keys -> accounts (account_id));
+diesel::joinable!(api_keys -> users (user_id));
 diesel::joinable!(credit_requests -> users (user_id));
+diesel::joinable!(customer_expenditures -> accounts (account_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(

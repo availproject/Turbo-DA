@@ -118,7 +118,7 @@ pub async fn get_connection(
 ///
 /// # Arguments
 /// * `http_request` - HTTP request to extract user ID from
-pub fn retrieve_user_id(http_request: HttpRequest) -> Option<String> {
+pub fn retrieve_user_id(http_request: &HttpRequest) -> Option<String> {
     let headers = http_request.headers();
 
     for (name, value) in headers.iter() {
@@ -344,4 +344,21 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
         info!("All endpoints failed. Waiting 5 seconds before next retry....");
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
+}
+
+/// Retrieves user ID from HTTP request headers
+///
+/// # Arguments
+/// * `http_request` - HTTP request to extract user ID from
+pub fn retrieve_account_id(http_request: &HttpRequest) -> Option<Uuid> {
+    let headers = http_request.headers();
+
+    for (name, value) in headers.iter() {
+        if name == "account_id" {
+            if let Ok(account_id) = value.to_str() {
+                return Uuid::parse_str(account_id).ok();
+            }
+        }
+    }
+    None
 }

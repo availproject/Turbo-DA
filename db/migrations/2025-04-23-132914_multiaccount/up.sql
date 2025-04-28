@@ -1,9 +1,19 @@
 -- Your SQL goes here
 ALTER TABLE api_keys 
 ADD COLUMN account_id UUID NOT NULL,
-ADD CONSTRAINT fk_api_keys_account_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE;
+ADD CONSTRAINT fk_api_keys_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE users
 ADD COLUMN allocated_credit_balance NUMERIC(39, 0) NOT NULL DEFAULT 0;
 
+ALTER TABLE customer_expenditures
+ADD COLUMN account_id UUID NOT NULL,
+ADD CONSTRAINT fk_customer_expenditure_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE ON UPDATE CASCADE;
 
+UPDATE accounts
+SET app_id = s.app_id
+FROM users s
+WHERE accounts.user_id = s.id;
+
+ALTER TABLE users
+DROP COLUMN app_id;

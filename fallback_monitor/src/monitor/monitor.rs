@@ -4,20 +4,19 @@ use bigdecimal::BigDecimal;
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
-use db::controllers::{
-    customer_expenditure::{get_unresolved_transactions, increase_retry_count},
-    users::get_app_id,
-};
 use db::{
     controllers::{
-        customer_expenditure::update_customer_expenditure,
-        users::{update_credit_balance, TxParams},
+        customer_expenditure::increase_retry_count,
+        misc::{get_unresolved_transactions, update_credit_balance},
     },
-    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
-    schema::users::dsl::*,
+    models::accounts::Account,
 };
-use diesel::prelude::*;
-use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use db::{
+    controllers::{customer_expenditure::update_customer_expenditure, users::TxParams},
+    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
+};
+
+use diesel_async::AsyncPgConnection;
 use log::{error, info};
 use observability::{log_fallback_txn_error, log_retry_count};
 use turbo_da_core::utils::{format_size, Convertor};
@@ -77,64 +76,72 @@ async fn process_failed_transactions(
     client: &SDK,
     account: &Keypair,
     retry_count: i32,
-    failed_transactions_list: Vec<CustomerExpenditureGetWithPayload>,
+    failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Account, User)>,
 ) {
-    for i in failed_transactions_list {
-        info!("Processing failed transaction submission id: {:?} ", i.id);
-        let result = increase_retry_count(i.id, connection).await;
+    for (customer_expenditure_details, account_details, user_details) in failed_transactions_list {
+        info!(
+            "Processing failed transaction submission id: {:?} ",
+            customer_expenditure_details.id
+        );
+        let result = increase_retry_count(customer_expenditure_details.id, connection).await;
         if result.is_err() {
             log_fallback_txn_error(
-                &i.id.to_string(),
+                &customer_expenditure_details.id.to_string(),
                 "Failed to increase retry count for entry id",
             );
-            error!("Failed to increase retry count for entry id: {:?}", i.id);
+            error!(
+                "Failed to increase retry count for entry id: {:?}",
+                customer_expenditure_details.id
+            );
             continue;
         }
 
-        log_retry_count(&i.id.to_string(), i.retry_count as usize);
+        log_retry_count(
+            &customer_expenditure_details.id.to_string(),
+            customer_expenditure_details.retry_count as usize,
+        );
 
-        if i.retry_count > retry_count {
-            log_fallback_txn_error(&i.id.to_string(), "Retry count exceeded for transaction id");
-            error!("Retry count exceeded for transaction id: {:?}", i.id);
+        if customer_expenditure_details.retry_count > retry_count {
+            log_fallback_txn_error(
+                &customer_expenditure_details.id.to_string(),
+                "Retry count exceeded for transaction id",
+            );
+            error!(
+                "Retry count exceeded for transaction id: {:?}",
+                customer_expenditure_details.id
+            );
             continue;
         }
-        let Some(data) = i.payload else {
-            log_fallback_txn_error(&i.id.to_string(), "No payload found for transaction id");
-            error!("No payload found for transaction id: {:?}", i.id);
+        let Some(data) = customer_expenditure_details.payload else {
+            log_fallback_txn_error(
+                &customer_expenditure_details.id.to_string(),
+                "No payload found for transaction id",
+            );
+            error!(
+                "No payload found for transaction id: {:?}",
+                customer_expenditure_details.id
+            );
             continue;
-        };
-        let avail_app_id = match get_app_id(connection, &i.user_id).await {
-            Ok(app) => app,
-            Err(e) => {
-                log_fallback_txn_error(&i.id.to_string(), &e);
-                error!("Couldn't fetch app id. Error: {:?}", e);
-                return;
-            }
-        };
-
-        let credit_details = match users
-            .filter(db::schema::users::id.eq(&i.user_id))
-            .select(User::as_select())
-            .first::<User>(connection)
-            .await
-        {
-            Ok(details) => details,
-            Err(e) => {
-                log_fallback_txn_error(&i.id.to_string(), &format!("{:?}", e));
-                error!("Failed to get token details: {:?}", e);
-                continue;
-            }
         };
 
         let convertor = Convertor::new(client, account);
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used > credit_details.credit_balance {
-            log_fallback_txn_error(&i.id.to_string(), "Insufficient credits for user id");
-            error!("Insufficient credits for user id: {:?}", i.id);
-            continue;
+        if credits_used > account_details.credit_balance {
+            if !account_details.fallback_enabled || credits_used > user_details.credit_balance {
+                log_fallback_txn_error(
+                    &customer_expenditure_details.id.to_string(),
+                    "Insufficient credits for user id",
+                );
+                error!(
+                    "Insufficient credits for user id: {:?}",
+                    customer_expenditure_details.id
+                );
+                continue;
+            }
         }
-        let submit_data_class = SubmitDataAvail::new(client, account, avail_app_id);
+
+        let submit_data_class = SubmitDataAvail::new(client, account, account_details.app_id);
         let submission = submit_data_class.submit_data(&data).await;
 
         match submission {
@@ -150,14 +157,14 @@ async fn process_failed_transactions(
                     success,
                     &fees_as_bigdecimal,
                     &tx_params.amount_data_billed,
-                    i.id,
+                    customer_expenditure_details.id,
                     connection,
                 )
                 .await;
-                update_credit_balance(connection, &i.user_id, &tx_params).await;
+                update_credit_balance(connection, &account_details.id, &tx_params).await;
             }
             Err(e) => {
-                log_fallback_txn_error(&i.id.to_string(), &e);
+                log_fallback_txn_error(&customer_expenditure_details.id.to_string(), &e);
                 error!("Tx submission failed again: id {:?}", e);
             }
         }

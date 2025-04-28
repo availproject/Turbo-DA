@@ -9,6 +9,7 @@ pub struct Account {
     pub id: uuid::Uuid,
     pub created_at: chrono::NaiveDateTime,
     pub user_id: String,
+    pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
     pub fallback_enabled: bool,
@@ -18,6 +19,7 @@ pub struct Account {
 #[diesel(table_name = crate::schema::accounts)]
 pub struct AccountCreate {
     pub user_id: String,
+    pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
     pub fallback_enabled: bool,

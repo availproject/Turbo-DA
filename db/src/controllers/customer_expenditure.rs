@@ -73,7 +73,7 @@ pub async fn update_customer_expenditure(
     fees_as_bigdecimal_in_avail: &BigDecimal,
     submission_id: Uuid,
     connection: &mut AsyncPgConnection,
-) {
+) -> Result<(), String> {
     let update_values = (
         fees.eq(fees_as_bigdecimal),
         converted_fees.eq(fees_as_bigdecimal_in_avail),
@@ -87,22 +87,17 @@ pub async fn update_customer_expenditure(
         error.eq(None::<String>),
     );
 
-    let tx = diesel::update(customer_expenditures.filter(id.eq(submission_id)))
+    diesel::update(customer_expenditures.filter(id.eq(submission_id)))
         .set(update_values.clone())
         .execute(connection)
-        .await;
-
-    match tx {
-        Ok(_) => {
-            info!("Entry updated for submission id {:?} ", submission_id);
-        }
-        Err(e) => {
-            error!(
+        .await
+        .map_err(|e| {
+            format!(
                 "Couldn't insert customer expenditure entry {:?}. Error: {:?}",
                 update_values, e
-            );
-        }
-    }
+            )
+        })?;
+    Ok(())
 }
 
 pub async fn create_customer_expenditure_entry(
@@ -186,43 +181,6 @@ pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgC
         Err(e) => {
             error!("Couldn't insert error log value. Error: {:?}", e);
         }
-    }
-}
-
-/// Retrieves unresolved transactions from the database that have not exceeded retry limit
-///
-/// # Arguments
-/// * `connection` - Database connection handle
-/// * `retry` - Maximum number of retry attempts allowed
-///
-/// # Returns
-/// * `Ok(Vec<CustomerExpenditureGetWithPayload>)` - List of unresolved transactions
-/// * `Err(String)` - Error message if database query fails
-///
-/// # Description
-/// Queries the database for transactions that:
-/// 1. Have an error or payload
-/// 2. Have not exceeded the maximum retry count
-/// 3. Are ordered by creation date descending
-pub async fn get_unresolved_transactions(
-    connection: &mut AsyncPgConnection,
-    retry: i32,
-) -> Result<Vec<CustomerExpenditureGetWithPayload>, String> {
-    match customer_expenditures
-        .filter(error.is_not_null())
-        .or_filter(payload.is_not_null().and(created_at.lt(diesel::dsl::sql::<
-            diesel::sql_types::Timestamp,
-        >(
-            "NOW() - INTERVAL '15 minutes'"
-        ))))
-        .filter(retry_count.lt(retry))
-        .order(created_at.desc())
-        .select(CustomerExpenditureGetWithPayload::as_select())
-        .load(connection)
-        .await
-    {
-        Ok(list) => Ok(list),
-        Err(_) => Err("DB Call Error".to_string()),
     }
 }
 

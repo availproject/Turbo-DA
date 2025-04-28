@@ -6,7 +6,11 @@ use actix_web::web;
 use avail_rust::Keypair;
 use bigdecimal::BigDecimal;
 use db::{
-    controllers::customer_expenditure::{add_error_entry, update_customer_expenditure},
+    controllers::{
+        customer_expenditure::{add_error_entry, update_customer_expenditure},
+        misc::get_account_by_id,
+        users::get_user,
+    },
     errors::*,
     models::user_model::User,
     schema::users::dsl::*,
@@ -22,7 +26,7 @@ use tokio::{
 };
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
-use db::controllers::credit_balance::{update_credit_balance, TxParams};
+use db::controllers::{misc::update_credit_balance, users::TxParams};
 
 use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
 
@@ -168,21 +172,8 @@ impl<'a> ProcessSubmitResponse<'a> {
 
     #[tracing::instrument(name = "process_response", skip(self))]
     pub async fn process_response(&mut self) -> Result<&'a Response, String> {
-        let credit_details = match users
-            .filter(db::schema::users::id.eq(&self.response.user_id))
-            .select(User::as_select())
-            .first::<User>(&mut self.connection)
-            .await
-        {
-            Ok(details) => details,
-            Err(e) => {
-                error!(
-                    "Failed to get user information: {:?} {:?}",
-                    self.response.user_id, e
-                );
-                return Err("INVALID USER".to_string());
-            }
-        };
+        let (account, user) =
+            get_account_by_id(&mut self.connection, &self.response.account_id).await?;
 
         let data = self.response.raw_payload.clone();
 
@@ -193,30 +184,30 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used > credit_details.credit_balance {
-            return Err("Insufficient credits".to_string());
-        }
-
-        match self.submit_avail_class.submit_data(&data).await {
-            Ok(result) => {
-                let params = TxParams {
-                    amount_data: format_size(data.len()),
-                    amount_data_billed: credits_used,
-                    fees: result.gas_fee,
-                };
-
-                self.update_database(result, params).await;
-
-                Ok(self.response)
-            }
-            Err(submit_err) => {
-                error!("Failed to submit data to avail: {:?}", submit_err);
-                Err(format!("Failed to submit data to avail: {:?}", submit_err))
+        if credits_used > account.credit_balance {
+            if !account.fallback_enabled || credits_used > user.credit_balance {
+                return Err("Insufficient credits".to_string());
             }
         }
+
+        let result = self.submit_avail_class.submit_data(&data).await?;
+
+        let params = TxParams {
+            amount_data: format_size(data.len()),
+            amount_data_billed: credits_used,
+            fees: result.gas_fee,
+        };
+
+        self.update_database(result, params).await?;
+
+        Ok(self.response)
     }
 
-    pub async fn update_database(&mut self, result: TransactionInfo, tx_params: TxParams) {
+    pub async fn update_database(
+        &mut self,
+        result: TransactionInfo,
+        tx_params: TxParams,
+    ) -> Result<(), String> {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
 
         update_customer_expenditure(
@@ -226,8 +217,10 @@ impl<'a> ProcessSubmitResponse<'a> {
             self.response.submission_id,
             self.connection,
         )
-        .await;
-        update_credit_balance(self.connection, &self.response.user_id, &tx_params).await;
+        .await?;
+        update_credit_balance(self.connection, &self.response.account_id, &tx_params).await?;
+
+        Ok(())
     }
 }
 

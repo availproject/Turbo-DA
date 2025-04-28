@@ -1,7 +1,7 @@
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_user_id_from_jwt},
+    utils::{get_connection, retrieve_account_id, retrieve_user_id_from_jwt},
 };
 /// Web framework dependencies for handling HTTP requests and responses
 use actix_web::{
@@ -44,13 +44,11 @@ struct GetAllUsersParams {
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
     pub name: Option<String>,
-    pub app_id: i32,
 }
 
 /// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterAccount {
-    pub app_id: i32,
     pub fallback_enabled: bool,
 }
 
@@ -58,6 +56,7 @@ pub(crate) struct RegisterAccount {
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct UpdateAppID {
     pub app_id: i32,
+    pub account_id: Uuid,
 }
 
 /// Retrieves a list of all users with optional limit
@@ -194,7 +193,6 @@ pub async fn register_new_user(
         UserCreate {
             id: user,
             name: username.clone(),
-            app_id: payload.app_id,
         },
     )
     .await;
@@ -251,6 +249,7 @@ pub async fn generate_app_account(
         &mut connection,
         AccountCreate {
             user_id: user,
+            app_id: 0,
             credit_balance: BigDecimal::from(0),
             credit_used: BigDecimal::from(0),
             fallback_enabled: payload.fallback_enabled,
@@ -357,6 +356,11 @@ async fn generate_api_key(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
+    let account_id = match retrieve_account_id(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("Account Id not retrieved"),
+    };
+
     let key = Uuid::new_v4().to_string().replace("-", "");
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -373,6 +377,7 @@ async fn generate_api_key(
             api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
+            account_id: account_id,
         },
     )
     .await;
@@ -517,7 +522,13 @@ async fn update_app_id(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let query = db::controllers::users::update_app_id(&mut connection, &user, payload.app_id).await;
+    let query = db::controllers::accounts::update_app_id(
+        &mut connection,
+        &payload.account_id,
+        &user,
+        payload.app_id,
+    )
+    .await;
 
     match query {
         Ok(_) => HttpResponse::Ok().json(json!({ "message": "App ID updated" })),

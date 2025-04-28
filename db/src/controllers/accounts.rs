@@ -1,6 +1,6 @@
 use crate::{
     models::accounts::{Account, AccountCreate},
-    schema::accounts::dsl::*,
+    schema::{accounts::dsl::*, users},
 };
 use bigdecimal::BigDecimal;
 use diesel::ExpressionMethods;
@@ -90,4 +90,33 @@ pub async fn allocate_credit_balance(
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+pub async fn update_app_id(
+    connection: &mut AsyncPgConnection,
+    account_id: &Uuid,
+    user: &String,
+    new_app_id: i32,
+) -> Result<(), String> {
+    diesel::update(accounts.filter(id.eq(account_id)).filter(user_id.eq(user)))
+        .set(app_id.eq(new_app_id))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn get_app_id(
+    connection: &mut AsyncPgConnection,
+    account_id: &Uuid,
+) -> Result<i32, String> {
+    match accounts
+        .filter(id.eq(account_id))
+        .select(Account::as_select())
+        .first::<Account>(connection)
+        .await
+    {
+        Ok(account) => Ok(account.app_id),
+        Err(_) => Err("DB Call Error".to_string()),
+    }
 }
