@@ -18,6 +18,7 @@ pub struct Account {
 #[derive(Insertable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::accounts)]
 pub struct AccountCreate {
+    pub id: uuid::Uuid,
     pub user_id: String,
     pub app_id: i32,
     pub credit_balance: BigDecimal,

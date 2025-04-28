@@ -13,7 +13,7 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 
-use super::users::TxParams;
+use super::users::{get_user, TxParams};
 
 pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
@@ -55,29 +55,26 @@ pub async fn update_credit_balance(
 
     let mut leftover_val = BigDecimal::from(0);
     let mut user_credit_balance_change = &leftover_val;
-    let mut account_credit_balance_change = &tx_params.amount_data_billed;
+    let account_credit_balance_change = &tx_params.amount_data_billed;
 
     if tx_params.amount_data_billed > account.credit_balance {
         leftover_val = &account.credit_balance - &tx_params.amount_data_billed;
         user_credit_balance_change = &leftover_val;
-        account_credit_balance_change = &account.credit_balance;
     }
-    if account_credit_balance_change != &BigDecimal::from(0) {
-        diesel::update(accounts::accounts.filter(accounts::id.eq(account_id)))
-            .set((
-                accounts::credit_balance
-                    .eq(accounts::credit_balance - account_credit_balance_change),
-                accounts::credit_used.eq(accounts::credit_used + &tx_params.amount_data_billed),
-            ))
-            .execute(connection)
-            .await
-            .map_err(|e| {
-                format!(
+
+    diesel::update(accounts::accounts.filter(accounts::id.eq(account_id)))
+        .set((
+            accounts::credit_balance.eq(accounts::credit_balance - account_credit_balance_change),
+            accounts::credit_used.eq(accounts::credit_used + &tx_params.amount_data_billed),
+        ))
+        .execute(connection)
+        .await
+        .map_err(|e| {
+            format!(
                 "Couldn't update account credit balance for account id {:?}, fee: {:?}. Error {:?}",
-                    account_id, tx_params.fees, e
-                )
-            })?;
-    }
+                account_id, tx_params.fees, e
+            )
+        })?;
 
     if user_credit_balance_change > &BigDecimal::from(0) {
         diesel::update(users::users.filter(users::id.eq(account.user_id)))
@@ -135,4 +132,56 @@ pub async fn get_unresolved_transactions(
         .load::<(CustomerExpenditureGetWithPayload, Account, User)>(connection)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Allocates or deallocates credits to a user's account
+///
+/// # Arguments
+/// * `connection` - Database connection handle
+/// * `user_id` - User ID to update
+/// * `amount` - Amount to allocate (positive) or deallocate (negative)
+///
+/// # Returns
+/// * `Ok(())` - If the allocation was successful
+/// * `Err(String)` - Error message if the database operation fails
+///
+/// # Description
+/// Updates the allocated_credit_balance field for a user ( not individual account), which tracks credits
+/// that have been reserved for specific purposes. This function can both increase
+/// (positive amount) or decrease (negative amount) the allocated balance.
+pub async fn allocate_credit_balance(
+    connection: &mut AsyncPgConnection,
+    account_id: &Uuid,
+    user: &String,
+    amount: &BigDecimal,
+) -> Result<(), String> {
+    if amount < &BigDecimal::from(0) {
+        return Err("Cannot allocate negative credits".to_string());
+    }
+    let user_obj = get_user(connection, user).await?;
+    if amount > &BigDecimal::from(0)
+        && user_obj.credit_balance - user_obj.allocated_credit_balance < *amount
+    {
+        return Err("Insufficient balance".to_string());
+    }
+
+    diesel::update(
+        accounts::accounts
+            .filter(accounts::id.eq(account_id))
+            .filter(accounts::user_id.eq(user)),
+    )
+    .set((accounts::credit_balance.eq(accounts::credit_balance + amount)))
+    .execute(connection)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    diesel::update(users::users.filter(users::id.eq(user)))
+        .set((
+            users::allocated_credit_balance.eq(users::allocated_credit_balance + amount),
+            users::credit_balance.eq(users::credit_balance - amount),
+        ))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

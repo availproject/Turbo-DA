@@ -27,7 +27,10 @@ use actix_web::{
 use config::AppConfig;
 use controllers::{
     fund::purchase_cost,
-    users::{delete_api_key, generate_api_key, get_api_key},
+    users::{
+        allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
+        get_api_key,
+    },
 };
 use tokio::time::Duration;
 
@@ -154,7 +157,10 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(update_app_id)
                             .service(purchase_cost)
                             .service(estimate_credits_for_bytes)
-                            .service(estimate_credits),
+                            .service(estimate_credits)
+                            .service(allocate_credit)
+                            .service(delete_account)
+                            .service(generate_app_account),
                     )
                     .service(
                         web::scope("/admin")

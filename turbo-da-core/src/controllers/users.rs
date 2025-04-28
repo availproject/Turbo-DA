@@ -13,7 +13,7 @@ use bigdecimal::BigDecimal;
 /// Database models and schema definitions
 use db::{
     controllers::{
-        accounts::{create_account, delete_account_by_user_id},
+        accounts::{create_account, delete_account_by_id},
         users::user_exists,
     },
     models::{accounts::AccountCreate, api::ApiKeyCreate, user_model::UserCreate},
@@ -245,22 +245,27 @@ pub async fn generate_app_account(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let tx = create_account(
-        &mut connection,
-        AccountCreate {
-            user_id: user,
-            app_id: 0,
-            credit_balance: BigDecimal::from(0),
-            credit_used: BigDecimal::from(0),
-            fallback_enabled: payload.fallback_enabled,
-        },
-    )
-    .await;
+    let account_id = Uuid::new_v4();
+    let account = AccountCreate {
+        id: account_id,
+        user_id: user,
+        app_id: 0,
+        credit_balance: BigDecimal::from(0),
+        credit_used: BigDecimal::from(0),
+        fallback_enabled: payload.fallback_enabled,
+    };
+
+    let tx = create_account(&mut connection, &account).await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success") })),
+        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success"), "data": account })),
         Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
     }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct DeleteAccount {
+    pub account_id: Uuid,
 }
 
 /// Delete an account for the authenticated user.
@@ -278,6 +283,7 @@ pub async fn generate_app_account(
 
 #[delete("/delete_account")]
 pub async fn delete_account(
+    payload: web::Json<DeleteAccount>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
@@ -292,7 +298,7 @@ pub async fn delete_account(
     };
 
     // Delete the account
-    let tx = delete_account_by_user_id(&mut connection, user.clone()).await;
+    let tx = delete_account_by_id(&mut connection, user.clone(), payload.account_id).await;
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "message": "Account successfully deleted" })),
@@ -322,7 +328,7 @@ pub async fn allocate_credit(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let tx = db::controllers::accounts::allocate_credit_balance(
+    let tx = db::controllers::misc::allocate_credit_balance(
         &mut connection,
         &payload.account_id,
         &user,
@@ -332,10 +338,13 @@ pub async fn allocate_credit(
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "message": "Credit balance allocated" })),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(json!({ "error": format!("Error: {}", e) }))
-        }
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e })),
     }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct GenerateApiKey {
+    pub account_id: Uuid,
 }
 
 /// Generates a new API key for the authenticated user
@@ -348,17 +357,13 @@ pub async fn allocate_credit(
 /// JSON response containing the new API key or error message
 #[post("/generate_api_key")]
 async fn generate_api_key(
+    payload: web::Json<GenerateApiKey>,
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
-
-    let account_id = match retrieve_account_id(&http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("Account Id not retrieved"),
     };
 
     let key = Uuid::new_v4().to_string().replace("-", "");
@@ -377,7 +382,7 @@ async fn generate_api_key(
             api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
-            account_id: account_id,
+            account_id: payload.account_id,
         },
     )
     .await;

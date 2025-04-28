@@ -113,6 +113,7 @@ where
                         });
                     }
                 };
+
                 // 2. If there is no entry in redis, make a call to db and update redis
                 let api_key_info = api_keys
                     .filter(api_keys::api_key.eq(api_key_hash.as_str()))

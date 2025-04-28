@@ -8,10 +8,16 @@ use diesel::QueryDsl;
 use diesel::SelectableHelper;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
+use super::misc::get_account_by_id;
+
 pub async fn create_api_key(
     connection: &mut AsyncPgConnection,
     key: &ApiKeyCreate,
 ) -> Result<(), String> {
+    let account = get_account_by_id(connection, &key.account_id).await?;
+    if account.0.user_id != key.user_id {
+        return Err("Account does not belong to user".to_string());
+    }
     diesel::insert_into(api_keys)
         .values(key)
         .execute(&mut *connection)

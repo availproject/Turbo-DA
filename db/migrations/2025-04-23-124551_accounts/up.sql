@@ -1,5 +1,5 @@
 CREATE TABLE accounts ( 
-    id UUID PRIMARY KEY,
+    id UUID UNIQUE PRIMARY KEY,
     user_id VARCHAR NOT NULL,
     app_id INTEGER NOT NULL,
     credit_balance NUMERIC(39, 0) NOT NULL DEFAULT 0,
