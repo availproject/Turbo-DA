@@ -25,7 +25,7 @@ use serde_json::json;
 /// This endpoint allows a user to retrieve the status and details of their fund request. The response includes information about the amount deposited, the amount of Avail approved, and the current status of the request.
 ///
 /// # Route
-/// `GET v1/user/request_fund_status`
+/// `GET /v1/user/request_fund_status`
 ///
 /// # Headers
 /// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request. The token should belong to the user whose fund request status is being queried.
@@ -84,6 +84,34 @@ struct PurchaseCostParams {
     pub data_size: u64, // in Bytes
 }
 
+/// Calculate the credit cost for a given data size.
+///
+/// # Description
+/// This endpoint calculates the credit cost required to submit data of a specified size to the Avail network.
+///
+/// # Route
+/// `GET /v1/user/purchase_cost`
+///
+/// # Query Parameters
+/// * `data_size` - The size of the data in bytes for which to calculate the credit cost.
+///
+/// # Returns
+/// A JSON object containing the calculated credit cost for the specified data size.
+///
+/// # Example Request
+///
+/// ```bash
+/// curl -X GET "https://api.example.com/v1/user/purchase_cost?data_size=1024"
+/// ```
+///
+/// # Example Response
+///
+/// ```json
+/// {
+///   "credits_cost": "0.0123456789"
+/// }
+/// ```
+
 #[get("/purchase_cost")]
 pub async fn purchase_cost(
     query: web::Query<PurchaseCostParams>,
@@ -108,6 +136,34 @@ pub struct EstimateCreditsParams {
     pub data: BigDecimal,
 }
 
+/// Estimate the credits required for a given data amount.
+///
+/// # Description
+/// This endpoint estimates the number of credits required to process a specified amount of data.
+///
+/// # Route
+/// `GET /v1/user/estimate_credits`
+///
+/// # Query Parameters
+/// * `data` - The amount of data as a decimal value for which to estimate credit requirements.
+///
+/// # Returns
+/// A JSON object containing the estimated credit cost for the specified data amount.
+///
+/// # Example Request
+///
+/// ```bash
+/// curl -X GET "https://api.example.com/v1/user/estimate_credits?data=10.5"
+/// ```
+///
+/// # Example Response
+///
+/// ```json
+/// {
+///   "credits_cost": "0.0123456789"
+/// }
+/// ```
+
 #[get("/estimate_credits")]
 pub async fn estimate_credits(
     query: web::Query<EstimateCreditsParams>,
@@ -124,6 +180,36 @@ pub async fn estimate_credits(
 
     HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
 }
+
+/// Estimate the credits required for raw byte data.
+///
+/// # Description
+/// This endpoint calculates the credit cost for submitting raw byte data to the Avail network.
+///
+/// # Route
+/// `GET /v1/user/estimate_credits_for_bytes`
+///
+/// # Request Body
+/// Raw bytes that represent the data for which to estimate credit requirements.
+///
+/// # Returns
+/// A JSON object containing the estimated credit cost for the provided byte data.
+///
+/// # Example Request
+///
+/// ```bash
+/// curl -X GET "https://api.example.com/v1/user/estimate_credits_for_bytes" \
+///      -H "Content-Type: application/octet-stream" \
+///      --data-binary @file.bin
+/// ```
+///
+/// # Example Response
+///
+/// ```json
+/// {
+///   "credits_cost": "0.0123456789"
+/// }
+/// ```
 
 #[get("/estimate_credits_for_bytes")]
 pub async fn estimate_credits_for_bytes(
@@ -148,7 +234,7 @@ pub async fn estimate_credits_for_bytes(
 /// This endpoint provides a list of supported tokens along with their addresses. It helps clients understand which tokens are available for interactions and their associated addresses on the blockchain.
 ///
 /// # Route
-/// `GET /token_map`
+/// `GET /v1/token_map`
 ///
 /// # Returns
 /// A JSON object containing a mapping of token names to their addresses. The response provides a list of supported tokens with their respective blockchain addresses.
@@ -163,8 +249,10 @@ pub async fn estimate_credits_for_bytes(
 ///
 /// ```json
 /// {
-///   "ethereum": "0xc...",  // Ethereum token address
-///   "cardano": "0xd..."    // Cardano token address
+///   "token_map": {
+///     "ethereum": "0xc...",  // Ethereum token address
+///     "cardano": "0xd..."    // Cardano token address
+///   }
 /// }
 /// ```
 

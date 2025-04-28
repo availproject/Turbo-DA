@@ -9,28 +9,34 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use validator::Validate;
 
-/// Query parameters for retrieving expenditures with optional limit
+/// Query parameters for retrieving customer expenditures with optional limit
 #[derive(Deserialize, Serialize)]
 struct GetAllExpenditures {
     limit: Option<i64>,
 }
 
-/// Request payload for retrieving token expenditure details
+/// Request payload for retrieving detailed token expenditure information
 #[derive(Deserialize, Serialize, Validate)]
 struct GetTokenExpenditure {
     token_id: i32,
 }
 
-/// Retrieves all expenditures for an authenticated user
+/// Retrieves all expenditure records for an authenticated customer
+///
+/// This endpoint allows customers to view their transaction history and
+/// track how they've spent their credits on Avail data submissions.
+/// The results include transaction details such as data size, fees paid,
+/// and submission status.
 ///
 /// # Arguments
-/// * `request_payload` - Query parameters containing optional limit
-/// * `config` - Application configuration
-/// * `injected_dependency` - Database connection pool
-/// * `http_request` - HTTP request containing user authentication
+/// * `request_payload` - Query parameters containing optional result limit
+/// * `config` - Application configuration with default limits
+/// * `injected_dependency` - Database connection pool for data access
+/// * `http_request` - HTTP request containing JWT for user authentication
 ///
 /// # Returns
-/// JSON response containing list of expenditures or error
+/// * Success: JSON response with a list of expenditure records
+/// * Error: 500 status code with error message if user authentication or database access fails
 #[get("/get_all_expenditure")]
 pub async fn get_all_expenditure(
     request_payload: web::Query<GetAllExpenditures>,

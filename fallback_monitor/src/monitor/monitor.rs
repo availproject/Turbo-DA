@@ -153,7 +153,7 @@ async fn process_failed_transactions(
                     amount_data_billed: credits_used,
                     fees: success.gas_fee,
                 };
-                update_customer_expenditure(
+                let result = update_customer_expenditure(
                     success,
                     &fees_as_bigdecimal,
                     &tx_params.amount_data_billed,
@@ -161,7 +161,24 @@ async fn process_failed_transactions(
                     connection,
                 )
                 .await;
-                update_credit_balance(connection, &account_details.id, &tx_params).await;
+                if result.is_err() {
+                    error!("Failed to update customer expenditure: {:?}", result.err());
+                    log_fallback_txn_error(
+                        &customer_expenditure_details.id.to_string(),
+                        "Failed to update customer expenditure",
+                    );
+                    continue;
+                }
+                let result =
+                    update_credit_balance(connection, &account_details.id, &tx_params).await;
+                if result.is_err() {
+                    error!("Failed to update credit balance: {:?}", result.err());
+                    log_fallback_txn_error(
+                        &customer_expenditure_details.id.to_string(),
+                        "Failed to update credit balance",
+                    );
+                    continue;
+                }
             }
             Err(e) => {
                 log_fallback_txn_error(&customer_expenditure_details.id.to_string(), &e);

@@ -61,13 +61,27 @@ pub(crate) struct UpdateAppID {
 
 /// Retrieves a list of all users with optional limit
 ///
-/// # Arguments
-/// * `payload` - Query parameters containing optional limit
-/// * `config` - Application configuration
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Returns a list of all users in the system, with an optional limit parameter to restrict the number of results.
+///
+/// # Route
+/// `GET /v1/user/get_all_users`
+///
+/// # Query Parameters
+/// * `limit` - Optional parameter to limit the number of users returned
 ///
 /// # Returns
-/// JSON response containing list of users or error
+/// JSON response containing a list of users or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "results": [
+///     {"id": "user1@example.com", "name": "User One"},
+///     {"id": "user2@example.com", "name": "User Two"}
+///   ]
+/// }
+/// ```
 #[get("/get_all_users")]
 pub async fn get_all_users(
     payload: web::Query<GetAllUsersParams>,
@@ -89,25 +103,33 @@ pub async fn get_all_users(
     HttpResponse::Ok().json(json!({"results":results}))
 }
 
-/// Retrieves details for the authenticated user.
+/// Retrieves details for the authenticated user
 ///
 /// # Description
 /// Gets user details based on the email address from the authentication token.
 ///
 /// # Route
-/// `GET v1/user/get_user`
+/// `GET /v1/user/get_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Returns
-/// An `HttpResponse` containing the user's details or an appropriate error message.
+/// JSON response containing user details or an appropriate error message
 ///
 /// # Example Response
 /// ```json
 /// {
-///   "id": "1",
+///   "id": "user@example.com",
 ///   "name": "John Doe",
-///   "email": "john@example.com",
-///   "app_id": 1001,
-///   "assigned_wallet": "0x123..."
+///   "accounts": [
+///     {
+///       "id": "uuid-string",
+///       "app_id": 1001,
+///       "credit_balance": "100.00",
+///       "fallback_enabled": true
+///     }
+///   ]
 /// }
 /// ```
 
@@ -133,28 +155,30 @@ pub async fn get_user(
     }
 }
 
-/// Registers a new user in the system.
+/// Registers a new user in the system
 ///
 /// # Description
-/// Creates a new user account with the provided name and app_id. The email address is extracted from
+/// Creates a new user account with the provided name. The email address is extracted from
 /// the authentication token.
 ///
 /// # Route
-/// `POST v1/users/register_new_user`
+/// `POST /v1/user/register_new_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
 /// {
-///   "name": "John Doe",
-///   "app_id": 1001
+///   "name": "John Doe"
 /// }
 /// ```
 ///
 /// # Returns
-/// - 200 OK with success message if registration succeeds
-/// - 409 Conflict if user already exists
-/// - 400 Bad Request if validation fails
-/// - 500 Internal Server Error if user info cannot be retrieved
+/// * 200 OK with success message if registration succeeds
+/// * 409 Conflict if user already exists
+/// * 400 Bad Request if validation fails
+/// * 500 Internal Server Error if user info cannot be retrieved
 
 #[post("/register_new_user")]
 pub async fn register_new_user(
@@ -202,28 +226,45 @@ pub async fn register_new_user(
         Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
     }
 }
-/// Generate an app account for a user in the system.
+/// Generate an app account for a user
 ///
 /// # Description
-/// Creates a new account with the provided app_id and fallback settings. The user ID is extracted from
+/// Creates a new account with fallback settings. The user ID is extracted from
 /// the authentication token.
 ///
 /// # Route
-/// `POST v1/users/generate_app_account`
+/// `POST /v1/user/generate_app_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
 /// {
-///   "app_id": 1001,
 ///   "fallback_enabled": true
 /// }
 /// ```
 ///
 /// # Returns
-/// - 200 OK with success message if account creation succeeds
-/// - 400 Bad Request if validation fails
-/// - 406 Not Acceptable if account creation fails
-/// - 500 Internal Server Error if user info cannot be retrieved
+/// * 200 OK with account details if creation succeeds
+/// * 400 Bad Request if validation fails
+/// * 406 Not Acceptable if account creation fails
+/// * 500 Internal Server Error if user info cannot be retrieved
+///
+/// # Example Response
+/// ```json
+/// {
+///   "message": "Success",
+///   "data": {
+///     "id": "uuid-string",
+///     "user_id": "user@example.com",
+///     "app_id": 0,
+///     "credit_balance": "0",
+///     "credit_used": "0",
+///     "fallback_enabled": true
+///   }
+/// }
+/// ```
 
 #[post("/generate_app_account")]
 pub async fn generate_app_account(
@@ -268,18 +309,28 @@ pub struct DeleteAccount {
     pub account_id: Uuid,
 }
 
-/// Delete an account for the authenticated user.
+/// Delete an account for the authenticated user
 ///
 /// # Description
-/// Deletes the account associated with the user ID extracted from the authentication token.
+/// Deletes the specified account associated with the authenticated user.
 ///
 /// # Route
-/// `DELETE v1/users/delete_account`
+/// `DELETE /v1/user/delete_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "account_id": "uuid-string"
+/// }
+/// ```
 ///
 /// # Returns
-/// - 200 OK with success message if account deletion succeeds
-/// - 404 Not Found if account doesn't exist
-/// - 500 Internal Server Error if user info cannot be retrieved or deletion fails
+/// * 200 OK with success message if deletion succeeds
+/// * 404 Not Found if account doesn't exist
+/// * 500 Internal Server Error if deletion fails
 
 #[delete("/delete_account")]
 pub async fn delete_account(
@@ -312,6 +363,30 @@ pub struct AllocateCreditBalance {
     pub amount: BigDecimal,
     pub account_id: Uuid,
 }
+
+/// Allocate credit balance to a user account
+///
+/// # Description
+/// Allocates the specified amount of credits to the user's account.
+///
+/// # Route
+/// `POST /v1/user/allocate_credit_balance`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "amount": "100.00",
+///   "account_id": "uuid-string"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK with success message if allocation succeeds
+/// * 500 Internal Server Error if allocation fails
+
 #[post("/allocate_credit_balance")]
 pub async fn allocate_credit(
     payload: web::Json<AllocateCreditBalance>,
@@ -347,14 +422,35 @@ pub struct GenerateApiKey {
     pub account_id: Uuid,
 }
 
-/// Generates a new API key for the authenticated user
+/// Generate a new API key for the authenticated user
 ///
-/// # Arguments
-/// * `http_request` - The HTTP request containing user authentication
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Creates a new API key associated with the specified account.
+///
+/// # Route
+/// `POST /v1/user/generate_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "account_id": "uuid-string"
+/// }
+/// ```
 ///
 /// # Returns
-/// JSON response containing the new API key or error message
+/// * 200 OK with the new API key if generation succeeds
+/// * 500 Internal Server Error if generation fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "api_key": "abcdef1234567890"
+/// }
+/// ```
+
 #[post("/generate_api_key")]
 async fn generate_api_key(
     payload: web::Json<GenerateApiKey>,
@@ -393,14 +489,32 @@ async fn generate_api_key(
     }
 }
 
-/// Retrieves all API keys for the authenticated user
+/// Retrieve all API keys for the authenticated user
 ///
-/// # Arguments
-/// * `http_request` - The HTTP request containing user authentication
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Returns a list of all API keys associated with the authenticated user.
+///
+/// # Route
+/// `GET /v1/user/get_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Returns
-/// JSON response containing list of API keys or error message
+/// * 200 OK with a list of API keys if retrieval succeeds
+/// * 500 Internal Server Error if retrieval fails
+///
+/// # Example Response
+/// ```json
+/// [
+///   {
+///     "api_key": "***********abc12",
+///     "account_id": "uuid-string",
+///     "created_at": "2023-01-01T12:00:00Z"
+///   }
+/// ]
+/// ```
+
 #[get("/get_api_key")]
 pub async fn get_api_key(
     http_request: HttpRequest,
@@ -430,13 +544,16 @@ pub struct DeleteApiKey {
     pub identifier: String,
 }
 
-/// Deletes an API key for the authenticated user.
+/// Delete an API key for the authenticated user
 ///
 /// # Description
 /// Removes the specified API key from both the database and Redis cache.
 ///
 /// # Route
-/// `DELETE v1/users/delete_api_key`
+/// `DELETE /v1/user/delete_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
@@ -446,9 +563,16 @@ pub struct DeleteApiKey {
 /// ```
 ///
 /// # Returns
-/// - 200 OK with deleted key identifier
-/// - 404 Not Found if key doesn't exist
-/// - 500 Internal Server Error if deletion fails
+/// * 200 OK with deleted key identifier if deletion succeeds
+/// * 404 Not Found if key doesn't exist
+/// * 500 Internal Server Error if deletion fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "api_key": "abc12"
+/// }
+/// ```
 
 #[delete("/delete_api_key")]
 async fn delete_api_key(
@@ -492,24 +616,35 @@ async fn delete_api_key(
     };
 }
 
-/// Updates the app_id for the authenticated user.
+/// Update the app_id for a user account
 ///
 /// # Description
-/// Changes the app_id associated with the user's account.
+/// Changes the app_id associated with the specified account.
 ///
 /// # Route
-/// `PUT v1/users/update_app_id`
+/// `PUT /v1/user/update_app_id`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
 /// {
-///   "app_id": 1002
+///   "app_id": 1002,
+///   "account_id": "uuid-string"
 /// }
 /// ```
 ///
 /// # Returns
-/// - 200 OK with success message
-/// - 500 Internal Server Error if update fails
+/// * 200 OK with success message if update succeeds
+/// * 500 Internal Server Error if update fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "message": "App ID updated"
+/// }
+/// ```
 
 #[put("/update_app_id")]
 async fn update_app_id(

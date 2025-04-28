@@ -6,11 +6,8 @@ use actix_web::{
     Error,
 };
 use db::{
-    models::{accounts::Account, api::ApiKey},
-    schema::{
-        accounts,
-        api_keys::{self, dsl::*},
-    },
+    models::api::ApiKey,
+    schema::api_keys::{self, dsl::*},
 };
 use diesel::prelude::*;
 use diesel::QueryDsl;

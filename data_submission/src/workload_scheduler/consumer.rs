@@ -4,19 +4,18 @@
 use super::common::Response;
 use actix_web::web;
 use avail_rust::Keypair;
+use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
         customer_expenditure::{add_error_entry, update_customer_expenditure},
         misc::get_account_by_id,
-        users::get_user,
+        misc::update_credit_balance,
+        users::TxParams,
     },
     errors::*,
-    models::user_model::User,
-    schema::users::dsl::*,
 };
-use diesel::prelude::*;
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::{error, info};
 use observability::log_failed_txn;
 use std::sync::Arc;
@@ -25,10 +24,6 @@ use tokio::{
     time::{timeout, Duration},
 };
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
-
-use db::controllers::{misc::update_credit_balance, users::TxParams};
-
-use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
 
 pub struct Consumer {
     sender: Sender<Response>,

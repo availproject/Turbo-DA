@@ -6,10 +6,12 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use db::controllers::{
-    customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
+use db::{
+    controllers::{
+        customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
+    },
+    models::customer_expenditure::CreateCustomerExpenditure,
 };
-use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::error;
 use serde::{Deserialize, Serialize};
