@@ -55,16 +55,27 @@ pub async fn update_credit_balance(
 
     let mut leftover_val = BigDecimal::from(0);
     let mut user_credit_balance_change = &leftover_val;
-    let account_credit_balance_change = &tx_params.amount_data_billed;
 
     if tx_params.amount_data_billed > account.credit_balance {
-        leftover_val = &account.credit_balance - &tx_params.amount_data_billed;
+        leftover_val = &tx_params.amount_data_billed - &account.credit_balance;
         user_credit_balance_change = &leftover_val;
     }
-
+    println!(
+        "account.credit_balance: {:?}",
+        account.credit_balance.to_string()
+    );
+    println!(
+        "tx_params.amount_data_billed: {:?}",
+        tx_params.amount_data_billed.to_string()
+    );
+    println!("leftover_val: {:?}", leftover_val.to_string());
+    println!(
+        "user_credit_balance_change: {:?}",
+        user_credit_balance_change.to_string()
+    );
     diesel::update(accounts::accounts.filter(accounts::id.eq(account_id)))
         .set((
-            accounts::credit_balance.eq(accounts::credit_balance - account_credit_balance_change),
+            accounts::credit_balance.eq(accounts::credit_balance - &tx_params.amount_data_billed),
             accounts::credit_used.eq(accounts::credit_used + &tx_params.amount_data_billed),
         ))
         .execute(connection)
