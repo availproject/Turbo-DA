@@ -60,19 +60,7 @@ pub async fn update_credit_balance(
         leftover_val = &tx_params.amount_data_billed - &account.credit_balance;
         user_credit_balance_change = &leftover_val;
     }
-    println!(
-        "account.credit_balance: {:?}",
-        account.credit_balance.to_string()
-    );
-    println!(
-        "tx_params.amount_data_billed: {:?}",
-        tx_params.amount_data_billed.to_string()
-    );
-    println!("leftover_val: {:?}", leftover_val.to_string());
-    println!(
-        "user_credit_balance_change: {:?}",
-        user_credit_balance_change.to_string()
-    );
+
     diesel::update(accounts::accounts.filter(accounts::id.eq(account_id)))
         .set((
             accounts::credit_balance.eq(accounts::credit_balance - &tx_params.amount_data_billed),
