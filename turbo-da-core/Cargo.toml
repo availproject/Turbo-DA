@@ -12,6 +12,7 @@ permissioned=[]
 diesel = { workspace = true }
 bigdecimal = { workspace = true }
 dotenv = { workspace = true }
+utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 alloy = { version = "0.7.2", features = ["full"] }
 clerk-rs = { version = "0.4.0", features = ["actix"] }
 actix-web = { workspace = true }
@@ -47,6 +48,7 @@ confy = {version = "0.3.1"}
 db = {path = "../db" }
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
+
 
 [dev-dependencies]
 actix-http = "3.9.0"

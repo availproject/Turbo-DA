@@ -35,19 +35,6 @@ contract TurboDAResolver is
         uint256 amount,
         address from
     );
-    /**
-     * @dev Emitted when a Withdrawal is made
-     * @param userID The unique identifier of the user
-     * @param tokenAddress The address of the token (address(0) for ETH)
-     * @param amount The amount withdrawn
-     * @param to The address that made the withdrawal
-     */
-    event Withdrawal(
-        bytes userID,
-        address tokenAddress,
-        uint256 amount,
-        address to
-    );
 
     /**
      * @dev Emitted when an operator withdraws funds from the contract
