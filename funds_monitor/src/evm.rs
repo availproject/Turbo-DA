@@ -55,13 +55,10 @@ impl EVM {
     ) -> Result<Self, String> {
         info!("Network ws url: {:?}", ws_url);
         let ws = WsConnect::new(ws_url);
-        let provider = match ProviderBuilder::new().on_ws(ws).await {
-            Ok(p) => p,
-            Err(e) => {
-                error!("Failed to connect to Turbo DA Contract: {:?}", e);
-                return Err(format!("Failed to connect to Turbo DA Contract: {:?}", e));
-            }
-        };
+        let provider = ProviderBuilder::new().on_ws(ws).await.map_err(|e| {
+            error!("Failed to connect to Turbo DA Contract: {:?}", e);
+            format!("Failed to connect to Turbo DA Contract: {:?}", e)
+        })?;
 
         Ok(Self {
             provider,
@@ -94,34 +91,32 @@ impl EVM {
             info!("header: {:?}", header.number);
             let finalised_block = header.inner.number - self.finalised_threshold;
 
-            self.check_deposits(finalised_block).await;
+            match self.check_deposits(finalised_block).await {
+                Ok(_) => info!("Deposits checked successfully"),
+                Err(e) => error!("Failed to check deposits: {}", e),
+            }
         }
     }
 
-    async fn check_deposits(&mut self, number: u64) {
+    async fn check_deposits(&mut self, number: u64) -> Result<(), String> {
         let filter = Filter::new()
             .address(Address::from_str(&self.contract_address).unwrap())
             .event("Deposit(bytes,address,uint256,address)")
             .from_block(self.start_block)
             .to_block(number);
-
-        let logs = match self.provider.get_logs(&filter).await {
-            Ok(logs) => logs,
-            Err(e) => {
-                error!("Failed to get logs: {}", e);
-                return;
-            }
-        };
-
+        let logs = self
+            .provider
+            .get_logs(&filter)
+            .await
+            .map_err(|e| format!("Failed to get logs: {}", e))?;
         self.start_block = number + 1;
-
         for log in logs {
             info!("Log from our contract: {:?}", log.block_hash);
             let receipt = match self.process_deposit_event(&log) {
                 Ok(receipt) => receipt,
                 Err(e) => {
                     println!("Failed to process deposit event: {}", e);
-                    return;
+                    continue;
                 }
             };
 
@@ -184,6 +179,7 @@ impl EVM {
                 )
                 .await;
         }
+        Ok(())
     }
 
     fn process_deposit_event(&self, log: &Log) -> Result<Deposit, String> {

@@ -12,9 +12,9 @@ use actix_web::{
 
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
-use db::{models::credit_requests::CreditRequestInfo, schema::credit_requests::dsl::*};
-use diesel::prelude::*;
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use db::controllers::fund::get_fund_status;
+
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -69,14 +69,11 @@ pub async fn request_funds_status(
         Err(response) => return response,
     };
 
-    let tx: Vec<CreditRequestInfo> = credit_requests
-        .filter(db::schema::credit_requests::user_id.eq(user))
-        .select(CreditRequestInfo::as_select())
-        .load(&mut *connection)
-        .await
-        .expect("Error loading users");
-
-    HttpResponse::Ok().json(json!({"requests": tx}))
+    let tx = get_fund_status(user, &mut connection).await;
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(json!({"status": "success", "error": false, "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": true, "message": e})),
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone)]

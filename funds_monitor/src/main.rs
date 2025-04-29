@@ -6,12 +6,13 @@ use std::sync::Arc;
 
 use avail::run;
 use config::Config;
+use config::Network;
+use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::dsl::*};
+use diesel::prelude::*;
 use diesel::PgConnection;
 use evm::EVM;
 use log::{error, info};
-use utils::Utils;
 
-// TODO: Clean up the code
 #[tokio::main]
 async fn main() {
     let cfg = match Config::default().load_config() {
@@ -37,63 +38,47 @@ async fn main() {
     for (network_name, network_config) in &cfg_ref_2.network {
         let network_name = network_name.clone();
         let network_config = network_config.clone();
-
         let network_ws_url = network_config.ws_url.clone();
         let contract_address = network_config.contract_address.clone();
         let finalised_threshold = network_config.finalised_threshold.clone();
-
         let cfg_ref_4 = cfg_ref_3.clone();
         info!("Task for network: {}", network_name);
 
         tokio::spawn(async move {
             info!("Spawning new task");
 
-            let mut connection =
-                match PgConnection::establish(cfg_ref_4.clone().database_url.as_str().clone())
-                    .map_err(|e| {
-                        format!(
-                            "Error connecting to {}: {}",
-                            cfg_ref_4.clone().database_url.clone(),
-                            e
-                        )
-                    }) {
-                    Ok(conn) => conn,
-                    Err(e) => {
-                        error!("Failed to establish database connection: {}", e);
-                        return;
-                    }
-                };
-
-            let finalised_block_number =
-                query_finalised_block_number(network_config.chain_id, &mut connection);
-
-            drop(connection);
-            let mut evm = match EVM::new(
-                contract_address,
-                network_ws_url,
-                network_config.chain_id,
-                finalised_threshold,
-                finalised_block_number.block_number as u64,
-                cfg_ref_4.clone(),
-            )
-            .await
-            {
-                Ok(evm) => evm,
-                Err(e) => {
-                    error!("Error creating EVM connection: {}", e);
-                    return;
-                }
-            };
-
-            evm.monitor_evm_chains().await;
-        })
-        .await
-        .unwrap();
+            match monitor(network_config, cfg_ref_4).await {
+                Ok(_) => info!("Monitor task completed successfully"),
+                Err(e) => error!("Error running monitor task: {}", e),
+            }
+        });
     }
 }
 
-use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::dsl::*};
-use diesel::prelude::*;
+async fn monitor(network_config: Network, cfg: Arc<Config>) -> Result<(), String> {
+    let mut connection = PgConnection::establish(&cfg.database_url)
+        .map_err(|e| format!("Error connecting to {}: {}", cfg.database_url, e))?;
+
+    let finalised_block_number =
+        query_finalised_block_number(network_config.chain_id, &mut connection);
+
+    drop(connection);
+
+    let mut evm = EVM::new(
+        network_config.contract_address,
+        network_config.ws_url,
+        network_config.chain_id,
+        network_config.finalised_threshold,
+        finalised_block_number.block_number as u64,
+        cfg.clone(),
+    )
+    .await
+    .map_err(|e| format!("Error creating EVM connection: {}", e))?;
+    evm.monitor_evm_chains().await;
+
+    Ok(())
+}
+
 fn query_finalised_block_number(
     evm_chain_id: i32,
     connection: &mut PgConnection,

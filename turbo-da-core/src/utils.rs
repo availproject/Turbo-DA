@@ -172,6 +172,7 @@ pub struct Price {
     pub eth: Option<f64>,
     pub usd: Option<f64>,
 }
+
 /// Gets current prices for Avail and specified token from CoinGecko API
 ///
 /// # Arguments
@@ -190,54 +191,32 @@ pub async fn get_prices(
         ("vs_currencies", "usd".to_string()),
     ];
 
-    let response = match client
+    let response = client
         .get(coingecko_api_url)
         .query(&params)
         .header("accept", "application/json")
         .header("x-cg-pro-api-key", coingecko_api_key)
         .send()
         .await
-    {
-        Ok(resp) => resp,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
+        .map_err(|e| e.to_string())?;
 
-    let json = match response.json::<HashMap<String, Price>>().await {
-        Ok(j) => j,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
+    let json = response
+        .json::<HashMap<String, Price>>()
+        .await
+        .map_err(|e| e.to_string())?;
 
     let coin_price = match json.get(token) {
-        Some(val) => match val.usd {
-            Some(coin_price) => coin_price,
-            None => {
-                let msg = format!("{:?} price not found from coingecho", token);
-
-                return Err(msg);
-            }
-        },
+        Some(val) => val.usd.ok_or_else(|| price_not_found_error(token))?,
         None => {
-            let msg = format!("{:?} price not found from coingecho", token);
+            let msg = price_not_found_error(token);
             return Err(msg);
         }
     };
 
     let avail_price = match json.get("avail") {
-        Some(val) => match val.usd {
-            Some(avail_price) => avail_price,
-            None => {
-                let msg = "Avail price not found from coingecho".to_string();
-
-                return Err(msg);
-            }
-        },
+        Some(val) => val.usd.ok_or_else(|| price_not_found_error("avail"))?,
         None => {
-            let msg = "Avail price not found from coingecho".to_string();
-
+            let msg = price_not_found_error("avail");
             return Err(msg);
         }
     };
@@ -332,7 +311,6 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
         match SDK::new(endpoint).await {
             Ok(sdk) => {
                 info!("Connected successfully to endpoint: {}", endpoint);
-
                 return sdk;
             }
             Err(e) => {
@@ -361,4 +339,8 @@ pub fn retrieve_account_id(http_request: &HttpRequest) -> Option<Uuid> {
         }
     }
     None
+}
+
+fn price_not_found_error(token: &str) -> String {
+    format!("{:?} price not found from coingecho", token)
 }
