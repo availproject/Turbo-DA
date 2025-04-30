@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
+
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardTransientUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
@@ -19,9 +19,21 @@ contract TurboDAResolver is
     Initializable,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
+    ReentrancyGuardTransientUpgradeable
 {
+    /// @notice Role for operators
+    bytes32 private constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    /// @notice Address where admin withdrawals are sent
+    address public withdrawalAddress;
+
+    /// @notice Mapping to track which token addresses are valid for deposits
+    mapping(address => bool) public validTokenAddresses;
+
+    /// @notice Nested mapping tracking deposits: userID => tokenAddress => depositor => amount
+    mapping(bytes => mapping(address => mapping(address => uint256)))
+        public userDeposits;
+
     /**
      * @dev Emitted when a deposit is made
      * @param userID The unique identifier of the user
@@ -30,8 +42,8 @@ contract TurboDAResolver is
      * @param from The address that made the deposit
      */
     event Deposit(
-        bytes userID,
-        address tokenAddress,
+        bytes indexed userID,
+        address indexed tokenAddress,
         uint256 amount,
         address from
     );
@@ -46,7 +58,7 @@ contract TurboDAResolver is
     event OperatorWithdrawal(
         address operator,
         uint256 amount,
-        address tokenAddress,
+        address indexed tokenAddress,
         address to
     );
 
@@ -61,32 +73,18 @@ contract TurboDAResolver is
     error InvalidTokenAddress();
     error InvalidSignature();
     error InsufficientDeposit();
-    error FailedToSendEther();
+    error ETHTransferFailed();
     error NonceAlreadyUsed();
-
-    /// @notice Role for operators
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-
-    /// @notice Mapping to track which token addresses are valid for deposits
-    mapping(address => bool) public validTokenAddresses;
-
-    /// @notice Nested mapping tracking deposits: userID => tokenAddress => depositor => amount
-    mapping(bytes => mapping(address => mapping(address => uint256)))
-        public userDeposits;
-
-    /// @notice Address where admin withdrawals are sent
-    address public withdrawalAddress;
-    mapping(uint256 => bool) public usedNonce;
 
     /**
      * @dev Initializes the contract
      * @notice Sets initial values for withdrawalAddress, owner, and signer
      */
-    function initialize(address _owner) public initializer {
+    function initialize(address _owner) external initializer {
         withdrawalAddress = _owner;
         __AccessControl_init();
         __Pausable_init();
-        __ReentrancyGuard_init();
+        __ReentrancyGuardTransient_init();
         _setRoleAdmin(OPERATOR_ROLE, DEFAULT_ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
     }
@@ -97,7 +95,7 @@ contract TurboDAResolver is
      */
     function deposit(
         bytes calldata userID
-    ) public payable whenNotPaused nonReentrant {
+    ) external payable whenNotPaused nonReentrant {
         if (msg.value == 0) {
             revert InvalidAmount();
         }
@@ -116,7 +114,7 @@ contract TurboDAResolver is
         bytes calldata userID,
         uint256 amount,
         address tokenAddress
-    ) public whenNotPaused nonReentrant {
+    ) external whenNotPaused nonReentrant {
         _depositERC20(userID, amount, tokenAddress);
     }
 
@@ -133,20 +131,12 @@ contract TurboDAResolver is
         uint256 amount,
         uint256 deadline,
         address tokenAddress,
-        bytes memory signature
-    ) public whenNotPaused nonReentrant {
+        bytes32 r,
+        bytes32 s,
+        uint8 v
+    ) external whenNotPaused nonReentrant {
         if (signature.length != 65) {
             revert InvalidSignature();
-        }
-
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly ("memory-safe") {
-            r := mload(add(signature, 0x20))
-            s := mload(add(signature, 0x40))
-            v := byte(0, mload(add(signature, 0x60)))
         }
 
         /// @dev Try to call permit, if it fails, don't revert and continue. https://docs.openzeppelin.com/contracts/5.x/api/token/erc20#IERC20Permit
@@ -168,7 +158,7 @@ contract TurboDAResolver is
      * @dev Allows owner to withdraw ETH from the contract
      * @param amount The amount to withdraw (0 for entire balance)
      */
-    function withdrawDeposit(uint256 amount) public onlyRole(OPERATOR_ROLE) {
+    function withdrawDeposit(uint256 amount) external onlyRole(OPERATOR_ROLE) {
         if (amount == 0) {
             amount = address(this).balance;
         }
@@ -178,7 +168,7 @@ contract TurboDAResolver is
         }
 
         (bool sent, ) = withdrawalAddress.call{value: amount}("");
-        if (!sent) revert FailedToSendEther();
+        if (!sent) revert ETHTransferFailed();
         emit OperatorWithdrawal(
             msg.sender,
             amount,
@@ -195,7 +185,7 @@ contract TurboDAResolver is
     function withdrawDepositERC20(
         uint256 amount,
         address tokenAddress
-    ) public onlyRole(OPERATOR_ROLE) {
+    ) external onlyRole(OPERATOR_ROLE) {
         if (!validTokenAddresses[tokenAddress]) {
             revert InvalidTokenAddress();
         }
@@ -218,6 +208,17 @@ contract TurboDAResolver is
     }
 
     /**
+     * @dev Updates the withdrawal address
+     * @param _newWithdrawalAddress The new address for withdrawals
+     */
+    function updateWithdrawalAddress(
+        address _newWithdrawalAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        withdrawalAddress = _newWithdrawalAddress;
+        emit WithdrawalAddressUpdate(withdrawalAddress);
+    }
+
+    /**
      * @dev Internal function to handle ERC20 deposits
      * @param userID The unique identifier of the user
      * @param amount The amount to deposit
@@ -227,7 +228,7 @@ contract TurboDAResolver is
         bytes calldata userID,
         uint256 amount,
         address tokenAddress
-    ) internal {
+    ) private {
         if (amount == 0) {
             revert InvalidAmount();
         }
@@ -241,37 +242,6 @@ contract TurboDAResolver is
     }
 
     /**
-     * @dev Updates the withdrawal address
-     * @param _newWithdrawalAddress The new address for withdrawals
-     */
-    function updateWithdrawalAddress(
-        address _newWithdrawalAddress
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        withdrawalAddress = _newWithdrawalAddress;
-        emit WithdrawalAddressUpdate(withdrawalAddress);
-    }
-
-    /**
-     * @dev Adds an operator address with OPERATOR_ROLE permissions
-     * @param _operator The address to grant operator role to
-     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE. Function grantRole enforces this condition
-     */
-
-    function addOperator(address _operator) external {
-        grantRole(OPERATOR_ROLE, _operator);
-    }
-
-    /**
-     * @dev Removes an operator address by revoking their OPERATOR_ROLE permissions
-     * @param _operator The address to revoke operator role from
-     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE. Function revokeRole enforces this condition
-     */
-
-    function removeOperator(address _operator) external {
-        revokeRole(OPERATOR_ROLE, _operator);
-    }
-
-    /**
      * @dev Sets whether a token is valid for deposits
      * @param tokenAddress The address of the token
      * @param validity True if the token should be valid, false otherwise
@@ -279,15 +249,7 @@ contract TurboDAResolver is
     function configureTokenValidity(
         address tokenAddress,
         bool validity
-    ) public onlyRole(OPERATOR_ROLE) {
+    ) external onlyRole(OPERATOR_ROLE) {
         validTokenAddresses[tokenAddress] = validity;
     }
-    /**
-     * @dev Authorizes an upgrade to a new implementation
-     * @param newImplementation The address of the new implementation
-     * @notice Only callable by accounts with DEFAULT_ADMIN_ROLE
-     */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }
