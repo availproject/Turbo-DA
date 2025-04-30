@@ -12,7 +12,7 @@ contract DeployTurboDAResolverContract is Script {
         address proxy = Upgrades.deployTransparentProxy(
             "TurboDAResolver.sol",
             msg.sender,
-            abi.encodeCall(TurboDAResolver.initialize, (msg.sender))
+            abi.encodeCall(TurboDAResolver.initialize, (msg.sender, 3 days))
         );
 
         console.log("TurboDAResolver deployed at:", address(proxy));
