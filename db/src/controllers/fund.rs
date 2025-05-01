@@ -13,3 +13,23 @@ pub async fn get_fund_status(
         .await
         .map_err(|e| format!("Error loading fund status: {}", e))
 }
+
+pub async fn create_credit_request(
+    user: String,
+    chain: i32,
+    connection: &mut AsyncPgConnection,
+) -> Result<(), String> {
+    let res = diesel::insert_into(credit_requests)
+        .values((
+            user_id.eq(user),
+            chain_id.eq(chain),
+            request_status.eq("pending"),
+        ))
+        .execute(connection)
+        .await
+        .map_err(|e| format!("Error creating credit request: {}", e))?;
+    if res == 0 {
+        return Err("Error creating credit request".to_string());
+    }
+    Ok(())
+}

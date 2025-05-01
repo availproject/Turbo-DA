@@ -5,20 +5,72 @@ use crate::{
 use std::sync::Arc;
 
 use actix_web::{
-    get,
+    get, post,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
 
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
-use db::controllers::fund::get_fund_status;
+use db::controllers::fund::{create_credit_request, get_fund_status};
 
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+/// Parameters for registering a credit request
+///
+/// # Fields
+/// * `chain` - The chain ID for which the credit request is being registered
+#[derive(Deserialize, Serialize, Clone)]
+struct RegisterCreditRequestParams {
+    pub chain: i32,
+}
+
+/// Register a new credit request for a user
+///
+/// # Description
+/// This endpoint allows a user to register a new credit request for a specific blockchain.
+/// The request is stored in the database with a "pending" status for later processing.
+///
+/// # Route
+/// `POST /register_credit_request?chain={chain_id}`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
+///
+/// # Query Parameters
+/// * `chain` - The chain ID for which the credit request is being registered
+///
+/// # Returns
+/// * Success: JSON response with status "success" and the transaction data
+/// * Error: Internal server error with appropriate error message
+#[post("/register_credit_request")]
+async fn register_credit_request(
+    query: web::Query<RegisterCreditRequestParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    // Extract user ID from JWT token
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    // Establish database connection
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    // Create credit request in the database
+    let tx = create_credit_request(user, query.0.chain, &mut connection).await;
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(json!({"status": "success", "error": false, "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": true, "message": e})),
+    }
+}
 /// Retrieve the status and details of a user's fund request.
 ///
 /// # Description

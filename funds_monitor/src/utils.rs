@@ -11,7 +11,7 @@ use db::{
 };
 use diesel::prelude::*;
 use hex;
-use log::{error, info};
+use log::{debug, error, info};
 use turbo_da_core::utils::Convertor;
 
 pub struct Deposit {
@@ -50,37 +50,28 @@ impl Utils {
         connection: &mut PgConnection,
         chain_identifier: i32, // 0 for Avail
         status: &String,
-    ) {
+    ) -> Result<(), String> {
         let original_user_id = match receipt.user_id.split("0x").last() {
-            Some(hex_str) => match hex::decode(hex_str) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    error!("Failed to decode hex string: {}", e);
-                    return;
-                }
-            },
+            Some(hex_str) => hex::decode(hex_str).map_err(|e| {
+                error!("Failed to decode hex string: {}", e);
+                e.to_string()
+            })?,
             None => {
                 error!("Failed to parse userID - no hex data found after 0x");
-                return;
+                return Err("Failed to parse userID - no hex data found after 0x".to_string());
             }
         };
         let user_id_local = String::from_utf8_lossy(&original_user_id).into_owned();
         let address = receipt.token_address.to_lowercase();
-        let amount = match self
+        let amount = self
             .get_amount_to_be_credited(
                 address,
                 BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
             )
             .await
-        {
-            Ok(amount) => amount,
-            Err(e) => {
-                error!("Failed to parse amount: {}", e);
-                return;
-            }
-        };
+            .map_err(|e| format!("Failed to get amount to be credited: {}", e))?;
 
-        let tx = diesel::insert_into(credit_requests::table)
+        diesel::insert_into(credit_requests::table)
             .values(CreditRequests {
                 amount_credit: Some(amount.clone()),
                 request_status: status.to_string(),
@@ -89,23 +80,17 @@ impl Utils {
                 tx_hash: Some(transaction_hash.clone()),
                 request_type: "DEPOSIT".to_string(),
             })
-            .execute(&mut *connection);
-
-        match tx {
-            Ok(_) => {
-                info!("Success: {} status: {}", user_id_local, status);
-                self.update_token_information_on_deposit(
-                    &receipt,
-                    &amount,
-                    &user_id_local,
-                    connection,
-                )
-                .await;
-            }
-            Err(e) => {
+            .execute(&mut *connection)
+            .map_err(|e| {
                 error!("Couldn't store fund request: {:?}", e);
-            }
-        }
+                format!("Failed to store fund request: {}", e)
+            })?;
+
+        info!("Success: {} status: {}", user_id_local, status);
+        self.update_token_information_on_deposit(&receipt, &amount, &user_id_local, connection)
+            .await;
+
+        Ok(())
     }
 
     pub async fn update_token_information_on_deposit(
@@ -125,7 +110,7 @@ impl Utils {
         });
 
         if updated_rows > 0 {
-            info!(
+            debug!(
                 "Successfully updated token balances with user ID {} with amount {}",
                 receipt.user_id, receipt.amount
             );
@@ -149,17 +134,13 @@ impl Utils {
         match row {
             Ok(row) => {
                 if row > 0 {
-                    info!("Updated finalised block number: {}", row);
+                    debug!("Updated finalised block number: {}", row);
                     Ok(())
                 } else {
-                    error!("No rows updated for finalised block number");
                     Err(format!("No rows updated for finalised block number"))
                 }
             }
-            Err(e) => {
-                error!("Failed to update finalised block number: {}", e);
-                Err(format!("Failed to update finalised block number: {}", e))
-            }
+            Err(e) => Err(format!("Failed to update finalised block number: {}", e)),
         }
     }
 
@@ -168,28 +149,18 @@ impl Utils {
         address: String,
         amount: BigDecimal,
     ) -> Result<BigDecimal, String> {
-        let price = match calculate_avail_token_equivalent(
+        let price = calculate_avail_token_equivalent(
             &self.coin_gecho_api_url,
             &self.coin_gecho_api_key,
             &amount,
             &address,
         )
         .await
-        {
-            Ok(price) => price,
-            Err(e) => {
-                error!("Failed to get price for {}: {}", address, e);
-                return Err(format!("Failed to get price for {}: {}", address, e));
-            }
-        };
+        .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
 
-        let client = match SDK::new(self.avail_rpc_url.as_str()).await {
-            Ok(client) => client,
-            Err(e) => {
-                error!("Failed to create SDK client: {:?}", e);
-                return Err(format!("Failed to create SDK client: {:?}", e));
-            }
-        };
+        let client = SDK::new(self.avail_rpc_url.as_str())
+            .await
+            .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
 
         let account = account::alice();
         let converter = Convertor::new(&client, &account);
@@ -224,38 +195,26 @@ pub async fn calculate_avail_token_equivalent(
             String::from("Token address not found in token mapping")
         })?;
 
-    let (token_usd_price, avail_usd_price) = match get_prices(
+    let (token_usd_price, avail_usd_price) = get_prices(
         &http_client,
         &coingecko_api_url,
         &coingecko_api_key,
         token_symbol.as_str(),
     )
     .await
-    {
-        Ok(prices) => prices,
-        Err(e) => {
-            error!("Failed to fetch prices for {}: {}", token_symbol, e);
-            return Err(format!(
-                "Failed to fetch prices for {}: {}",
-                token_symbol, e
-            ));
-        }
-    };
+    .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-    info!("Current token USD price: {}", token_usd_price);
-    info!("Current AVAIL USD price: {}", avail_usd_price);
+    debug!("Current token USD price: {}", token_usd_price);
+    debug!("Current AVAIL USD price: {}", avail_usd_price);
 
     let token_avail_ratio = token_usd_price / avail_usd_price;
     let source_token_decimals = TOKEN_MAP.get(token_symbol.as_str()).unwrap().token_decimals;
     let avail_token_decimals = TOKEN_MAP.get("avail").unwrap().token_decimals;
-    let token_avail_ratio_decimal =
-        match BigDecimal::from_str(token_avail_ratio.to_string().as_str()) {
-            Ok(ratio) => ratio,
-            Err(e) => {
-                error!("Failed to convert price ratio to decimal: {}", e);
-                return Err(format!("Failed to convert price ratio to decimal: {}", e));
-            }
-        };
+    let token_avail_ratio_decimal = BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+        .map_err(|e| {
+            error!("Failed to convert price ratio to decimal: {}", e);
+            format!("Failed to convert price ratio to decimal: {}", e)
+        })?;
 
     let equivalent_amount = token_avail_ratio_decimal
         * token_amount

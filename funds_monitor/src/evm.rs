@@ -137,7 +137,7 @@ impl EVM {
                 continue;
             };
 
-            match self
+            if let Err(e) = self
                 .utils
                 .update_finalised_block_number(
                     number as i32,
@@ -147,12 +147,7 @@ impl EVM {
                 )
                 .await
             {
-                Ok(_) => {
-                    info!("Updated finalised block number: {}", number);
-                }
-                Err(e) => {
-                    error!("Failed to update finalised block number: {}", e);
-                }
+                error!("Failed to update finalised block number: {}", e);
             }
 
             let tx_hash = match log.transaction_hash {
@@ -169,7 +164,8 @@ impl EVM {
                 amount: receipt.amount.to_string(),
                 from: receipt.from.to_string(),
             };
-            self.utils
+            let result = self
+                .utils
                 .update_database_on_deposit(
                     &deposit,
                     &tx_hash,
@@ -178,6 +174,9 @@ impl EVM {
                     &"Processed".to_string(),
                 )
                 .await;
+            if let Err(e) = result {
+                error!("Failed to update database: {}", e);
+            }
         }
         Ok(())
     }

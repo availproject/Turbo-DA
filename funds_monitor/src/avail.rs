@@ -7,7 +7,7 @@ use avail::utility::calls::types::BatchAll;
 use avail_rust::prelude::*;
 use avail_rust::{avail, block, error::ClientError, subxt, Block, Filter, SDK};
 use diesel::PgConnection;
-use log::{error, info};
+use log::{debug, error, info};
 use subxt::utils::MultiAddress;
 
 use crate::config::Config;
@@ -108,24 +108,17 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
 
         let acc_string = std::format!("{}", acc);
         let ascii_remark = block::to_ascii(remark.clone()).unwrap();
-        info!(
+        debug!(
             "Found matching batch call - Destination: {}, Value: {}, Remark: {:?}",
             acc_string, value, ascii_remark
         );
 
         let mut connection = utils.establish_connection()?;
 
-        match utils
+        utils
             .update_finalised_block_number(number as i32, hash, &mut connection, 0)
             .await
-        {
-            Ok(_) => {
-                info!("Updated finalised block number: {}", number);
-            }
-            Err(e) => {
-                error!("Failed to update finalised block number: {}", e);
-            }
-        }
+            .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
         let receipt = Deposit {
             user_id: ascii_remark,
@@ -143,6 +136,10 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
                 &"Processed".to_string(),
             )
             .await
+            .map_err(|e| {
+                error!("Failed to update database on deposit: {}", e);
+                format!("Failed to update database on deposit: {}", e)
+            })?;
     }
 
     Ok(())
