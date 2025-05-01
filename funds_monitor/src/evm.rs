@@ -21,17 +21,10 @@ sol! {
 
 sol! {
     event Deposit(
-        bytes userID,
-        address tokenAddress,
+        bytes32 indexed orderId,
+        address indexed tokenAddress,
         uint256 amount,
         address from
-    );
-
-    event Withdrawal(
-        bytes userID,
-        address tokenAddress,
-        uint256 amount,
-        address to
     );
 }
 
@@ -159,7 +152,6 @@ impl EVM {
             };
 
             let deposit = EvmDeposit {
-                user_id: receipt.userID.to_string(),
                 token_address: receipt.tokenAddress.to_string(),
                 amount: receipt.amount.to_string(),
                 from: receipt.from.to_string(),
@@ -167,6 +159,7 @@ impl EVM {
             let result = self
                 .utils
                 .update_database_on_deposit(
+                    &receipt.orderId.to_string(),
                     &deposit,
                     &tx_hash,
                     &mut connection,

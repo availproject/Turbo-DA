@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Insertable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::credit_requests)]
 pub struct CreditRequests {
-    pub user_id: String,
     pub amount_credit: Option<BigDecimal>,
     pub chain_id: Option<i32>,
     pub request_status: String,
@@ -13,7 +12,7 @@ pub struct CreditRequests {
     pub tx_hash: Option<String>,
 }
 
-#[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
+#[derive(Queryable, Selectable, Serialize, Deserialize, Debug, Insertable)]
 #[diesel(table_name = crate::schema::credit_requests)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct CreditRequestsGet {

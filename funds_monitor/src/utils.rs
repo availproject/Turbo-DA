@@ -6,7 +6,7 @@ use turbo_da_core::utils::{get_prices, TOKEN_MAP};
 use avail_rust::{account, SDK};
 use bigdecimal::BigDecimal;
 use db::{
-    models::credit_requests::CreditRequests,
+    models::credit_requests::{CreditRequests, CreditRequestsGet},
     schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
@@ -15,7 +15,6 @@ use log::{debug, error, info};
 use turbo_da_core::utils::Convertor;
 
 pub struct Deposit {
-    pub user_id: String,
     pub token_address: String,
     pub amount: String,
     pub from: String,
@@ -45,23 +44,13 @@ impl Utils {
 
     pub async fn update_database_on_deposit(
         &self,
+        order_id: &String,
         receipt: &Deposit,
         transaction_hash: &String,
         connection: &mut PgConnection,
         chain_identifier: i32, // 0 for Avail
         status: &String,
     ) -> Result<(), String> {
-        let original_user_id = match receipt.user_id.split("0x").last() {
-            Some(hex_str) => hex::decode(hex_str).map_err(|e| {
-                error!("Failed to decode hex string: {}", e);
-                e.to_string()
-            })?,
-            None => {
-                error!("Failed to parse userID - no hex data found after 0x");
-                return Err("Failed to parse userID - no hex data found after 0x".to_string());
-            }
-        };
-        let user_id_local = String::from_utf8_lossy(&original_user_id).into_owned();
         let address = receipt.token_address.to_lowercase();
         let amount = self
             .get_amount_to_be_credited(
@@ -71,23 +60,28 @@ impl Utils {
             .await
             .map_err(|e| format!("Failed to get amount to be credited: {}", e))?;
 
-        diesel::insert_into(credit_requests::table)
-            .values(CreditRequests {
-                amount_credit: Some(amount.clone()),
-                request_status: status.to_string(),
-                user_id: user_id_local.clone(),
-                chain_id: Some(chain_identifier),
-                tx_hash: Some(transaction_hash.clone()),
-                request_type: "DEPOSIT".to_string(),
-            })
-            .execute(&mut *connection)
+        let parsed_id = order_id
+            .parse::<i32>()
+            .map_err(|e| format!("Failed to parse order ID: {}", e))?;
+
+        let row = diesel::update(credit_requests::table)
+            .filter(credit_requests::id.eq(parsed_id))
+            .set((
+                credit_requests::amount_credit.eq(Some(amount.clone())),
+                credit_requests::request_status.eq(status.to_string()),
+                credit_requests::chain_id.eq(Some(chain_identifier)),
+                credit_requests::tx_hash.eq(Some(transaction_hash.clone())),
+                credit_requests::request_type.eq("DEPOSIT".to_string()),
+            ))
+            .returning(CreditRequestsGet::as_returning())
+            .get_result::<CreditRequestsGet>(&mut *connection)
             .map_err(|e| {
                 error!("Couldn't store fund request: {:?}", e);
                 format!("Failed to store fund request: {}", e)
             })?;
 
-        info!("Success: {} status: {}", user_id_local, status);
-        self.update_token_information_on_deposit(&receipt, &amount, &user_id_local, connection)
+        debug!("Success: {} status: {}", order_id, status);
+        self.update_token_information_on_deposit(&amount, &row.user_id, connection)
             .await;
 
         Ok(())
@@ -95,7 +89,6 @@ impl Utils {
 
     pub async fn update_token_information_on_deposit(
         &self,
-        receipt: &Deposit,
         amount: &BigDecimal,
         user_id: &String,
         connection: &mut PgConnection,
@@ -112,10 +105,10 @@ impl Utils {
         if updated_rows > 0 {
             debug!(
                 "Successfully updated token balances with user ID {} with amount {}",
-                receipt.user_id, receipt.amount
+                user_id, amount
             );
         } else {
-            error!("No rows updated for user ID: {}", receipt.user_id);
+            error!("No rows updated for user ID: {}", user_id);
         }
     }
 
