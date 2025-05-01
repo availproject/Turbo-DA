@@ -1,11 +1,9 @@
 use crate::{
     models::{
-        accounts::Account, customer_expenditure::CustomerExpenditureGetWithPayload,
-        user_model::User,
+        apps::Account, customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User,
     },
     schema::{
-        accounts::dsl as accounts, customer_expenditures::dsl as customer_expenditures,
-        users::dsl as users,
+        apps::dsl as apps, customer_expenditures::dsl as customer_expenditures, users::dsl as users,
     },
 };
 use bigdecimal::BigDecimal;
@@ -19,10 +17,10 @@ pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
     account_id: &Uuid,
 ) -> Result<(i32, BigDecimal), String> {
-    let query: Result<(i32, BigDecimal), diesel::result::Error> = accounts::accounts
+    let query: Result<(i32, BigDecimal), diesel::result::Error> = apps::apps
         .inner_join(users::users)
-        .filter(accounts::id.eq(account_id))
-        .select((accounts::app_id, users::credit_balance))
+        .filter(apps::id.eq(account_id))
+        .select((apps::app_id, users::credit_balance))
         .first::<(i32, BigDecimal)>(connection)
         .await;
 
@@ -36,9 +34,9 @@ pub async fn get_account_by_id(
     connection: &mut AsyncPgConnection,
     account_id: &Uuid,
 ) -> Result<(Account, User), String> {
-    let account = accounts::accounts
+    let account = apps::apps
         .inner_join(users::users)
-        .filter(accounts::id.eq(account_id))
+        .filter(apps::id.eq(account_id))
         .select((Account::as_select(), User::as_select()))
         .first::<(Account, User)>(connection)
         .await
@@ -61,10 +59,10 @@ pub async fn update_credit_balance(
         user_credit_balance_change = &leftover_val;
     }
 
-    diesel::update(accounts::accounts.filter(accounts::id.eq(account_id)))
+    diesel::update(apps::apps.filter(apps::id.eq(account_id)))
         .set((
-            accounts::credit_balance.eq(accounts::credit_balance - &tx_params.amount_data_billed),
-            accounts::credit_used.eq(accounts::credit_used + &tx_params.amount_data_billed),
+            apps::credit_balance.eq(apps::credit_balance - &tx_params.amount_data_billed),
+            apps::credit_used.eq(apps::credit_used + &tx_params.amount_data_billed),
         ))
         .execute(connection)
         .await
@@ -113,7 +111,7 @@ pub async fn get_unresolved_transactions(
     retry: i32,
 ) -> Result<Vec<(CustomerExpenditureGetWithPayload, Account, User)>, String> {
     customer_expenditures::customer_expenditures
-        .inner_join(accounts::accounts)
+        .inner_join(apps::apps)
         .inner_join(users::users)
         .filter(customer_expenditures::error.is_not_null())
         .or_filter(customer_expenditures::payload.is_not_null().and(
@@ -165,11 +163,11 @@ pub async fn allocate_credit_balance(
     }
 
     diesel::update(
-        accounts::accounts
-            .filter(accounts::id.eq(account_id))
-            .filter(accounts::user_id.eq(user)),
+        apps::apps
+            .filter(apps::id.eq(account_id))
+            .filter(apps::user_id.eq(user)),
     )
-    .set((accounts::credit_balance.eq(accounts::credit_balance + amount)))
+    .set((apps::credit_balance.eq(apps::credit_balance + amount)))
     .execute(connection)
     .await
     .map_err(|e| e.to_string())?;

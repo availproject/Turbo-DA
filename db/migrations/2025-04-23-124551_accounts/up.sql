@@ -1,4 +1,4 @@
-CREATE TABLE accounts ( 
+CREATE TABLE apps ( 
     id UUID UNIQUE PRIMARY KEY,
     user_id VARCHAR NOT NULL,
     app_id INTEGER NOT NULL,

@@ -9,7 +9,7 @@ use db::{
         customer_expenditure::increase_retry_count,
         misc::{get_unresolved_transactions, update_credit_balance},
     },
-    models::accounts::Account,
+    models::apps::Account,
 };
 use db::{
     controllers::{customer_expenditure::update_customer_expenditure, users::TxParams},

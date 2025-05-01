@@ -1,19 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    accounts (id) {
-        id -> Uuid,
-        user_id -> Varchar,
-        app_id -> Int4,
-        credit_balance -> Numeric,
-        credit_used -> Numeric,
-        fallback_enabled -> Bool,
-        created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-    }
-}
-
-diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
         api_key -> Varchar,
@@ -22,7 +9,20 @@ diesel::table! {
         user_id -> Varchar,
         #[max_length = 255]
         identifier -> Varchar,
-        account_id -> Uuid,
+        app_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    apps (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        app_id -> Int4,
+        credit_balance -> Numeric,
+        credit_used -> Numeric,
+        fallback_enabled -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -58,7 +58,8 @@ diesel::table! {
         retry_count -> Int4,
         error -> Nullable<Varchar>,
         payload -> Nullable<Bytea>,
-        account_id -> Uuid,
+        updated_at -> Timestamp,
+        app_id -> Uuid,
     }
 }
 
@@ -82,16 +83,16 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(accounts -> users (user_id));
-diesel::joinable!(api_keys -> accounts (account_id));
+diesel::joinable!(api_keys -> apps (app_id));
 diesel::joinable!(api_keys -> users (user_id));
+diesel::joinable!(apps -> users (user_id));
 diesel::joinable!(credit_requests -> users (user_id));
-diesel::joinable!(customer_expenditures -> accounts (account_id));
+diesel::joinable!(customer_expenditures -> apps (app_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    accounts,
     api_keys,
+    apps,
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,

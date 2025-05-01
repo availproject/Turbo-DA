@@ -1,19 +1,21 @@
 -- Your SQL goes here
 ALTER TABLE api_keys 
-ADD COLUMN account_id UUID NOT NULL,
-ADD CONSTRAINT fk_api_keys_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE ON UPDATE CASCADE;
+ADD COLUMN app_id UUID NOT NULL,
+ADD CONSTRAINT fk_api_keys_app_id FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE users
 ADD COLUMN allocated_credit_balance NUMERIC(39, 0) NOT NULL DEFAULT 0;
 
-ALTER TABLE customer_expenditures
-ADD COLUMN account_id UUID NOT NULL,
-ADD CONSTRAINT fk_customer_expenditure_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE ON UPDATE CASCADE;
-
-UPDATE accounts
+UPDATE apps
 SET app_id = s.app_id
 FROM users s
-WHERE accounts.user_id = s.id;
+WHERE apps.user_id = s.id;
 
 ALTER TABLE users
 DROP COLUMN app_id;
+
+ALTER TABLE customer_expenditures
+ADD COLUMN updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ADD COLUMN app_id UUID NOT NULL,
+ADD CONSTRAINT fk_customer_expenditure_app_id FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE ON UPDATE CASCADE;
+

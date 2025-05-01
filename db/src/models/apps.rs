@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
-#[diesel(table_name = crate::schema::accounts)]
+#[diesel(table_name = crate::schema::apps)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Account {
     pub id: uuid::Uuid,
@@ -16,7 +16,7 @@ pub struct Account {
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]
-#[diesel(table_name = crate::schema::accounts)]
+#[diesel(table_name = crate::schema::apps)]
 pub struct AccountCreate {
     pub id: uuid::Uuid,
     pub user_id: String,

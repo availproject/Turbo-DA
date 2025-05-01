@@ -1,7 +1,7 @@
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
-    utils::{get_connection, retrieve_account_id, retrieve_user_id_from_jwt},
+    utils::{get_connection, retrieve_user_id_from_jwt},
 };
 /// Web framework dependencies for handling HTTP requests and responses
 use actix_web::{
@@ -13,10 +13,10 @@ use bigdecimal::BigDecimal;
 /// Database models and schema definitions
 use db::{
     controllers::{
-        accounts::{create_account, delete_account_by_id},
+        apps::{create_account, delete_account_by_id},
         users::user_exists,
     },
-    models::{accounts::AccountCreate, api::ApiKeyCreate, user_model::UserCreate},
+    models::{api::ApiKeyCreate, apps::AccountCreate, user_model::UserCreate},
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -55,8 +55,8 @@ pub(crate) struct RegisterAccount {
 /// Request payload for updating a user's app ID
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct UpdateAppID {
-    pub app_id: i32,
-    pub account_id: Uuid,
+    pub avail_app_id: i32,
+    pub app_id: Uuid,
 }
 
 /// Retrieves a list of all users with optional limit
@@ -286,9 +286,9 @@ pub async fn generate_app_account(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let account_id = Uuid::new_v4();
+    let app_id = Uuid::new_v4();
     let account = AccountCreate {
-        id: account_id,
+        id: app_id,
         user_id: user,
         app_id: 0,
         credit_balance: BigDecimal::from(0),
@@ -306,7 +306,7 @@ pub async fn generate_app_account(
 
 #[derive(Deserialize, Serialize, Validate)]
 pub struct DeleteAccount {
-    pub account_id: Uuid,
+    pub app_id: Uuid,
 }
 
 /// Delete an account for the authenticated user
@@ -323,7 +323,7 @@ pub struct DeleteAccount {
 /// # Request Body
 /// ```json
 /// {
-///   "account_id": "uuid-string"
+///   "app_id": "uuid-string"
 /// }
 /// ```
 ///
@@ -349,7 +349,7 @@ pub async fn delete_account(
     };
 
     // Delete the account
-    let tx = delete_account_by_id(&mut connection, user.clone(), payload.account_id).await;
+    let tx = delete_account_by_id(&mut connection, user.clone(), payload.app_id).await;
 
     match tx {
         Ok(_) => HttpResponse::Ok().json(json!({ "message": "Account successfully deleted" })),
@@ -361,7 +361,7 @@ pub async fn delete_account(
 #[derive(Deserialize, Serialize, Validate)]
 pub struct AllocateCreditBalance {
     pub amount: BigDecimal,
-    pub account_id: Uuid,
+    pub app_id: Uuid,
 }
 
 /// Allocate credit balance to a user account
@@ -379,7 +379,7 @@ pub struct AllocateCreditBalance {
 /// ```json
 /// {
 ///   "amount": "100.00",
-///   "account_id": "uuid-string"
+///   "app_id": "uuid-string"
 /// }
 /// ```
 ///
@@ -405,7 +405,7 @@ pub async fn allocate_credit(
 
     let tx = db::controllers::misc::allocate_credit_balance(
         &mut connection,
-        &payload.account_id,
+        &payload.app_id,
         &user,
         &payload.amount,
     )
@@ -419,7 +419,7 @@ pub async fn allocate_credit(
 
 #[derive(Deserialize, Serialize, Validate)]
 pub struct GenerateApiKey {
-    pub account_id: Uuid,
+    pub app_id: Uuid,
 }
 
 /// Generate a new API key for the authenticated user
@@ -436,7 +436,7 @@ pub struct GenerateApiKey {
 /// # Request Body
 /// ```json
 /// {
-///   "account_id": "uuid-string"
+///   "app_id": "uuid-string"
 /// }
 /// ```
 ///
@@ -478,7 +478,7 @@ async fn generate_api_key(
             api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
-            account_id: payload.account_id,
+            app_id: payload.app_id,
         },
     )
     .await;
@@ -509,7 +509,7 @@ async fn generate_api_key(
 /// [
 ///   {
 ///     "api_key": "***********abc12",
-///     "account_id": "uuid-string",
+///     "app_id": "uuid-string",
 ///     "created_at": "2023-01-01T12:00:00Z"
 ///   }
 /// ]
@@ -631,7 +631,7 @@ async fn delete_api_key(
 /// ```json
 /// {
 ///   "app_id": 1002,
-///   "account_id": "uuid-string"
+///   "app_id": "uuid-string"
 /// }
 /// ```
 ///
@@ -662,11 +662,11 @@ async fn update_app_id(
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
 
-    let query = db::controllers::accounts::update_app_id(
+    let query = db::controllers::apps::update_app_id(
         &mut connection,
-        &payload.account_id,
+        &payload.app_id,
         &user,
-        payload.app_id,
+        payload.avail_app_id,
     )
     .await;
 

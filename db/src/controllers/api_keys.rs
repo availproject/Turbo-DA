@@ -14,7 +14,7 @@ pub async fn create_api_key(
     connection: &mut AsyncPgConnection,
     key: &ApiKeyCreate,
 ) -> Result<(), String> {
-    let account = get_account_by_id(connection, &key.account_id).await?;
+    let account = get_account_by_id(connection, &key.app_id).await?;
     if account.0.user_id != key.user_id {
         return Err("Account does not belong to user".to_string());
     }
