@@ -26,7 +26,7 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
-    fund::purchase_cost,
+    fund::{purchase_cost, register_credit_request},
     users::{
         allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
         get_api_key,
@@ -160,7 +160,8 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(estimate_credits)
                             .service(allocate_credit)
                             .service(delete_account)
-                            .service(generate_app_account),
+                            .service(generate_app_account)
+                            .service(register_credit_request),
                     )
                     .service(
                         web::scope("/admin")

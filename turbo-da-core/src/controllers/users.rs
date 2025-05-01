@@ -76,9 +76,23 @@ pub(crate) struct UpdateAppID {
 /// # Example Response
 /// ```json
 /// {
-///   "results": [
-///     {"id": "user1@example.com", "name": "User One"},
-///     {"id": "user2@example.com", "name": "User Two"}
+///   "state": "SUCCESS",
+///   "message": "Users retrieved successfully",
+///   "data": [
+///     {
+///       "id": "user1@example.com",
+///       "name": "User One",
+///       "credit_balance": "100.00",
+///       "credit_used": "25.50",
+///       "allocated_credit_balance": "200.00"
+///     },
+///     {
+///       "id": "user2@example.com",
+///       "name": "User Two",
+///       "credit_balance": "50.00",
+///       "credit_used": "10.25",
+///       "allocated_credit_balance": "100.00"
+///     }
 ///   ]
 /// }
 /// ```
@@ -100,7 +114,11 @@ pub async fn get_all_users(
     };
     let results = db::controllers::users::get_all_users(&mut connection, final_limit).await;
 
-    HttpResponse::Ok().json(json!({"results":results}))
+    HttpResponse::Ok().json(json!({
+        "state": "SUCCESS",
+        "message": "Users retrieved successfully",
+        "data": results,
+    }))
 }
 
 /// Retrieves details for the authenticated user
@@ -120,16 +138,15 @@ pub async fn get_all_users(
 /// # Example Response
 /// ```json
 /// {
-///   "id": "user@example.com",
-///   "name": "John Doe",
-///   "accounts": [
-///     {
-///       "id": "uuid-string",
-///       "app_id": 1001,
-///       "credit_balance": "100.00",
-///       "fallback_enabled": true
-///     }
-///   ]
+///   "state": "SUCCESS",
+///   "message": "User retrieved successfully",
+///   "data": {
+///     "id": "user@example.com",
+///     "name": "John Doe",
+///     "credit_balance": "50.00",
+///     "credit_used": "10.25",
+///     "allocated_credit_balance": "100.00"
+///   }
 /// }
 /// ```
 
@@ -140,7 +157,12 @@ pub async fn get_user(
 ) -> impl Responder {
     let user_email = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Email not retrieved",
+            }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -150,8 +172,15 @@ pub async fn get_user(
 
     let user = db::controllers::users::get_user(&mut connection, &user_email).await;
     match user {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+        Ok(user) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "User retrieved successfully",
+            "data": user,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
@@ -179,6 +208,14 @@ pub async fn get_user(
 /// * 409 Conflict if user already exists
 /// * 400 Bad Request if validation fails
 /// * 500 Internal Server Error if user info cannot be retrieved
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Success: John Doe"
+/// }
+/// ```
 
 #[post("/register_new_user")]
 pub async fn register_new_user(
@@ -187,7 +224,10 @@ pub async fn register_new_user(
     http_request: HttpRequest,
 ) -> impl Responder {
     if let Err(errors) = payload.validate() {
-        return HttpResponse::BadRequest().json(errors);
+        return HttpResponse::BadRequest().json(json!({
+            "state": "ERROR",
+            "error": errors,
+        }));
     }
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -197,14 +237,22 @@ pub async fn register_new_user(
 
     let mut user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Email not retrieved",
+            }))
+        }
     };
 
     if user_exists(&mut connection, user.as_mut_str())
         .await
         .is_ok_and(|exists| exists)
     {
-        return HttpResponse::Conflict().body("User already exists");
+        return HttpResponse::Conflict().json(json!({
+            "state": "ERROR",
+            "error": "User already exists",
+        }));
     }
 
     let username = match payload.name.clone() {
@@ -222,8 +270,14 @@ pub async fn register_new_user(
     .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success: {}", username) })),
-        Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": format!("Success: {}", username),
+        })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({
+            "state": "ERROR",
+            "error": format!("Error: {}", e)
+        })),
     }
 }
 /// Generate an app account for a user
@@ -254,7 +308,8 @@ pub async fn register_new_user(
 /// # Example Response
 /// ```json
 /// {
-///   "message": "Success",
+///   "state": "SUCCESS",
+///   "message": "Account created successfully",
 ///   "data": {
 ///     "id": "uuid-string",
 ///     "user_id": "user@example.com",
@@ -273,7 +328,10 @@ pub async fn generate_app_account(
     http_request: HttpRequest,
 ) -> impl Responder {
     if let Err(errors) = payload.validate() {
-        return HttpResponse::BadRequest().json(errors);
+        return HttpResponse::BadRequest().json(json!({
+            "state": "ERROR",
+            "error": errors,
+        }));
     }
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -283,7 +341,12 @@ pub async fn generate_app_account(
 
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
     let app_id = Uuid::new_v4();
@@ -299,8 +362,15 @@ pub async fn generate_app_account(
     let tx = create_account(&mut connection, &account).await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success"), "data": account })),
-        Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Account created successfully",
+            "data": account
+        })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({
+            "state": "ERROR",
+            "error": format!("Error: {}", e)
+        })),
     }
 }
 
@@ -331,6 +401,14 @@ pub struct DeleteAccount {
 /// * 200 OK with success message if deletion succeeds
 /// * 404 Not Found if account doesn't exist
 /// * 500 Internal Server Error if deletion fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Account successfully deleted"
+/// }
+/// ```
 
 #[delete("/delete_account")]
 pub async fn delete_account(
@@ -352,9 +430,14 @@ pub async fn delete_account(
     let tx = delete_account_by_id(&mut connection, user.clone(), payload.app_id).await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": "Account successfully deleted" })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Error deleting account: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Account successfully deleted",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": format!("Error deleting account: {}", e),
+        })),
     }
 }
 
@@ -386,6 +469,14 @@ pub struct AllocateCreditBalance {
 /// # Returns
 /// * 200 OK with success message if allocation succeeds
 /// * 500 Internal Server Error if allocation fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Credit balance allocated successfully"
+/// }
+/// ```
 
 #[post("/allocate_credit_balance")]
 pub async fn allocate_credit(
@@ -412,8 +503,14 @@ pub async fn allocate_credit(
     .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": "Credit balance allocated" })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e })),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Credit balance allocated successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
@@ -447,7 +544,11 @@ pub struct GenerateApiKey {
 /// # Example Response
 /// ```json
 /// {
-///   "api_key": "abcdef1234567890"
+///   "state": "SUCCESS",
+///   "message": "API key created successfully",
+///   "data": {
+///     "api_key": "abcdef1234567890"
+///   }
 /// }
 /// ```
 
@@ -484,8 +585,17 @@ async fn generate_api_key(
     .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "api_key": key })),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "API key created successfully",
+            "data": {
+                "api_key": key
+            }
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
@@ -506,13 +616,19 @@ async fn generate_api_key(
 ///
 /// # Example Response
 /// ```json
-/// [
-///   {
-///     "api_key": "***********abc12",
-///     "app_id": "uuid-string",
-///     "created_at": "2023-01-01T12:00:00Z"
-///   }
-/// ]
+/// {
+///   "state": "SUCCESS",
+///   "message": "API key retrieved successfully",
+///   "data": [
+///     {
+///       "api_key": "***********abc12",
+///       "identifier": "abc12",
+///       "created_at": "2023-01-01T12:00:00Z",
+///       "user_id": "user-id-string",
+///       "app_id": "uuid-string"
+///     }
+///   ]
+/// }
 /// ```
 
 #[get("/get_api_key")]
@@ -533,8 +649,15 @@ pub async fn get_api_key(
     let query = db::controllers::api_keys::get_api_key(&mut connection, &user).await;
 
     match query {
-        Ok(key) => HttpResponse::Ok().json(key),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(key) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "API key retrieved successfully",
+            "data": key
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
@@ -563,14 +686,18 @@ pub struct DeleteApiKey {
 /// ```
 ///
 /// # Returns
-/// * 200 OK with deleted key identifier if deletion succeeds
+/// * 200 OK with success message and deleted key identifier if deletion succeeds
 /// * 404 Not Found if key doesn't exist
 /// * 500 Internal Server Error if deletion fails
 ///
 /// # Example Response
 /// ```json
 /// {
-///   "api_key": "abc12"
+///   "state": "SUCCESS",
+///   "message": "API key deleted successfully",
+///   "data": {
+///     "api_key": "abc12"
+///   }
 /// }
 /// ```
 
@@ -610,7 +737,13 @@ async fn delete_api_key(
                     error!("Error connecting to Redis: {}", e);
                 }
             }
-            return HttpResponse::Ok().json(json!({ "api_key": payload.identifier }));
+            return HttpResponse::Ok().json(json!({
+                "state": "SUCCESS",
+                "message": "API key deleted successfully",
+                "data": {
+                    "api_key": payload.identifier
+                }
+            }));
         }
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
@@ -630,7 +763,7 @@ async fn delete_api_key(
 /// # Request Body
 /// ```json
 /// {
-///   "app_id": 1002,
+///   "avail_app_id": 1002,
 ///   "app_id": "uuid-string"
 /// }
 /// ```
@@ -642,7 +775,9 @@ async fn delete_api_key(
 /// # Example Response
 /// ```json
 /// {
-///   "message": "App ID updated"
+///   "state": "SUCCESS",
+///   "message": "App ID updated successfully",
+///   "error": null
 /// }
 /// ```
 
@@ -659,7 +794,12 @@ async fn update_app_id(
 
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
     let query = db::controllers::apps::update_app_id(
@@ -671,7 +811,14 @@ async fn update_app_id(
     .await;
 
     match query {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": "App ID updated" })),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "App ID updated successfully",
+            "error": null
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }

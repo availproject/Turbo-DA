@@ -23,20 +23,52 @@ struct GetTokenExpenditure {
 
 /// Retrieves all expenditure records for an authenticated customer
 ///
+/// # Description
 /// This endpoint allows customers to view their transaction history and
 /// track how they've spent their credits on Avail data submissions.
 /// The results include transaction details such as data size, fees paid,
 /// and submission status.
 ///
-/// # Arguments
-/// * `request_payload` - Query parameters containing optional result limit
-/// * `config` - Application configuration with default limits
-/// * `injected_dependency` - Database connection pool for data access
-/// * `http_request` - HTTP request containing JWT for user authentication
+/// # Route
+/// `GET /v1/user/get_all_expenditure?limit={limit}`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
+///
+/// # Query Parameters
+/// * `limit` - Optional parameter to limit the number of records returned
 ///
 /// # Returns
 /// * Success: JSON response with a list of expenditure records
 /// * Error: 500 status code with error message if user authentication or database access fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Expenditure retrieved successfully",
+///   "data": {
+///     "results": [
+///       {
+///         "id": "123e4567-e89b-12d3-a456-426614174000",
+///         "user_id": "user123",
+///         "extrinsic_index": 42,
+///         "amount_data": "1024",
+///         "fees": "0.05",
+///         "to_address": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+///         "block_number": 12345,
+///         "block_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+///         "data_hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+///         "tx_hash": "0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba",
+///         "created_at": "2023-01-01T12:00:00Z",
+///         "error": null,
+///         "converted_fees": "0.05",
+///         "app_id": "123e4567-e89b-12d3-a456-426614174001"
+///       }
+///     ]
+///   }
+/// }
+/// ```
 #[get("/get_all_expenditure")]
 pub async fn get_all_expenditure(
     request_payload: web::Query<GetAllExpenditures>,
@@ -47,7 +79,10 @@ pub async fn get_all_expenditure(
     let limit = request_payload.limit;
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "state": "ERROR", "message": "User Id not retrieved" }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -61,7 +96,7 @@ pub async fn get_all_expenditure(
     };
 
     match handle_get_all_expenditure(&mut connection, user, final_limit).await {
-        Ok(response) => HttpResponse::Ok().json(response),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+        Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e.to_string() })),
     }
 }

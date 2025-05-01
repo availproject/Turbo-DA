@@ -23,7 +23,8 @@ pub async fn create_credit_request(
         .values((
             user_id.eq(user),
             chain_id.eq(chain),
-            request_status.eq("pending"),
+            request_status.eq("PENDING"),
+            request_type.eq("DEPOSIT"),
         ))
         .execute(connection)
         .await

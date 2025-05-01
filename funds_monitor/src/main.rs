@@ -11,6 +11,7 @@ use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::ds
 use diesel::prelude::*;
 use diesel::PgConnection;
 use evm::EVM;
+use log::debug;
 use log::{error, info};
 
 #[tokio::main]
@@ -22,6 +23,7 @@ async fn main() {
             return;
         }
     };
+    println!("cfg: {:?}", cfg);
     let cfg_ref = Arc::new(cfg);
     let cfg_ref_2 = cfg_ref.clone();
     let cfg_ref_3 = cfg_ref.clone();
@@ -38,14 +40,12 @@ async fn main() {
     for (network_name, network_config) in &cfg_ref_2.network {
         let network_name = network_name.clone();
         let network_config = network_config.clone();
-        let network_ws_url = network_config.ws_url.clone();
-        let contract_address = network_config.contract_address.clone();
-        let finalised_threshold = network_config.finalised_threshold.clone();
+
         let cfg_ref_4 = cfg_ref_3.clone();
-        info!("Task for network: {}", network_name);
+        debug!("Task for network: {}", network_name);
 
         tokio::spawn(async move {
-            info!("Spawning new task");
+            debug!("Spawning new task");
 
             match monitor(network_config, cfg_ref_4).await {
                 Ok(_) => info!("Monitor task completed successfully"),
@@ -74,6 +74,7 @@ async fn monitor(network_config: Network, cfg: Arc<Config>) -> Result<(), String
     )
     .await
     .map_err(|e| format!("Error creating EVM connection: {}", e))?;
+
     evm.monitor_evm_chains().await;
 
     Ok(())

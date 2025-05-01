@@ -12,7 +12,7 @@ use alloy::{
 use crate::utils::{Deposit as EvmDeposit, Utils};
 use crate::Config;
 use futures_util::stream::StreamExt;
-use log::{error, info};
+use log::{debug, error, info};
 use std::sync::Arc;
 
 sol! {
@@ -46,12 +46,12 @@ impl EVM {
         start_block: u64,
         cfg: Arc<Config>,
     ) -> Result<Self, String> {
-        info!("Network ws url: {:?}", ws_url);
         let ws = WsConnect::new(ws_url);
-        let provider = ProviderBuilder::new().on_ws(ws).await.map_err(|e| {
-            error!("Failed to connect to Turbo DA Contract: {:?}", e);
-            format!("Failed to connect to Turbo DA Contract: {:?}", e)
-        })?;
+
+        let provider = ProviderBuilder::new()
+            .on_ws(ws)
+            .await
+            .map_err(|e| format!("Failed to connect to Turbo DA Contract: {:?}", e))?;
 
         Ok(Self {
             provider,
@@ -69,7 +69,7 @@ impl EVM {
     }
 
     pub async fn monitor_evm_chains(&mut self) {
-        info!(
+        debug!(
             "Monitor service started for contract_address: {} with threshold: {}",
             self.contract_address, self.finalised_threshold
         );
@@ -81,7 +81,7 @@ impl EVM {
         let mut _stream = subscription.into_stream();
 
         while let Some(header) = _stream.next().await {
-            info!("header: {:?}", header.number);
+            debug!("header: {:?}", header.number);
             let finalised_block = header.inner.number - self.finalised_threshold;
 
             match self.check_deposits(finalised_block).await {
@@ -104,7 +104,7 @@ impl EVM {
             .map_err(|e| format!("Failed to get logs: {}", e))?;
         self.start_block = number + 1;
         for log in logs {
-            info!("Log from our contract: {:?}", log.block_hash);
+            debug!("Log from our contract: {:?}", log.block_hash);
             let receipt = match self.process_deposit_event(&log) {
                 Ok(receipt) => receipt,
                 Err(e) => {

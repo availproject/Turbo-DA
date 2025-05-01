@@ -35,12 +35,12 @@ struct RegisterCreditRequestParams {
 /// The request is stored in the database with a "pending" status for later processing.
 ///
 /// # Route
-/// `POST /register_credit_request?chain={chain_id}`
+/// `POST /v1/user/register_credit_request`
 ///
 /// # Headers
 /// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
 ///
-/// # Query Parameters
+/// # Request Body
 /// * `chain` - The chain ID for which the credit request is being registered
 ///
 /// # Returns
@@ -48,14 +48,19 @@ struct RegisterCreditRequestParams {
 /// * Error: Internal server error with appropriate error message
 #[post("/register_credit_request")]
 async fn register_credit_request(
-    query: web::Query<RegisterCreditRequestParams>,
+    payload: web::Json<RegisterCreditRequestParams>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
     // Extract user ID from JWT token
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
     // Establish database connection
@@ -65,10 +70,10 @@ async fn register_credit_request(
     };
 
     // Create credit request in the database
-    let tx = create_credit_request(user, query.0.chain, &mut connection).await;
+    let tx = create_credit_request(user, payload.0.chain, &mut connection).await;
     match tx {
-        Ok(tx) => HttpResponse::Ok().json(json!({"status": "success", "error": false, "data": tx})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": true, "message": e})),
+        Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit request created successfully", "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
 /// Retrieve the status and details of a user's fund request.
@@ -85,25 +90,19 @@ async fn register_credit_request(
 /// # Returns
 /// A JSON object with details about the fund request, including the request ID, user ID, token address, amounts deposited and approved, request status, and creation timestamp.
 ///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/request_fund_status" \
-///      -H "Authorization: Bearer YOUR_TOKEN"
-/// ```
-///
 /// # Example Response
 ///
 /// ```json
 /// {
-///   "id": 1,
-///   "user_id": "12345",
-///   "token_address": "0x123abc456def789ghi",
-///   "chain_id": 1,
-///   "amount_token_deposited": "250",
-///   "amount_avail_approved": "100000000000000000000", // scaled to 18 decimal places
-///   "request_status": "pending",
-///   "created_at": "2024-09-11T12:34:56"
+///   "state": "SUCCESS",
+///   "message": "Fund request status retrieved successfully",
+///   "data": [{
+///     "amount_credit": "100000000000000000000", // scaled to 18 decimal places
+///     "chain_id": 1,
+///     "request_status": "pending",
+///     "request_type": "credit",
+///     "tx_hash": "0x123abc456def789ghi"
+///   }]
 /// }
 /// ```
 
@@ -114,7 +113,12 @@ pub async fn request_funds_status(
 ) -> impl Responder {
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
@@ -123,8 +127,8 @@ pub async fn request_funds_status(
 
     let tx = get_fund_status(user, &mut connection).await;
     match tx {
-        Ok(tx) => HttpResponse::Ok().json(json!({"status": "success", "error": false, "data": tx})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": true, "message": e})),
+        Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Fund request status retrieved successfully", "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
 
@@ -139,7 +143,7 @@ struct PurchaseCostParams {
 /// This endpoint calculates the credit cost required to submit data of a specified size to the Avail network.
 ///
 /// # Route
-/// `GET /v1/user/purchase_cost`
+/// `GET /v1/user/purchase_cost?data_size={size}`
 ///
 /// # Query Parameters
 /// * `data_size` - The size of the data in bytes for which to calculate the credit cost.
@@ -147,17 +151,13 @@ struct PurchaseCostParams {
 /// # Returns
 /// A JSON object containing the calculated credit cost for the specified data size.
 ///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/purchase_cost?data_size=1024"
-/// ```
-///
 /// # Example Response
 ///
 /// ```json
 /// {
-///   "credits_cost": "0.0123456789"
+///   "state": "SUCCESS",
+///   "message": "Credit cost calculated successfully",
+///   "data": "0.0123456789"
 /// }
 /// ```
 
@@ -177,7 +177,7 @@ pub async fn purchase_cost(
 
     let credits_cost = credits_cost * BigDecimal::from(query.0.data_size as u128) / 1024.0;
 
-    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+    HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -191,7 +191,7 @@ pub struct EstimateCreditsParams {
 /// This endpoint estimates the number of credits required to process a specified amount of data.
 ///
 /// # Route
-/// `GET /v1/user/estimate_credits`
+/// `GET /v1/user/estimate_credits?data={amount}`
 ///
 /// # Query Parameters
 /// * `data` - The amount of data as a decimal value for which to estimate credit requirements.
@@ -199,17 +199,13 @@ pub struct EstimateCreditsParams {
 /// # Returns
 /// A JSON object containing the estimated credit cost for the specified data amount.
 ///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/estimate_credits?data=10.5"
-/// ```
-///
 /// # Example Response
 ///
 /// ```json
 /// {
-///   "credits_cost": "0.0123456789"
+///   "state": "SUCCESS",
+///   "message": "Credit cost calculated successfully",
+///   "data": "0.0123456789"
 /// }
 /// ```
 
@@ -227,7 +223,7 @@ pub async fn estimate_credits(
         .calculate_credit_utlisation(query.0.data.to_string().as_bytes().to_vec())
         .await;
 
-    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+    HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
 }
 
 /// Estimate the credits required for raw byte data.
@@ -244,19 +240,13 @@ pub async fn estimate_credits(
 /// # Returns
 /// A JSON object containing the estimated credit cost for the provided byte data.
 ///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/user/estimate_credits_for_bytes" \
-///      -H "Content-Type: application/octet-stream" \
-///      --data-binary @file.bin
-/// ```
-///
 /// # Example Response
 ///
 /// ```json
 /// {
-///   "credits_cost": "0.0123456789"
+///   "state": "SUCCESS",
+///   "message": "Credit cost calculated successfully",
+///   "data": "0.0123456789"
 /// }
 /// ```
 
@@ -274,7 +264,7 @@ pub async fn estimate_credits_for_bytes(
         .calculate_credit_utlisation(request_payload.to_vec())
         .await;
 
-    HttpResponse::Ok().json(json!({"credits_cost": credits_cost}))
+    HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
 }
 
 /// Retrieve the list of supported tokens and their corresponding addresses.
@@ -283,31 +273,31 @@ pub async fn estimate_credits_for_bytes(
 /// This endpoint provides a list of supported tokens along with their addresses. It helps clients understand which tokens are available for interactions and their associated addresses on the blockchain.
 ///
 /// # Route
-/// `GET /v1/token_map`
+/// `GET /v1/user/token_map`
 ///
 /// # Returns
-/// A JSON object containing a mapping of token names to their addresses. The response provides a list of supported tokens with their respective blockchain addresses.
-///
-/// # Example Request
-///
-/// ```bash
-/// curl -X GET "https://api.example.com/v1/token_map"
-/// ```
+/// A JSON object containing a mapping of token names to their addresses.
 ///
 /// # Example Response
 ///
 /// ```json
 /// {
-///   "token_map": {
-///     "ethereum": "0xc...",  // Ethereum token address
-///     "cardano": "0xd..."    // Cardano token address
+///   "state": "SUCCESS",
+///   "message": "Token map retrieved successfully",
+///   "data": {
+///     "ethereum": {
+///       "token_address": "0xc...",
+///       "other_properties": "..."
+///     },
+///     "cardano": {
+///       "token_address": "0xd...",
+///       "other_properties": "..."
+///     }
 ///   }
 /// }
 /// ```
 
 #[get("/token_map")]
 pub async fn get_token_map() -> impl Responder {
-    HttpResponse::Ok().json(json!({
-        "token_map": &*TOKEN_MAP,
-    }))
+    HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Token map retrieved successfully", "data": &*TOKEN_MAP}))
 }

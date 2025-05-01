@@ -49,7 +49,7 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load_config(&self) -> Result<Config, std::io::Error> {
+    pub fn load_config(&self) -> Result<Config, String> {
         dotenv().ok();
         env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
         if let Ok(config) = self.load_from_toml() {
@@ -57,20 +57,13 @@ impl Config {
         }
 
         info!("Trying to read from environment variables");
-
-        match self.load_from_env() {
-            Ok(config) => Ok(config),
-            Err(env_error) => {
-                error!(
-                    "Couldn't load configuration: TOML error, and ENVIRONMENT error: {:?}",
-                    env_error
-                );
-                Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Couldn't fetch configuration from either TOML file or environment variables",
-                ))
-            }
-        }
+        self.load_from_env().map_err(|env_error| {
+            error!(
+                "Failed to load configuration from environment variables: {:?}",
+                env_error
+            );
+            env_error.to_string()
+        })
     }
 
     fn load_from_toml(&self) -> Result<Config, Box<dyn Error>> {

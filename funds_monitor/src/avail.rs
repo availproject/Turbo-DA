@@ -23,12 +23,13 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
         cfg.database_url.clone(),
         cfg.avail_rpc_url.clone(),
     );
+
     info!("SDK initialized with local endpoint");
 
     let mut connection = utils.establish_connection()?;
 
     sync_database(&mut connection, &sdk, &utils).await?;
-
+    println!("avail_rpc_url: {:?}", cfg.avail_rpc_url);
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
         match avail_block {
@@ -42,7 +43,6 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
         }
     }
 
-    info!("Avail run completed successfully");
     Ok(())
 }
 

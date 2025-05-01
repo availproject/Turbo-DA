@@ -107,8 +107,8 @@ pub async fn get_connection(
         Err(err) => {
             error!("Failed to get a database connection: {}", err);
             return Err(HttpResponse::InternalServerError().json(json!({
-                "status": "error",
-                "message": "Database connection error"
+                "state": "ERROR",
+                "error": "Database connection error"
             })));
         }
     }
