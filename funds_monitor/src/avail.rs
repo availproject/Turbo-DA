@@ -121,7 +121,6 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
             .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
         let receipt = Deposit {
-            user_id: ascii_remark,
             token_address: "0x0000000000000000000000000000000000000000".to_string(),
             amount: value.to_string(),
             from: account,
@@ -129,6 +128,7 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
 
         utils
             .update_database_on_deposit(
+                &ascii_remark,
                 &receipt,
                 &tx_hash,
                 &mut connection,
