@@ -115,7 +115,7 @@ impl EVM {
             let receipt = match self.process_deposit_event(&log) {
                 Ok(receipt) => receipt,
                 Err(e) => {
-                    println!("Failed to process deposit event: {}", e);
+                    error!("Failed to process deposit event: {}", e);
                     continue;
                 }
             };

@@ -85,13 +85,9 @@ async fn process_failed_transactions(
         );
         let result = increase_retry_count(customer_expenditure_details.id, connection).await;
         if result.is_err() {
-            log_fallback_txn_error(
+            log_error(
                 &customer_expenditure_details.id.to_string(),
-                "Failed to increase retry count for entry id",
-            );
-            error!(
-                "Failed to increase retry count for entry id: {:?}",
-                customer_expenditure_details.id
+                "Failed to increase retry count",
             );
             continue;
         }
@@ -102,24 +98,16 @@ async fn process_failed_transactions(
         );
 
         if customer_expenditure_details.retry_count > retry_count {
-            log_fallback_txn_error(
+            log_error(
                 &customer_expenditure_details.id.to_string(),
-                "Retry count exceeded for transaction id",
-            );
-            error!(
-                "Retry count exceeded for transaction id: {:?}",
-                customer_expenditure_details.id
+                "Retry count exceeded",
             );
             continue;
         }
         let Some(data) = customer_expenditure_details.payload else {
-            log_fallback_txn_error(
+            log_error(
                 &customer_expenditure_details.id.to_string(),
                 "No payload found for transaction id",
-            );
-            error!(
-                "No payload found for transaction id: {:?}",
-                customer_expenditure_details.id
             );
             continue;
         };
@@ -129,13 +117,9 @@ async fn process_failed_transactions(
 
         if credits_used > account_details.credit_balance {
             if !account_details.fallback_enabled || credits_used > user_details.credit_balance {
-                log_fallback_txn_error(
+                log_error(
                     &customer_expenditure_details.id.to_string(),
                     "Insufficient credits for user id",
-                );
-                error!(
-                    "Insufficient credits for user id: {:?}",
-                    customer_expenditure_details.id
                 );
                 continue;
             }
@@ -162,18 +146,15 @@ async fn process_failed_transactions(
                 )
                 .await;
                 if result.is_err() {
-                    error!("Failed to update customer expenditure: {:?}", result.err());
-                    log_fallback_txn_error(
+                    log_error(
                         &customer_expenditure_details.id.to_string(),
                         "Failed to update customer expenditure",
                     );
-                    continue;
                 }
                 let result =
                     update_credit_balance(connection, &account_details.id, &tx_params).await;
                 if result.is_err() {
-                    error!("Failed to update credit balance: {:?}", result.err());
-                    log_fallback_txn_error(
+                    log_error(
                         &customer_expenditure_details.id.to_string(),
                         "Failed to update credit balance",
                     );
@@ -181,9 +162,16 @@ async fn process_failed_transactions(
                 }
             }
             Err(e) => {
-                log_fallback_txn_error(&customer_expenditure_details.id.to_string(), &e);
-                error!("Tx submission failed again: id {:?}", e);
+                log_error(&customer_expenditure_details.id.to_string(), &e);
             }
         }
     }
+}
+
+fn log_error(id: &str, message: &str) {
+    error!(
+        "Fallback transaction error: id {:?}, message: {:?}",
+        id, message
+    );
+    log_fallback_txn_error(id, message);
 }
