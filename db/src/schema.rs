@@ -30,7 +30,7 @@ diesel::table! {
     credit_requests (id) {
         id -> Int4,
         user_id -> Varchar,
-        amount_credit -> Numeric,
+        amount_credit -> Nullable<Numeric>,
         chain_id -> Nullable<Int4>,
         #[max_length = 50]
         request_status -> Varchar,
@@ -38,6 +38,7 @@ diesel::table! {
         tx_hash -> Nullable<Varchar>,
         #[max_length = 50]
         request_type -> Varchar,
+        updated_at -> Timestamp,
     }
 }
 

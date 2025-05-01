@@ -129,20 +129,19 @@ where
                         if let Err(e) = insert_headers(&mut headers, "user_id", &key.user_id) {
                             return e;
                         }
-                        if let Err(e) = insert_headers(&mut headers, "account_id", &key.account_id)
-                        {
+                        if let Err(e) = insert_headers(&mut headers, "app_id", &key.app_id) {
                             return e;
                         }
 
                         match self.redis.set(
                             api_key_hash.as_str(),
-                            format!("{}:{}", key.user_id.to_string(), key.account_id.to_string())
+                            format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())
                                 .as_str(),
                         ) {
                             Ok(_) => {
                                 info!(
                                     "API key set in redis for user {}:{}",
-                                    key.user_id, key.account_id
+                                    key.user_id, key.app_id
                                 );
                             }
                             Err(e) => {

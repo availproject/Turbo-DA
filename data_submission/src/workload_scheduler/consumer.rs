@@ -98,7 +98,7 @@ impl Consumer {
                         );
 
                         let submit_data_class =
-                            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.app_id);
+                            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
                         let mut process_response = ProcessSubmitResponse::new(
                             &response,
@@ -168,7 +168,7 @@ impl<'a> ProcessSubmitResponse<'a> {
     #[tracing::instrument(name = "process_response", skip(self))]
     pub async fn process_response(&mut self) -> Result<&'a Response, String> {
         let (account, user) =
-            get_account_by_id(&mut self.connection, &self.response.account_id).await?;
+            get_account_by_id(&mut self.connection, &self.response.app_id).await?;
 
         let data = self.response.raw_payload.clone();
 
@@ -213,7 +213,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             self.connection,
         )
         .await?;
-        update_credit_balance(self.connection, &self.response.account_id, &tx_params).await?;
+        update_credit_balance(self.connection, &self.response.app_id, &tx_params).await?;
 
         Ok(())
     }

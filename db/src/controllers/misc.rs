@@ -46,10 +46,10 @@ pub async fn get_account_by_id(
 
 pub async fn update_credit_balance(
     connection: &mut AsyncPgConnection,
-    account_id: &Uuid,
+    app_id: &Uuid,
     tx_params: &TxParams,
 ) -> Result<(), String> {
-    let (account, _) = get_account_by_id(connection, account_id).await?;
+    let (account, _) = get_account_by_id(connection, app_id).await?;
 
     let mut leftover_val = BigDecimal::from(0);
     let mut user_credit_balance_change = &leftover_val;
@@ -59,7 +59,7 @@ pub async fn update_credit_balance(
         user_credit_balance_change = &leftover_val;
     }
 
-    diesel::update(apps::apps.filter(apps::id.eq(account_id)))
+    diesel::update(apps::apps.filter(apps::id.eq(app_id)))
         .set((
             apps::credit_balance.eq(apps::credit_balance - &tx_params.amount_data_billed),
             apps::credit_used.eq(apps::credit_used + &tx_params.amount_data_billed),
@@ -69,7 +69,7 @@ pub async fn update_credit_balance(
         .map_err(|e| {
             format!(
                 "Couldn't update account credit balance for account id {:?}, fee: {:?}. Error {:?}",
-                account_id, tx_params.fees, e
+                app_id, tx_params.fees, e
             )
         })?;
 
@@ -84,7 +84,7 @@ pub async fn update_credit_balance(
             .map_err(|e| {
                 format!(
                     "Couldn't update user credit balance for account id {:?}, fee: {:?}. Error {:?}",
-                    account_id, tx_params.fees, e
+                    app_id, tx_params.fees, e
                 )
             })?;
     }

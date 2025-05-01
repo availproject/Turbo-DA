@@ -14,13 +14,13 @@ pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
 ///
 /// # Arguments
 /// * `http_request` - HTTP request to extract user ID from
-pub fn retrieve_account_id(http_request: &HttpRequest) -> Option<Uuid> {
+pub fn retrieve_app_id(http_request: &HttpRequest) -> Option<Uuid> {
     let headers = http_request.headers();
 
     for (name, value) in headers.iter() {
-        if name == "account_id" {
-            if let Ok(account_id) = value.to_str() {
-                return Uuid::parse_str(account_id).ok();
+        if name == "app_id" {
+            if let Ok(app_id) = value.to_str() {
+                return Uuid::parse_str(app_id).ok();
             }
         }
     }

@@ -82,7 +82,7 @@ impl Utils {
 
         let tx = diesel::insert_into(credit_requests::table)
             .values(CreditRequests {
-                amount_credit: amount.clone(),
+                amount_credit: Some(amount.clone()),
                 request_status: status.to_string(),
                 user_id: user_id_local.clone(),
                 chain_id: Some(chain_identifier),

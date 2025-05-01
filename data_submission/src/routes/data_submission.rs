@@ -1,6 +1,6 @@
-use crate::utils::map_user_id_to_thread;
+use crate::config::AppConfig;
+use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
-use crate::{config::AppConfig, utils::retrieve_account_id};
 use actix_web::{
     post,
     web::{self, Bytes},
@@ -48,7 +48,7 @@ pub async fn submit_data(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let account_id = match retrieve_account_id(&http_request) {
+    let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
     };
@@ -63,7 +63,7 @@ pub async fn submit_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &account_id).await {
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
             return HttpResponse::InternalServerError().body(e);
@@ -77,14 +77,14 @@ pub async fn submit_data(
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload.data.as_bytes().to_vec().into(),
         submission_id,
-        account_id,
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.data.as_bytes().len()),
         user_id: user_id.clone(),
-        account_id: account_id,
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(request_payload.data.as_bytes().to_vec()),
@@ -130,7 +130,7 @@ pub async fn submit_raw_data(
     if request_payload.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let account_id = match retrieve_account_id(&http_request) {
+    let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
@@ -150,7 +150,7 @@ pub async fn submit_raw_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &account_id).await {
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
             return HttpResponse::InternalServerError().json(json!({ "error": e }));
@@ -164,7 +164,7 @@ pub async fn submit_raw_data(
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.len()),
         user_id: user_id.clone(),
-        account_id: account_id,
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(request_payload.to_vec()),
@@ -174,8 +174,8 @@ pub async fn submit_raw_data(
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload,
         submission_id,
-        account_id,
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     tokio::spawn(async move {
