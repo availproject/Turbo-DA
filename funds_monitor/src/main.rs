@@ -14,7 +14,7 @@ use evm::EVM;
 use log::debug;
 use log::{error, info};
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let cfg = match Config::default().load_config() {
         Ok(c) => c,
@@ -23,19 +23,20 @@ async fn main() {
             return;
         }
     };
-    println!("cfg: {:?}", cfg);
+
     let cfg_ref = Arc::new(cfg);
     let cfg_ref_2 = cfg_ref.clone();
     let cfg_ref_3 = cfg_ref.clone();
 
-    tokio::spawn(async move {
+    let mut handles = Vec::new();
+    handles.push(tokio::spawn(async move {
         info!("Starting Avail Chain Monitor");
 
         let result = run(cfg_ref.clone()).await;
         if let Err(e) = result {
             error!("Error running Avail Chain Monitor: {:?}", e);
         }
-    });
+    }));
 
     for (network_name, network_config) in &cfg_ref_2.network {
         let network_name = network_name.clone();
@@ -44,14 +45,21 @@ async fn main() {
         let cfg_ref_4 = cfg_ref_3.clone();
         debug!("Task for network: {}", network_name);
 
-        tokio::spawn(async move {
+        handles.push(tokio::spawn(async move {
             debug!("Spawning new task");
 
             match monitor(network_config, cfg_ref_4).await {
                 Ok(_) => info!("Monitor task completed successfully"),
                 Err(e) => error!("Error running monitor task: {}", e),
             }
-        });
+        }));
+    }
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Ctrl+C pressed, shutting down...");
+        }
+        _ = futures::future::join_all(handles) => {}
     }
 }
 
@@ -75,7 +83,7 @@ async fn monitor(network_config: Network, cfg: Arc<Config>) -> Result<(), String
     .await
     .map_err(|e| format!("Error creating EVM connection: {}", e))?;
 
-    evm.monitor_evm_chains().await;
+    evm.monitor_evm_chain().await;
 
     Ok(())
 }
@@ -97,7 +105,8 @@ fn query_finalised_block_number(
                 id: 0,
                 chain_id: 0,
                 block_number: 0,
-                block_hash: "".to_string(),
+                block_hash: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
             };
         }
     }

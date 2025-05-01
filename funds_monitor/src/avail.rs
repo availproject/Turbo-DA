@@ -15,7 +15,7 @@ use crate::query_finalised_block_number;
 use crate::utils::{Deposit, Utils};
 // Remark is the user id in hex format
 pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
-    info!("Starting Avail Chain Monitor");
+    debug!("Starting Avail Chain Monitor");
     let sdk = SDK::new(cfg.avail_rpc_url.as_str()).await?;
     let utils = Utils::new(
         cfg.coin_gecho_api_url.clone(),
@@ -24,12 +24,12 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
         cfg.avail_rpc_url.clone(),
     );
 
-    info!("SDK initialized with local endpoint");
+    debug!("SDK initialized with local endpoint");
 
     let mut connection = utils.establish_connection()?;
 
-    sync_database(&mut connection, &sdk, &utils).await?;
-    println!("avail_rpc_url: {:?}", cfg.avail_rpc_url);
+    let _ = sync_database(&mut connection, &sdk, &utils).await;
+
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
         match avail_block {
@@ -62,10 +62,9 @@ async fn sync_database(
 }
 
 async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
-    info!("Filtering batch calls from block");
+    debug!("Filtering batch calls from block");
 
     let all_batch_calls = block.transactions_static::<BatchAll>(Filter::new());
-    info!("Filtering batch calls from block");
 
     // Filtering
     for batch_all in all_batch_calls {

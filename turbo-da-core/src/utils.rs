@@ -283,14 +283,14 @@ lazy_static! {
         m.insert(
             "ethereum".to_string(),
             Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
+                token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44".to_string(),
                 token_decimals: 18,
             },
         );
         m.insert(
             "avail".to_string(),
             Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
+                token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44".to_string(),
                 token_decimals: 18,
             },
         );

@@ -68,8 +68,8 @@ impl EVM {
         })
     }
 
-    pub async fn monitor_evm_chains(&mut self) {
-        debug!(
+    pub async fn monitor_evm_chain(&mut self) {
+        info!(
             "Monitor service started for contract_address: {} with threshold: {}",
             self.contract_address, self.finalised_threshold
         );
@@ -85,7 +85,7 @@ impl EVM {
             let finalised_block = header.inner.number - self.finalised_threshold;
 
             match self.check_deposits(finalised_block).await {
-                Ok(_) => info!("Deposits checked successfully"),
+                Ok(_) => debug!("Deposits checked successfully"),
                 Err(e) => error!("Failed to check deposits: {}", e),
             }
         }
@@ -94,7 +94,7 @@ impl EVM {
     async fn check_deposits(&mut self, number: u64) -> Result<(), String> {
         let filter = Filter::new()
             .address(Address::from_str(&self.contract_address).unwrap())
-            .event("Deposit(bytes,address,uint256,address)")
+            .event("Deposit(bytes32,address,uint256,address)")
             .from_block(self.start_block)
             .to_block(number);
         let logs = self

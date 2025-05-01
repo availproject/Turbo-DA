@@ -61,6 +61,7 @@ impl Utils {
             .map_err(|e| format!("Failed to get amount to be credited: {}", e))?;
 
         let parsed_id = order_id
+            .trim_start_matches("0x")
             .parse::<i32>()
             .map_err(|e| format!("Failed to parse order ID: {}", e))?;
 
@@ -178,7 +179,7 @@ pub async fn calculate_avail_token_equivalent(
 ) -> Result<BigDecimal, String> {
     let http_client = Client::new();
 
-    info!("Fetching current price for token: {}", token_address);
+    debug!("Fetching current price for token: {}", token_address);
     let token_symbol = TOKEN_MAP
         .iter()
         .find(|(_, token)| token.token_address == token_address)
@@ -197,7 +198,7 @@ pub async fn calculate_avail_token_equivalent(
     .await
     .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-    debug!("Current token USD price: {}", token_usd_price);
+    debug!("Current Token USD price: {}", token_usd_price);
     debug!("Current AVAIL USD price: {}", avail_usd_price);
 
     let token_avail_ratio = token_usd_price / avail_usd_price;
