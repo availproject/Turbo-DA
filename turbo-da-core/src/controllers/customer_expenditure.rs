@@ -3,7 +3,10 @@ use crate::{
     utils::{get_connection, retrieve_user_id_from_jwt},
 };
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
-use db::controllers::customer_expenditure::handle_get_all_expenditure;
+use chrono::NaiveDateTime;
+use db::controllers::customer_expenditure::{
+    handle_get_all_expenditure, handle_get_expenditure_by_time_range,
+};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -96,6 +99,38 @@ pub async fn get_all_expenditure(
     };
 
     match handle_get_all_expenditure(&mut connection, user, final_limit).await {
+        Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e.to_string() })),
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct ExpenditureTimeRangeQuery {
+    start_date: NaiveDateTime,
+    end_date: NaiveDateTime,
+}
+
+#[get("/get_expenditure_by_time_range")]
+pub async fn get_expenditure_by_time_range(
+    request_payload: web::Query<ExpenditureTimeRangeQuery>,
+    config: web::Data<AppConfig>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "state": "ERROR", "message": "User Id not retrieved" }))
+        }
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    match handle_get_expenditure_by_time_range(&mut connection, request_payload.start_date, request_payload.end_date).await {
         Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e.to_string() })),
     }

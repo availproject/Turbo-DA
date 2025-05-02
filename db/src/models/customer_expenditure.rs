@@ -28,6 +28,7 @@ pub struct CustomerExpenditureGet {
     pub error: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub converted_fees: Option<BigDecimal>,
+    pub updated_at: chrono::NaiveDateTime,
     pub app_id: Uuid,
 }
 

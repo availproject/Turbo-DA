@@ -5,6 +5,7 @@
 pub mod config;
 pub mod controllers;
 pub mod routes;
+pub mod s3;
 pub mod utils;
 
 use crate::controllers::{
@@ -12,7 +13,6 @@ use crate::controllers::{
     fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
     users::{get_all_users, get_user, register_new_user, update_app_id},
 };
-
 use actix_cors::Cors;
 use actix_extensible_rate_limit::{
     backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
@@ -26,10 +26,12 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
+    customer_expenditure::get_expenditure_by_time_range,
+    file::{download_file, upload_file},
     fund::{purchase_cost, register_credit_request},
     users::{
         allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
-        get_api_key,
+        get_api_key, get_apps,
     },
 };
 use tokio::time::Duration;
@@ -119,12 +121,12 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(Logger::default())
             .service(
                 web::scope("/v1")
+                    .service(get_token_map)
                     .wrap(ClerkMiddleware::new(
                         MemoryCacheJwksProvider::new(clerk.clone()),
                         None,
                         true,
                     ))
-                    .service(get_token_map)
                     .service(
                         web::scope("/user")
                             .wrap_fn(|req, srv| {
@@ -161,7 +163,11 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(allocate_credit)
                             .service(delete_account)
                             .service(generate_app_account)
-                            .service(register_credit_request),
+                            .service(register_credit_request)
+                            .service(upload_file)
+                            .service(download_file)
+                            .service(get_expenditure_by_time_range)
+                            .service(get_apps),
                     )
                     .service(
                         web::scope("/admin")

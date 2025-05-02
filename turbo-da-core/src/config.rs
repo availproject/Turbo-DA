@@ -20,6 +20,11 @@ pub struct AppConfig {
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
     pub clerk_secret_key: String,
+    pub aws_access_key_id: String,
+    pub aws_endpoint_url: String,
+    pub aws_region: String,
+    pub s3_bucket_name: String,
+    pub aws_secret_access_key: String,
 }
 
 impl Default for AppConfig {
@@ -36,6 +41,11 @@ impl Default for AppConfig {
             rate_limit_max_requests: 100,
             avail_rpc_endpoint: vec![],
             clerk_secret_key: String::new(),
+            aws_access_key_id: String::new(),
+            aws_endpoint_url: String::new(),
+            aws_region: String::new(),
+            s3_bucket_name: String::new(),
+            aws_secret_access_key: String::new(),
         }
     }
 }
@@ -165,6 +175,12 @@ impl AppConfig {
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
 
+        let aws_access_key_id = env::var("AWS_ACCESS_KEY_ID")?;
+        let aws_endpoint_url = env::var("AWS_ENDPOINT_URL")?;
+        let aws_region = env::var("AWS_REGION")?;
+        let s3_bucket_name = env::var("S3_BUCKET_NAME")?;
+        let aws_secret_access_key = env::var("AWS_SECRET_ACCESS_KEY")?;
+
         Ok(AppConfig {
             port,
             database_url,
@@ -177,6 +193,11 @@ impl AppConfig {
             rate_limit_window_size,
             rate_limit_max_requests,
             avail_rpc_endpoint,
+            aws_access_key_id,
+            aws_endpoint_url,
+            aws_region,
+            s3_bucket_name,
+            aws_secret_access_key,
         })
     }
 }

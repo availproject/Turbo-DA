@@ -16,7 +16,7 @@ use db::{
         apps::{create_account, delete_account_by_id},
         users::user_exists,
     },
-    models::{api::ApiKeyCreate, apps::AccountCreate, user_model::UserCreate},
+    models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -350,7 +350,7 @@ pub async fn generate_app_account(
     };
 
     let app_id = Uuid::new_v4();
-    let account = AccountCreate {
+    let account = AppsCreate {
         id: app_id,
         user_id: user,
         app_id: 0,
@@ -370,6 +370,67 @@ pub async fn generate_app_account(
         Err(e) => HttpResponse::NotAcceptable().json(json!({
             "state": "ERROR",
             "error": format!("Error: {}", e)
+        })),
+    }
+}
+/// Retrieves all apps for the authenticated user
+///
+/// # Description
+/// Gets a list of all applications associated with the authenticated user.
+///
+/// # Route
+/// `GET /v1/user/get_apps`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Returns
+/// JSON response containing the list of apps or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Apps retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "app_id": 1001,
+///       "credit_balance": "25.00",
+///       "credit_used": "5.50",
+///       "fallback_enabled": true
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_apps")]
+pub async fn get_apps(
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let apps = db::controllers::apps::get_apps(&mut connection, &user).await;
+
+    match apps {
+        Ok(apps) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Apps retrieved successfully",
+            "data": apps,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
         })),
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     models::{
-        apps::Account, customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User,
+        apps::Apps, customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User,
     },
     schema::{
         apps::dsl as apps, customer_expenditures::dsl as customer_expenditures, users::dsl as users,
@@ -33,12 +33,12 @@ pub async fn validate_and_get_entries(
 pub async fn get_account_by_id(
     connection: &mut AsyncPgConnection,
     account_id: &Uuid,
-) -> Result<(Account, User), String> {
+) -> Result<(Apps, User), String> {
     let account = apps::apps
         .inner_join(users::users)
         .filter(apps::id.eq(account_id))
-        .select((Account::as_select(), User::as_select()))
-        .first::<(Account, User)>(connection)
+        .select((Apps::as_select(), User::as_select()))
+        .first::<(Apps, User)>(connection)
         .await
         .map_err(|e| e.to_string())?;
     Ok(account)
@@ -109,7 +109,7 @@ pub async fn update_credit_balance(
 pub async fn get_unresolved_transactions(
     connection: &mut AsyncPgConnection,
     retry: i32,
-) -> Result<Vec<(CustomerExpenditureGetWithPayload, Account, User)>, String> {
+) -> Result<Vec<(CustomerExpenditureGetWithPayload, Apps, User)>, String> {
     customer_expenditures::customer_expenditures
         .inner_join(apps::apps)
         .inner_join(users::users)
@@ -123,10 +123,10 @@ pub async fn get_unresolved_transactions(
         .order(customer_expenditures::created_at.desc())
         .select((
             CustomerExpenditureGetWithPayload::as_select(),
-            Account::as_select(),
+            Apps::as_select(),
             User::as_select(),
         ))
-        .load::<(CustomerExpenditureGetWithPayload, Account, User)>(connection)
+        .load::<(CustomerExpenditureGetWithPayload, Apps, User)>(connection)
         .await
         .map_err(|e| e.to_string())
 }

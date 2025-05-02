@@ -55,6 +55,7 @@ pub async fn allocate_global_credit_balance(
 
 pub async fn get_user(connection: &mut AsyncPgConnection, user: &String) -> Result<User, String> {
     let query = users
+        .inner_join(crate::schema::apps::dsl::apps)
         .filter(id.eq(user))
         .select(User::as_select())
         .first::<User>(connection)

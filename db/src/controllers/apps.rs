@@ -1,5 +1,5 @@
 use crate::{
-    models::apps::{Account, AccountCreate},
+    models::apps::{Apps, AppsCreate},
     schema::apps::dsl::*,
 };
 use bigdecimal::BigDecimal;
@@ -13,7 +13,7 @@ use super::users::allocate_global_credit_balance;
 
 pub async fn create_account(
     connection: &mut AsyncPgConnection,
-    account: &AccountCreate,
+    account: &AppsCreate,
 ) -> Result<(), String> {
     diesel::insert_into(apps)
         .values(account)
@@ -27,12 +27,12 @@ pub async fn get_account_by_user_id(
     connection: &mut AsyncPgConnection,
     user_identifier: &String,
     account_id: Uuid,
-) -> Result<Account, String> {
+) -> Result<Apps, String> {
     let account = apps
         .filter(id.eq(account_id))
         .filter(user_id.eq(user_identifier))
-        .select(Account::as_select())
-        .first::<Account>(connection)
+        .select(Apps::as_select())
+        .first::<Apps>(connection)
         .await
         .map_err(|e| e.to_string())?;
     Ok(account)
@@ -75,9 +75,20 @@ pub async fn update_app_id(
 pub async fn get_app_id(connection: &mut AsyncPgConnection, app: &Uuid) -> Result<i32, String> {
     let account = apps
         .filter(id.eq(app))
-        .select(Account::as_select())
-        .first::<Account>(connection)
+        .select(Apps::as_select())
+        .first::<Apps>(connection)
         .await
         .map_err(|e| e.to_string())?;
     Ok(account.app_id)
+}
+
+pub async fn get_apps(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+) -> Result<Vec<Apps>, String> {
+    apps.filter(user_id.eq(user))
+        .select(Apps::as_select())
+        .load::<Apps>(connection)
+        .await
+        .map_err(|e| e.to_string())
 }

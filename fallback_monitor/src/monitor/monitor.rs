@@ -9,7 +9,7 @@ use db::{
         customer_expenditure::increase_retry_count,
         misc::{get_unresolved_transactions, update_credit_balance},
     },
-    models::apps::Account,
+    models::apps::Apps,
 };
 use db::{
     controllers::{customer_expenditure::update_customer_expenditure, users::TxParams},
@@ -76,7 +76,7 @@ async fn process_failed_transactions(
     client: &SDK,
     account: &Keypair,
     retry_count: i32,
-    failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Account, User)>,
+    failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
 ) {
     for (customer_expenditure_details, account_details, user_details) in failed_transactions_list {
         info!(
