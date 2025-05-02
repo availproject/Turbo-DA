@@ -84,7 +84,7 @@ pub async fn get_all_expenditure(
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
-                .json(json!({ "state": "ERROR", "message": "User Id not retrieved" }))
+                .json(json!({ "state": "ERROR", "error": "User Id not retrieved" }))
         }
     };
 
@@ -100,7 +100,7 @@ pub async fn get_all_expenditure(
 
     match handle_get_all_expenditure(&mut connection, user, final_limit).await {
         Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e.to_string() })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
     }
 }
 
@@ -121,7 +121,7 @@ pub async fn get_expenditure_by_time_range(
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
-                .json(json!({ "state": "ERROR", "message": "User Id not retrieved" }))
+                .json(json!({ "state": "ERROR", "error": "User Id not retrieved" }))
         }
     };
 
@@ -132,6 +132,6 @@ pub async fn get_expenditure_by_time_range(
 
     match handle_get_expenditure_by_time_range(&mut connection, request_payload.start_date, request_payload.end_date).await {
         Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e.to_string() })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
     }
 }
