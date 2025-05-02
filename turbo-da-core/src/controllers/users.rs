@@ -734,14 +734,19 @@ async fn generate_api_key(
 /// }
 /// ```
 
-#[get("/get_api_key")]
-pub async fn get_api_key(
+#[get("/get_api_keys")]
+pub async fn get_api_keys(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -749,7 +754,7 @@ pub async fn get_api_key(
         Err(response) => return response,
     };
 
-    let query = db::controllers::api_keys::get_api_key(&mut connection, &user).await;
+    let query = db::controllers::api_keys::get_api_keys(&mut connection, &user).await;
 
     match query {
         Ok(key) => HttpResponse::Ok().json(json!({

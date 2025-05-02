@@ -26,7 +26,7 @@ pub async fn create_api_key(
     Ok(())
 }
 
-pub async fn get_api_key(
+pub async fn get_api_keys(
     connection: &mut AsyncPgConnection,
     user: &String,
 ) -> Result<Vec<ApiKey>, String> {

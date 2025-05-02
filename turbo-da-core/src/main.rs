@@ -31,7 +31,7 @@ use controllers::{
     fund::{purchase_cost, register_credit_request},
     users::{
         allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
-        get_api_key, get_apps, reclaim_credits,
+        get_api_keys, get_apps, reclaim_credits,
     },
 };
 use tokio::time::Duration;
@@ -155,7 +155,7 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(register_new_user)
                             .service(generate_api_key)
                             .service(delete_api_key)
-                            .service(get_api_key)
+                            .service(get_api_keys)
                             .service(update_app_id)
                             .service(purchase_cost)
                             .service(estimate_credits_for_bytes)
