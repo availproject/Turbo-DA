@@ -92,3 +92,14 @@ pub async fn get_apps(
         .await
         .map_err(|e| e.to_string())
 }
+
+pub async fn get_app_by_id(
+    connection: &mut AsyncPgConnection,
+    id_query: &Uuid,
+) -> Result<Apps, String> {
+    apps.filter(id.eq(id_query))
+        .select(Apps::as_select())
+        .first::<Apps>(connection)
+        .await
+        .map_err(|e| e.to_string())
+}

@@ -576,6 +576,48 @@ pub async fn allocate_credit(
 }
 
 #[derive(Deserialize, Serialize, Validate)]
+pub struct ReclaimCredits {
+    pub app_id: Uuid,
+    pub amount: BigDecimal,
+}
+
+#[post("/reclaim_credits")]
+pub async fn reclaim_credits(
+    payload: web::Json<ReclaimCredits>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let tx = db::controllers::misc::reclaim_credits(
+        &mut connection,
+        &payload.app_id,
+        &user,
+        &payload.amount,
+    )
+    .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Credits reclaimed successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
 pub struct GenerateApiKey {
     pub app_id: Uuid,
 }

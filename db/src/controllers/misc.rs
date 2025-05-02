@@ -11,7 +11,10 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 
-use super::users::{get_user, TxParams};
+use super::{
+    apps::get_app_by_id,
+    users::{get_user, TxParams},
+};
 
 pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
@@ -176,6 +179,42 @@ pub async fn allocate_credit_balance(
         .set((
             users::allocated_credit_balance.eq(users::allocated_credit_balance + amount),
             users::credit_balance.eq(users::credit_balance - amount),
+        ))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn reclaim_credits(
+    connection: &mut AsyncPgConnection,
+    account_id: &Uuid,
+    user: &String,
+    amount: &BigDecimal,
+) -> Result<(), String> {
+    if amount < &BigDecimal::from(0) {
+        return Err("Cannot reclaim negative credits".to_string());
+    }
+
+    let app_obj = get_app_by_id(connection, account_id).await?;
+    if app_obj.credit_balance < *amount {
+        return Err("Insufficient balance".to_string());
+    }
+
+    diesel::update(
+        apps::apps
+            .filter(apps::id.eq(account_id))
+            .filter(apps::user_id.eq(user)),
+    )
+    .set((apps::credit_balance.eq(apps::credit_balance - amount)))
+    .execute(connection)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    diesel::update(users::users.filter(users::id.eq(user)))
+        .set((
+            users::allocated_credit_balance.eq(users::allocated_credit_balance - amount),
+            users::credit_balance.eq(users::credit_balance + amount),
         ))
         .execute(connection)
         .await
