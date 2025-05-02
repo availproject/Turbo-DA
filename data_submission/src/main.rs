@@ -39,7 +39,6 @@ async fn main() -> Result<(), std::io::Error> {
     info!("Starting Data Submission server....");
 
     init_meter("data_submission");
-    init_tracer("data_submission");
 
     let app_config = AppConfig::default().load_config()?;
 
