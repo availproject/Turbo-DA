@@ -298,7 +298,7 @@ pub async fn register_new_user(
 /// Generate an app account for a user
 ///
 /// # Description
-/// Creates a new account with fallback settings. The user ID is extracted from
+/// Creates a new account with fallback settings and optional app details. The user ID is extracted from
 /// the authentication token.
 ///
 /// # Route
@@ -310,7 +310,11 @@ pub async fn register_new_user(
 /// # Request Body
 /// ```json
 /// {
-///   "fallback_enabled": true
+///   "avail_app_id": 1001,
+///   "fallback_enabled": true,
+///   "app_name": "My Application",
+///   "app_description": "Description of my application",
+///   "app_logo": "https://example.com/logo.png"
 /// }
 /// ```
 ///
@@ -328,10 +332,13 @@ pub async fn register_new_user(
 ///   "data": {
 ///     "id": "uuid-string",
 ///     "user_id": "user@example.com",
-///     "app_id": 0,
+///     "app_id": 1001,
 ///     "credit_balance": "0",
 ///     "credit_used": "0",
-///     "fallback_enabled": true
+///     "fallback_enabled": true,
+///     "app_name": "My Application",
+///     "app_description": "Description of my application",
+///     "app_logo": "https://example.com/logo.png"
 ///   }
 /// }
 /// ```
