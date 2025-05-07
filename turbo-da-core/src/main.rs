@@ -28,7 +28,7 @@ use config::AppConfig;
 use controllers::{
     customer_expenditure::get_expenditure_by_time_range,
     file::{download_file, upload_file},
-    fund::{purchase_cost, register_credit_request},
+    fund::{get_fund_list, purchase_cost, register_credit_request},
     users::{
         allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
         get_api_keys, get_apps, reclaim_credits,
@@ -168,6 +168,7 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(download_file)
                             .service(get_expenditure_by_time_range)
                             .service(get_apps)
+                            .service(get_fund_list)
                             .service(reclaim_credits),
                     )
                     .service(

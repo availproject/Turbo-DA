@@ -77,6 +77,41 @@ async fn register_credit_request(
     }
 }
 
+/// Retrieve a list of all fund transactions for a user
+///
+/// # Description
+/// This endpoint retrieves all fund transactions associated with the authenticated user.
+/// The transactions are fetched from the database and returned in a structured format.
+///
+/// # Route
+/// `GET /v1/user/get_fund_list`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Returns
+/// * 200 OK with a list of fund transactions if successful
+/// * 500 Internal Server Error if user authentication fails or database errors occur
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Fund list retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "chain_id": 1,
+///       "amount_credit": "100000000000000000000",
+///       "request_status": "completed",
+///       "request_type": "credit",
+///       "tx_hash": "0x123abc456def789ghi",
+///       "created_at": "2023-01-01T12:00:00Z"
+///     }
+///   ]
+/// }
+/// ```
 #[get("/get_fund_list")]
 pub async fn get_fund_list(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,

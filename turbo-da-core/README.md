@@ -809,3 +809,39 @@ curl -X GET "https://api.example.com/v1/user/token_map" \
   }
 }
 ```
+
+#### 23. GET /v1/user/get_fund_list
+
+Retrieve a list of all fund transactions for a user.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>` - JWT token for authentication
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/user/get_fund_list" \
+     -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Fund list retrieved successfully",
+  "data": [
+    {
+      "id": "uuid-string",
+      "user_id": "user@example.com",
+      "chain_id": 1,
+      "amount_credit": "100000000000000000000",
+      "request_status": "completed",
+      "request_type": "credit",
+      "tx_hash": "0x123abc456def789ghi",
+      "created_at": "2023-01-01T12:00:00Z"
+    }
+  ]
+}
+```
