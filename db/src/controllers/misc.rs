@@ -196,7 +196,7 @@ pub async fn reclaim_credits(
         return Err("Cannot reclaim negative credits".to_string());
     }
 
-    let app_obj = get_app_by_id(connection, account_id).await?;
+    let app_obj = get_app_by_id(connection, user, account_id).await?;
     if app_obj.credit_balance < *amount {
         return Err("Insufficient balance".to_string());
     }

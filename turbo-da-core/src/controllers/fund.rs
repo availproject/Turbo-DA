@@ -76,6 +76,37 @@ async fn register_credit_request(
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
+
+#[get("/get_fund_list")]
+pub async fn get_fund_list(
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx = db::controllers::fund::get_fund_list(user, &mut connection).await;
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(
+            json!({"state": "SUCCESS", "message": "Fund list retrieved successfully", "data": tx}),
+        ),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
+        }
+    }
+}
+
 /// Retrieve the status and details of a user's fund request.
 ///
 /// # Description

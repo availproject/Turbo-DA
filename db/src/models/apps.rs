@@ -12,6 +12,9 @@ pub struct Apps {
     pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
     pub fallback_enabled: bool,
 }
 
@@ -24,4 +27,7 @@ pub struct AppsCreate {
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
     pub fallback_enabled: bool,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
 }

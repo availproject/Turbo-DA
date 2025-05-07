@@ -49,7 +49,22 @@ pub(crate) struct RegisterUser {
 /// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterAccount {
+    pub avail_app_id: Option<i32>,
     pub fallback_enabled: bool,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
+}
+
+/// Request payload for user registration
+#[derive(Deserialize, Serialize, Validate)]
+pub(crate) struct EditAccount {
+    pub app_id: Uuid,
+    pub avail_app_id: Option<i32>,
+    pub fallback_enabled: bool,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
 }
 
 /// Request payload for updating a user's app ID
@@ -350,13 +365,17 @@ pub async fn generate_app_account(
     };
 
     let app_id = Uuid::new_v4();
+    let avail_app_id = payload.avail_app_id.unwrap_or(0);
     let account = AppsCreate {
         id: app_id,
         user_id: user,
-        app_id: 0,
+        app_id: avail_app_id,
         credit_balance: BigDecimal::from(0),
         credit_used: BigDecimal::from(0),
         fallback_enabled: payload.fallback_enabled,
+        app_name: payload.app_name.clone(),
+        app_description: payload.app_description.clone(),
+        app_logo: payload.app_logo.clone(),
     };
 
     let tx = create_account(&mut connection, &account).await;
@@ -370,6 +389,89 @@ pub async fn generate_app_account(
         Err(e) => HttpResponse::NotAcceptable().json(json!({
             "state": "ERROR",
             "error": format!("Error: {}", e)
+        })),
+    }
+}
+/// Updates an existing app account with new information
+///
+/// # Description
+/// Allows a user to update the details of an existing application account, including app name,
+/// description, logo, and other settings.
+///
+/// # Route
+/// `PUT /v1/user/edit_app_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": "uuid-string",
+///   "avail_app_id": 1001,
+///   "fallback_enabled": true,
+///   "app_name": "Updated App Name",
+///   "app_description": "Updated app description",
+///   "app_logo": "https://example.com/logo.png"
+/// }
+/// ```
+///
+/// # Returns
+/// JSON response indicating success or failure of the update operation
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "App account updated successfully"
+/// }
+/// ```
+#[put("/edit_app_account")]
+pub async fn edit_app_account(
+    payload: web::Json<EditAccount>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let mut account = db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id)
+        .await
+        .map_err(|e| {
+            HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": e.to_string(),
+            }))
+        })
+        .unwrap();
+
+    account.app_name = payload.app_name.clone();
+    account.app_description = payload.app_description.clone();
+    account.app_logo = payload.app_logo.clone();
+    account.fallback_enabled = payload.fallback_enabled;
+
+    let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "App account updated successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
         })),
     }
 }

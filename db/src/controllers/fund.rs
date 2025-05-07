@@ -34,3 +34,15 @@ pub async fn create_credit_request(
     }
     Ok(())
 }
+
+pub async fn get_fund_list(
+    user: String,
+    connection: &mut AsyncPgConnection,
+) -> Result<Vec<CreditRequestInfo>, String> {
+    credit_requests
+        .filter(user_id.eq(user))
+        .select(CreditRequestInfo::as_select())
+        .load(&mut *connection)
+        .await
+        .map_err(|e| format!("Error loading fund list: {}", e))
+}

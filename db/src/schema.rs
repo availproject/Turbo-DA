@@ -18,9 +18,13 @@ diesel::table! {
         id -> Uuid,
         user_id -> Varchar,
         app_id -> Int4,
+        app_name -> Nullable<Varchar>,
+        app_description -> Nullable<Varchar>,
+        app_logo -> Nullable<Varchar>,
         credit_balance -> Numeric,
         credit_used -> Numeric,
         fallback_enabled -> Bool,
+        metadata_path -> Nullable<Varchar>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
     }

@@ -95,11 +95,29 @@ pub async fn get_apps(
 
 pub async fn get_app_by_id(
     connection: &mut AsyncPgConnection,
+    extracted_user_id: &String,
     id_query: &Uuid,
 ) -> Result<Apps, String> {
     apps.filter(id.eq(id_query))
+        .filter(user_id.eq(extracted_user_id))
         .select(Apps::as_select())
         .first::<Apps>(connection)
         .await
         .map_err(|e| e.to_string())
+}
+
+pub async fn update_app_account(
+    connection: &mut AsyncPgConnection,
+    payload: &Apps,
+) -> Result<(), String> {
+    diesel::update(apps.filter(id.eq(payload.id)))
+        .set((
+            app_name.eq(&payload.app_name),
+            app_description.eq(&payload.app_description),
+            app_logo.eq(&payload.app_logo),
+        ))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
