@@ -1,5 +1,11 @@
 // @generated automatically by Diesel CLI.
 
+pub mod sql_types {
+    #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "fallback_status"))]
+    pub struct FallbackStatus;
+}
+
 diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
@@ -14,6 +20,9 @@ diesel::table! {
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::FallbackStatus;
+
     apps (id) {
         id -> Uuid,
         user_id -> Varchar,
@@ -24,6 +33,7 @@ diesel::table! {
         credit_balance -> Numeric,
         credit_used -> Numeric,
         fallback_enabled -> Bool,
+        fallback_updated_at -> Array<Nullable<FallbackStatus>>,
         metadata_path -> Nullable<Varchar>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,

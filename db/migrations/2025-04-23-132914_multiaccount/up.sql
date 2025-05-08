@@ -1,4 +1,4 @@
--- Your SQL goes here
+
 ALTER TABLE api_keys 
 ADD COLUMN app_id UUID NOT NULL,
 ADD CONSTRAINT fk_api_keys_app_id FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE ON UPDATE CASCADE;
