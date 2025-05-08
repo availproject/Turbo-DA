@@ -30,8 +30,8 @@ use controllers::{
     file::{download_file, upload_file},
     fund::{get_fund_list, purchase_cost, register_credit_request},
     users::{
-        allocate_credit, delete_account, delete_api_key, generate_api_key, generate_app_account,
-        get_api_keys, get_apps, reclaim_credits,
+        allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
+        generate_app_account, get_api_keys, get_apps, reclaim_credits,
     },
 };
 use tokio::time::Duration;
@@ -163,6 +163,7 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(allocate_credit)
                             .service(delete_account)
                             .service(generate_app_account)
+                            .service(edit_app_account)
                             .service(register_credit_request)
                             .service(upload_file)
                             .service(download_file)
