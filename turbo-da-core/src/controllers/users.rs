@@ -473,10 +473,12 @@ pub async fn edit_app_account(
     account.app_logo = payload.app_logo.clone();
 
     if let Some(fallback_enabled) = payload.fallback_enabled {
-        account.fallback_enabled = fallback_enabled;
-        account
-            .fallback_updated_at
-            .push(Some(Status::new(chrono::Utc::now(), fallback_enabled)));
+        if fallback_enabled != account.fallback_enabled {
+            account.fallback_enabled = fallback_enabled;
+            account
+                .fallback_updated_at
+                .push(Some(Status::new(chrono::Utc::now(), fallback_enabled)));
+        }
     }
 
     let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
