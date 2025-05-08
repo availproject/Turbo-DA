@@ -16,7 +16,11 @@ use db::{
         apps::{create_account, delete_account_by_id},
         users::user_exists,
     },
-    models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
+    models::{
+        api::ApiKeyCreate,
+        apps::{AppsCreate, Status},
+        user_model::UserCreate,
+    },
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -61,7 +65,7 @@ pub(crate) struct RegisterAccount {
 pub(crate) struct EditAccount {
     pub app_id: Uuid,
     pub avail_app_id: Option<i32>,
-    pub fallback_enabled: bool,
+    pub fallback_enabled: Option<bool>,
     pub app_name: Option<String>,
     pub app_description: Option<String>,
     pub app_logo: Option<String>,
@@ -467,7 +471,13 @@ pub async fn edit_app_account(
     account.app_name = payload.app_name.clone();
     account.app_description = payload.app_description.clone();
     account.app_logo = payload.app_logo.clone();
-    account.fallback_enabled = payload.fallback_enabled;
+
+    if let Some(fallback_enabled) = payload.fallback_enabled {
+        account.fallback_enabled = fallback_enabled;
+        account
+            .fallback_updated_at
+            .push(Some(Status::new(chrono::Utc::now(), fallback_enabled)));
+    }
 
     let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
 
