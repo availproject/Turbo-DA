@@ -8,8 +8,12 @@ const CreditHistory = async ({ token }: { token?: string }) => {
   const response = await HistoryService.getCreditHistory({
     token: token!,
   })
-    .then((response) => response.data)
+    .then((response) => response.data.filter((credit:any) => credit?.request_status === 'Processed'))
     .catch((error) => []);
+
+    console.log({
+      response
+    });
 
   return (
     <>
@@ -34,14 +38,14 @@ const CreditHistory = async ({ token }: { token?: string }) => {
           ]}
           listdata={response}
           renderCell={(heading: string, value: any, last: boolean) => (
-            <div className={cn("flex min-w-[150px]", last && "justify-end")}>
+            <div className={cn("flex w-[150px]", last && "justify-end")}>
               <Text
                 weight={"bold"}
                 size={"base"}
                 className={cn("py-3 px-4", !last && "text-right")}
                 variant={heading === "type" ? "green" : "white"}
               >
-                {value}
+                {value??'-'}
               </Text>
             </div>
           )}

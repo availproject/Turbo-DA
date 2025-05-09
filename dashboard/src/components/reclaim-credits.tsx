@@ -12,6 +12,7 @@ import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
 import { Dialog, DialogContent } from "./ui/dialog";
+import useBalance from "@/hooks/useBalance";
 
 type ReclaimCreditsProps = {
   id: string;
@@ -23,6 +24,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
   const { token } = useConfig();
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const { updateCreditBalance } = useBalance();
 
   const handleSubmit = async () => {
     try {
@@ -35,6 +37,8 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
       console.log({
         response,
       });
+      updateCreditBalance()
+      setOpen('')
     } catch (error) {
     } finally {
       setLoading(false);

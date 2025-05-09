@@ -13,6 +13,7 @@ import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
 import { Dialog, DialogContent } from "./ui/dialog";
+import useBalance from "@/hooks/useBalance";
 
 type AssignCreditsProps = {
   id: string;
@@ -25,6 +26,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
   const { creditBalance } = useOverview();
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const { updateCreditBalance } = useBalance();
 
   const handleSubmit = async () => {
     try {
@@ -37,6 +39,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
       console.log({
         response,
       });
+      updateCreditBalance()
+      setOpen('')
     } catch (error) {
     } finally {
       setLoading(false);

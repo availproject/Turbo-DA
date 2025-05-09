@@ -31,10 +31,26 @@ export default async function Page({ searchParams }: PageProps) {
             selectedHistory={selectedHistory?.type as HISTORY_TYPES}
           >
             <TabsContent value={HISTORY_TYPES.CREDIT}>
-              <CreditHistory token={token} />
+              <Suspense
+                fallback={
+                  <Text size={"xs"} color="white">
+                    Loading...
+                  </Text>
+                }
+              >
+                <CreditHistory token={token} />
+              </Suspense>
             </TabsContent>
             <TabsContent value={HISTORY_TYPES.PUBLISH}>
-              <DataPostingHistory token={token} />
+              <Suspense
+                fallback={
+                  <Text size={"xs"} color="white">
+                    Loading...
+                  </Text>
+                }
+              >
+                <DataPostingHistory token={token} />
+              </Suspense>
             </TabsContent>
           </HistoryWrapper>
         </Suspense>

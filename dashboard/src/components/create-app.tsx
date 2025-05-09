@@ -15,6 +15,7 @@ import { ChangeEvent, useCallback, useRef, useState } from "react";
 import { Text } from ".//text";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import useBalance from "@/hooks/useBalance";
 
 const avatarOptions = ["smile", "sad", "band"];
 
@@ -44,11 +45,6 @@ export default function CreateApp({
   const { token } = useConfig();
 
   const saveAppDetails = useCallback(async () => {
-    console.log({
-      selectedAvatar,
-      previewUploadedAvatar,
-    });
-
     if ((!selectedAvatar && !previewUploadedAvatar) || !appId || !appName) {
       setError("All fields are required");
       return;
@@ -72,10 +68,6 @@ export default function CreateApp({
             })
         : selectedAvatar;
 
-      console.log({
-        uploadAvatar,
-      });
-
       const response =
         type === "edit"
           ? await CreditService.updateApp({
@@ -91,9 +83,12 @@ export default function CreateApp({
               appName,
               avatar: uploadAvatar!,
             });
+
       console.log({
-        response,
+        response
       });
+      
+      setOpen('')
     } catch (error) {
     } finally {
       setLoading(false);

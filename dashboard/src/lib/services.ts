@@ -362,6 +362,7 @@ export async function registerUser(
     //   "An error occurred while registering user from backend",
     //   error
     // );
+    return "Something went wrong";
   }
 }
 

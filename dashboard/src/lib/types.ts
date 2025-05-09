@@ -32,7 +32,7 @@ export const TOKEN_MAP: TokenMap = {
     token_ticker: "AVAIL",
   },
   ethereum: {
-    token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44",
+    token_address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
     token_decimals: 18,
     token_ticker: "ETH",
   },

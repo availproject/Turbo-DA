@@ -1,8 +1,16 @@
 import { datadogLogs } from "@datadog/browser-logs";
 
+type Site =
+  | "datadoghq.com"
+  | "us3.datadoghq.com"
+  | "us5.datadoghq.com"
+  | "datadoghq.eu"
+  | "ddog-gov.com"
+  | "ap1.datadoghq.com";
+
 datadogLogs.init({
   clientToken: process.env.NEXT_PUBLIC_DATADOG_RUM_CLIENT_TOKEN || "",
-  site: process.env.NEXT_PUBLIC_DD_HOST || "datadoghq.com",
+  site: (process.env.NEXT_PUBLIC_DD_HOST as Site) || "datadoghq.com",
   forwardErrorsToLogs: true,
   sessionSampleRate: 100,
   service: process.env.NEXT_PUBLIC_DD_SERVICE || "turbo-da",

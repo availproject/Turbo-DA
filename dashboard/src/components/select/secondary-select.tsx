@@ -14,17 +14,21 @@ interface SecondarySelectProps {
   value?: string;
   onChange: (value: string) => void;
   className?: string;
-  label?: string;
+  defaultValue?: string;
 }
 
 const SecondarySelect = ({
   options,
   placeholder = "Select",
-  label,
   onChange,
   value,
   className,
+  defaultValue,
 }: SecondarySelectProps) => {
+  console.log({
+    defaultValue,
+  });
+
   return (
     <div
       className={cn(
@@ -33,7 +37,11 @@ const SecondarySelect = ({
       )}
     >
       <div className="flex items-center h-full">
-        <Select value={value} onValueChange={onChange}>
+        <Select
+          defaultValue={defaultValue}
+          value={value}
+          onValueChange={onChange}
+        >
           <SelectTrigger className="h-12 w-full flex-1 border-0 outline-none cursor-pointer">
             <SelectValue
               placeholder={
@@ -44,7 +52,10 @@ const SecondarySelect = ({
               className="font-bold text-white font-inter flex-1 data-[placeholder]:text-white cursor-pointer"
             />
           </SelectTrigger>
-          <SelectContent className="bg-[#112235] p-0 border-0">
+          <SelectContent
+            className="bg-[#112235] p-0 border-0"
+            defaultValue={defaultValue}
+          >
             {options.map((option) => (
               <SelectItem
                 key={option}

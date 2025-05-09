@@ -62,7 +62,6 @@ const CreditUsage = ({ token }: { token?: string }) => {
             </Text>
           </CardTitle>
           <SecondarySelect
-            label="Time"
             options={month}
             onChange={(value) => setFilter(value)}
             value={filter}

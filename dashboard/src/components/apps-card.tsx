@@ -29,7 +29,14 @@ const AppsCard = ({ token }: AppsCardProps) => {
             acc: Record<string, string[]>,
             current: { app_id: string; api_key: string }
           ) => {
-            return { ...acc, [current.app_id]: [current.api_key] };
+            if (acc[current.app_id]) {
+              return {
+                ...acc,
+                [current.app_id]: [...acc[current.app_id], current.api_key],
+              };
+            } else {
+              return { ...acc, [current.app_id]: [current.api_key] };
+            }
           },
           {}
         );
@@ -60,7 +67,6 @@ const AppsCard = ({ token }: AppsCardProps) => {
             </CardTitle>
             <div className="flex items-center gap-6">
               <SecondarySelect
-                label="Show"
                 options={["All", "Allocated"]}
                 onChange={(value) => setFilter(value as Filter)}
                 value={filter}

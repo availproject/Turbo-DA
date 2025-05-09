@@ -11,6 +11,21 @@ export enum APP_TABS {
   HISTORY = "history",
 }
 
+export const numberToBytes32 = (num: number): `0x${string}` => {
+  const hex = num.toString(16);
+  const paddedHex = hex.padStart(64, '0');
+  return `0x${paddedHex}` as `0x${string}`;
+};
+
+export const tokenMap = {
+  ethereum:{
+    tokenAddress:'0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44'
+  },
+  avail:{
+    tokenAddress:'0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44'
+  }
+}
+
 export const formatDataBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return "0 Bytes";
 

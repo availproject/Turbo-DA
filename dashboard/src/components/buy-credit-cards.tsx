@@ -1,14 +1,26 @@
 "use client";
 import { config } from "@/config/walletConfig";
+import { useDebounce } from "@/hooks/useDebounce";
 import useWallet from "@/hooks/useWallet";
+import { TOKEN_MAP } from "@/lib/types";
+import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
+import CreditService from "@/services/credit";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
-import { MouseEvent, useEffect, useMemo, useState } from "react";
+import {
+  MouseEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Abi, parseUnits } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
+import CreditsAdded from "./credits-added";
+import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
 import SecondarySelect from "./select/secondary-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
@@ -29,16 +41,63 @@ export const abi: Abi = [
   },
 ];
 
+export const depositAbi: Abi = [
+  {
+    type: "function",
+    name: "deposit",
+    inputs: [{ name: "orderId", type: "bytes32", internalType: "bytes32" }],
+    outputs: [],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "depositERC20",
+    inputs: [
+      { name: "orderId", type: "bytes32", internalType: "bytes32" },
+      { name: "amount", type: "uint256", internalType: "uint256" },
+      { name: "tokenAddress", type: "address", internalType: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "depositERC20WithPermit",
+    inputs: [
+      { name: "orderId", type: "bytes32", internalType: "bytes32" },
+      { name: "amount", type: "uint256", internalType: "uint256" },
+      { name: "deadline", type: "uint256", internalType: "uint256" },
+      {
+        name: "tokenAddress",
+        type: "address",
+        internalType: "address",
+      },
+      { name: "v", type: "uint8", internalType: "uint8" },
+      { name: "r", type: "bytes32", internalType: "bytes32" },
+      { name: "s", type: "bytes32", internalType: "bytes32" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+];
+
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
   const [tokenAmount, setTokenAmount] = useState("");
+  const [estimateData, setEstimateData] = useState();
+  const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
   const [error, setError] = useState("");
   const account = useAccount();
+  const { setOpen } = useDialog();
+  const balance = useWagmiBalance({
+    address: account.address,
+  });
+  const debouncedValue = useDebounce(deferredTokenValue, 500);
 
   const creditAmount = useMemo(() => {
-    return "";
+    return estimateData;
   }, []);
 
   useEffect(() => {
@@ -54,18 +113,87 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       });
   }, [account]);
 
+  useEffect(() => {
+    if (debouncedValue) {
+      calculateDataCredits();
+    }
+  }, [debouncedValue]);
+
+  const calculateDataCredits = async () => {
+    try {
+      const response = await CreditService.creditEstimates({
+        token: token!,
+        data: +debouncedValue,
+      });
+
+      setEstimateData(response.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const postOrder = async () => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_credit_request`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chain: account.chainId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  };
+
   const handleBuyCredits = async () => {
     if (!tokenAmount) return;
     setLoading(true);
+    setError("");
+    const orderResponse = await postOrder();
+
+    const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()].token_address;
+
     await writeContract(config, {
-      address: "0x99a907545815c289fb6de86d55fe61d996063a94",
+      address: tokenAddress as `0x${string}`,
       abi,
       functionName: "approve",
-      args: [account.address as `0x${string}`, parseUnits(tokenAmount, 18)],
+      args: [
+        process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+        parseUnits(tokenAmount, 18),
+      ],
       chainId: activeNetworkId,
     })
       .then((response) => {
         console.log(response);
+      })
+      .catch((error) => {
+        const message = error.message.split(".")[0];
+        setError(message);
+      });
+
+    await writeContract(config, {
+      address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+      abi: depositAbi,
+      functionName: "depositERC20",
+      args: [
+        numberToBytes32(orderResponse.data.id),
+        parseUnits(tokenAmount, 18),
+        tokenAddress,
+      ],
+      chainId: activeNetworkId,
+    })
+      .then((response) => {
+        console.log(response);
+        setOpen("credit-added");
       })
       .catch((error) => {
         const message = error.message.split(".")[0];
@@ -129,14 +257,19 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   </Text>
                   <SecondarySelect
                     onChange={(value) => setSelectedToken(value)}
-                    options={["Avail", "Ethereum"]}
+                    options={["Ethereum"]}
                     value={selectToken}
+                    defaultValue={"Ethereum"}
                     className="h-12 w-full"
                     placeholder="Select"
                   />
                 </div>
                 <PrimaryInput
-                  label="You Pay (USDT)"
+                  label={`You Pay ${
+                    balance.data?.symbol && selectToken
+                      ? `(${balance.data?.symbol})`
+                      : ""
+                  }`}
                   rightElement={
                     <Text
                       className="opacity-40 w-fit"
@@ -147,7 +280,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       MAX
                     </Text>
                   }
-                  description={`Available: 1500 USDT`}
+                  description={
+                    balance.data?.symbol && selectToken
+                      ? `Available: ${`${Number(
+                          balance.data?.formatted
+                        ).toFixed(5)} ${balance.data?.symbol}`}`
+                      : undefined
+                  }
                   placeholder="eg. 1000"
                   className={"flex-1"}
                   onChange={(value) => {
@@ -166,8 +305,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 />
               </div>
               <PrimaryInput
-                label="Amount of Credits (KBs)"
-                value={creditAmount}
+                label="Amount of Credits"
+                value={creditAmount ? formatDataBytes(+creditAmount) : ""}
               />
             </div>
 
@@ -223,6 +362,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           </TabsContent>
         </Tabs>
       </CardContent>
+      <CreditsAdded />
     </Card>
   );
 };

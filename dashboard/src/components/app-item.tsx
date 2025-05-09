@@ -24,7 +24,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
-  const { apiKeys } = useOverview();
+  const { apiKeys, setAPIKeys } = useOverview();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const progress =
@@ -39,15 +39,20 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appId: `${app.id}`,
       });
       setApiKey(response.data?.api_key);
+      if (response.data?.api_key) {
+        setAPIKeys((prev) => ({
+          ...prev,
+          [app.app_id]: [
+            ...(apiKeys?.[app.app_id] ?? []),
+            response.data?.api_key,
+          ],
+        }));
+      }
     } catch (error) {
     } finally {
       setLoading(false);
     }
   };
-
-  console.log({
-    app,
-  });
 
   return (
     <div className="flex items-start justify-between p-4 rounded-lg border border-solid border-[#565656] relative overflow-hidden">
@@ -272,7 +277,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             <Text size={"base"} weight={"bold"}>
               {apiKey}
             </Text>
-            <Copy size={24} color="#FFF" strokeWidth={1} />
+            <Copy
+              size={24}
+              color="#FFF"
+              strokeWidth={1}
+              onClick={async () => {
+                await navigator.clipboard.writeText(apiKey);
+              }}
+            />
           </div>
         )}
 
