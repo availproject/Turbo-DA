@@ -40,7 +40,7 @@ async fn main() {
             return;
         }
     };
-    init_meter("fallback service");
+    init_meter("fallback_service");
 
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();

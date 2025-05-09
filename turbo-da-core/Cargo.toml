@@ -12,8 +12,12 @@ permissioned=[]
 diesel = { workspace = true }
 bigdecimal = { workspace = true }
 dotenv = { workspace = true }
+aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version = "1.4.0", features = ["rt-tokio"] }
+utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 alloy = { version = "0.7.2", features = ["full"] }
 clerk-rs = { version = "0.4.0", features = ["actix"] }
+actix-multipart = "0.6.1"
 actix-web = { workspace = true }
 actix-cors = { workspace = true }
 serde = { workspace = true }
@@ -22,7 +26,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 unicode-normalization = "=0.1.22"
 avail-rust = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true , features=["fs"] }
 uuid = { workspace = true }
 validator = { version = "0.16", features = ["derive"] }
 num-bigint = "0.4"
@@ -47,6 +51,7 @@ confy = {version = "0.3.1"}
 db = {path = "../db" }
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
+
 
 [dev-dependencies]
 actix-http = "3.9.0"
