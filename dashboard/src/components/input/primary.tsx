@@ -1,0 +1,79 @@
+import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
+import Input from ".";
+import { Text } from "..//text";
+
+export interface PrimaryInputProps {
+  label?: string;
+  onChange?: (value: string) => void;
+  value?: string;
+  placeholder?: string;
+  type?: "text" | "email" | "password" | "number";
+  disabled?: boolean;
+  rightElement?: ReactNode;
+  description?: string;
+  className?: string;
+  error?: string;
+}
+
+const PrimaryInput = ({
+  label,
+  onChange,
+  value,
+  disabled = false,
+  type = "text",
+  placeholder = "",
+  rightElement,
+  description,
+  className = "",
+  error,
+}: PrimaryInputProps) => {
+  return (
+    <div className={cn("flex flex-col gap-2 w-full", className)}>
+      {label && (
+        <Text size={"sm"} weight={"medium"} as="label">
+          {label}
+        </Text>
+      )}
+      <div
+        className={cn(
+          "relative",
+          rightElement
+            ? "border border-grey-900 flex rounded-lg justify-center items-center pr-4 h-12"
+            : "",
+          rightElement && error && error !== "" ? "border-error" : ""
+        )}
+      >
+        <Input
+          value={value}
+          type={type}
+          name="input"
+          disabled={disabled}
+          className={cn(
+            "text-light-grey bg-transparent",
+            rightElement
+              ? "border-none"
+              : error && error !== ""
+              ? "border-error"
+              : "border-grey-900",
+            !rightElement ? "rounded-lg h-12" : ""
+          )}
+          placeholder={placeholder}
+          onChange={(e) => onChange?.(e.target.value)}
+        />
+        {rightElement}
+      </div>
+      {error ? (
+        <Text weight={"medium"} as="label" size={"sm"} variant={"error"}>
+          {error}
+        </Text>
+      ) : description ? (
+        <Text weight={"medium"} as="label" size={"sm"}>
+          {description}
+        </Text>
+      ) : null}
+    </div>
+  );
+};
+
+export default PrimaryInput;
