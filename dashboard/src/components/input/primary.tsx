@@ -31,7 +31,7 @@ const PrimaryInput = ({
   return (
     <div className={cn("flex flex-col gap-2 w-full", className)}>
       {label && (
-        <Text size={"sm"} weight={"medium"} as="label">
+        <Text size={"sm"} weight={"medium"} color="secondary-grey" as="label">
           {label}
         </Text>
       )}
@@ -39,7 +39,7 @@ const PrimaryInput = ({
         className={cn(
           "relative",
           rightElement
-            ? "border border-grey-900 flex rounded-lg justify-center items-center pr-4 h-12"
+            ? "border border-border-blue flex rounded-lg justify-center items-center pr-4 h-12"
             : "",
           rightElement && error && error !== "" ? "border-error" : ""
         )}
@@ -50,12 +50,12 @@ const PrimaryInput = ({
           name="input"
           disabled={disabled}
           className={cn(
-            "text-light-grey bg-transparent",
+            "text-light-grey bg-transparent text-base font-medium",
             rightElement
               ? "border-none"
               : error && error !== ""
               ? "border-error"
-              : "border-grey-900",
+              : "border-border-blue",
             !rightElement ? "rounded-lg h-12" : ""
           )}
           placeholder={placeholder}

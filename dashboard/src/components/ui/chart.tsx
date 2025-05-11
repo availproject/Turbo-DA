@@ -3,7 +3,7 @@
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 
-import { cn } from "@/lib/utils";
+import { cn, formatDataBytes } from "@/lib/utils";
 import { Text } from "../text";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
@@ -189,7 +189,7 @@ function ChartTooltipContent({
             <div
               key={item.dataKey}
               className={cn(
-                "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
+                "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-1 [&>svg]:h-2.5 [&>svg]:w-2.5",
                 indicator === "dot" && "items-start"
               )}
             >
@@ -238,12 +238,8 @@ function ChartTooltipContent({
                       </Text>
                     </div>
                     {item.value && (
-                      <Text
-                        weight={"medium"}
-                        variant={"light-grey"}
-                        size={"xs"}
-                      >
-                        {item.value}
+                      <Text weight={"medium"} size={"sm"}>
+                        {formatDataBytes(+item.value)}
                       </Text>
                     )}
                   </div>

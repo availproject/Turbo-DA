@@ -1,19 +1,23 @@
 import Button from "@/components/button";
-import { formatDataBytes } from "@/lib/utils";
+import useBalance from "@/hooks/useBalance";
+import { avatarList } from "@/lib/constant";
+import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { AppDetails } from "@/services/credit/response";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Wallet, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import Success from "./toast/success";
 import { Dialog, DialogContent } from "./ui/dialog";
-import useBalance from "@/hooks/useBalance";
 
 type AssignCreditsProps = {
   id: string;
@@ -39,8 +43,35 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
       console.log({
         response,
       });
-      updateCreditBalance()
-      setOpen('')
+      toast(
+        <Success
+          label="Credits Assigned Successfully!"
+          description={`${formatDataBytes(
+            +amount
+          )} credits successfully assigned from main credit balance`}
+        />,
+        {
+          theme: "colored",
+          progressClassName: "bg-[#78C47B]",
+          closeButton: (
+            <X
+              color="#FFF"
+              size={20}
+              className="cursor-pointer"
+              onClick={() => toast.dismiss()}
+            />
+          ),
+          style: {
+            backgroundColor: "#78C47B29",
+            width: "530px",
+            display: "flex",
+            justifyContent: "space-between",
+            borderRadius: "8px",
+          },
+        }
+      );
+      updateCreditBalance();
+      setOpen("");
     } catch (error) {
     } finally {
       setLoading(false);
@@ -56,8 +87,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         }
       }}
     >
-      <DialogContent className="w-full sm:max-w-[600px] bg-[#192a3d] rounded-2xl overflow-hidden border border-solid border-transparent p-4 flex flex-col focus-within:outline-0">
-        <div className="flex justify-between items-center mb-6">
+      <DialogContent className="min-w-[600px] h-[600px] border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey rounded-2xl overflow-hidden p-4 flex flex-col focus-within:outline-0">
+        <div className="flex justify-between items-center mb-2">
           <DialogTitle>
             <Text weight={"bold"} size={"2xl"}>
               Assign Credits
@@ -65,18 +96,18 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
           </DialogTitle>
 
           <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
-            <X color="#FFF" size={32} strokeWidth={1} />
+            <X color="#FFF" size={24} strokeWidth={1} />
           </Close>
         </div>
 
         <div className="flex flex-col gap-4 flex-1">
           <div className="flex items-center gap-2">
-            <Wallet color="#FFF" strokeWidth={1} size={40} />
+            <Wallet color="#B3B3B3" strokeWidth={1} size={40} />
             <div className="flex flex-col gap-y-1.5">
-              <Text size={"sm"} variant={"light-grey"}>
-                Unallocated Credits
+              <Text size={"sm"} variant={"light-grey"} weight={"medium"}>
+                Main Credit Balance
               </Text>
-              <Text size={"2xl"} weight={"bold"}>
+              <Text size={"2xl"} weight={"semibold"}>
                 {formatDataBytes(creditBalance)}
               </Text>
             </div>
@@ -87,8 +118,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
               <Text size={"sm"} weight={"medium"} as="label">
                 From
               </Text>
-              <div className="relative border border-grey-900 flex rounded-lg items-center p-4 h-12">
-                <Text size={"sm"} weight={"medium"} as="label">
+              <div className="relative border border-border-blue flex rounded-lg items-center p-3 h-12">
+                <Text weight={"semibold"} as="label">
                   Main Credit Balance
                 </Text>
               </div>
@@ -98,9 +129,28 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 To
               </Text>
 
-              <div className="relative border border-grey-900 rounded-lg items-center p-4 h-12 flex gap-x-2">
-                <Image src="/logo.svg" width={40} height={40} alt="" />
-                <Text size={"sm"} weight={"medium"} as="label">
+              <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
+                {appData.app_logo.includes(".") ? (
+                  <Image
+                    className="w-8 h-auto"
+                    alt={appData.app_name}
+                    src={baseImageUrl(appData.app_logo)}
+                    width={32}
+                    height={40}
+                  />
+                ) : (
+                  <div className="w-6 rounded overflow-hidden">
+                    <DotLottieReact
+                      src={avatarList?.[appData.app_logo].path}
+                      loop
+                      autoplay
+                      playOnHover={true}
+                      width={24}
+                      height={24}
+                    />
+                  </div>
+                )}
+                <Text weight={"semibold"} as="label">
                   {appData.app_name}
                 </Text>
               </div>
@@ -122,18 +172,16 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                   setAmount("");
                   return;
                 }
-                if (isNaN(+value)) {
-                  return;
-                }
 
-                const parsedValue = parseInt(value);
-                setAmount(parsedValue.toString());
+                if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  setAmount(value);
+                }
               }}
               value={amount}
-              className="border-0 px-0 text-white w-full"
+              className="px-0 text-white w-full"
               error={
                 creditBalance < +amount
-                  ? "Amount can’t exceed the main credit balance."
+                  ? `Amount can’t exceed the main credit balance. ${creditBalance}`
                   : ""
               }
             />
@@ -145,7 +193,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
             variant={
               !amount || !creditBalance || creditBalance < +amount
                 ? "disabled"
-                : "primary"
+                : "secondary"
             }
             disabled={
               loading || !amount || !creditBalance || creditBalance < +amount
@@ -158,6 +206,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 color="#fff"
                 size={24}
               />
+            ) : !amount ? (
+              "Enter Amount"
             ) : (
               "Confirm"
             )}

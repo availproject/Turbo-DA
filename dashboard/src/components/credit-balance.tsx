@@ -18,39 +18,44 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
 
   return (
     <>
-      <Card className="bg-[#192a3d] border-none shadow-[0px_4.37px_96.13px_-17.48px_#13151d] rounded-2xl p-0">
+      <Card className="shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wallet size={40} color="#FFF" strokeWidth={1} />
-              <div className="flex flex-col gap-2">
+          <div className="flex flex-col justify-between">
+            <div className="flex items-start gap-x-1.5">
+              <Wallet
+                size={36}
+                color="#B3B3B3"
+                strokeWidth={1}
+                className="mt-1"
+              />
+              <div className="flex flex-col">
                 <Text
                   as="span"
                   size={"sm"}
                   weight={"medium"}
-                  variant={"light-grey"}
+                  variant={"secondary-grey"}
                 >
                   Main Credit Balance
                 </Text>
-                <Text as="span" weight={"bold"} size={"2xl"}>
+                <Text as="span" weight={"bold"} size={"2xl"} className="mt-1">
                   {!!creditBalance ? formatDataBytes(creditBalance) : "-"}
                 </Text>
-                <Button
-                  variant={"link"}
-                  className="underline-offset-[2.5px]"
-                  onClick={() => setOpen("main-credit-balance")}
-                >
-                  <Text
-                    as="span"
-                    size={"sm"}
-                    weight={"bold"}
-                    variant={"light-grey"}
-                  >
-                    Check Fees Discount Eligibility
-                  </Text>
-                </Button>
               </div>
             </div>
+            <Button
+              variant={"link"}
+              className="underline-offset-[1.5px] decoration-[1px] mt-2.5 ml-10 w-fit"
+              onClick={() => setOpen("main-credit-balance")}
+            >
+              <Text
+                as="span"
+                size={"sm"}
+                weight={"semibold"}
+                variant={"grey-500"}
+              >
+                Check Fees Discount Eligibility
+              </Text>
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -32,22 +32,28 @@ const IconSelectContainer = ({
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         className={
-          "h-12 border-grey-900 rounded-lg w-full flex-1 cursor-pointer"
+          "h-12 border-border-blue rounded-lg w-full flex-1 cursor-pointer"
         }
       >
-        <SelectValue placeholder={placeholder} />
+        <SelectValue
+          placeholder={
+            <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
+              {placeholder}
+            </Text>
+          }
+        />
       </SelectTrigger>
 
-      <SelectContent className="bg-grey-700 p-0 border-0">
+      <SelectContent className="bg-bg-primary p-0 border border-border-blue">
         {options.map((option) => (
           <SelectItem
             key={option.value}
             value={option.value}
-            className="cursor-pointer hover:bg-grey-800 focus:bg-grey-800"
+            className="cursor-pointer hover:bg-border-blue focus:bg-border-blue"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-x-2">
               {option.icon}
-              <Text variant={"light-grey"} weight={"medium"}>
+              <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
                 {option.label}
               </Text>
             </div>

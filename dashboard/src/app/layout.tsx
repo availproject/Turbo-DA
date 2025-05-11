@@ -1,6 +1,5 @@
 import Footer from "@/components/footer";
 import Header from "@/components/header";
-import { ToastProvider } from "@/components/toast/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { template } from "@/lib/utils";
 import { OverviewProvider } from "@/providers/OverviewProvider";
@@ -9,23 +8,19 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import "@rainbow-me/rainbowkit/styles.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { ReactNode } from "react";
+import { ppmori } from "./fonts";
+
 import "./globals.css";
 import { Providers } from "./providers";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "TurboDA | Dashboard",
   description: "Dashboard to manage your TurboDA account",
   icons: {
-    icon: "/avail-icon.svg",
-    shortcut: "/avail-icon.svg",
-    apple: "/avail-icon.svg",
+    icon: "/avail-icon.ico",
+    shortcut: "/avail-icon.ico",
+    apple: "/avail-icon.ico",
   },
 };
 
@@ -70,23 +65,21 @@ export default async function Layout({ children }: { children: ReactNode }) {
 
   return (
     <ClerkProvider>
-      <ToastProvider>
-        <TooltipProvider>
-          <html lang="en" className={inter.className}>
-            <body>
-              <Providers token={token!}>
-                <Header />
-                <OverviewProvider
-                  creditBalance={+getUserDetails?.data?.credit_balance}
-                >
-                  {children}
-                </OverviewProvider>
-                <Footer />
-              </Providers>
-            </body>
-          </html>
-        </TooltipProvider>
-      </ToastProvider>
+      <TooltipProvider>
+        <html lang="en" className={`${ppmori.className} antialiased`}>
+          <body className="bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%]">
+            <Providers token={token!}>
+              <Header />
+              <OverviewProvider
+                creditBalance={+getUserDetails?.data?.credit_balance}
+              >
+                {children}
+              </OverviewProvider>
+              <Footer />
+            </Providers>
+          </body>
+        </html>
+      </TooltipProvider>
     </ClerkProvider>
   );
 }

@@ -9,20 +9,15 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
-import {
-  MouseEvent,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import Image from "next/image";
+import { MouseEvent, useDeferredValue, useEffect, useState } from "react";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
 import CreditsAdded from "./credits-added";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
-import SecondarySelect from "./select/secondary-select";
+import IconSelectContainer from "./select/icon-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import { Text } from "./text";
 import { Card, CardContent } from "./ui/card";
@@ -84,6 +79,7 @@ export const depositAbi: Abi = [
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
   const [tokenAmount, setTokenAmount] = useState("");
+  const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
@@ -95,10 +91,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     address: account.address,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
-
-  const creditAmount = useMemo(() => {
-    return estimateData;
-  }, []);
 
   useEffect(() => {
     if (!account.address) return;
@@ -114,10 +106,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   }, [account]);
 
   useEffect(() => {
-    if (debouncedValue) {
+    if (debouncedValue && !tokenAmountError) {
       calculateDataCredits();
     }
-  }, [debouncedValue]);
+  }, [debouncedValue, tokenAmountError]);
 
   const calculateDataCredits = async () => {
     try {
@@ -156,53 +148,61 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   const handleBuyCredits = async () => {
     if (!tokenAmount) return;
-    setLoading(true);
-    setError("");
-    const orderResponse = await postOrder();
-
-    const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()].token_address;
-
-    await writeContract(config, {
-      address: tokenAddress as `0x${string}`,
-      abi,
-      functionName: "approve",
-      args: [
-        process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
-        parseUnits(tokenAmount, 18),
-      ],
-      chainId: activeNetworkId,
-    })
-      .then((response) => {
-        console.log(response);
-      })
-      .catch((error) => {
-        const message = error.message.split(".")[0];
-        setError(message);
+    try {
+      setLoading(true);
+      setError("");
+      const orderResponse = await postOrder();
+      console.log({
+        selectToken,
+        orderResponse,
       });
 
-    await writeContract(config, {
-      address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
-      abi: depositAbi,
-      functionName: "depositERC20",
-      args: [
-        numberToBytes32(orderResponse.data.id),
-        parseUnits(tokenAmount, 18),
-        tokenAddress,
-      ],
-      chainId: activeNetworkId,
-    })
-      .then((response) => {
-        console.log(response);
-        setOpen("credit-added");
-      })
-      .catch((error) => {
-        const message = error.message.split(".")[0];
-        setError(message);
-        console.log(error.message.split(".")[0]);
-      })
-      .finally(() => {
+      if (!orderResponse?.data) {
         setLoading(false);
-      });
+        setError(orderResponse.message);
+        return;
+      }
+
+      const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()].token_address;
+      await writeContract(config, {
+        address: tokenAddress as `0x${string}`,
+        abi,
+        functionName: "approve",
+        args: [
+          process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+          parseUnits(tokenAmount, 18),
+        ],
+        chainId: activeNetworkId,
+      })
+        .then(async (res) => {
+          await writeContract(config, {
+            address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+            abi: depositAbi,
+            functionName: "depositERC20",
+            args: [
+              numberToBytes32(orderResponse.data.id),
+              parseUnits(tokenAmount, 18),
+              tokenAddress,
+            ],
+            chainId: activeNetworkId,
+          })
+            .then(() => setOpen("credit-added"))
+            .catch((error) => {
+              const message = error.message.split(".")[0];
+              setError(message);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
+        })
+        .catch((err) => {
+          const message = err.message.split(".")[0];
+          setError(message);
+          setLoading(false);
+        });
+    } catch (error) {
+      // setError(error.message);
+    }
   };
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
@@ -212,17 +212,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   };
 
   return (
-    <Card className="w-full min-lg:w-[466px] bg-[#192a3d] border-none shadow-[0px_4.37px_96.13px_-17.48px_#13151d] rounded-2xl pt-0 pb-0">
+    <Card className="w-full min-lg:w-[466px] shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0">
       <CardContent className="p-4 h-full">
         <Tabs defaultValue="buy" className="w-full gap-y-4 h-full">
-          <TabsList className="w-full p-1 bg-transparent border border-solid border-[#565656] rounded-3xl h-12">
-            <TabsTrigger
-              value="buy"
-              className="flex-1 h-10 data-[state=active]:bg-[#414e5d] data-[state=active]:text-white data-[state=active]:shadow-none data-[state=active]:border-[#bbbbbb] data-[state=active]:[text-shadow:0px_0px_10.68px_#ffffff] rounded-3xl cursor-pointer"
-            >
-              <Text size={"base"} weight={"medium"}>
-                Buy Credits
-              </Text>
+          <TabsList className="w-full p-1 border border-solid border-border-blue rounded-3xl h-12">
+            <TabsTrigger value="buy" variant="outline">
+              Buy Credits
             </TabsTrigger>
             <Tooltip>
               <TooltipTrigger
@@ -237,7 +232,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   Convert Credits
                 </Text>
               </TooltipTrigger>
-              <TooltipContent className="bg-[#0F1F30]">
+              <TooltipContent className="bg-black border-border-grey py-3 px-4 shadow-primary">
                 <Text size={"sm"} weight={"medium"}>
                   Coming Soon
                 </Text>
@@ -252,14 +247,31 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             <div className="flex flex-col gap-y-8">
               <div className="flex gap-2 w-full">
                 <div className="flex flex-col gap-2 flex-1">
-                  <Text size={"sm"} weight={"medium"} as="label">
+                  <Text
+                    size={"sm"}
+                    as="label"
+                    weight={"medium"}
+                    color="secondary-grey"
+                  >
                     Buy Using
                   </Text>
-                  <SecondarySelect
+                  <IconSelectContainer
                     onChange={(value) => setSelectedToken(value)}
-                    options={["Ethereum"]}
+                    options={[
+                      {
+                        label: "Ethereum",
+                        icon: (
+                          <Image
+                            src={"/currency/eth.png"}
+                            alt="ethereum"
+                            width={18}
+                            height={18}
+                          />
+                        ),
+                        value: "ethereum",
+                      },
+                    ]}
                     value={selectToken}
-                    defaultValue={"Ethereum"}
                     className="h-12 w-full"
                     placeholder="Select"
                   />
@@ -272,7 +284,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   }`}
                   rightElement={
                     <Text
-                      className="opacity-40 w-fit"
+                      className="w-fit"
                       weight={"bold"}
                       size={"base"}
                       as="span"
@@ -284,29 +296,37 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     balance.data?.symbol && selectToken
                       ? `Available: ${`${Number(
                           balance.data?.formatted
-                        ).toFixed(5)} ${balance.data?.symbol}`}`
+                        ).toFixed(5)}`}`
                       : undefined
                   }
                   placeholder="eg. 1000"
                   className={"flex-1"}
                   onChange={(value) => {
-                    if (value === "") {
+                    if (value === "" || !selectToken) {
                       setTokenAmount("");
-                      return;
-                    }
-                    if (isNaN(+value)) {
+                      setEstimateData(undefined);
+                      setTokenAmountError("");
                       return;
                     }
 
-                    const parsedValue = parseInt(value);
-                    setTokenAmount(parsedValue.toString());
+                    if (value.match(/\b\d+(\.\d+)?\b/)) {
+                      setTokenAmount(value);
+                    }
+                    if (Number(balance.data?.formatted) < +value) {
+                      setTokenAmountError(`Insufficent Balance`);
+                      setEstimateData(undefined);
+                    } else {
+                      setTokenAmountError("");
+                    }
                   }}
                   value={tokenAmount}
+                  error={tokenAmountError}
                 />
               </div>
               <PrimaryInput
                 label="Amount of Credits"
-                value={creditAmount ? formatDataBytes(+creditAmount) : ""}
+                value={estimateData ? formatDataBytes(+estimateData) : ""}
+                className="pointer-events-none"
               />
             </div>
 
@@ -324,6 +344,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         <Button
                           onClick={(e) => handleClick(e, props.show)}
                           variant={"primary"}
+                          className="h-12"
                         >
                           Connect Wallet
                         </Button>
@@ -334,9 +355,16 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       <Button
                         onClick={handleBuyCredits}
                         variant={
-                          !selectToken || !tokenAmount ? "disabled" : "primary"
+                          !selectToken || !tokenAmount || tokenAmount === "0"
+                            ? "disabled"
+                            : "secondary"
                         }
-                        disabled={loading || !selectToken || !tokenAmount}
+                        disabled={
+                          loading ||
+                          !selectToken ||
+                          !tokenAmount ||
+                          tokenAmount === "0"
+                        }
                       >
                         {loading ? (
                           <div className="flex gap-x-1 justify-center">
@@ -356,7 +384,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 </ConnectKitButton.Custom>
               </SignedIn>
               <SignedOut>
-                <Button variant={"primary"}>Sign In</Button>
+                <Button variant={"secondary"}>Sign In</Button>
               </SignedOut>
             </div>
           </TabsContent>

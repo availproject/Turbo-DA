@@ -138,7 +138,7 @@ class CreditService {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          avail_app_id: appId,
+          avail_app_id: +appId,
           app_id: id,
           app_name: appName,
           app_logo: avatar,
@@ -161,7 +161,7 @@ class CreditService {
     avatar,
   }: {
     token: string;
-    appId: number;
+    appId: string;
     appName: string;
     avatar: string;
   }) {
@@ -177,7 +177,7 @@ class CreditService {
           avail_app_id: +appId,
           app_name: appName,
           app_logo: avatar,
-          fallback_enabled: false,
+          fallback_enabled: true,
         }),
       }
     );
@@ -191,10 +191,10 @@ class CreditService {
 
   static async deleteAPIKey({
     token,
-    apiKey,
+    identifier,
   }: {
     token: string;
-    apiKey: string;
+    identifier: string;
   }) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/delete_api_key`,
@@ -205,7 +205,7 @@ class CreditService {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          identifier: apiKey,
+          identifier: identifier,
         }),
       }
     );

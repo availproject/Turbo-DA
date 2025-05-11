@@ -14,7 +14,7 @@ import Image from "next/image";
 import { useDeferredValue, useEffect, useState } from "react";
 import { Text } from ".//text";
 import { useDialog } from "./dialog/provider";
-import Input from "./input";
+import PrimaryInput from "./input/primary";
 
 type DiscountEligibilityProps = {
   token?: string;
@@ -56,7 +56,7 @@ function DiscountEligibility({ token }: DiscountEligibilityProps) {
       open={open === "main-credit-balance"}
       onOpenChange={(value) => !value && setOpen("")}
     >
-      <DialogContent className="w-full sm:max-w-[600px] p-0 bg-[#192a3d] border-transparent rounded-2xl outline-0">
+      <DialogContent className="min-w-[600px] h-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl outline-0">
         <div className="relative">
           <DialogHeader className="p-4 pb-0 flex justify-between flex-row">
             <DialogTitle>
@@ -65,11 +65,11 @@ function DiscountEligibility({ token }: DiscountEligibilityProps) {
               </Text>
             </DialogTitle>
             <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
-              <X color="#FFF" size={32} strokeWidth={1} />
+              <X color="#FFF" size={24} strokeWidth={1} />
             </Close>
           </DialogHeader>
 
-          <div className="flex flex-col p-4 gap-4 mt-10">
+          <div className="flex flex-col p-4 gap-4 mt-2">
             <div className="flex flex-col gap-8">
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -83,12 +83,10 @@ function DiscountEligibility({ token }: DiscountEligibilityProps) {
                   </Text>
                   <InfoIcon color="#dadada" size={16} />
                 </div>
-                <Input
-                  className="h-12 rounded-lg border-[#bbbbbb] bg-transparent text-white placeholder:text-[#dadada]/70"
+                <PrimaryInput
                   placeholder="eg. 100 KB"
-                  value={batchValue ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
+                  value={`${batchValue ?? ""}`}
+                  onChange={(value) => {
                     if (value === "") {
                       setBatchValue(undefined);
                       return;
@@ -101,7 +99,6 @@ function DiscountEligibility({ token }: DiscountEligibilityProps) {
                     setBatchValue(parsedValue);
                   }}
                   type="text"
-                  maxLength={18}
                 />
               </div>
             </div>
@@ -133,7 +130,12 @@ function DiscountEligibility({ token }: DiscountEligibilityProps) {
                 <Text as="span" size={"sm"} weight={"bold"}>
                   {batchSizeData.discount} discount (Max)
                 </Text>
-                <Text as="span" size={"sm"} className="text-[#88d67b]">
+                <Text
+                  as="span"
+                  weight={"medium"}
+                  size={"sm"}
+                  className="text-[#88d67b]"
+                >
                   {" "}
                   on the fees.
                   <br />

@@ -114,7 +114,7 @@ async fn main() -> Result<(), std::io::Error> {
                     Ok(res)
                 }
             })
-            .wrap(rate_limiter)
+            // .wrap(rate_limiter)
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())

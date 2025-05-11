@@ -6,22 +6,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { baseImageUrl } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import CreditService from "@/services/credit";
+import { AppDetails } from "@/services/credit/response";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { ChangeEvent, useCallback, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
-import useBalance from "@/hooks/useBalance";
-
-const avatarOptions = ["smile", "sad", "band"];
+import AvatarList from "./lottie-comp/avatar-list";
+import Success from "./toast/success";
 
 type CreateAppProps = {
   type?: "create" | "edit";
-  appData?: any;
+  appData?: AppDetails;
   id?: string;
 };
 
@@ -35,7 +37,6 @@ export default function CreateApp({
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
-  const [customImages, setCustomImages] = useState([]);
   const [uploadedAvatar, setUploadedAvatar] = useState<File>();
   const [previewUploadedAvatar, setPreviewUploadedAvatar] = useState<string>();
   const [selectedAvatar, setSelectedAvatar] = useState<string>(
@@ -63,32 +64,62 @@ export default function CreateApp({
               return response?.file;
             })
             .catch((error) => {
-              setLoading(true);
+              setLoading(false);
               return undefined;
             })
         : selectedAvatar;
+
+      if (!uploadAvatar) return;
 
       const response =
         type === "edit"
           ? await CreditService.updateApp({
               token: token!,
-              appId,
+              appId: `${appData?.app_id}`,
               appName,
-              avatar: uploadAvatar!,
-              id: appData.id,
+              avatar: uploadAvatar,
+              id: appData?.id!,
+              fallbackEnabled: appData?.fallback_enabled,
             })
           : await CreditService.createApp({
               token: token!,
-              appId,
+              appId: `${appId}`,
               appName,
-              avatar: uploadAvatar!,
+              avatar: uploadAvatar,
             });
 
       console.log({
-        response
+        response,
       });
-      
-      setOpen('')
+
+      toast(
+        <Success
+          label={
+            type === "edit" ? "Updated Successfully!" : "Created Successfully!"
+          }
+        />,
+        {
+          theme: "colored",
+          progressClassName: "bg-[#78C47B]",
+          closeButton: (
+            <X
+              color="#FFF"
+              size={20}
+              className="cursor-pointer"
+              onClick={() => toast.dismiss()}
+            />
+          ),
+          style: {
+            backgroundColor: "#78C47B29",
+            width: "300px",
+            display: "flex",
+            justifyContent: "space-between",
+            borderRadius: "8px",
+          },
+        }
+      );
+
+      setOpen("");
     } catch (error) {
     } finally {
       setLoading(false);
@@ -97,22 +128,15 @@ export default function CreateApp({
 
   const handleClick = () => inputRef.current?.click();
 
-  function convertImageToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
+  const convertImageToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
 
-      reader.onload = () => {
-        const base64String = reader.result as string;
-        resolve(base64String);
-      };
-
-      reader.onerror = (error) => {
-        reject(error);
-      };
+      reader.onerror = (error) => reject(error);
 
       reader.readAsDataURL(file);
     });
-  }
 
   const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
@@ -137,12 +161,12 @@ export default function CreateApp({
         setOpen(value ? "create-app" : "");
       }}
     >
-      <DialogContent className="p-0 border-none bg-[#192a3d] text-white max-w-[600px] w-[600px] rounded-2xl outline-0">
-        <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-4 right-4">
-          <X color="#FFF" size={32} strokeWidth={1} />
+      <DialogContent className="min-w-[600px] h-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl flex flex-col gap-y-0">
+        <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-6 right-6">
+          <X color="#FFF" size={24} strokeWidth={1} />
         </Close>
 
-        <DialogHeader className="p-4">
+        <DialogHeader className="px-6 pt-6 block">
           <DialogTitle>
             <Text size={"2xl"} weight={"bold"}>
               {type === "create" ? "Create New App" : "Edit App"}
@@ -150,7 +174,7 @@ export default function CreateApp({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col px-4 gap-6">
+        <div className="flex flex-col px-6 gap-6 mt-8">
           <PrimaryInput
             placeholder="eg. Aakash's App"
             label="App Name"
@@ -168,45 +192,51 @@ export default function CreateApp({
               Choose An Avatar
             </Text>
             <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-x-3">
-                {avatarOptions.map((avatar, index) => (
-                  <div
-                    key={index}
-                    className={`w-10 h-10 bg-white rounded overflow-hidden flex items-center justify-center ${
-                      selectedAvatar === avatar
-                        ? "bg-[#44515f] p-1.5 border border-[#bbbbbb]"
-                        : "cursor-pointer"
-                    }`}
-                    onClick={() => {
-                      setSelectedAvatar(avatar);
-                      clearUploadAvatar();
-                    }}
-                  >
-                    <div className="w-full h-full bg-white rounded flex items-center justify-center">
-                      <Image
-                        src="/logo.svg"
-                        alt="Avatar option"
-                        width={32}
-                        height={32}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {previewUploadedAvatar && (
+              <AvatarList
+                selected={selectedAvatar}
+                onClick={(value) => {
+                  setSelectedAvatar(value);
+                  setPreviewUploadedAvatar(undefined);
+                  setUploadedAvatar(undefined);
+                }}
+              />
+              {selectedAvatar?.includes(".") && !previewUploadedAvatar && (
                 <div className="flex items-center gap-x-3">
-                  <div className="relative w-10 h-10 bg-[#44515f] border border-[#bbbbbb] rounded">
+                  <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded">
                     <X
-                      color="#000"
-                      className="absolute -top-1 -right-2 bg-white rounded-full cursor-pointer"
-                      size={14}
-                      onClick={clearUploadAvatar}
+                      color="#FFF"
+                      className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
+                      size={20}
+                      onClick={() => {
+                        setSelectedAvatar("");
+                      }}
                     />
+
                     <Image
-                      src={previewUploadedAvatar}
+                      src={baseImageUrl(selectedAvatar)}
                       alt="Avatar option"
                       width={32}
                       height={32}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+              {previewUploadedAvatar && (
+                <div className="flex items-center gap-x-3">
+                  <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded-md p-1.5">
+                    <X
+                      color="#FFF"
+                      className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
+                      size={20}
+                      onClick={clearUploadAvatar}
+                    />
+
+                    <Image
+                      src={previewUploadedAvatar}
+                      alt="Avatar option"
+                      width={40}
+                      height={40}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -237,12 +267,12 @@ export default function CreateApp({
           <PrimaryInput
             placeholder="eg. AV1234"
             label="App ID"
-            value={appId}
+            value={`${appId}`}
             onChange={(value) => setAppId(value)}
           />
         </div>
 
-        <div className="px-4 mt-auto mb-4 pt-12 flex flex-col gap-y-2 items-center">
+        <div className="px-6 mt-auto mb-6 pt-12 flex flex-col gap-y-2 items-center">
           {!!error && (
             <Text variant={"error"} size={"xs"}>
               {error}
@@ -261,43 +291,6 @@ export default function CreateApp({
               !appId ||
               (!selectedAvatar && !uploadedAvatar)
             }
-            // onClick={() => {
-            //   saveAppDetails;
-            //   toast();
-            // toast({
-            //   variant: "destructive",
-            //   title: "Uh oh! Something went wrong.",
-            //   description: "There was a problem with your request.",
-            //   action: ACTION_TYPES.ADD_TOAST,
-            // });
-            // toast(
-            //   <div className="flex w-fit gap-x-2">
-            //     <div className="bg-white border border-[#E9EAEB] h-10 w-10 rounded flex items-center justify-center">
-            //       <div className="border-2 border-[#88d67b] rounded-full flex items-center justify-center w-5 h-5">
-            //         <Check color="#88d67b" size={20} />
-            //       </div>
-            //     </div>
-            //     <div className="flex flex-col gap-y-0">
-            //       <Text size={"sm"} weight={"bold"}>
-            //         Credits Allocated Successfully!
-            //       </Text>
-            //       <Text size={"sm"} variant={"light-grey"} weight={"normal"}>
-            //         500 credits have been successfully allocated to App A
-            //       </Text>
-            //     </div>
-            //   </div>,
-            //   {
-            //     cancel: {
-            //       label: <X color="#FFF" size={32} strokeWidth={1} />,
-            //       onClick: () => console.log("Undo"),
-            //     },
-            //     cancelButtonStyle: {
-            //       backgroundColor: "transparent",
-            //     },
-            //     className: "bg-black text-white",
-            //   }
-            // );
-            // }}
           >
             {loading ? (
               <LoaderCircle

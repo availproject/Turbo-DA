@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import Button from "../button";
 import { Text } from "../text";
 
@@ -7,7 +6,7 @@ type EmptyStateProps = {
   message?: string;
   cta?: {
     label: string;
-    link: string;
+    action: () => void;
   };
 };
 
@@ -22,9 +21,9 @@ const EmptyState = ({ message, cta }: EmptyStateProps) => {
           </Text>
         )}
         {cta && (
-          <Link href={cta.link}>
-            <Button className="w-[195px]">{cta.label}</Button>
-          </Link>
+          <Button className="w-[195px]" onClick={cta.action}>
+            {cta.label}
+          </Button>
         )}
       </div>
     </div>

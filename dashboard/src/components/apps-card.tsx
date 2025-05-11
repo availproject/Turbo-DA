@@ -1,8 +1,10 @@
 "use client";
+import useAPIKeys from "@/hooks/useApiKeys";
 import { Filter, useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { Plus } from "lucide-react";
 import { useEffect } from "react";
+import { ToastContainer } from "react-toastify";
 import { Text } from ".//text";
 import AppList from "./app-list";
 import Button from "./button";
@@ -17,37 +19,14 @@ type AppsCardProps = {
 
 const AppsCard = ({ token }: AppsCardProps) => {
   const { setOpen } = useDialog();
-  const { setAPIKeys, setFilter, filter, appsList, setAppsList } =
-    useOverview();
+  const { setFilter, filter, appsList, setAppsList } = useOverview();
+  const { updateAPIKeys } = useAPIKeys();
 
   useEffect(() => {
     if (!token) return;
-    CreditService.getAPIKeys({ token })
-      .then((response) => {
-        const apiKeysList = response.data?.reduce(
-          (
-            acc: Record<string, string[]>,
-            current: { app_id: string; api_key: string }
-          ) => {
-            if (acc[current.app_id]) {
-              return {
-                ...acc,
-                [current.app_id]: [...acc[current.app_id], current.api_key],
-              };
-            } else {
-              return { ...acc, [current.app_id]: [current.api_key] };
-            }
-          },
-          {}
-        );
-        setAPIKeys(apiKeysList);
-      })
-      .catch((error) => {
-        console.log(error);
-      });
+    updateAPIKeys();
     CreditService.getApps({ token })
       .then((response) => {
-        console.log(response);
         setAppsList(response?.data ?? []);
       })
       .catch((error) => {
@@ -57,15 +36,16 @@ const AppsCard = ({ token }: AppsCardProps) => {
 
   return (
     <>
-      <Card className="bg-[#192a3d] border-none shadow-[0px_4.37px_96.13px_-17.48px_#13151d] rounded-lg pt-0 gap-0 flex-1">
-        <CardHeader className="p-4 border-b border-[#565656] gap-0">
+      <Card className="shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-lg pt-0 gap-0 flex-1 pb-0 block">
+        <CardHeader className="p-4 border-b border-border-blue gap-0">
           <div className="flex items-center justify-between">
             <CardTitle>
               <Text size={"xl"} weight={"bold"} variant={"light-grey"}>
-                Your Apps ({appsList.length})
+                Your Apps {appsList.length ? `(${appsList.length})` : null}
               </Text>
             </CardTitle>
             <div className="flex items-center gap-6">
+              <ToastContainer />
               <SecondarySelect
                 options={["All", "Allocated"]}
                 onChange={(value) => setFilter(value as Filter)}
@@ -74,29 +54,30 @@ const AppsCard = ({ token }: AppsCardProps) => {
               <Button
                 variant="link"
                 className="flex items-center gap-1.5 p-1.5 hover:bg-transparent cursor-pointer underline-offset-[2.5px]"
-                onClick={() => setOpen("create-app")}
+                onClick={() => {
+                  setOpen("create-app");
+                }}
               >
-                <div className="w-6 h-6 rounded border border-dashed border-[#dadada] flex items-center justify-center">
+                <div className="w-6 h-6 rounded border border-dashed border-light-grey flex items-center justify-center">
                   <Plus size={14} color="#dadada" />
                 </div>
-                <Text size={"sm"} weight={"bold"} variant={"light-grey"}>
-                  Create New App
+                <Text size={"sm"} weight={"semibold"} variant={"grey-500"}>
+                  Create New
                 </Text>
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4">
+        <CardContent className="px-0">
           <Text
             size={"sm"}
             weight={"medium"}
             variant={"light-grey"}
-            className="mb-4"
+            className="mb-4 px-4 pt-4"
           >
             Generate a key. Use this key to submit data. You can have multiple
             keys for the same app.
           </Text>
-
           <AppList />
         </CardContent>
       </Card>

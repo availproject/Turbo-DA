@@ -2,16 +2,19 @@ import AppsCard from "@/components/apps-card";
 import BuyCreditsCard from "@/components/buy-credit-cards";
 import CreditBalance from "@/components/credit-balance";
 import DashboardWrapper from "@/components/dashboard-wrapper";
+import TurboOnWallet from "@/components/lottie-comp/turbo-on-wallet";
 import { TabsContent } from "@/components/tabs";
 import { Text } from "@/components/text";
+import HistoryWrapper from "@/components/transactions-history";
+import CreditHistory from "@/components/transactions-history/credit-history";
+import DataPostingHistory from "@/components/transactions-history/data-posting-history";
 import { Card } from "@/components/ui/card";
+import { HISTORY_TYPES } from "@/lib/types";
 import { APP_TABS, template } from "@/lib/utils";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { Suspense } from "react";
-
 const CreditUsage = dynamic(() => import("@/components/credit-usage"), {
   loading: () => <div>Loading....</div>,
 });
@@ -22,7 +25,7 @@ export default async function Page() {
     <DashboardWrapper selectedTab={APP_TABS.OVERVIEW}>
       <TabsContent
         value={APP_TABS.OVERVIEW}
-        className="border-t border-[#575757] pt-4"
+        className="border-t border-[#2B4761] pt-4"
       >
         <Suspense
           fallback={
@@ -38,13 +41,8 @@ export default async function Page() {
                 <AppsCard token={token} />
               </SignedIn>
               <SignedOut>
-                <Card className="bg-[#192a3d] border-none shadow-[0px_4.37px_96.13px_-17.48px_#13151d] rounded-lg pt-0 gap-0 flex-1 flex justify-center items-center flex-col gap-y-2.5 h-[520px]">
-                  <Image
-                    src={"/signout.svg"}
-                    width={159}
-                    height={134}
-                    alt="empty-state"
-                  />
+                <Card className="bg-[#192a3d] border-border-grey shadow-primary rounded-lg pt-0 gap-0 flex-1 flex justify-center items-center flex-col gap-y-2.5 h-[520px] bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%]">
+                  <TurboOnWallet />
                   <Text weight={"semibold"} size={"base"}>
                     Sign In and Connect Your Wallet To Buy Credits
                   </Text>
@@ -59,6 +57,19 @@ export default async function Page() {
             </div>
           </div>
         </Suspense>
+      </TabsContent>
+      <TabsContent
+        value={APP_TABS.HISTORY}
+        className="border-t border-[#2B4761] pt-4 w-full"
+      >
+        <HistoryWrapper>
+          <TabsContent value={HISTORY_TYPES.CREDIT}>
+            <CreditHistory token={token} />
+          </TabsContent>
+          <TabsContent value={HISTORY_TYPES.PUBLISH}>
+            <DataPostingHistory token={token} />
+          </TabsContent>
+        </HistoryWrapper>
       </TabsContent>
     </DashboardWrapper>
   );

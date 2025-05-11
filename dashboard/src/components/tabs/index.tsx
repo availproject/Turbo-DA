@@ -43,9 +43,9 @@ function TabsTrigger({
 }) {
   const variants = {
     outline:
-      "h-10 px-4 py-[11px] data-[state=inactive]:text-[#949494] data-[state=active]:text-white data-[state=active]:bg-[#414e5d] data-[state=active]:shadow-none data-[state=active]:border-[#bbbbbb] data-[state=active]:[text-shadow:0px_0px_10.68px_#ffffff] rounded-3xl cursor-pointer text-base font-medium",
+      "flex justify-center items-center h-10 px-4 data-[state=inactive]:text-[#949494] data-[state=active]:text-white data-[state=active]:border-border-blue data-[state=active]:bg-[#2B4761] data-[state=active]:shadow-none rounded-3xl cursor-pointer text-base font-semibold",
     regular:
-      "h-10 px-4 py-[11px] data-[state=inactive]:text-[#949494] data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none data-[state=active]:[text-shadow:0px_0px_10.68px_#ffffff] cursor-pointer text-base font-medium",
+      "h-10 px-4 data-[state=inactive]:text-[#949494] data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none cursor-pointer text-base font-medium",
   };
   return (
     <TabsPrimitive.Trigger

@@ -25,14 +25,10 @@ const SecondarySelect = ({
   className,
   defaultValue,
 }: SecondarySelectProps) => {
-  console.log({
-    defaultValue,
-  });
-
   return (
     <div
       className={cn(
-        "relative w-32 h-10 rounded-lg overflow-hidden border border-solid border-[#bbbbbb]",
+        "relative w-32 h-10 rounded-lg overflow-hidden border border-border-blue",
         className
       )}
     >
@@ -45,24 +41,24 @@ const SecondarySelect = ({
           <SelectTrigger className="h-12 w-full flex-1 border-0 outline-none cursor-pointer">
             <SelectValue
               placeholder={
-                <Text variant={"light-grey"} weight={"medium"}>
+                <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
                   {placeholder}
                 </Text>
               }
-              className="font-bold text-white font-inter flex-1 data-[placeholder]:text-white cursor-pointer"
+              className="font-bold text-white font-inter text-sm flex-1 data-[placeholder]:text-white cursor-pointer"
             />
           </SelectTrigger>
           <SelectContent
-            className="bg-[#112235] p-0 border-0"
+            className="bg-bg-primary p-0 border border-border-blue mt-1"
             defaultValue={defaultValue}
           >
             {options.map((option) => (
               <SelectItem
                 key={option}
                 value={option}
-                className="cursor-pointer hover:bg-[#414E5D] focus:bg-[#414E5D]"
+                className="cursor-pointer hover:bg-border-blue focus:bg-border-blue"
               >
-                <Text variant={"light-grey"} weight={"medium"}>
+                <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
                   {option}
                 </Text>
               </SelectItem>

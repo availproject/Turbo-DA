@@ -8,10 +8,13 @@ export const buttonVariants = cva("cursor-pointer", {
   variants: {
     variant: {
       primary:
-        "h-12 bg-blue rounded-full w-full hover:bg-blue/90 text-base font-bold text-white",
+        "h-10 bg-blue rounded-full w-full hover:bg-blue/90 text-sm font-bold text-white pt-px shadow-primary-button bg-linear-[90deg] from-blue from-[3.81%] to-button-light-blue to-[92.61%]",
+      secondary:
+        "h-12 bg-blue rounded-full w-full hover:bg-blue/90 text-md font-bold text-white pt-px shadow-primary-button bg-linear-[90deg] from-blue from-[3.81%] to-button-light-blue to-[92.61%]",
       disabled:
-        "bg-grey rounded-full w-full text-base font-bold text-black/40 cursor-not-allowed h-12 ",
+        "bg-[#13334F] rounded-full w-full text-base font-bold text-white/40 cursor-not-allowed h-12",
       ghost: "inline-flex justify-center items-center has-[>svg]:p-1",
+      danger: "w-full h-12 bg-[#CB62623D] hover:bg-[#CB62623D]/90 rounded-full",
       link: "text-light-grey underline",
     },
   },
