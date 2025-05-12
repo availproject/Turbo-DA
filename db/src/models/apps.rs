@@ -75,11 +75,13 @@ impl ToSql<crate::schema::sql_types::AssignedCreditsLog, Pg> for AssignedCredits
             diesel::sql_types::Numeric,
             diesel::sql_types::Numeric,
             diesel::sql_types::Numeric,
+            diesel::sql_types::Timestamptz,
         )>::write_tuple(
             &(
                 &self.credit_balance_original,
                 &self.credit_balance_used_original,
                 &self.credits_added,
+                &self.created_at,
             ),
             &mut out.reborrow(),
         )
