@@ -1,6 +1,6 @@
 "use client";
 import { Tokens } from "@/lib/types";
-import { AppDetails } from "@/services/credit/response";
+import { AppDetails } from "@/services/app/response";
 import React, {
   createContext,
   Dispatch,

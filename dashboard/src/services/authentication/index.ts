@@ -13,6 +13,10 @@ class AuthenticationService {
         }
       );
 
+      if (!response.ok) {
+        return undefined;
+      }
+
       return await response.json();
     } catch (error) {
       return undefined;
@@ -32,7 +36,7 @@ class AuthenticationService {
         }
       );
       if (!response.ok) {
-        return new Error(`HTTP error! Status: ${response.status}`);
+        return undefined;
       }
 
       return await response.json();

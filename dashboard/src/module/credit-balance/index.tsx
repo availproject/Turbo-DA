@@ -16,6 +16,10 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
   const { setOpen } = useDialog();
   const { creditBalance } = useOverview();
 
+  console.log({
+    creditBalance,
+  });
+
   return (
     <>
       <Card className="relative shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden">
@@ -39,7 +43,7 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
                   Main Credit Balance
                 </Text>
                 <Text as="span" weight={"bold"} size={"2xl"} className="mt-1">
-                  {!!creditBalance ? formatDataBytes(creditBalance) : "-"}
+                  {+creditBalance ? formatDataBytes(+creditBalance) : "-"}
                 </Text>
               </div>
             </div>

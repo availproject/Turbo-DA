@@ -46,7 +46,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
       return {};
     });
 
-  if (!!getUserDetails) {
+  if (!getUserDetails) {
     const registerUser = await AuthenticationService.registerUser({
       token: token!,
       name: user?.fullName!,
