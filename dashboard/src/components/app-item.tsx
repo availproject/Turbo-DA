@@ -4,7 +4,7 @@ import { avatarList } from "@/lib/constant";
 import { baseImageUrl, cn, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/credit/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, Pencil, X } from "lucide-react";
@@ -46,7 +46,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await CreditService.generateAPIKey({
+      const response = await AppService.generateAPIKey({
         token,
         appId: `${app.id}`,
       });
@@ -60,7 +60,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   const updateFallbackHandler = async () => {
     try {
-      const response = await CreditService.updateApp({
+      const response = await AppService.updateApp({
         token: token!,
         appId: `${app.app_id}`,
         appName: app.app_name,

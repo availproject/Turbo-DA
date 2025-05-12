@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { baseImageUrl } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/credit/response";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Plus, X } from "lucide-react";
@@ -55,7 +55,7 @@ export default function CreateApp({
 
     try {
       const uploadAvatar = uploadedAvatar
-        ? await CreditService.uploadFile({
+        ? await AppService.uploadFile({
             token: token!,
             file: uploadedAvatar!,
           })
@@ -73,7 +73,7 @@ export default function CreateApp({
 
       const response =
         type === "edit"
-          ? await CreditService.updateApp({
+          ? await AppService.updateApp({
               token: token!,
               appId: `${appData?.app_id}`,
               appName,
@@ -81,7 +81,7 @@ export default function CreateApp({
               id: appData?.id!,
               fallbackEnabled: appData?.fallback_enabled,
             })
-          : await CreditService.createApp({
+          : await AppService.createApp({
               token: token!,
               appId: `${appId}`,
               appName,

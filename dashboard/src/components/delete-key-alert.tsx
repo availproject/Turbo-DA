@@ -1,7 +1,7 @@
 import Button from "@/components/button";
 import useAPIKeys from "@/hooks/useApiKeys";
 import { useConfig } from "@/providers/ConfigProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
@@ -34,7 +34,7 @@ const DeleteKeyAlert = ({
   const handleDelete = async () => {
     try {
       setLoading(true);
-      const response = await CreditService.deleteAPIKey({
+      const response = await AppService.deleteAPIKey({
         token: token!,
         identifier,
       });

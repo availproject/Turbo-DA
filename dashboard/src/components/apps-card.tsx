@@ -1,7 +1,7 @@
 "use client";
 import useAPIKeys from "@/hooks/useApiKeys";
 import { Filter, useOverview } from "@/providers/OverviewProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { Plus } from "lucide-react";
 import { useEffect } from "react";
 import { ToastContainer } from "react-toastify";
@@ -25,7 +25,7 @@ const AppsCard = ({ token }: AppsCardProps) => {
   useEffect(() => {
     if (!token) return;
     updateAPIKeys();
-    CreditService.getApps({ token })
+    AppService.getApps({ token })
       .then((response) => {
         setAppsList(response?.data ?? []);
       })

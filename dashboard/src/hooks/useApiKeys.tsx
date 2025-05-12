@@ -1,6 +1,6 @@
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 
 const useAPIKeys = () => {
   const { setAPIKeys } = useOverview();
@@ -9,7 +9,7 @@ const useAPIKeys = () => {
   const updateAPIKeys = async () => {
     if (!token) return;
 
-    CreditService.getAPIKeys({ token })
+    AppService.getAPIKeys({ token })
       .then((response) => {
         const apiKeysList = response.data?.reduce(
           (

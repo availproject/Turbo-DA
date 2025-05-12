@@ -4,7 +4,7 @@ import { avatarList } from "@/lib/constant";
 import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/credit/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
@@ -35,7 +35,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      const response = await CreditService.assignCredits({
+      const response = await AppService.assignCredits({
         token: token!,
         amount,
         appId: appData.id,
