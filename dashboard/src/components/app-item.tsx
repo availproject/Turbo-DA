@@ -100,14 +100,16 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             />
           ) : (
             <div className="w-10 rounded overflow-hidden">
-              <DotLottieReact
-                src={avatarList?.[app.app_logo].path}
-                loop
-                autoplay
-                playOnHover={true}
-                width={40}
-                height={40}
-              />
+              {avatarList?.[app?.app_logo]?.path ? (
+                <DotLottieReact
+                  src={avatarList?.[app?.app_logo]?.path}
+                  loop
+                  autoplay
+                  playOnHover={true}
+                  width={40}
+                  height={40}
+                />
+              ) : null}
             </div>
           )}
         </div>

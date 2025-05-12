@@ -110,14 +110,16 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
               />
             ) : (
               <div className="w-10 h-10 rounded overflow-hidden mb-1">
-                <DotLottieReact
-                  src={avatarList?.[appData.app_logo].path}
-                  loop
-                  autoplay
-                  playOnHover={true}
-                  width={40}
-                  height={40}
-                />
+                {avatarList?.[appData?.app_logo]?.path ? (
+                  <DotLottieReact
+                    src={avatarList?.[appData.app_logo].path}
+                    loop
+                    autoplay
+                    playOnHover={true}
+                    width={40}
+                    height={40}
+                  />
+                ) : null}
               </div>
             )}
             <div className="">
@@ -146,14 +148,16 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
                   />
                 ) : (
                   <div className="w-6 rounded overflow-hidden">
-                    <DotLottieReact
-                      src={avatarList?.[appData.app_logo].path}
-                      loop
-                      autoplay
-                      playOnHover={true}
-                      width={24}
-                      height={24}
-                    />
+                    {avatarList?.[appData?.app_logo]?.path ? (
+                      <DotLottieReact
+                        src={avatarList?.[appData.app_logo].path}
+                        loop
+                        autoplay
+                        playOnHover={true}
+                        width={24}
+                        height={24}
+                      />
+                    ) : null}
                   </div>
                 )}
                 <Text size={"sm"} weight={"medium"} as="label">

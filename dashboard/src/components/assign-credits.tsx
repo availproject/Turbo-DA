@@ -140,14 +140,16 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                   />
                 ) : (
                   <div className="w-6 rounded overflow-hidden">
-                    <DotLottieReact
-                      src={avatarList?.[appData.app_logo].path}
-                      loop
-                      autoplay
-                      playOnHover={true}
-                      width={24}
-                      height={24}
-                    />
+                    {avatarList?.[appData?.app_logo]?.path ? (
+                      <DotLottieReact
+                        src={avatarList?.[appData?.app_logo]?.path}
+                        loop
+                        autoplay
+                        playOnHover={true}
+                        width={24}
+                        height={24}
+                      />
+                    ) : null}
                   </div>
                 )}
                 <Text weight={"semibold"} as="label">
