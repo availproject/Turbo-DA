@@ -1,14 +1,12 @@
 "use client";
 import { cn, formatDataBytes } from "@/lib/utils";
 import HistoryService from "@/services/history";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
 
 const CreditHistory = ({ token }: { token?: string }) => {
-  const router = useRouter();
   const [historyList, setHistoryList] = useState<any[]>();
 
   useEffect(() => {

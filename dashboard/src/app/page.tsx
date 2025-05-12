@@ -1,13 +1,8 @@
-import AppsCard from "@/components/apps-card";
-import BuyCreditsCard from "@/components/buy-credit-cards";
-import CreditBalance from "@/components/credit-balance";
 import DashboardWrapper from "@/components/dashboard-wrapper";
 import TurboOnWallet from "@/components/lottie-comp/turbo-on-wallet";
 import { TabsContent } from "@/components/tabs";
 import { Text } from "@/components/text";
 import HistoryWrapper from "@/components/transactions-history";
-import CreditHistory from "@/components/transactions-history/credit-history";
-import DataPostingHistory from "@/components/transactions-history/data-posting-history";
 import { Card } from "@/components/ui/card";
 import { HISTORY_TYPES } from "@/lib/types";
 import { APP_TABS, template } from "@/lib/utils";
@@ -18,6 +13,23 @@ import { Suspense } from "react";
 const CreditUsage = dynamic(() => import("@/components/credit-usage"), {
   loading: () => <div>Loading....</div>,
 });
+const CreditHistory = dynamic(
+  () => import("@/components/transactions-history/credit-history"),
+  {
+    loading: () => <div>Loading....</div>,
+  }
+);
+const DataPostingHistory = dynamic(
+  () => import("@/components/transactions-history/data-posting-history"),
+  {
+    loading: () => <div>Loading....</div>,
+  }
+);
+
+const CreditBalance = dynamic(() => import("@/components/credit-balance"));
+const BuyCreditsCard = dynamic(() => import("@/components/buy-credit-cards"));
+const AppsCard = dynamic(() => import("@/components/apps-card"));
+
 export default async function Page() {
   const { getToken } = await auth();
   const token = (await getToken({ template })) ?? undefined;
