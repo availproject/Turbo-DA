@@ -59,7 +59,7 @@ const DynamicTable: FC<DynamicTableProps> = ({
           listdata.map((data, index) => (
             <div
               key={index}
-              className="flex justify-between border border-[#444753] rounded-lg mb-4 bg-[#192A3D] py-1 shadow-b-lg"
+              className="flex justify-between rounded-lg mb-4 py-1 border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey"
             >
               {headings.map((heading, index, array) => (
                 <div

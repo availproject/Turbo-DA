@@ -57,7 +57,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
                     weight={"bold"}
                     size={"base"}
                     className={cn("py-3 px-4", !last && "text-right")}
-                    variant={heading === "discount" ? "green" : "white"}
+                    variant={heading === "converted_fees" ? "green" : "white"}
                   >
                     {value}
                   </Text>
