@@ -184,7 +184,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
                   size={"base"}
                   weight={"bold"}
                 >
-                  of {formatDataBytes(+appData.credit_balance)}
+                  of {formatDataBytes(+appData.credit_balance, 2)}
                 </Text>
               }
               className="border-0 px-0 text-white w-full"

@@ -343,7 +343,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       return (
                         <Button
                           onClick={(e) => handleClick(e, props.show)}
-                          variant={"primary"}
+                          variant={"secondary"}
                           className="h-12"
                         >
                           Connect Wallet

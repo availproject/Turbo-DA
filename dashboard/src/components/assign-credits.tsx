@@ -166,7 +166,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                   size={"base"}
                   weight={"bold"}
                 >
-                  of {formatDataBytes(creditBalance)}
+                  of {formatDataBytes(creditBalance, 2)}
                 </Text>
               }
               onChange={(value) => {
