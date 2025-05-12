@@ -21,6 +21,11 @@ class AuthenticationService {
 
   static async fetchUser({ token }: { token: string }) {
     try {
+      console.log("token", token);
+      console.log(
+        "process.env.NEXT_PUBLIC_API_URL",
+        `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_user`
+      );
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_user`,
         {
@@ -31,6 +36,7 @@ class AuthenticationService {
           },
         }
       );
+      console.log("response", response);
       if (!response.ok) {
         return new Error(`HTTP error! Status: ${response.status}`);
       }
