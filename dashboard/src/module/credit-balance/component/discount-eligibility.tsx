@@ -10,11 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
+import { turboDADocLink } from "@/lib/constant";
 import { formatDataBytes } from "@/lib/utils";
 import CreditService from "@/services/credit";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 function DiscountEligibility({ token }: { token?: string }) {
@@ -195,16 +197,18 @@ function DiscountEligibility({ token }: { token?: string }) {
                   </>
                 )}
               </Text>
-              <Button variant="link" className="underline pl-0">
-                <Text
-                  as="span"
-                  size={"sm"}
-                  weight={"bold"}
-                  variant={"light-grey"}
-                >
-                  Read Docs
-                </Text>
-              </Button>
+              <Link href={turboDADocLink} target="_blank" className="w-fit">
+                <Button variant="link" className="underline pl-0">
+                  <Text
+                    as="span"
+                    size={"sm"}
+                    weight={"bold"}
+                    variant={"light-grey"}
+                  >
+                    Read Docs
+                  </Text>
+                </Button>
+              </Link>
             </div>
 
             <Card className="border-none bg-transparent shadow-none">

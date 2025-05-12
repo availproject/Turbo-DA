@@ -30,3 +30,12 @@ export const avatarList: Record<string, { path: string }> = {
     path: "/avatar/Avatar 10.lottie",
   },
 };
+
+export const turboDADocLink =
+  "https://docs.availproject.org/api-reference/avail-turbo-da-api";
+
+export const privacyPolicy =
+  "https://avail-project.notion.site/Privacy-Policy-e5f47df2f3a64055a7966bbaabe9a2eb";
+
+export const tnc =
+  "https://avail-project.notion.site/Privacy-Policy-e5f47df2f3a64055a7966bbaabe9a2eb";
