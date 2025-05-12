@@ -114,7 +114,6 @@ async fn main() -> Result<(), std::io::Error> {
                     Ok(res)
                 }
             })
-            .wrap(rate_limiter)
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
@@ -129,6 +128,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ))
                     .service(
                         web::scope("/user")
+                            .wrap(rate_limiter)
                             .wrap_fn(|req, srv| {
                                 let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
                                 let fut = srv.call(req);
