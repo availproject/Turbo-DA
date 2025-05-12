@@ -100,7 +100,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
 
         <div className="flex flex-col gap-4 flex-1">
           <div className="flex items-center gap-x-2">
-            {appData.app_logo.includes(".") ? (
+            {appData?.app_logo?.includes(".") ? (
               <Image
                 className="w-10 h-auto mb-1"
                 alt={appData.app_name}
@@ -136,7 +136,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
                 From
               </Text>
               <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
-                {appData.app_logo.includes(".") ? (
+                {appData?.app_logo?.includes(".") ? (
                   <Image
                     className="w-8 h-auto"
                     alt={appData.app_name}

@@ -90,7 +90,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
       <div className="flex w-full gap-x-1.5">
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
-          {app.app_logo.includes(".") ? (
+          {app?.app_logo?.includes(".") ? (
             <Image
               className="w-8 h-auto"
               alt={app.app_name}

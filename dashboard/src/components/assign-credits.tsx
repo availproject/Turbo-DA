@@ -130,7 +130,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
               </Text>
 
               <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
-                {appData.app_logo.includes(".") ? (
+                {appData?.app_logo?.includes(".") ? (
                   <Image
                     className="w-8 h-auto"
                     alt={appData.app_name}
