@@ -87,133 +87,136 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         }
       }}
     >
-      <DialogContent className="min-w-[600px] h-[600px] border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey rounded-2xl overflow-hidden p-4 flex flex-col focus-within:outline-0">
-        <div className="flex justify-between items-center mb-2">
-          <DialogTitle>
-            <Text weight={"bold"} size={"2xl"}>
-              Assign Credits
-            </Text>
-          </DialogTitle>
-
-          <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
-            <X color="#FFF" size={24} strokeWidth={1} />
-          </Close>
-        </div>
-
-        <div className="flex flex-col gap-4 flex-1">
-          <div className="flex items-center gap-2">
-            <Wallet color="#B3B3B3" strokeWidth={1} size={40} />
-            <div className="flex flex-col gap-y-1.5">
-              <Text size={"sm"} variant={"light-grey"} weight={"medium"}>
-                Main Credit Balance
+      <DialogContent className="min-w-[600px] h-[600px] border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey rounded-2xl overflow-hidden flex flex-col focus-within:outline-0 p-0">
+        <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+        <div className="relative h-full flex flex-col p-4 z-1">
+          <div className="flex justify-between items-center mb-2 relative z-1">
+            <DialogTitle>
+              <Text weight={"bold"} size={"2xl"}>
+                Assign Credits
               </Text>
-              <Text size={"2xl"} weight={"semibold"}>
-                {formatDataBytes(creditBalance)}
-              </Text>
-            </div>
+            </DialogTitle>
+
+            <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
+              <X color="#FFF" size={24} strokeWidth={1} />
+            </Close>
           </div>
 
-          <div className="flex flex-col gap-y-4">
-            <div className="flex flex-col gap-2 w-full">
-              <Text size={"sm"} weight={"medium"} as="label">
-                From
-              </Text>
-              <div className="relative border border-border-blue flex rounded-lg items-center p-3 h-12">
-                <Text weight={"semibold"} as="label">
+          <div className="flex flex-col gap-4 flex-1 relative z-1">
+            <div className="flex items-center gap-2">
+              <Wallet color="#B3B3B3" strokeWidth={1} size={40} />
+              <div className="flex flex-col gap-y-1.5">
+                <Text size={"sm"} variant={"light-grey"} weight={"medium"}>
                   Main Credit Balance
                 </Text>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 w-full">
-              <Text size={"sm"} weight={"medium"} as="label">
-                To
-              </Text>
-
-              <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
-                {appData?.app_logo?.includes(".") ? (
-                  <Image
-                    className="w-8 h-auto"
-                    alt={appData.app_name}
-                    src={baseImageUrl(appData.app_logo)}
-                    width={32}
-                    height={40}
-                  />
-                ) : (
-                  <div className="w-6 rounded overflow-hidden">
-                    {avatarList?.[appData?.app_logo]?.path ? (
-                      <DotLottieReact
-                        src={avatarList?.[appData?.app_logo]?.path}
-                        loop
-                        autoplay
-                        playOnHover={true}
-                        width={24}
-                        height={24}
-                      />
-                    ) : null}
-                  </div>
-                )}
-                <Text weight={"semibold"} as="label">
-                  {appData.app_name}
+                <Text size={"2xl"} weight={"semibold"}>
+                  {formatDataBytes(creditBalance)}
                 </Text>
               </div>
             </div>
-            <PrimaryInput
-              placeholder="e.g. 500"
-              label="Amount"
-              rightElement={
-                <Text
-                  className="opacity-40 w-[120px] text-end"
-                  size={"base"}
-                  weight={"bold"}
-                >
-                  of {formatDataBytes(creditBalance, 2)}
+
+            <div className="flex flex-col gap-y-4">
+              <div className="flex flex-col gap-2 w-full">
+                <Text size={"sm"} weight={"medium"} as="label">
+                  From
                 </Text>
-              }
-              onChange={(value) => {
-                if (value === "") {
-                  setAmount("");
-                  return;
-                }
+                <div className="relative border border-border-blue flex rounded-lg items-center p-3 h-12">
+                  <Text weight={"semibold"} as="label">
+                    Main Credit Balance
+                  </Text>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 w-full">
+                <Text size={"sm"} weight={"medium"} as="label">
+                  To
+                </Text>
 
-                if (value.match(/\b\d+(\.\d+)?\b/)) {
-                  setAmount(value);
+                <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
+                  {appData?.app_logo?.includes(".") ? (
+                    <Image
+                      className="w-8 h-auto"
+                      alt={appData.app_name}
+                      src={baseImageUrl(appData.app_logo)}
+                      width={32}
+                      height={40}
+                    />
+                  ) : (
+                    <div className="w-6 rounded overflow-hidden">
+                      {avatarList?.[appData?.app_logo]?.path ? (
+                        <DotLottieReact
+                          src={avatarList?.[appData?.app_logo]?.path}
+                          loop
+                          autoplay
+                          playOnHover={true}
+                          width={24}
+                          height={24}
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                  <Text weight={"semibold"} as="label">
+                    {appData.app_name}
+                  </Text>
+                </div>
+              </div>
+              <PrimaryInput
+                placeholder="e.g. 500"
+                label="Amount"
+                rightElement={
+                  <Text
+                    className="opacity-40 w-[120px] text-end"
+                    size={"base"}
+                    weight={"bold"}
+                  >
+                    of {formatDataBytes(creditBalance, 2)}
+                  </Text>
                 }
-              }}
-              value={amount}
-              className="px-0 text-white w-full"
-              error={
-                creditBalance < +amount
-                  ? `Amount can’t exceed the main credit balance. ${creditBalance}`
-                  : ""
-              }
-            />
-          </div>
-        </div>
+                onChange={(value) => {
+                  if (value === "") {
+                    setAmount("");
+                    return;
+                  }
 
-        <div className="mt-auto pt-20">
-          <Button
-            variant={
-              !amount || !creditBalance || creditBalance < +amount
-                ? "disabled"
-                : "secondary"
-            }
-            disabled={
-              loading || !amount || !creditBalance || creditBalance < +amount
-            }
-            onClick={handleSubmit}
-          >
-            {loading ? (
-              <LoaderCircle
-                className="animate-spin mx-auto"
-                color="#fff"
-                size={24}
+                  if (value.match(/\b\d+(\.\d+)?\b/)) {
+                    setAmount(value);
+                  }
+                }}
+                value={amount}
+                className="px-0 text-white w-full"
+                error={
+                  creditBalance < +amount
+                    ? `Amount can’t exceed the main credit balance. ${creditBalance}`
+                    : ""
+                }
               />
-            ) : !amount ? (
-              "Enter Amount"
-            ) : (
-              "Confirm"
-            )}
-          </Button>
+            </div>
+          </div>
+
+          <div className="mt-auto pt-20 relative z-1">
+            <Button
+              variant={
+                !amount || !creditBalance || creditBalance < +amount
+                  ? "disabled"
+                  : "secondary"
+              }
+              disabled={
+                loading || !amount || !creditBalance || creditBalance < +amount
+              }
+              onClick={handleSubmit}
+            >
+              {loading ? (
+                <LoaderCircle
+                  className="animate-spin mx-auto"
+                  color="#fff"
+                  size={24}
+                />
+              ) : !amount ? (
+                "Enter Amount"
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

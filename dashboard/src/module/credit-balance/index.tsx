@@ -1,12 +1,12 @@
 "use client";
+import Button from "@/components/button";
+import { useDialog } from "@/components/dialog/provider";
+import { Text } from "@/components/text";
+import { Card, CardContent } from "@/components/ui/card";
 import { formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { Wallet } from "lucide-react";
-import Button from "./button";
-import { useDialog } from "./dialog/provider";
-import DiscountEligibility from "./discount-eligibility";
-import { Text } from "./text";
-import { Card, CardContent } from "./ui/card";
+import DiscountEligibility from "./component/discount-eligibility";
 
 type CreditBalanceProps = {
   token?: string;
@@ -18,8 +18,9 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
 
   return (
     <>
-      <Card className="shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0">
-        <CardContent className="p-4">
+      <Card className="relative shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden">
+        <div className="bg-[url('/credit-balance-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+        <CardContent className="p-4 z-1 relative">
           <div className="flex flex-col justify-between">
             <div className="flex items-start gap-x-1.5">
               <Wallet

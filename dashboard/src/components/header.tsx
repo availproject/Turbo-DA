@@ -1,3 +1,4 @@
+import { turboDADocLink } from "@/lib/constant";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
@@ -20,7 +21,7 @@ async function Header() {
       </div>
       <div className="flex items-center justify-between gap-x-6 h-full">
         <Link
-          href={"#"}
+          href={turboDADocLink}
           target="_blank"
           className="flex gap-x-1.5 items-center border-x border-x-border-grey px-6 h-full"
         >

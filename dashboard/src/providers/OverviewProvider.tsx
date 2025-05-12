@@ -23,7 +23,7 @@ interface OverviewContextType {
   apiKeys?: Record<string, string[]>;
 }
 
-export type Filter = "All" | "Allocated";
+export type Filter = "All" | "Allocated" | "Unallocated";
 
 export const OverviewContext = createContext<OverviewContextType | undefined>(
   undefined
@@ -49,7 +49,11 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const filterAppList = useMemo(
     () =>
       appsList.filter((app) =>
-        filter === "Allocated" ? app.credit_balance !== "0" : true
+        filter === "Allocated"
+          ? app.credit_balance !== "0"
+          : filter === "Unallocated"
+          ? app.credit_balance === "0"
+          : true
       ),
     [appsList, filter]
   );

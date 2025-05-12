@@ -6,11 +6,11 @@ import { OverviewProvider } from "@/providers/OverviewProvider";
 import AuthenticationService from "@/services/authentication";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { dark } from "@clerk/themes";
 import "@rainbow-me/rainbowkit/styles.css";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import { ppmori } from "./fonts";
-
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -64,7 +64,11 @@ export default async function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        baseTheme: dark,
+      }}
+    >
       <TooltipProvider>
         <html lang="en" className={`${ppmori.className} antialiased`}>
           <body className="bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%]">

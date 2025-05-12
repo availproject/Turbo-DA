@@ -36,67 +36,70 @@ export default function ViewKeys({
       }}
     >
       <DialogContent className="w-full sm:max-w-[600px] h-[600px] rounded-2xl overflow-hidden border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey flex flex-col focus-within:outline-0 p-0">
-        <div className="flex justify-between items-center mb-0 p-4">
-          <DialogTitle>
-            <Text weight={"semibold"} size={"2xl"}>
-              All Active Keys
-            </Text>
-          </DialogTitle>
-
-          <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
-            <X color="#FFF" size={24} strokeWidth={1} />
-          </Close>
-        </div>
-
-        <div>
-          <div className="flex items-center gap-2 border-b border-[#2B4761] pb-2 justify-between px-4">
-            <div className="flex gap-x-24">
-              <Text weight={"medium"} size={"xs"} variant={"light-grey"}>
-                Sno.
+        <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+        <div className="relative h-full flex flex-col z-1">
+          <div className="flex justify-between items-center mb-0 p-4">
+            <DialogTitle>
+              <Text weight={"semibold"} size={"2xl"}>
+                All Active Keys
               </Text>
-              <Text weight={"medium"} size={"xs"} variant={"light-grey"}>
-                Key
+            </DialogTitle>
+
+            <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
+              <X color="#FFF" size={24} strokeWidth={1} />
+            </Close>
+          </div>
+
+          <div className="">
+            <div className="flex items-center gap-2 border-b border-[#2B4761] pb-2 justify-between px-4">
+              <div className="flex gap-x-24">
+                <Text weight={"medium"} size={"xs"} variant={"light-grey"}>
+                  Sno.
+                </Text>
+                <Text weight={"medium"} size={"xs"} variant={"light-grey"}>
+                  Key
+                </Text>
+              </div>
+              <Text
+                weight={"medium"}
+                size={"xs"}
+                variant={"light-grey"}
+                className="w-[100px] text-center"
+              >
+                Action
               </Text>
             </div>
-            <Text
-              weight={"medium"}
-              size={"xs"}
-              variant={"light-grey"}
-              className="w-[100px] text-center"
-            >
-              Action
-            </Text>
-          </div>
-          <div className="flex flex-col gap-y-4 pt-4">
-            {currentAppAPIKeys?.map((apiKey, i) => (
-              <div
-                className="flex items-center gap-2 justify-between px-4 h-8"
-                key={apiKey}
-              >
-                <div className="flex gap-x-24">
-                  <Text weight={"bold"} className="w-4">
-                    {i + 1}
-                  </Text>
-                  <Text weight={"bold"} className="w-20">
-                    ....{apiKey}
-                  </Text>
-                </div>
-
-                <Button
-                  variant={"danger"}
-                  className="h-8 w-[98px] flex justify-center items-center"
-                  onClick={() => openDeleteAlert(apiKey)}
+            <div className="flex flex-col gap-y-4 pt-4">
+              {currentAppAPIKeys?.map((apiKey, i) => (
+                <div
+                  className="flex items-center gap-2 justify-between px-4 h-8"
+                  key={apiKey}
                 >
-                  <Text
-                    weight={"medium"}
-                    size={"sm"}
-                    className="w-[100px] text-[#CB6262]"
+                  <div className="flex gap-x-24">
+                    <Text weight={"bold"} className="w-4">
+                      {i + 1}
+                    </Text>
+                    <Text weight={"bold"} className="w-20">
+                      ....{apiKey}
+                    </Text>
+                  </div>
+
+                  <Button
+                    variant={"danger"}
+                    className="h-8 w-[98px] flex justify-center items-center"
+                    onClick={() => openDeleteAlert(apiKey)}
                   >
-                    Delete
-                  </Text>
-                </Button>
-              </div>
-            ))}
+                    <Text
+                      weight={"medium"}
+                      size={"sm"}
+                      className="w-[100px] text-[#CB6262]"
+                    >
+                      Delete
+                    </Text>
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </DialogContent>
