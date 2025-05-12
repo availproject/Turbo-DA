@@ -145,7 +145,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="w-full">
-                    {app.fallback_enabled ? (
+                    {!+app.credit_balance ? (
                       <PrimaryProgress progress={progress} color={"green"} />
                     ) : (
                       <SecondaryProgress progress={progress} />
@@ -175,7 +175,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       </div>
                     </div>
                     <div className="flex gap-x-1.5">
-                      {app.fallback_enabled ? (
+                      {!+app.credit_balance ? (
                         <div className="h-3 w-3 bg-[#FF82C8] rounded-full" />
                       ) : (
                         <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">

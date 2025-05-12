@@ -36,8 +36,9 @@ const AppsCard = ({ token }: AppsCardProps) => {
 
   return (
     <>
-      <Card className="shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-lg pt-0 gap-0 flex-1 pb-0 block">
-        <CardHeader className="p-4 border-b border-border-blue gap-0">
+      <Card className="shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-lg pt-0 gap-0 flex-1 pb-0 block relative">
+        <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+        <CardHeader className="p-4 border-b border-border-blue gap-0 z-1 relative">
           <div className="flex items-center justify-between">
             <CardTitle>
               <Text size={"xl"} weight={"bold"} variant={"light-grey"}>
@@ -47,9 +48,10 @@ const AppsCard = ({ token }: AppsCardProps) => {
             <div className="flex items-center gap-6">
               <ToastContainer />
               <SecondarySelect
-                options={["All", "Allocated"]}
+                options={["All", "Unallocated", "Allocated"]}
                 onChange={(value) => setFilter(value as Filter)}
                 value={filter}
+                className="w-36"
               />
               <Button
                 variant="link"

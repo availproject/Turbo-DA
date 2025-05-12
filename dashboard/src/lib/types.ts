@@ -38,49 +38,7 @@ export const TOKEN_MAP: TokenMap = {
   },
 };
 
-export type Transaction = {
-  amount_avail_approved: string | null;
-  amount_token_deposited: string;
-  created_at: string;
-  id: number;
-  request_status: "Requested" | "Completed" | "Rejected";
-  token_address: string;
-  token_name: string;
-  token_symbol: string;
-  token_image: string;
-  user_id: string;
-};
-
 export enum SupportedChains {
   Mainnet = 1,
   Sepolia = 11155111,
 }
-
-export type BalanceResult = {
-  results: {
-    token_address: string;
-    token_balance: string;
-    token_details_id: number;
-    user_id: string;
-    token_used: string;
-  }[];
-};
-
-export type User = {
-  id: string;
-  name: string;
-  email: string;
-  app_id: number;
-  assigned_wallet: string;
-  credit_balance: string;
-  credit_used: string;
-};
-
-export type Balances = {
-  token_address: string;
-  token_balance: string;
-  token_name: string;
-  token_image: string;
-  token_used: string;
-  token_ticker?: string;
-};

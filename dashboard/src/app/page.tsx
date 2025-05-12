@@ -26,8 +26,8 @@ const DataPostingHistory = dynamic(
   }
 );
 
-const CreditBalance = dynamic(() => import("@/components/credit-balance"));
 const BuyCreditsCard = dynamic(() => import("@/components/buy-credit-cards"));
+const CreditBalance = dynamic(() => import("@/module/credit-balance"));
 const AppsCard = dynamic(() => import("@/components/apps-card"));
 
 export default async function Page() {
@@ -53,7 +53,8 @@ export default async function Page() {
                 <AppsCard token={token} />
               </SignedIn>
               <SignedOut>
-                <Card className="bg-[#192a3d] border-border-grey shadow-primary rounded-lg pt-0 gap-0 flex-1 flex justify-center items-center flex-col gap-y-2.5 h-[520px] bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%]">
+                <Card className="border-border-grey shadow-primary rounded-lg pt-0 gap-0 flex-1 flex justify-center items-center flex-col gap-y-2.5 h-[520px] bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] relative">
+                  <div className="bg-[url('/sign-in-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
                   <TurboOnWallet />
                   <Text weight={"semibold"} size={"base"}>
                     Sign In and Connect Your Wallet To Buy Credits

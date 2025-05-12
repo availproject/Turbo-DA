@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.17.0",
+    "@clerk/themes": "^2.2.43",
     "@datadog/browser-logs": "^6.6.3",
     "@lottiefiles/dotlottie-react": "^0.13.5",
     "@phosphor-icons/react": "^2.1.7",

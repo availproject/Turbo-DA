@@ -93,6 +93,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const debouncedValue = useDebounce(deferredTokenValue, 500);
 
   useEffect(() => {
+    // setOpen("credit-added");
     if (!account.address) return;
     showBalance({ token: account.address })
       .then((response) => {
@@ -113,7 +114,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   const calculateDataCredits = async () => {
     try {
-      const response = await CreditService.creditEstimates({
+      const response = await CreditService.calculatePurchaseCost({
         token: token!,
         data: +debouncedValue,
       });
@@ -212,8 +213,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   };
 
   return (
-    <Card className="w-full min-lg:w-[466px] shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0">
-      <CardContent className="p-4 h-full">
+    <Card className="w-full min-lg:w-[466px] shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0 relative">
+      <div className="bg-[url('/buy-credits-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+      <CardContent className="p-4 h-full z-1 relative">
         <Tabs defaultValue="buy" className="w-full gap-y-4 h-full">
           <TabsList className="w-full p-1 border border-solid border-border-blue rounded-3xl h-12">
             <TabsTrigger value="buy" variant="outline">

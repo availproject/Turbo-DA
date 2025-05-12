@@ -32,7 +32,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="fixed bottom-0 w-full bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] border-t border-border-grey px-4 py-1.5">
+    <footer className="fixed bottom-0 w-full bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] border-t border-border-grey px-4 py-1.5 z-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-x-2">
           <Text size={"xs"} className="text-[#FFFFFFB2]" weight={"bold"}>

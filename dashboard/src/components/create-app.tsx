@@ -154,156 +154,171 @@ export default function CreateApp({
     }
   };
 
+  const resetFields = () => {
+    setAppName("");
+    setAppId("");
+    setUploadedAvatar(undefined);
+    setPreviewUploadedAvatar(undefined);
+    setSelectedAvatar("");
+    setError("");
+  };
+
   return (
     <Dialog
       open={open === (id ?? "create-app")}
       onOpenChange={(value) => {
         setOpen(value ? "create-app" : "");
+        if (!value) {
+          resetFields();
+        }
       }}
     >
       <DialogContent className="min-w-[600px] h-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl flex flex-col gap-y-0">
-        <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-6 right-6">
-          <X color="#FFF" size={24} strokeWidth={1} />
-        </Close>
+        <div className="relative h-full flex flex-col">
+          <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+          <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-6 right-6">
+            <X color="#FFF" size={24} strokeWidth={1} />
+          </Close>
 
-        <DialogHeader className="px-6 pt-6 block">
-          <DialogTitle>
-            <Text size={"2xl"} weight={"bold"}>
-              {type === "create" ? "Create New App" : "Edit App"}
-            </Text>
-          </DialogTitle>
-        </DialogHeader>
+          <DialogHeader className="px-6 pt-6 block">
+            <DialogTitle>
+              <Text size={"2xl"} weight={"bold"}>
+                {type === "create" ? "Create New App" : "Edit App"}
+              </Text>
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex flex-col px-6 gap-6 mt-8">
-          <PrimaryInput
-            placeholder="eg. Aakash's App"
-            label="App Name"
-            value={appName}
-            onChange={(value) => setAppName(value)}
-          />
+          <div className="flex flex-col px-6 gap-6 mt-8">
+            <PrimaryInput
+              placeholder="eg. Aakash's App"
+              label="App Name"
+              value={appName}
+              onChange={(value) => setAppName(value)}
+            />
 
-          <div className="flex flex-col gap-2">
-            <Text
-              as="label"
-              size={"sm"}
-              weight={"medium"}
-              variant={"light-grey"}
-            >
-              Choose An Avatar
-            </Text>
-            <div className="flex flex-col gap-4">
-              <AvatarList
-                selected={selectedAvatar}
-                onClick={(value) => {
-                  setSelectedAvatar(value);
-                  setPreviewUploadedAvatar(undefined);
-                  setUploadedAvatar(undefined);
-                }}
-              />
-              {selectedAvatar?.includes(".") && !previewUploadedAvatar && (
-                <div className="flex items-center gap-x-3">
-                  <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded">
-                    <X
-                      color="#FFF"
-                      className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
-                      size={20}
-                      onClick={() => {
-                        setSelectedAvatar("");
-                      }}
-                    />
-
-                    <Image
-                      src={baseImageUrl(selectedAvatar)}
-                      alt="Avatar option"
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-              {previewUploadedAvatar && (
-                <div className="flex items-center gap-x-3">
-                  <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded-md p-1.5">
-                    <X
-                      color="#FFF"
-                      className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
-                      size={20}
-                      onClick={clearUploadAvatar}
-                    />
-
-                    <Image
-                      src={previewUploadedAvatar}
-                      alt="Avatar option"
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Button
-                variant={"ghost"}
-                className="flex items-center gap-1.5 py-1 cursor-pointer w-fit"
-                onClick={handleClick}
+            <div className="flex flex-col gap-2 relative z-1">
+              <Text
+                as="label"
+                size={"sm"}
+                weight={"medium"}
+                variant={"light-grey"}
               >
-                <div className="w-8 h-8 rounded overflow-hidden border border-dashed border-white flex items-center justify-center">
-                  <Plus size={24} color="#FFF" strokeWidth={1} />
-                </div>
-                <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-                  Upload From Device
-                </Text>
-                <input
-                  type="file"
-                  hidden
-                  ref={inputRef}
-                  accept="*/png"
-                  onChange={handleChange}
+                Choose An Avatar
+              </Text>
+              <div className="flex flex-col gap-4">
+                <AvatarList
+                  selected={selectedAvatar}
+                  onClick={(value) => {
+                    setSelectedAvatar(value);
+                    setPreviewUploadedAvatar(undefined);
+                    setUploadedAvatar(undefined);
+                  }}
                 />
-              </Button>
-            </div>
-          </div>
-          <PrimaryInput
-            placeholder="eg. AV1234"
-            label="App ID"
-            value={`${appId}`}
-            onChange={(value) => setAppId(value)}
-          />
-        </div>
+                {selectedAvatar?.includes(".") && !previewUploadedAvatar && (
+                  <div className="flex items-center gap-x-3">
+                    <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded">
+                      <X
+                        color="#FFF"
+                        className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
+                        size={20}
+                        onClick={() => {
+                          setSelectedAvatar("");
+                        }}
+                      />
 
-        <div className="px-6 mt-auto mb-6 pt-12 flex flex-col gap-y-2 items-center">
-          {!!error && (
-            <Text variant={"error"} size={"xs"}>
-              {error}
-            </Text>
-          )}
-          <Button
-            onClick={saveAppDetails}
-            variant={
-              !appName || !appId || (!selectedAvatar && !uploadedAvatar)
-                ? "disabled"
-                : "primary"
-            }
-            disabled={
-              loading ||
-              !appName ||
-              !appId ||
-              (!selectedAvatar && !uploadedAvatar)
-            }
-          >
-            {loading ? (
-              <LoaderCircle
-                className="animate-spin mx-auto"
-                color="#fff"
-                size={24}
-              />
-            ) : type === "edit" ? (
-              "Save"
-            ) : (
-              "Create New App"
+                      <Image
+                        src={baseImageUrl(selectedAvatar)}
+                        alt="Avatar option"
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+                {previewUploadedAvatar && (
+                  <div className="flex items-center gap-x-3">
+                    <div className="relative w-10 h-10 bg-[#2B4761] border border-grey-900 rounded-md p-1.5">
+                      <X
+                        color="#FFF"
+                        className="absolute -top-2.5 -right-2.5 bg-[#CF6679] rounded-full cursor-pointer p-0.5"
+                        size={20}
+                        onClick={clearUploadAvatar}
+                      />
+
+                      <Image
+                        src={previewUploadedAvatar}
+                        alt="Avatar option"
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant={"ghost"}
+                  className="flex items-center gap-1.5 py-1 cursor-pointer w-fit"
+                  onClick={handleClick}
+                >
+                  <div className="w-8 h-8 rounded overflow-hidden border border-dashed border-white flex items-center justify-center">
+                    <Plus size={24} color="#FFF" strokeWidth={1} />
+                  </div>
+                  <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
+                    Upload From Device
+                  </Text>
+                  <input
+                    type="file"
+                    hidden
+                    ref={inputRef}
+                    accept="*/png"
+                    onChange={handleChange}
+                  />
+                </Button>
+              </div>
+            </div>
+            <PrimaryInput
+              placeholder="eg. AV1234"
+              label="App ID"
+              value={`${appId}`}
+              onChange={(value) => setAppId(value)}
+            />
+          </div>
+
+          <div className="px-6 mt-auto mb-6 pt-12 flex flex-col gap-y-2 items-center relative z-1">
+            {!!error && (
+              <Text variant={"error"} size={"xs"}>
+                {error}
+              </Text>
             )}
-          </Button>
+            <Button
+              onClick={saveAppDetails}
+              variant={
+                !appName || !appId || (!selectedAvatar && !uploadedAvatar)
+                  ? "disabled"
+                  : "primary"
+              }
+              disabled={
+                loading ||
+                !appName ||
+                !appId ||
+                (!selectedAvatar && !uploadedAvatar)
+              }
+            >
+              {loading ? (
+                <LoaderCircle
+                  className="animate-spin mx-auto"
+                  color="#fff"
+                  size={24}
+                />
+              ) : type === "edit" ? (
+                "Save"
+              ) : (
+                "Create New App"
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

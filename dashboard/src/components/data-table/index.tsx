@@ -59,13 +59,14 @@ const DynamicTable: FC<DynamicTableProps> = ({
           listdata.map((data, index) => (
             <div
               key={index}
-              className="flex justify-between rounded-lg mb-4 py-1 border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey"
+              className="flex justify-between rounded-lg mb-4  border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey overflow-hidden z-1 relative"
             >
+              <div className="bg-[url('/table-row-noise.png')] bg-no-repeat absolute h-[50px] opacity-80 w-full z-0" />
               {headings.map((heading, index, array) => (
                 <div
                   key={heading.key}
                   className={cn(
-                    "flex min-w-[150px]",
+                    "flex min-w-[150px] relative",
                     array.length - 1 === index ? "justify-end" : "justify-start"
                   )}
                 >
@@ -82,56 +83,6 @@ const DynamicTable: FC<DynamicTableProps> = ({
                 </div>
               ))}
             </div>
-            // <div
-            //   key={index}
-            //   className="flex justify-between border border-[#444753] rounded-lg mb-4 bg-[#192A3D] py-1 shadow-b-lg"
-            // >
-            //   <div className="flex min-w-[150px]">
-            //     <Text
-            //       weight={"bold"}
-            //       size={"base"}
-            //       className="py-3 px-4 text-left"
-            //     >
-            //       {purchase.date}
-            //     </Text>
-            //   </div>
-            //   <div className="flex min-w-[150px]">
-            //     <Text
-            //       weight={"bold"}
-            //       size={"base"}
-            //       className="py-3 px-4 text-left text-[#88D67B]"
-            //     >
-            //       {purchase.type}
-            //     </Text>
-            //   </div>
-            //   <div className="flex min-w-[150px]">
-            //     <Text
-            //       weight={"bold"}
-            //       size={"base"}
-            //       className="py-3 px-4 text-left"
-            //     >
-            //       {purchase.token}
-            //     </Text>
-            //   </div>
-            //   <div className="flex min-w-[150px]">
-            //     <Text
-            //       weight={"bold"}
-            //       size={"base"}
-            //       className="py-3 px-4 text-left"
-            //     >
-            //       {purchase.amountPaid}
-            //     </Text>
-            //   </div>
-            //   <div className="flex min-w-[150px] justify-end">
-            //     <Text
-            //       weight={"bold"}
-            //       size={"base"}
-            //       className="py-3 px-4 text-left"
-            //     >
-            //       {purchase.creditReceived.toLocaleString()} KB
-            //     </Text>
-            //   </div>
-            // </div>
           ))
         ) : (
           <div className="flex justify-center items-center flex-col h-[334px]">
