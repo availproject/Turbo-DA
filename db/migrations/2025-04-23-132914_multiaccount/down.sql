@@ -1,5 +1,10 @@
 ALTER TABLE customer_expenditures
-DROP COLUMN app_id;
+DROP COLUMN app_id,
+DROP COLUMN updated_at;
+
+ALTER TABLE credit_requests
+DROP COLUMN app_id,
+DROP COLUMN updated_at;
 
 ALTER TABLE api_keys DROP CONSTRAINT fk_api_keys_app_id;
 ALTER TABLE api_keys DROP COLUMN app_id;
