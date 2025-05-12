@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{io::Read, str::FromStr};
 
 use reqwest::Client;
 use turbo_da_core::utils::{get_prices, TOKEN_MAP};
@@ -60,10 +60,14 @@ impl Utils {
             .await
             .map_err(|e| format!("Failed to get amount to be credited: {}", e))?;
 
-        let parsed_id = order_id
-            .trim_start_matches("0x")
-            .parse::<i32>()
+        println!("Amount to be credited: {}", amount);
+
+        println!("Order ID: {}", order_id);
+
+        let parsed_id = i32::from_str_radix(order_id.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse order ID: {}", e))?;
+
+        println!("Parsed ID: {}", parsed_id);
 
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
