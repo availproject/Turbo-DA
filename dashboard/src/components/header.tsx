@@ -8,7 +8,7 @@ import Button from "./button";
 
 async function Header() {
   return (
-    <header className="sticky top-0 z-10 w-full h-16 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-10 flex items-center justify-between">
+    <header className="sticky top-0 z-2 w-full h-16 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-10 flex items-center justify-between">
       <div className="flex gap-x-3 items-center">
         <Image alt="Avail logo" src="/logo.svg" width={110} height={32} />
         <Text

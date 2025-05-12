@@ -33,7 +33,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
     .then((res) => ({ fullName: res?.fullName }))
     .catch((error) => ({ fullName: undefined }));
 
-  const token = await authDetails.token;
+  const token = await authDetails?.token;
 
   let getUserDetails = await AuthenticationService.fetchUser({
     token: token!,
@@ -47,7 +47,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
       return {};
     });
 
-  if (!!getUserDetails) {
+  if (!getUserDetails) {
     const registerUser = await AuthenticationService.registerUser({
       token: token!,
       name: user?.fullName!,

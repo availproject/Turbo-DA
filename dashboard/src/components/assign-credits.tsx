@@ -5,7 +5,7 @@ import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
-import { AppDetails } from "@/services/credit/response";
+import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Wallet, X } from "lucide-react";
@@ -53,7 +53,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         {
           theme: "colored",
           progressClassName: "bg-[#78C47B]",
-          closeButton: (
+          closeButton: () => (
             <X
               color="#FFF"
               size={20}
@@ -67,6 +67,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
+            top: "60px",
           },
         }
       );

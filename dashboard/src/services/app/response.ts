@@ -9,4 +9,5 @@ export interface AppDetails {
   credit_balance: string;
   credit_used: string;
   fallback_enabled: boolean;
+  allback_updated_at: { updated_at: string; value: boolean }[];
 }

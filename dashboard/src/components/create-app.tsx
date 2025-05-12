@@ -6,10 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import useApp from "@/hooks/useApp";
 import { baseImageUrl } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
-import { AppDetails } from "@/services/credit/response";
+import { AppDetails } from "@/services/app/response";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import Image from "next/image";
@@ -44,6 +45,7 @@ export default function CreateApp({
   );
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
+  const { updateAppList } = useApp();
 
   const saveAppDetails = useCallback(async () => {
     if ((!selectedAvatar && !previewUploadedAvatar) || !appId || !appName) {
@@ -92,6 +94,8 @@ export default function CreateApp({
         response,
       });
 
+      updateAppList();
+
       toast(
         <Success
           label={
@@ -101,7 +105,7 @@ export default function CreateApp({
         {
           theme: "colored",
           progressClassName: "bg-[#78C47B]",
-          closeButton: (
+          closeButton: () => (
             <X
               color="#FFF"
               size={20}
@@ -115,6 +119,7 @@ export default function CreateApp({
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
+            top: "60px",
           },
         }
       );

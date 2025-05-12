@@ -60,6 +60,7 @@ const Footer = () => {
             <Link
               key={index}
               href={link.url}
+              target="_blank"
               className="w-5 h-5 flex justify-center items-center"
             >
               {link.icon}
