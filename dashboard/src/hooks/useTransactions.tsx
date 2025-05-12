@@ -1,17 +1,20 @@
-import { useCallback, useEffect } from "react";
-import useWallet from "./useWallet";
-import { useAuth } from "@clerk/nextjs";
-import { fetchTokenBalances, fetchTransactions } from "@/lib/services";
-import { useCommonStore } from "@/store/common";
-import { getToken as getEthToken } from "@wagmi/core";
-import { capitalizeFirstLetter, getTokenDecimals, getTokenNameByAddress, getTokenTicker, template } from "@/lib/utils";
-import { Balances, Transaction } from "@/lib/types";
 import { Logger } from "@/lib/logger";
-import { toast } from "@/components/ui/use-toast";
-import { showFailedMessage } from "@/utils/toasts";
-import { pollWithDelay } from "@/lib/poller";
-import { useAccount } from "wagmi";
+import { fetchTokenBalances, fetchTransactions } from "@/lib/services";
+import { Balances, Transaction } from "@/lib/types";
+import {
+  capitalizeFirstLetter,
+  getTokenDecimals,
+  getTokenNameByAddress,
+  getTokenTicker,
+  template,
+} from "@/lib/utils";
+import { useCommonStore } from "@/store/common";
+// import { showFailedMessage } from "@/utils/toasts";
+import { useAuth } from "@clerk/nextjs";
+import { useCallback, useEffect } from "react";
 import { formatUnits } from "viem";
+import { useAccount } from "wagmi";
+import useWallet from "./useWallet";
 
 export default function useTransactions() {
   const { switchNetwork, activeUserAddress, activeNetworkId, showBalance } =
@@ -69,7 +72,7 @@ export default function useTransactions() {
 
       transactions.requests.forEach(async (transaction) => {
         const tokenName = getTokenNameByAddress(transaction.token_address);
-      
+
         _recentTransactions.push({
           ...transaction,
           token_name: tokenName,
@@ -111,27 +114,30 @@ export default function useTransactions() {
         const tokenName = getTokenNameByAddress(token.token_address);
         const tokenDecimals = getTokenDecimals(tokenName);
         const tokenTicker = getTokenTicker(tokenName);
-      
+
         _balances.push({
           token_name: capitalizeFirstLetter(tokenName),
           token_address: token.token_address,
           token_image: `/tokens/${token.token_address}.png`,
-          token_balance: formatUnits(BigInt(token.token_balance), tokenDecimals),
+          token_balance: formatUnits(
+            BigInt(token.token_balance),
+            tokenDecimals
+          ),
           token_ticker: tokenTicker,
           token_used: formatUnits(BigInt(token.token_used), tokenDecimals),
         });
       });
-      
+
       setTokenBalances(_balances);
 
       setTokenBalances(_balances);
       return _balances;
     } catch (error: any) {
       Logger.error(`BALANCE_FETCHER_ERROR ${error.message} - ${error.status}`);
-      showFailedMessage({
-        title: "Error",
-        description: "An error occurred while fetching token balances",
-      });
+      // showFailedMessage({
+      //   title: "Error",
+      //   description: "An error occurred while fetching token balances",
+      // });
     }
   }, [getToken, isSignedIn, setTokenBalances]);
 

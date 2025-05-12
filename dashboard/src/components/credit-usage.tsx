@@ -26,11 +26,9 @@ const chartData = [
 const chartConfig = {
   assignedBalance: {
     label: "Assigned Balance",
-    color: "#dadada",
   },
   mainBalance: {
     label: "Main Balance",
-    color: "#dadada",
   },
 } satisfies ChartConfig;
 
@@ -53,11 +51,11 @@ const CreditUsage = ({ token }: { token?: string }) => {
   const [filter, setFilter] = useState(month[0]);
 
   return (
-    <Card className="w-full min-lg:w-[464px] bg-[#192A3D] rounded-2xl border-[#444753] p-0 gap-0">
-      <CardHeader className="p-4 border-b border-[#565656]">
+    <Card className="w-full min-lg:w-[464px] shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 gap-0">
+      <CardHeader className="p-4 border-b border-border-blue">
         <div className="flex items-center justify-between">
           <CardTitle>
-            <Text weight={"bold"} size={"xl"}>
+            <Text weight={"semibold"} size={"xl"}>
               Credit Usage
             </Text>
           </CardTitle>
@@ -70,14 +68,17 @@ const CreditUsage = ({ token }: { token?: string }) => {
       </CardHeader>
       <ChartContainer
         config={chartConfig}
-        className="min-h-[340px] w-full my-4"
+        className="min-h-[340px] w-full my-4 -ml-2"
       >
         <BarChart accessibilityLayer data={chartData}>
-          <Bar dataKey="assignedBalance" fill="#EB7BF4" radius={[3, 3, 0, 0]} />
           <Bar dataKey="mainBalance" fill="#88D67B" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="assignedBalance" fill="#EB7BF4" radius={[3, 3, 0, 0]} />
           <ChartTooltip
             content={
-              <ChartTooltipContent className="bg-[#0F1F30] border border-[#444753] text-white" />
+              <ChartTooltipContent
+                hideLabel={true}
+                className="bg-black border border-border-grey shadow-primary text-white"
+              />
             }
             cursor={false}
           />
@@ -86,13 +87,21 @@ const CreditUsage = ({ token }: { token?: string }) => {
             tickLine={false}
             tickMargin={10}
             axisLine={true}
+            fontWeight={500}
+            style={{
+              fill: "#C6CACF",
+            }}
           />
           <YAxis
             dataKey="assignedBalance"
             tickLine={false}
             tickMargin={10}
             axisLine={true}
-            tickCount={7}
+            tickCount={9}
+            style={{
+              fill: "#C6CACF",
+            }}
+            fontWeight={500}
           />
         </BarChart>
       </ChartContainer>

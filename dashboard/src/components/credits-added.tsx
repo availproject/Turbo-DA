@@ -20,12 +20,6 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
     }
   }, [open]);
 
-  const popupData = {
-    credits: credits,
-    title: "Credits Added Successfully",
-    description: "Allocate these credits to your app now",
-  };
-
   return (
     <Dialog
       open={"credit-added" === open}
@@ -35,11 +29,11 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
         }
       }}
     >
-      <DialogContent className="p-0 border-none bg-[#192a3d] text-white max-w-[600px] w-[600px] rounded-2xl">
+      <DialogContent className="p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] text-white max-w-[600px] w-[600px] rounded-2xl">
         <Card className="relative w-[600px] h-[400px] bg-[#192a3d] rounded-2xl overflow-hidden border border-solid border-transparent">
           <DialogTitle></DialogTitle>
           <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-4 right-4">
-            <X color="#FFF" size={32} strokeWidth={1} />
+            <X color="#FFF" size={24} strokeWidth={1} />
           </Close>
 
           <CardContent className="flex flex-col items-center justify-center h-full pt-0">
@@ -50,29 +44,20 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
                 </div>
 
                 <Text
-                  weight={"bold"}
+                  weight={"semibold"}
                   size={"sxl"}
                   className="relative self-stretch text-center"
                 >
-                  {popupData.credits}
+                  {credits}
                 </Text>
               </div>
 
               <Text
                 size={"2xl"}
-                weight={"bold"}
-                className="relative self-stretch text-[#88d67b] text-center"
+                weight={"semibold"}
+                className="text-[#78C47B] text-center"
               >
-                {popupData.title}
-              </Text>
-
-              <Text
-                weight={"medium"}
-                variant={"light-grey"}
-                size={"sm"}
-                className="relative w-fit text-center"
-              >
-                {popupData.description}
+                Credits Added Successfully
               </Text>
             </div>
           </CardContent>

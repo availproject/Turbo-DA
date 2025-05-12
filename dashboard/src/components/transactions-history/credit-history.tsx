@@ -1,33 +1,49 @@
-import { cn } from "@/lib/utils";
+"use client";
+import { cn, formatDataBytes } from "@/lib/utils";
 import HistoryService from "@/services/history";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
 
-const CreditHistory = async ({ token }: { token?: string }) => {
-  const response = await HistoryService.getCreditHistory({
-    token: token!,
-  })
-    .then((response) => response.data.filter((credit:any) => credit?.request_status === 'Processed'))
-    .catch((error) => []);
+const CreditHistory = ({ token }: { token?: string }) => {
+  const router = useRouter();
+  const [historyList, setHistoryList] = useState<any[]>();
 
-    console.log({
-      response
-    });
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const response = await HistoryService.getCreditHistory({
+        token: token!,
+      });
+      const processedHistory = response?.data?.filter(
+        (credit: any) => credit?.request_status === "Processed"
+      );
+      setHistoryList(processedHistory);
+    } catch (error) {
+      setHistoryList([]);
+    }
+  };
 
   return (
     <>
-      <div className="h-px bg-[#575757]" />
-      {!response?.length ? (
+      <div className="h-px bg-[#2B4761]" />
+      {!historyList?.length ? (
         <EmptyState
           message="Your Credit History Would Be Shown Here"
           cta={{
-            link: "/",
+            action: () => {
+              window.location.reload();
+            },
             label: "Buy Credits",
           }}
         />
       ) : null}
-      {response.length ? (
+      {historyList?.length ? (
         <DynamicTable
           headings={[
             { key: "created_at", label: "Purchasing Date" },
@@ -36,16 +52,18 @@ const CreditHistory = async ({ token }: { token?: string }) => {
             { key: "request_status", label: "Amount Paid" },
             { key: "amount_credit", label: "Credit Received" },
           ]}
-          listdata={response}
+          listdata={historyList}
           renderCell={(heading: string, value: any, last: boolean) => (
             <div className={cn("flex w-[150px]", last && "justify-end")}>
               <Text
                 weight={"bold"}
                 size={"base"}
                 className={cn("py-3 px-4", !last && "text-right")}
-                variant={heading === "type" ? "green" : "white"}
+                variant={heading === "request_type" ? "green" : "white"}
               >
-                {value??'-'}
+                {heading === "amount_credit"
+                  ? formatDataBytes(value)
+                  : value ?? "-"}
               </Text>
             </div>
           )}

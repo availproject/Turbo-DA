@@ -1,23 +1,37 @@
+"use client";
 import { cn } from "@/lib/utils";
 import HistoryService from "@/services/history";
+import { useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
 
-const DataPostingHistory = async ({ token }: { token?: string }) => {
-  const response = await HistoryService.getDataPostingHistory({
-    token: token!,
-  })
-    .then((response) => response.data.results)
-    .catch((error) => []);
+const DataPostingHistory = ({ token }: { token?: string }) => {
+  const [historyList, setHistoryList] = useState<any[]>();
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const response = await HistoryService.getDataPostingHistory({
+        token: token!,
+      });
+
+      setHistoryList(response?.data?.results ?? []);
+    } catch (error) {
+      setHistoryList([]);
+    }
+  };
 
   return (
     <>
-      <div className="h-px bg-[#575757]" />
-      {!response?.length ? (
+      <div className="h-px bg-[#2B4761]" />
+      {!historyList?.length ? (
         <EmptyState message="Your Data Posting History Would Be Shown Here" />
       ) : null}
-      {response?.length ? (
+      {historyList?.length ? (
         <>
           <Text
             variant={"light-grey"}
@@ -33,7 +47,7 @@ const DataPostingHistory = async ({ token }: { token?: string }) => {
               { key: "amount_data", label: "Data Posted" },
               { key: "converted_fees", label: "Discount Received" },
             ]}
-            listdata={response}
+            listdata={historyList}
             renderCell={(heading: string, value: any, last: boolean) => {
               return (
                 <div

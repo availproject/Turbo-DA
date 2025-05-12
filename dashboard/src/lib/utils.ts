@@ -13,29 +13,40 @@ export enum APP_TABS {
 
 export const numberToBytes32 = (num: number): `0x${string}` => {
   const hex = num.toString(16);
-  const paddedHex = hex.padStart(64, '0');
+  const paddedHex = hex.padStart(64, "0");
   return `0x${paddedHex}` as `0x${string}`;
 };
 
 export const tokenMap = {
-  ethereum:{
-    tokenAddress:'0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44'
+  ethereum: {
+    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
   },
-  avail:{
-    tokenAddress:'0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44'
-  }
-}
+  avail: {
+    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
+  },
+};
 
-export const formatDataBytes = (bytes: number, decimals = 2) => {
+export const baseImageUrl = (path?: string) => {
+  return process.env.NEXT_PUBLIC_IMAGES_URL! + path;
+};
+
+export const maskNumber = (value: string) => {
+  if (value.length <= 5) return value;
+  return "..." + value.slice(-5);
+};
+
+export const formatDataBytes = (bytes: number, decimals = 4) => {
   if (bytes === 0) return "0 Bytes";
 
   const k = 1024;
   const dm = Math.max(0, decimals);
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB"];
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
 
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
+    sizes[i] ?? ""
+  }`;
 };
 
 export function formatBalance(balance: string) {

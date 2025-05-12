@@ -49,7 +49,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const filterAppList = useMemo(
     () =>
       appsList.filter((app) =>
-        filter === "Allocated" ? app.credit_used !== "0" : true
+        filter === "Allocated" ? app.credit_balance !== "0" : true
       ),
     [appsList, filter]
   );

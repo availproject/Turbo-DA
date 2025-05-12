@@ -1,18 +1,22 @@
 import Button from "@/components/button";
-import { formatDataBytes } from "@/lib/utils";
+import useBalance from "@/hooks/useBalance";
+import { avatarList } from "@/lib/constant";
+import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/credit/response";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import Success from "./toast/success";
 import { Dialog, DialogContent } from "./ui/dialog";
-import useBalance from "@/hooks/useBalance";
 
 type ReclaimCreditsProps = {
   id: string;
@@ -29,7 +33,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      const response = await CreditService.reclaimCredits({
+      const response = await AppService.reclaimCredits({
         token: token!,
         amount,
         appId: appData.id,
@@ -37,8 +41,35 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
       console.log({
         response,
       });
-      updateCreditBalance()
-      setOpen('')
+      updateCreditBalance();
+      setOpen("");
+      toast(
+        <Success
+          label="Credits Reclaimed Successfully!"
+          description={`${formatDataBytes(
+            +amount
+          )} credits successfully reclaimed from ${appData.app_name}`}
+        />,
+        {
+          theme: "colored",
+          progressClassName: "bg-[#78C47B]",
+          closeButton: (
+            <X
+              color="#FFF"
+              size={20}
+              className="cursor-pointer"
+              onClick={() => toast.dismiss()}
+            />
+          ),
+          style: {
+            backgroundColor: "#78C47B29",
+            width: "530px",
+            display: "flex",
+            justifyContent: "space-between",
+            borderRadius: "8px",
+          },
+        }
+      );
     } catch (error) {
     } finally {
       setLoading(false);
@@ -54,27 +85,46 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
         }
       }}
     >
-      <DialogContent className="w-full sm:max-w-[600px] bg-[#192a3d] rounded-2xl overflow-hidden border border-solid border-transparent p-4 flex flex-col focus-within:outline-0">
-        <div className="flex justify-between items-center mb-6">
+      <DialogContent className="min-w-[600px] h-[600px] border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey rounded-2xl overflow-hidden p-4 flex flex-col focus-within:outline-0">
+        <div className="flex justify-between items-center mb-2">
           <DialogTitle>
-            <Text weight={"bold"} size={"2xl"}>
+            <Text weight={"semibold"} size={"2xl"}>
               Reclaim Credits
             </Text>
           </DialogTitle>
 
           <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
-            <X color="#FFF" size={32} strokeWidth={1} />
+            <X color="#FFF" size={24} strokeWidth={1} />
           </Close>
         </div>
 
         <div className="flex flex-col gap-4 flex-1">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.svg" width={40} height={40} alt="" />
-            <div className="flex flex-col gap-y-1.5">
-              <Text size={"sm"} variant={"light-grey"}>
+          <div className="flex items-center gap-x-2">
+            {appData.app_logo.includes(".") ? (
+              <Image
+                className="w-10 h-auto mb-1"
+                alt={appData.app_name}
+                src={baseImageUrl(appData.app_logo)}
+                width={40}
+                height={40}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded overflow-hidden mb-1">
+                <DotLottieReact
+                  src={avatarList?.[appData.app_logo].path}
+                  loop
+                  autoplay
+                  playOnHover={true}
+                  width={40}
+                  height={40}
+                />
+              </div>
+            )}
+            <div className="">
+              <Text size={"sm"} variant={"light-grey"} weight="medium">
                 {appData.app_name} Balance
               </Text>
-              <Text size={"2xl"} weight={"bold"}>
+              <Text size={"2xl"} weight={"semibold"}>
                 {formatDataBytes(+appData.credit_balance)}
               </Text>
             </div>
@@ -85,8 +135,27 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
               <Text size={"sm"} weight={"medium"} as="label">
                 From
               </Text>
-              <div className="relative border border-grey-900 rounded-lg items-center p-4 h-12 flex gap-x-2">
-                <Image src="/logo.svg" width={40} height={40} alt="" />
+              <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
+                {appData.app_logo.includes(".") ? (
+                  <Image
+                    className="w-8 h-auto"
+                    alt={appData.app_name}
+                    src={baseImageUrl(appData.app_logo)}
+                    width={32}
+                    height={40}
+                  />
+                ) : (
+                  <div className="w-6 rounded overflow-hidden">
+                    <DotLottieReact
+                      src={avatarList?.[appData.app_logo].path}
+                      loop
+                      autoplay
+                      playOnHover={true}
+                      width={24}
+                      height={24}
+                    />
+                  </div>
+                )}
                 <Text size={"sm"} weight={"medium"} as="label">
                   {appData.app_name}
                 </Text>
@@ -96,7 +165,7 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
               <Text size={"sm"} weight={"medium"} as="label">
                 To
               </Text>
-              <div className="relative border border-grey-900 flex rounded-lg items-center p-4 h-12">
+              <div className="relative border border-border-blue flex rounded-lg items-center p-3 h-12">
                 <Text size={"sm"} weight={"medium"} as="label">
                   Main Credit Balance
                 </Text>
@@ -120,22 +189,28 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
                   setAmount("");
                   return;
                 }
-                if (isNaN(+value)) {
-                  return;
+                if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  setAmount(value);
                 }
-
-                const parsedValue = parseInt(value);
-                setAmount(parsedValue.toString());
               }}
               value={amount}
+              error={
+                +appData.credit_balance < +amount
+                  ? `Amount can’t exceed the app balance ${appData.credit_balance}`
+                  : ""
+              }
             />
           </div>
         </div>
 
         <div className="mt-auto pt-20">
           <Button
-            variant={!amount ? "disabled" : "primary"}
-            disabled={loading || !amount}
+            variant={
+              !amount || +appData.credit_balance < +amount
+                ? "disabled"
+                : "secondary"
+            }
+            disabled={loading || !amount || +appData.credit_balance < +amount}
             onClick={handleSubmit}
           >
             {loading ? (
@@ -144,6 +219,8 @@ export default function ReclaimCredits({ id, appData }: ReclaimCreditsProps) {
                 color="#fff"
                 size={24}
               />
+            ) : !amount ? (
+              "Enter Amount"
             ) : (
               "Confirm"
             )}

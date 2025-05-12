@@ -1,32 +1,44 @@
 "use client";
-import { cn, formatDataBytes } from "@/lib/utils";
+import useAPIKeys from "@/hooks/useApiKeys";
+import { avatarList } from "@/lib/constant";
+import { baseImageUrl, cn, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import CreditService from "@/services/credit";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/credit/response";
-import { Copy, Info, InfoIcon, Pencil, X } from "lucide-react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { Copy, Pencil, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import AssignCredits from "./assign-credits";
 import Button from "./button";
 import CreateApp from "./create-app";
 import DeleteKeyAlert from "./delete-key-alert";
 import { useDialog } from "./dialog/provider";
-import { Progress } from "./progress";
+import PrimaryProgress from "./progress/primary-progress";
+import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
+import SwitchDescription from "./switch-description";
 import { Text } from "./text";
+import Success from "./toast/success";
 import { Skeleton } from "./ui/skeleton";
-import { Switch } from "./ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
+  const [useMainBalance, setUseMainBalance] = useState(
+    +app.credit_balance ? false : app.fallback_enabled ? true : false
+  );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
-  const { apiKeys, setAPIKeys } = useOverview();
+  const { apiKeys, creditBalance } = useOverview();
+  const { updateAPIKeys } = useAPIKeys();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
+
   const progress =
     (+app.credit_used / +app.credit_balance + +app.credit_used) * 100;
 
@@ -34,228 +46,276 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await CreditService.generateAPIKey({
+      const response = await AppService.generateAPIKey({
         token,
         appId: `${app.id}`,
       });
       setApiKey(response.data?.api_key);
-      if (response.data?.api_key) {
-        setAPIKeys((prev) => ({
-          ...prev,
-          [app.app_id]: [
-            ...(apiKeys?.[app.app_id] ?? []),
-            response.data?.api_key,
-          ],
-        }));
-      }
+      response.data?.api_key && updateAPIKeys();
     } catch (error) {
     } finally {
       setLoading(false);
     }
   };
 
+  const updateFallbackHandler = async () => {
+    try {
+      const response = await AppService.updateApp({
+        token: token!,
+        appId: `${app.app_id}`,
+        appName: app.app_name,
+        avatar: app.app_logo,
+        id: app.id,
+        fallbackEnabled: useMainBalance,
+      });
+      console.log({
+        response,
+      });
+    } catch (error) {
+      console.log({
+        error,
+      });
+    }
+  };
+
+  const disableToggle = useMemo(() => {
+    if (+app.credit_balance || !creditBalance) {
+      return true;
+    }
+
+    return false;
+  }, [creditBalance]);
+
   return (
-    <div className="flex items-start justify-between p-4 rounded-lg border border-solid border-[#565656] relative overflow-hidden">
-      <div className="flex items-start gap-1.5 flex-1">
-        <div className="w-10 h-10 bg-white rounded flex items-center justify-center">
-          <Image
-            className="w-8 h-auto"
-            alt="App icon"
-            src="/logo.svg"
-            width={32}
-            height={40}
-          />
+    <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
+      <div className="flex w-full gap-x-1.5">
+        <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
+          {app.app_logo.includes(".") ? (
+            <Image
+              className="w-8 h-auto"
+              alt={app.app_name}
+              src={baseImageUrl(app.app_logo)}
+              width={32}
+              height={40}
+            />
+          ) : (
+            <div className="w-10 rounded overflow-hidden">
+              <DotLottieReact
+                src={avatarList?.[app.app_logo].path}
+                loop
+                autoplay
+                playOnHover={true}
+                width={40}
+                height={40}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2 flex-1">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <Text weight={"medium"} size={"base"}>
-                  {app.app_name}
-                </Text>
-                <Button
-                  variant="ghost"
-                  className="w-6 h-6 p-0 bg-[#88919a] rounded-2xl hover:bg-[#88919a] cursor-pointer"
-                  onClick={() => setOpen("update-app" + app.id)}
-                >
-                  <Pencil size={24} color="#FFF" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Text variant={"light-grey"} weight={"medium"} size={"sm"}>
-                  App ID:
-                </Text>
-                <Text size={"base"} weight={"bold"}>
-                  {app.app_id}
-                </Text>
-              </div>
+        <div className="flex items-center justify-between flex-1">
+          <div className="flex flex-col justify-between">
+            <div className="flex items-center gap-1.5 justify-between">
+              <Text weight={"semibold"}>{app.app_name}</Text>
+              <Button
+                variant="ghost"
+                className="w-6 h-6 p-1 bg-[#2F4252] rounded-2xl hover:bg-[#2F4252] cursor-pointer"
+                onClick={() => setOpen("update-app" + app.id)}
+              >
+                <Pencil size={24} color="#FFF" />
+              </Button>
             </div>
+            <div className="flex items-center gap-1.5">
+              <Text variant={"light-grey"} weight={"medium"} size={"sm"}>
+                App ID:
+              </Text>
+              <Text size={"base"} weight={"bold"}>
+                {app.app_id}
+              </Text>
+            </div>
+          </div>
 
-            {progress ? (
-              <div className="flex flex-col w-[200px] items-end gap-2">
-                <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-                  Used: {formatDataBytes(+app.credit_used)}/
-                  {formatDataBytes(+app.credit_balance + +app.credit_used)}
-                </Text>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="w-full">
-                      <Progress value={30} color={"green"} />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-[#0F1F30]">
-                    <div className="flex flex-col gap-y-2">
-                      <div className="flex gap-x-1.5">
-                        <div className="h-3 w-3 rounded-full bg-[#7DC372] mt-0.5" />
-                        <div>
-                          <Text
-                            variant={"light-grey"}
-                            weight={"medium"}
-                            size={"xs"}
-                          >
-                            Used
-                          </Text>
-                          <Text weight={"medium"} size={"xs"}>
-                            00
-                          </Text>
-                        </div>
+          {+app.credit_balance ? (
+            <div className="flex flex-col w-[200px] items-end gap-2">
+              <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
+                Used: {+app.credit_used ? formatDataBytes(+app.credit_used) : 0}
+                /{formatDataBytes(+app.credit_balance + +app.credit_used)}
+              </Text>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full">
+                    {app.fallback_enabled ? (
+                      <PrimaryProgress progress={progress} color={"green"} />
+                    ) : (
+                      <SecondaryProgress progress={progress} />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-black w-[147px] p-2">
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex gap-x-1.5">
+                      <div
+                        className={cn(
+                          "h-3 w-3 rounded-full mt-0.5",
+                          app.fallback_enabled ? "bg-[#7DC372]" : "bg-[#FF82C8]"
+                        )}
+                      />
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Used
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {formatDataBytes(+app.credit_used)}
+                        </Text>
                       </div>
-                      <div className="flex gap-x-1.5">
+                    </div>
+                    <div className="flex gap-x-1.5">
+                      {app.fallback_enabled ? (
+                        <div className="h-3 w-3 bg-[#FF82C8] rounded-full" />
+                      ) : (
                         <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
                           <div className="h-3 w-0.5 bg-[#dadada33]" />
                         </div>
-                        <div>
-                          <Text
-                            variant={"light-grey"}
-                            weight={"medium"}
-                            size={"xs"}
-                          >
-                            Unused
-                          </Text>
-                          <Text weight={"medium"} size={"xs"}>
-                            500KB
-                          </Text>
-                        </div>
+                      )}
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Unused
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {formatDataBytes(+app.credit_used)}
+                        </Text>
                       </div>
                     </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            ) : null}
-            {!progress ? (
-              <div className="flex w-fit items-end gap-2">
-                <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-                  [App will use unallocated credits]
-                </Text>
-                <Info color="#dadada" size={20} className="cursor-pointer" />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex items-start gap-x-4 mt-1">
-            <Text
-              size={"sm"}
-              weight={"bold"}
-              variant={"blue"}
-              className="underline underline-offset-[2.5px] cursor-pointer"
-              onClick={() => {
-                generateApiKey();
-                setDisplayAPIKey(true);
-              }}
-            >
-              Generate API Key
-            </Text>
-            <div
-              className="flex gap-x-0.5 cursor-pointer"
-              onClick={() => setOpen("view-key" + app.id)}
-            >
-              <Text
-                size={"sm"}
-                weight={"bold"}
-                variant={"light-grey"}
-                className={cn(
-                  "underline underline-offset-[2.5px]",
-                  !apiKeys?.[app.id]?.length && "opacity-30"
-                )}
-              >
-                View All Keys
-              </Text>
-              {apiKeys?.[app.id]?.length ? (
-                <Text size={"sm"} weight={"bold"} variant={"light-grey"}>
-                  ({apiKeys?.[app.id]?.length})
-                </Text>
-              ) : null}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             </div>
-
-            <Text
-              size={"sm"}
-              weight={"bold"}
-              variant={"light-grey"}
-              onClick={() => setOpen("assign-credits" + app.id)}
-              className={cn(
-                "underline underline-offset-[2.5px]",
-                apiKeys?.[app.id]?.length ? "cursor-pointer" : "opacity-30"
-              )}
-            >
-              Assign Credits
-            </Text>
-            <Text
-              size={"sm"}
-              weight={"bold"}
-              variant={"light-grey"}
-              className={cn(
-                "underline underline-offset-[2.5px]",
-                +app.credit_used ? "cursor-pointer" : "opacity-30"
-              )}
-              onClick={() => setOpen("reclaim-credits" + app.id)}
-            >
-              Reclaim Credits
-            </Text>
-          </div>
-          <div className="flex items-center space-x-2 mt-1">
-            <Switch id="airplane-mode" />
-            <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-              Use Main Credit Balance
-            </Text>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InfoIcon size={20} color="#FFF" className="cursor-pointer" />
-              </TooltipTrigger>
-              <TooltipContent className="bg-[#0F1F30] w-[300px]">
-                <Text
-                  size={"sm"}
-                  weight={"medium"}
-                  variant={"light-grey"}
-                  className="text-[#aaabac]"
-                >
-                  By default, apps use your{" "}
-                  <Text as="i">‘Unallocated Credits’</Text>. Click on{" "}
-                  <Text as="i">‘Allocate Credits’</Text> and uncheck the
-                  checkbox if you want to use your{" "}
-                  <Text as="i">‘Allocated Credits’</Text> only.
-                </Text>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          <div className="flex gap-x-2 items-center mt-1">
-            <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full items-center">
-              <div className="h-1.5 w-1.5 rounded-full bg-green" />
-              <Text
-                variant={"light-grey"}
-                weight={"medium"}
-                size={"xs"}
-                className="uppercase"
-              >
-                Using Main Credit Balance Only
-              </Text>
-            </div>
-          </div>
+          ) : null}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2 w-full mt-4">
+        <div className="flex items-start gap-x-4 mt-1 justify-between">
+          <Text
+            size={"sm"}
+            weight={"bold"}
+            variant={"blue"}
+            className="underline underline-offset-[2.5px] cursor-pointer"
+            onClick={() => {
+              generateApiKey();
+              setDisplayAPIKey(true);
+            }}
+          >
+            Generate API Key
+          </Text>
+          <div
+            className={cn(
+              "flex gap-x-0.5",
+              apiKeys?.[app.id]?.length && "cursor-pointer"
+            )}
+            onClick={() =>
+              apiKeys?.[app.id]?.length && setOpen("view-key" + app.id)
+            }
+          >
+            <Text
+              size={"sm"}
+              weight={"bold"}
+              variant={"light-grey"}
+              className={cn(
+                "underline underline-offset-[2.5px]",
+                !apiKeys?.[app.id]?.length && "opacity-30"
+              )}
+            >
+              View All Keys
+            </Text>
+            {apiKeys?.[app.id]?.length ? (
+              <Text size={"sm"} weight={"bold"} variant={"blue"}>
+                ({apiKeys?.[app.id]?.length})
+              </Text>
+            ) : null}
+          </div>
+
+          <Text
+            size={"sm"}
+            weight={"bold"}
+            variant={"light-grey"}
+            onClick={() =>
+              apiKeys?.[app.id]?.length && setOpen("assign-credits" + app.id)
+            }
+            className={cn(
+              "underline underline-offset-[2.5px]",
+              apiKeys?.[app.id]?.length ? "cursor-pointer" : "opacity-30"
+            )}
+          >
+            Assign Credits
+          </Text>
+          <Text
+            size={"sm"}
+            weight={"bold"}
+            variant={"light-grey"}
+            className={cn(
+              "underline underline-offset-[2.5px]",
+              +app.credit_balance ? "cursor-pointer" : "opacity-30"
+            )}
+            onClick={() =>
+              +app.credit_balance && setOpen("reclaim-credits" + app.id)
+            }
+          >
+            Reclaim Credits
+          </Text>
+        </div>
+        <SwitchDescription
+          id={app.id}
+          disabled={disableToggle}
+          checked={useMainBalance}
+          onChecked={(value) => {
+            setUseMainBalance(value);
+            updateFallbackHandler();
+          }}
+        />
+        {!+app?.credit_balance && useMainBalance ? (
+          <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
+            <div className="h-1.5 w-1.5 rounded-full bg-green" />
+            <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+              Using Main Credit Balance Only
+            </Text>
+          </div>
+        ) : null}
+        {+app.credit_balance ? (
+          <div className="flex gap-x-1 border border-[#FF82C8CC] bg-[#FF82C829] py-0.5 px-2 rounded-full w-fit items-center mt-3">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
+            <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+              Using Assigned Credits Only
+            </Text>
+          </div>
+        ) : null}
+        {!+app?.credit_balance && !useMainBalance ? (
+          <div className="flex gap-x-1 border border-[#E4A354CC] bg-[#E4A35429] py-0.5 px-2 rounded-full w-fit items-center mt-3">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#E4A354]" />
+            <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+              Credits Inactive — Please Assign Some Or Use Main Balance
+            </Text>
+          </div>
+        ) : null}
+        {!+creditBalance ? (
+          <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
+            <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+              Credits Null — Please BUY Some TO POST data
+            </Text>
+          </div>
+        ) : null}
       </div>
       <div
         className={cn(
-          "absolute transition-all duration-500 bg-[#112133] w-full left-0 p-4 flex gap-y-2 flex-col",
+          "absolute transition-all duration-500 bg-[#13334F] w-full left-0 p-4 flex gap-y-1 flex-col border-t border-border-blue",
           displayAPIKey ? "bottom-0" : "-bottom-32"
         )}
       >
@@ -274,7 +334,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <Skeleton className="h-4 w-[250px]" />
         ) : (
           <div className="flex items-center gap-x-2 cursor-pointer w-fit">
-            <Text size={"base"} weight={"bold"}>
+            <Text size={"xl"} weight={"bold"}>
               {apiKey}
             </Text>
             <Copy
@@ -283,6 +343,25 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               strokeWidth={1}
               onClick={async () => {
                 await navigator.clipboard.writeText(apiKey);
+                toast(<Success label="API key copied" />, {
+                  theme: "colored",
+                  progressClassName: "bg-[#78C47B]",
+                  closeButton: (
+                    <X
+                      color="#FFF"
+                      size={20}
+                      className="cursor-pointer"
+                      onClick={() => toast.dismiss()}
+                    />
+                  ),
+                  style: {
+                    backgroundColor: "#78C47B29",
+                    width: "300px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderRadius: "8px",
+                  },
+                });
               }}
             />
           </div>
@@ -299,9 +378,24 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       {open === "reclaim-credits" + app.id && (
         <ReclaimCredits id={"reclaim-credits" + app.id} appData={app} />
       )}
-      {open === "view-key" + app.id && <ViewKeys id={"view-key" + app.id} />}
-      {open === "delete-key-alert" + app.id && (
-        <DeleteKeyAlert id={"delete-key-alert" + app.id} />
+      {open === "view-key" + app.id && (
+        <ViewKeys
+          id={"view-key" + app.id}
+          appId={app.id}
+          openDeleteAlert={(apiKey) => {
+            setOpenDeleteAlert(apiKey);
+            setOpen("delete-key-alert" + app.id);
+          }}
+        />
+      )}
+      {open === "delete-key-alert" + app.id && openDeleteAlert && (
+        <DeleteKeyAlert
+          id={"delete-key-alert" + app.id}
+          identifier={openDeleteAlert}
+          clearAlertCallback={() => {
+            setOpenDeleteAlert(undefined);
+          }}
+        />
       )}
       {open === "update-app" + app.id && (
         <CreateApp type="edit" appData={app} id={"update-app" + app.id} />
