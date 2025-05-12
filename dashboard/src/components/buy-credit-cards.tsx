@@ -5,7 +5,7 @@ import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import CreditService from "@/services/credit";
-import { SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
@@ -384,7 +384,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 </ConnectKitButton.Custom>
               </SignedIn>
               <SignedOut>
-                <Button variant={"secondary"}>Sign In</Button>
+                <SignInButton mode="modal" component="div">
+                  <Button variant={"secondary"}>Sign In</Button>
+                </SignInButton>
               </SignedOut>
             </div>
           </TabsContent>
