@@ -66,7 +66,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appName: app.app_name,
         avatar: app.app_logo,
         id: app.id,
-        fallbackEnabled: useMainBalance,
+        fallbackEnabled: !useMainBalance,
       });
       console.log({
         response,
