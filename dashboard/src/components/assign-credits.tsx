@@ -53,7 +53,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         {
           theme: "colored",
           progressClassName: "bg-[#78C47B]",
-          closeButton: (
+          closeButton: () => (
             <X
               color="#FFF"
               size={20}
@@ -67,6 +67,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
+            top: "60px",
           },
         }
       );

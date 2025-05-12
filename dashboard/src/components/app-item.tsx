@@ -360,7 +360,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                 toast(<Success label="API key copied" />, {
                   theme: "colored",
                   progressClassName: "bg-[#78C47B]",
-                  closeButton: (
+                  closeButton: () => (
                     <X
                       color="#FFF"
                       size={20}
@@ -374,6 +374,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                     display: "flex",
                     justifyContent: "space-between",
                     borderRadius: "8px",
+                    top: "60px",
                   },
                 });
               }}

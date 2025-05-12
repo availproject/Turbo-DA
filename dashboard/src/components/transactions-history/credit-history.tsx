@@ -1,7 +1,7 @@
 "use client";
 import { cn, formatDataBytes } from "@/lib/utils";
 import HistoryService from "@/services/history";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
@@ -26,6 +26,17 @@ const CreditHistory = ({ token }: { token?: string }) => {
       setHistoryList([]);
     }
   };
+
+  const displayValues = useCallback((heading: string, value: any) => {
+    switch (heading) {
+      case "created_at":
+        return new Date(value).toDateString();
+      case "amount_credit":
+        return formatDataBytes(value);
+      default:
+        return value ?? "-";
+    }
+  }, []);
 
   return (
     <>
@@ -59,9 +70,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
                 className={cn("py-3 px-4", !last && "text-right")}
                 variant={heading === "request_type" ? "green" : "white"}
               >
-                {heading === "amount_credit"
-                  ? formatDataBytes(value)
-                  : value ?? "-"}
+                {displayValues(heading, value)}
               </Text>
             </div>
           )}
