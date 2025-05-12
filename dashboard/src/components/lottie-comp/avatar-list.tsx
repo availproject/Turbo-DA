@@ -22,15 +22,17 @@ const AvatarList = ({
             )}
             key={key}
           >
-            <DotLottieReact
-              src={value.path}
-              loop
-              autoplay
-              playOnHover={true}
-              width={40}
-              height={40}
-              onClick={() => onClick(key)}
-            />
+            {value?.path ? (
+              <DotLottieReact
+                src={value.path}
+                loop
+                autoplay
+                playOnHover={true}
+                width={40}
+                height={40}
+                onClick={() => onClick(key)}
+              />
+            ) : null}
           </div>
         );
       })}
