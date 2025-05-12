@@ -43,7 +43,7 @@ const DeleteKeyAlert = ({
         toast(<Success label="Deleted Successfully!" />, {
           theme: "colored",
           progressClassName: () => "bg-[#78C47B]",
-          closeButton: (
+          closeButton: () => (
             <X
               color="#FFF"
               size={20}
@@ -57,6 +57,7 @@ const DeleteKeyAlert = ({
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
+            top: "60px",
           },
         });
         closeModal();

@@ -105,13 +105,21 @@ export default function CreateApp({
         {
           theme: "colored",
           progressClassName: "bg-[#78C47B]",
-          closeButton: false,
+          closeButton: () => (
+            <X
+              color="#FFF"
+              size={20}
+              className="cursor-pointer"
+              onClick={() => toast.dismiss()}
+            />
+          ),
           style: {
             backgroundColor: "#78C47B29",
             width: "300px",
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
+            top: "60px",
           },
         }
       );
