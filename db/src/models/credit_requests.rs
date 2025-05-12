@@ -34,6 +34,7 @@ pub struct CreditRequestInfo {
     pub request_status: String,
     pub request_type: String,
     pub tx_hash: Option<String>,
+    pub created_at: chrono::NaiveDateTime,
 }
 
 #[derive(Queryable, Selectable)]

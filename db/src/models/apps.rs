@@ -10,6 +10,8 @@ use diesel::{
 
 use serde::{Deserialize, Serialize};
 
+use crate::schema::api_keys::created_at;
+
 #[derive(Debug, Clone, FromSqlRow, AsExpression, PartialEq, Eq, Serialize, Deserialize)]
 #[diesel(sql_type = crate::schema::sql_types::FallbackStatus)]
 pub struct Status {
@@ -42,6 +44,69 @@ impl FromSql<crate::schema::sql_types::FallbackStatus, Pg> for Status {
     }
 }
 
+#[derive(Debug, Clone, FromSqlRow, AsExpression, PartialEq, Eq, Serialize, Deserialize)]
+#[diesel(sql_type = crate::schema::sql_types::AssignedCreditsLog)]
+pub struct AssignedCreditsLog {
+    pub credit_balance_original: BigDecimal,
+    pub credit_balance_used_original: BigDecimal,
+    pub credits_added: BigDecimal,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl AssignedCreditsLog {
+    pub fn new(
+        credit_balance_original: BigDecimal,
+        credit_balance_used_original: BigDecimal,
+        credits_added: BigDecimal,
+        at: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            credit_balance_original,
+            credit_balance_used_original,
+            credits_added,
+            created_at: at,
+        }
+    }
+}
+
+impl ToSql<crate::schema::sql_types::AssignedCreditsLog, Pg> for AssignedCreditsLog {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> serialize::Result {
+        serialize::WriteTuple::<(
+            diesel::sql_types::Numeric,
+            diesel::sql_types::Numeric,
+            diesel::sql_types::Numeric,
+        )>::write_tuple(
+            &(
+                &self.credit_balance_original,
+                &self.credit_balance_used_original,
+                &self.credits_added,
+            ),
+            &mut out.reborrow(),
+        )
+    }
+}
+impl FromSql<crate::schema::sql_types::AssignedCreditsLog, Pg> for AssignedCreditsLog {
+    fn from_sql(bytes: PgValue<'_>) -> deserialize::Result<Self> {
+        let (credit_balance_original, credit_balance_used_original, credits_added, at) =
+            FromSql::<
+                Record<(
+                    diesel::sql_types::Numeric,
+                    diesel::sql_types::Numeric,
+                    diesel::sql_types::Numeric,
+                    diesel::sql_types::Timestamptz,
+                )>,
+                Pg,
+            >::from_sql(bytes)?;
+
+        Ok(AssignedCreditsLog {
+            credit_balance_original,
+            credit_balance_used_original,
+            credits_added,
+            created_at: at,
+        })
+    }
+}
+
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::apps)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -57,6 +122,7 @@ pub struct Apps {
     pub app_logo: Option<String>,
     pub fallback_enabled: bool,
     pub fallback_updated_at: Vec<Option<Status>>,
+    pub assigned_credits_logs: Option<Vec<Option<AssignedCreditsLog>>>,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]

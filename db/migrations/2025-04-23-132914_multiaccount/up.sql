@@ -57,3 +57,9 @@ UPDATE api_keys
 SET app_id = apps.id
 FROM apps
 WHERE api_keys.user_id = apps.user_id;
+
+ALTER TABLE api_keys
+ALTER COLUMN app_id SET NOT NULL;
+
+ALTER TABLE customer_expenditures
+ALTER COLUMN app_id SET NOT NULL;
