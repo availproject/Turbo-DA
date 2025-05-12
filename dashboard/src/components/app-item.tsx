@@ -249,11 +249,15 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             weight={"bold"}
             variant={"light-grey"}
             onClick={() =>
-              apiKeys?.[app.id]?.length && setOpen("assign-credits" + app.id)
+              apiKeys?.[app.id]?.length &&
+              !useMainBalance &&
+              setOpen("assign-credits" + app.id)
             }
             className={cn(
               "underline underline-offset-[2.5px]",
-              apiKeys?.[app.id]?.length ? "cursor-pointer" : "opacity-30"
+              apiKeys?.[app.id]?.length && !useMainBalance
+                ? "cursor-pointer"
+                : "opacity-30"
             )}
           >
             Assign Credits
@@ -264,10 +268,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             variant={"light-grey"}
             className={cn(
               "underline underline-offset-[2.5px]",
-              +app.credit_balance ? "cursor-pointer" : "opacity-30"
+              +app.credit_balance && !useMainBalance
+                ? "cursor-pointer"
+                : "opacity-30"
             )}
             onClick={() =>
-              +app.credit_balance && setOpen("reclaim-credits" + app.id)
+              +app.credit_balance &&
+              !useMainBalance &&
+              setOpen("reclaim-credits" + app.id)
             }
           >
             Reclaim Credits
