@@ -1,6 +1,8 @@
 use crate::{
     models::{
-        apps::Apps, customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User,
+        apps::{Apps, AssignedCreditsLog},
+        customer_expenditure::CustomerExpenditureGetWithPayload,
+        user_model::User,
     },
     schema::{
         apps::dsl as apps, customer_expenditures::dsl as customer_expenditures, users::dsl as users,
@@ -165,12 +167,24 @@ pub async fn allocate_credit_balance(
         return Err("Insufficient balance".to_string());
     }
 
+    let app_obj = get_app_by_id(connection, user, account_id).await?;
+
     diesel::update(
         apps::apps
             .filter(apps::id.eq(account_id))
             .filter(apps::user_id.eq(user)),
     )
-    .set((apps::credit_balance.eq(apps::credit_balance + amount)))
+    .set((
+        apps::credit_balance.eq(apps::credit_balance + amount),
+        apps::assigned_credits_logs.eq(apps::assigned_credits_logs.concat(Some(vec![Some(
+            AssignedCreditsLog::new(
+                app_obj.credit_balance,
+                app_obj.credit_used,
+                amount.clone(),
+                chrono::Utc::now(),
+            ),
+        )]))),
+    ))
     .execute(connection)
     .await
     .map_err(|e| e.to_string())?;

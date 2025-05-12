@@ -15,7 +15,7 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use lazy_static::lazy_static;
-use log::{error, info};
+use log::{debug, error, info};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -343,4 +343,51 @@ pub fn retrieve_account_id(http_request: &HttpRequest) -> Option<Uuid> {
 
 fn price_not_found_error(token: &str) -> String {
     format!("{:?} price not found from coingecho", token)
+}
+
+pub async fn calculate_avail_token_equivalent(
+    coingecko_api_url: &str,
+    coingecko_api_key: &str,
+    token_amount: &BigDecimal,
+    token_address: &str,
+) -> Result<BigDecimal, String> {
+    let http_client = Client::new();
+
+    debug!("Fetching current price for token: {}", token_address);
+    let token_symbol = TOKEN_MAP
+        .iter()
+        .find(|(_, token)| token.token_address == token_address)
+        .map(|(key, _)| key.clone())
+        .ok_or_else(|| {
+            error!("Token address not found in token mapping");
+            String::from("Token address not found in token mapping")
+        })?;
+
+    let (token_usd_price, avail_usd_price) = get_prices(
+        &http_client,
+        &coingecko_api_url,
+        &coingecko_api_key,
+        token_symbol.as_str(),
+    )
+    .await
+    .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
+
+    debug!("Current Token USD price: {}", token_usd_price);
+    debug!("Current AVAIL USD price: {}", avail_usd_price);
+
+    let token_avail_ratio = token_usd_price / avail_usd_price;
+    let source_token_decimals = TOKEN_MAP.get(token_symbol.as_str()).unwrap().token_decimals;
+    let avail_token_decimals = TOKEN_MAP.get("avail").unwrap().token_decimals;
+    let token_avail_ratio_decimal = BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+        .map_err(|e| {
+            error!("Failed to convert price ratio to decimal: {}", e);
+            format!("Failed to convert price ratio to decimal: {}", e)
+        })?;
+
+    let equivalent_amount = token_avail_ratio_decimal
+        * token_amount
+        * BigDecimal::from(10_u64.pow(avail_token_decimals as u32))
+        / BigDecimal::from(10_u64.pow(source_token_decimals as u32));
+
+    Ok(equivalent_amount.round(0))
 }

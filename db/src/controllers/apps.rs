@@ -3,9 +3,9 @@ use crate::{
     schema::apps::dsl::*,
 };
 use bigdecimal::BigDecimal;
-use diesel::ExpressionMethods;
 use diesel::QueryDsl;
 use diesel::SelectableHelper;
+use diesel::{ExpressionMethods, PgArrayExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 
@@ -115,6 +115,8 @@ pub async fn update_app_account(
             app_name.eq(&payload.app_name),
             app_description.eq(&payload.app_description),
             app_logo.eq(&payload.app_logo),
+            fallback_enabled.eq(&payload.fallback_enabled),
+            fallback_updated_at.eq(fallback_updated_at.concat(&payload.fallback_updated_at)),
         ))
         .execute(connection)
         .await

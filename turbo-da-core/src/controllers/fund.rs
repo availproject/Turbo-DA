@@ -1,6 +1,9 @@
 use crate::{
     config::AppConfig,
-    utils::{generate_avail_sdk, get_connection, retrieve_user_id_from_jwt, Convertor, TOKEN_MAP},
+    utils::{
+        calculate_avail_token_equivalent, generate_avail_sdk, get_connection,
+        retrieve_user_id_from_jwt, Convertor, TOKEN_MAP,
+    },
 };
 use std::sync::Arc;
 
@@ -331,6 +334,56 @@ pub async fn estimate_credits_for_bytes(
         .await;
 
     HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct EstimateCreditsToken {
+    pub amount: BigDecimal,
+    pub token_address: String,
+}
+
+/// Estimate the credits equivalent for a given token amount.
+///
+/// # Description
+/// This endpoint calculates how many credits can be obtained for a specified amount of a particular token.
+///
+/// # Route
+/// `GET /v1/user/estimate_credits_against_token?amount={amount}&token_address={address}`
+///
+/// # Query Parameters
+/// * `amount` - The amount of the token to convert to credits.
+/// * `token_address` - The blockchain address of the token to convert from.
+///
+/// # Returns
+/// A JSON object containing the estimated credit equivalent for the specified token amount.
+///
+/// # Example Response
+///
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Credit cost calculated successfully",
+///   "data": "0.0123456789"
+/// }
+/// ```
+
+#[get("/estimate_credits_against_token")]
+pub async fn estimate_credits_against_token(
+    query: web::Query<EstimateCreditsToken>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let price = calculate_avail_token_equivalent(
+        &config.coingecko_api_url,
+        &config.coingecko_api_key,
+        &query.0.amount,
+        &query.0.token_address,
+    )
+    .await;
+
+    match price {
+        Ok(price) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": price})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"state": "ERROR", "message": e})),
+    }
 }
 
 /// Retrieve the list of supported tokens and their corresponding addresses.
