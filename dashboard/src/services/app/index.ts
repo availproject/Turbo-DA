@@ -27,7 +27,7 @@ class AppService {
     fallbackEnabled = false,
   }: {
     token: string;
-    appId: string;
+    appId: number;
     appName: string;
     avatar: string;
     id: string;
@@ -65,7 +65,7 @@ class AppService {
     avatar,
   }: {
     token: string;
-    appId: string;
+    appId: number;
     appName: string;
     avatar: string;
   }) {

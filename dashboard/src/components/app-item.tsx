@@ -68,7 +68,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     try {
       const response = await AppService.updateApp({
         token: token!,
-        appId: `${app.app_id}`,
+        appId: app.app_id,
         appName: app.app_name,
         avatar: app.app_logo,
         id: app.id,

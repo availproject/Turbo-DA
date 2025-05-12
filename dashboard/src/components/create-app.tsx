@@ -62,7 +62,6 @@ export default function CreateApp({
             file: uploadedAvatar!,
           })
             .then((response) => {
-              console.log(response);
               return response?.file;
             })
             .catch((error) => {
@@ -77,7 +76,7 @@ export default function CreateApp({
         type === "edit"
           ? await AppService.updateApp({
               token: token!,
-              appId: `${appData?.app_id}`,
+              appId: +appData?.app_id!,
               appName,
               avatar: uploadAvatar,
               id: appData?.id!,
@@ -85,14 +84,10 @@ export default function CreateApp({
             })
           : await AppService.createApp({
               token: token!,
-              appId: `${appId}`,
+              appId: +appId!,
               appName,
               avatar: uploadAvatar,
             });
-
-      console.log({
-        response,
-      });
 
       updateAppList();
 
@@ -284,8 +279,9 @@ export default function CreateApp({
               </div>
             </div>
             <PrimaryInput
-              placeholder="eg. AV1234"
+              placeholder="eg. 1234"
               label="App ID"
+              type="text"
               value={`${appId}`}
               onChange={(value) => setAppId(value)}
             />

@@ -39,11 +39,9 @@ export default async function Layout({ children }: { children: ReactNode }) {
     token: token!,
   })
     .then((response) => {
-      console.log("response", response);
       return response;
     })
     .catch((error) => {
-      console.log("error", error);
       return {};
     });
 
