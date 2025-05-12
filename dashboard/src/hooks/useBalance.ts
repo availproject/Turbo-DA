@@ -11,14 +11,16 @@ const useBalance = () => {
     if (!token) return;
     AuthenticationService.fetchUser({ token })
       .then((response) => {
-        setCreditBalance(response.data?.credit_balance);
+        setCreditBalance(
+          response?.data?.credit_balance ? +response?.data?.credit_balance : 0
+        );
       })
       .catch((error) => {
         console.log(error);
       });
   }, [token]);
 
-  return { updateCreditBalance, creditBalance };
+  return { updateCreditBalance, creditBalance: +creditBalance };
 };
 
 export default useBalance;

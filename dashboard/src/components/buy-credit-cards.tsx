@@ -1,5 +1,6 @@
 "use client";
 import { config } from "@/config/walletConfig";
+import useBalance from "@/hooks/useBalance";
 import { useDebounce } from "@/hooks/useDebounce";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
@@ -86,6 +87,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [selectToken, setSelectedToken] = useState("");
   const [error, setError] = useState("");
   const account = useAccount();
+  const { updateCreditBalance } = useBalance();
   const { setOpen } = useDialog();
   const balance = useWagmiBalance({
     address: account.address,
@@ -153,10 +155,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       setLoading(true);
       setError("");
       const orderResponse = await postOrder();
-      console.log({
-        selectToken,
-        orderResponse,
-      });
 
       if (!orderResponse?.data) {
         setLoading(false);
@@ -187,7 +185,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             ],
             chainId: activeNetworkId,
           })
-            .then(() => setOpen("credit-added"))
+            .then(() => {
+              updateCreditBalance();
+              setOpen("credit-added");
+            })
             .catch((error) => {
               const message = error.message.split(".")[0];
               setError(message);

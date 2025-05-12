@@ -4,7 +4,7 @@ import { avatarList } from "@/lib/constant";
 import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
-import { AppDetails } from "@/services/credit/response";
+import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";

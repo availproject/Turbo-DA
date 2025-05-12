@@ -42,7 +42,7 @@ const DeleteKeyAlert = ({
         updateAPIKeys();
         toast(<Success label="Deleted Successfully!" />, {
           theme: "colored",
-          progressClassName: "bg-[#78C47B]",
+          progressClassName: () => "bg-[#78C47B]",
           closeButton: (
             <X
               color="#FFF"

@@ -5,11 +5,11 @@ import { baseImageUrl, cn, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
-import { AppDetails } from "@/services/credit/response";
+import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, Pencil, X } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import AssignCredits from "./assign-credits";
 import Button from "./button";
@@ -27,13 +27,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
+  const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
   const [useMainBalance, setUseMainBalance] = useState(
-    +app.credit_balance ? false : app.fallback_enabled ? true : false
+    +app.credit_balance
+      ? false
+      : app.fallback_enabled
+      ? !creditBalance
+        ? false
+        : true
+      : false
   );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
-  const { apiKeys, creditBalance } = useOverview();
   const { updateAPIKeys } = useAPIKeys();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
@@ -66,7 +72,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appName: app.app_name,
         avatar: app.app_logo,
         id: app.id,
-        fallbackEnabled: useMainBalance,
+        fallbackEnabled: !useMainBalance,
       });
       console.log({
         response,
@@ -249,15 +255,13 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             weight={"bold"}
             variant={"light-grey"}
             onClick={() =>
-              apiKeys?.[app.id]?.length &&
               !useMainBalance &&
+              creditBalance &&
               setOpen("assign-credits" + app.id)
             }
             className={cn(
               "underline underline-offset-[2.5px]",
-              apiKeys?.[app.id]?.length && !useMainBalance
-                ? "cursor-pointer"
-                : "opacity-30"
+              !useMainBalance && creditBalance ? "cursor-pointer" : "opacity-30"
             )}
           >
             Assign Credits
@@ -314,7 +318,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </Text>
           </div>
         ) : null}
-        {!+creditBalance ? (
+        {!+creditBalance && +app?.credit_balance && useMainBalance ? (
           <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -414,4 +418,4 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   );
 };
 
-export default AppItem;
+export default memo(AppItem);
