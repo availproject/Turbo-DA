@@ -18,8 +18,8 @@ const AvatarList = ({
             className={cn(
               "w-10 rounded overflow-hidden",
               selected === key
-                ? "p-1 border border-light-grey"
-                : "cursor-pointer"
+                ? "border border-light-grey"
+                : "cursor-pointer border border-transparent"
             )}
             key={key}
           >

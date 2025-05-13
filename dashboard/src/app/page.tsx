@@ -34,7 +34,7 @@ export default async function Page() {
   const { getToken } = await auth();
   const token = (await getToken({ template })) ?? undefined;
   return (
-    <DashboardWrapper selectedTab={APP_TABS.OVERVIEW}>
+    <DashboardWrapper>
       <TabsContent
         value={APP_TABS.OVERVIEW}
         className="border-t border-[#2B4761] pt-4"

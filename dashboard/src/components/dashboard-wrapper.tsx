@@ -1,17 +1,11 @@
 "use client";
 import { APP_TABS } from "@/lib/utils";
 import { SignedIn } from "@clerk/nextjs";
-import { Fragment, ReactNode } from "react";
+import { Fragment, memo, ReactNode } from "react";
 import { Tabs, TabsList, TabsTrigger } from "./tabs";
 import { Text } from "./text";
 
-const DashboardWrapper = ({
-  selectedTab,
-  children,
-}: {
-  selectedTab: APP_TABS;
-  children: ReactNode;
-}) => {
+const DashboardWrapper = ({ children }: { children: ReactNode }) => {
   const mainTabs = [
     {
       value: "overview",
@@ -67,4 +61,4 @@ const DashboardWrapper = ({
   );
 };
 
-export default DashboardWrapper;
+export default memo(DashboardWrapper);
