@@ -9,8 +9,7 @@ import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, Pencil, X } from "lucide-react";
 import Image from "next/image";
-import { memo, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { memo, useState } from "react";
 import AssignCredits from "./assign-credits";
 import Button from "./button";
 import CreateApp from "./create-app";
@@ -21,7 +20,7 @@ import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import { Text } from "./text";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 import { Skeleton } from "./ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
@@ -29,21 +28,14 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(
-    +app.credit_balance
-      ? false
-      : app.fallback_enabled
-      ? !creditBalance
-        ? false
-        : true
-      : false
-  );
+  const [useMainBalance, setUseMainBalance] = useState(app?.fallback_enabled);
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
+  const { success } = useAppToast();
 
   const progress =
     (+app.credit_used / +app.credit_balance + +app.credit_used) * 100;
@@ -84,13 +76,13 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  const disableToggle = useMemo(() => {
-    if (+app.credit_balance || !creditBalance) {
-      return true;
-    }
+  // const disableToggle = useMemo(() => {
+  //   if (+app.credit_balance || !creditBalance) {
+  //     return true;
+  //   }
 
-    return false;
-  }, [creditBalance]);
+  //   return false;
+  // }, [creditBalance]);
 
   return (
     <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
@@ -287,14 +279,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         </div>
         <SwitchDescription
           id={app.id}
-          disabled={disableToggle}
+          // disabled={disableToggle}
           checked={useMainBalance}
           onChecked={(value) => {
             setUseMainBalance(value);
             updateFallbackHandler();
           }}
         />
-        {!+app?.credit_balance && useMainBalance ? (
+        {useMainBalance && +creditBalance ? (
           <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-green" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -302,7 +294,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </Text>
           </div>
         ) : null}
-        {+app.credit_balance ? (
+        {+app.credit_balance && !useMainBalance ? (
           <div className="flex gap-x-1 border border-[#FF82C8CC] bg-[#FF82C829] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -318,7 +310,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </Text>
           </div>
         ) : null}
-        {!+creditBalance && +app?.credit_balance && useMainBalance ? (
+        {!+creditBalance && useMainBalance && !+app.credit_balance ? (
           <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -357,26 +349,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               strokeWidth={1}
               onClick={async () => {
                 await navigator.clipboard.writeText(apiKey);
-                toast(<Success label="API key copied" />, {
-                  theme: "colored",
-                  progressClassName: "bg-[#78C47B]",
-                  closeButton: () => (
-                    <X
-                      color="#FFF"
-                      size={20}
-                      className="cursor-pointer"
-                      onClick={() => toast.dismiss()}
-                    />
-                  ),
-                  style: {
-                    backgroundColor: "#78C47B29",
-                    width: "300px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderRadius: "8px",
-                    top: "60px",
-                  },
-                });
+                success({ label: "API key copied" });
               }}
             />
           </div>

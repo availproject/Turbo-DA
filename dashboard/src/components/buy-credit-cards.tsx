@@ -113,18 +113,22 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
-      calculateDataCredits();
+      calculateEstimateCredits({ amount: +debouncedValue });
     }
   }, [debouncedValue, tokenAmountError]);
 
-  const calculateDataCredits = async () => {
+  const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()]?.token_address;
     try {
-      const response = await CreditService.calculatePurchaseCost({
-        token: token!,
-        data: +debouncedValue,
-      });
+      const response = await CreditService.calculateEstimateCreditsAgainstToken(
+        {
+          token: token!,
+          amount: amount,
+          tokenAddress: tokenAddress,
+        }
+      );
 
-      setEstimateData(response.data);
+      setEstimateData(response?.data);
     } catch (error) {
       console.log(error);
     }

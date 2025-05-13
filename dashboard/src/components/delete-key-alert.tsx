@@ -5,11 +5,10 @@ import AppService from "@/services/app";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
 const DeleteKeyAlert = ({
@@ -25,6 +24,7 @@ const DeleteKeyAlert = ({
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
   const [loading, setLoading] = useState(false);
+  const { success } = useAppToast();
 
   const closeModal = () => {
     clearAlertCallback();
@@ -38,28 +38,9 @@ const DeleteKeyAlert = ({
         token: token!,
         identifier,
       });
-      if (response) {
+      if (response.state === "SUCCESS") {
         updateAPIKeys();
-        toast(<Success label="Deleted Successfully!" />, {
-          theme: "colored",
-          progressClassName: () => "bg-[#78C47B]",
-          closeButton: () => (
-            <X
-              color="#FFF"
-              size={20}
-              className="cursor-pointer"
-              onClick={() => toast.dismiss()}
-            />
-          ),
-          style: {
-            backgroundColor: "#78C47B29",
-            width: "300px",
-            display: "flex",
-            justifyContent: "space-between",
-            borderRadius: "8px",
-            top: "60px",
-          },
-        });
+        success({ label: "Deleted Successfully!" });
         closeModal();
       }
     } catch (error) {

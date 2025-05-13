@@ -49,15 +49,17 @@ class CreditService {
     return await response.json();
   }
 
-  static async calculatePurchaseCost({
+  static async calculateEstimateCreditsAgainstToken({
     token,
-    data,
+    amount,
+    tokenAddress,
   }: {
     token: string;
-    data: number;
+    amount: number;
+    tokenAddress: string;
   }) {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/purchase_cost?data=${data}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${amount}&token_address=${tokenAddress}`,
       {
         method: "GET",
         headers: {

@@ -44,8 +44,14 @@ export const formatDataBytes = (bytes: number, decimals = 4) => {
 
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
+  if (!sizes[i]) {
+    return `${Math.floor(
+      parseFloat((bytes / Math.pow(k, i)).toFixed(dm))
+    )} ${sizes.at(-1)}+`;
+  }
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-    sizes[i] ?? ""
+    sizes[i] ?? `${sizes.at(-1)}+`
   }`;
 };
 
