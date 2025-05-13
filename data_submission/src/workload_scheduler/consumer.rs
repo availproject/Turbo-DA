@@ -9,11 +9,11 @@ use bigdecimal::BigDecimal;
 use db::{
     controllers::{
         customer_expenditure::{add_error_entry, update_customer_expenditure},
-        misc::get_account_by_id,
-        misc::update_credit_balance,
+        misc::{get_account_by_id, update_credit_balance},
         users::TxParams,
     },
     errors::*,
+    models::apps::Apps,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::{error, info};
@@ -193,7 +193,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             fees: result.gas_fee,
         };
 
-        self.update_database(result, params).await?;
+        self.update_database(result, &account, params).await?;
 
         Ok(self.response)
     }
@@ -201,6 +201,7 @@ impl<'a> ProcessSubmitResponse<'a> {
     pub async fn update_database(
         &mut self,
         result: TransactionInfo,
+        account: &Apps,
         tx_params: TxParams,
     ) -> Result<(), String> {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
@@ -213,7 +214,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             self.connection,
         )
         .await?;
-        update_credit_balance(self.connection, &self.response.app_id, &tx_params).await?;
+        update_credit_balance(self.connection, &account, &tx_params).await?;
 
         Ok(())
     }

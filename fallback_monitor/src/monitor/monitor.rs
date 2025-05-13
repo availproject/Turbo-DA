@@ -151,8 +151,7 @@ async fn process_failed_transactions(
                         "Failed to update customer expenditure",
                     );
                 }
-                let result =
-                    update_credit_balance(connection, &account_details.id, &tx_params).await;
+                let result = update_credit_balance(connection, &account_details, &tx_params).await;
                 if result.is_err() {
                     log_error(
                         &customer_expenditure_details.id.to_string(),

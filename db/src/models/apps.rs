@@ -5,12 +5,10 @@ use diesel::{
     pg::{Pg, PgValue},
     prelude::*,
     serialize::{self, Output, ToSql},
-    sql_types::{Integer, Record, Text},
+    sql_types::Record,
 };
 
 use serde::{Deserialize, Serialize};
-
-use crate::schema::api_keys::created_at;
 
 #[derive(Debug, Clone, FromSqlRow, AsExpression, PartialEq, Eq, Serialize, Deserialize)]
 #[diesel(sql_type = crate::schema::sql_types::FallbackStatus)]
@@ -123,8 +121,9 @@ pub struct Apps {
     pub app_description: Option<String>,
     pub app_logo: Option<String>,
     pub fallback_enabled: bool,
-    pub fallback_updated_at: Vec<Option<Status>>,
+    pub fallback_updated_at: Option<Vec<Option<Status>>>,
     pub assigned_credits_logs: Option<Vec<Option<AssignedCreditsLog>>>,
+    pub fallback_credit_used: BigDecimal,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]

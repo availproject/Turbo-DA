@@ -51,45 +51,44 @@ pub async fn get_account_by_id(
 
 pub async fn update_credit_balance(
     connection: &mut AsyncPgConnection,
-    app_id: &Uuid,
+    app: &Apps,
     tx_params: &TxParams,
 ) -> Result<(), String> {
-    let (account, _) = get_account_by_id(connection, app_id).await?;
+    let mut billed_from_credit = BigDecimal::from(0);
+    let mut billed_from_fallback = BigDecimal::from(0);
 
-    let mut leftover_val = BigDecimal::from(0);
-    let mut user_credit_balance_change = &leftover_val;
-
-    if tx_params.amount_data_billed > account.credit_balance {
-        leftover_val = &tx_params.amount_data_billed - &account.credit_balance;
-        user_credit_balance_change = &leftover_val;
+    if tx_params.amount_data_billed > app.credit_balance {
+        billed_from_credit = &tx_params.amount_data_billed - &app.credit_balance;
+        billed_from_fallback = &tx_params.amount_data_billed - &billed_from_credit;
     }
 
-    diesel::update(apps::apps.filter(apps::id.eq(app_id)))
+    diesel::update(apps::apps.filter(apps::id.eq(&app.id)))
         .set((
-            apps::credit_balance.eq(apps::credit_balance - &tx_params.amount_data_billed),
-            apps::credit_used.eq(apps::credit_used + &tx_params.amount_data_billed),
+            apps::credit_balance.eq(apps::credit_balance - &billed_from_credit),
+            apps::credit_used.eq(apps::credit_used + &billed_from_credit),
+            apps::fallback_credit_used.eq(apps::fallback_credit_used + &billed_from_fallback),
         ))
         .execute(connection)
         .await
         .map_err(|e| {
             format!(
-                "Couldn't update account credit balance for account id {:?}, fee: {:?}. Error {:?}",
-                app_id, tx_params.fees, e
+                "Couldn't update app credit balance for app id {:?}, fee: {:?}. Error {:?}",
+                app.id, tx_params.fees, e
             )
         })?;
 
-    if user_credit_balance_change > &BigDecimal::from(0) {
-        diesel::update(users::users.filter(users::id.eq(account.user_id)))
+    if &billed_from_credit > &BigDecimal::from(0) {
+        diesel::update(users::users.filter(users::id.eq(&app.user_id)))
             .set((
-                users::credit_balance.eq(users::credit_balance - &user_credit_balance_change),
-                users::credit_used.eq(users::credit_used + &user_credit_balance_change),
+                users::credit_balance.eq(users::credit_balance - &billed_from_credit),
+                users::credit_used.eq(users::credit_used + &billed_from_credit),
             ))
             .execute(connection)
             .await
             .map_err(|e| {
                 format!(
-                    "Couldn't update user credit balance for account id {:?}, fee: {:?}. Error {:?}",
-                    app_id, tx_params.fees, e
+                    "Couldn't update user credit balance for app id {:?}, fee: {:?}. Error {:?}",
+                    app.id, tx_params.fees, e
                 )
             })?;
     }
@@ -220,7 +219,7 @@ pub async fn reclaim_credits(
             .filter(apps::id.eq(account_id))
             .filter(apps::user_id.eq(user)),
     )
-    .set((apps::credit_balance.eq(apps::credit_balance - amount)))
+    .set(apps::credit_balance.eq(apps::credit_balance - amount))
     .execute(connection)
     .await
     .map_err(|e| e.to_string())?;

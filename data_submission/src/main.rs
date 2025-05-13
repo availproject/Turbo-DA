@@ -31,7 +31,7 @@ mod utils;
 mod workload_scheduler;
 
 use config::AppConfig;
-use observability::{init_meter, init_tracer};
+use observability::init_meter;
 use workload_scheduler::consumer::Consumer;
 
 #[actix_web::main]
@@ -76,6 +76,10 @@ async fn main() -> Result<(), std::io::Error> {
 
     HttpServer::new(move || {
         let shared_producer_send = web::Data::new(sender.clone());
+        // let redis_client = Redis::new(shared_config.redis_url.as_str());
+        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+        // let manager = ConnectionManager::new(client).await.unwrap();
+        // let redis_backend = RedisBackend::builder(manager).build();
         let backend = InMemoryBackend::builder().build();
         let input = SimpleInputFunctionBuilder::new(
             Duration::from_secs(shared_config.rate_limit_window_size),
@@ -92,12 +96,12 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(rate_limiter)
             .wrap(Logger::default())
             .service(health_check)
-            .wrap(Auth::new(
-                Redis::new(shared_config.redis_url.as_str()),
-                shared_config.database_url.clone(),
-            ))
             .service(
                 web::scope("/v1")
+                    .wrap(Auth::new(
+                        Redis::new(shared_config.redis_url.as_str()),
+                        shared_config.database_url.clone(),
+                    ))
                     .app_data(web::PayloadConfig::new(shared_config.payload_size))
                     .app_data(shared_producer_send.clone())
                     .app_data(shared_config.clone())

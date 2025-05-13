@@ -1,25 +1,14 @@
-use std::io::Read;
-
 use crate::{
     config::AppConfig,
     s3::{self, s3_download},
-    utils::{get_connection, retrieve_user_id_from_jwt},
 };
-use actix_multipart::form::{json::Json as MpJson, tempfile::TempFile, MultipartForm};
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_multipart::form::{tempfile::TempFile, MultipartForm};
+use actix_web::{get, post, web, HttpResponse, Responder};
 use aws_sdk_s3::primitives::ByteStream;
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use s3::s3_upload;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
-use validator::Validate;
-
-/// Metadata for file upload
-#[derive(Debug, Deserialize)]
-struct Metadata {
-    /// Name of the file being uploaded
-    name: String,
-}
+use std::io::Read;
 
 /// Form structure for file uploads
 #[derive(Debug, MultipartForm)]

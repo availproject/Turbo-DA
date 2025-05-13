@@ -10,6 +10,7 @@ use db::controllers::customer_expenditure::{
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use uuid::Uuid;
 use validator::Validate;
 
 /// Query parameters for retrieving customer expenditures with optional limit
@@ -108,12 +109,12 @@ pub async fn get_all_expenditure(
 struct ExpenditureTimeRangeQuery {
     start_date: NaiveDateTime,
     end_date: NaiveDateTime,
+    app_id: Uuid,
 }
 
 #[get("/get_expenditure_by_time_range")]
 pub async fn get_expenditure_by_time_range(
     request_payload: web::Query<ExpenditureTimeRangeQuery>,
-    config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
@@ -130,7 +131,7 @@ pub async fn get_expenditure_by_time_range(
         Err(response) => return response,
     };
 
-    match handle_get_expenditure_by_time_range(&mut connection, request_payload.start_date, request_payload.end_date).await {
+    match handle_get_expenditure_by_time_range(&mut connection, &user, request_payload.start_date, request_payload.end_date, &request_payload.app_id).await {
         Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
     }

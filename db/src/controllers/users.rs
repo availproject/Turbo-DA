@@ -5,7 +5,6 @@ use crate::{
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use log::{error, info};
 
 /// Parameters for transaction details
 #[derive(Clone)]
@@ -46,7 +45,7 @@ pub async fn allocate_global_credit_balance(
     amount: &BigDecimal,
 ) -> Result<(), String> {
     diesel::update(users.filter(id.eq(user)))
-        .set((credit_balance.eq(credit_balance + amount)))
+        .set(credit_balance.eq(credit_balance + amount))
         .execute(connection)
         .await
         .map_err(|e| e.to_string())?;

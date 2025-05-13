@@ -1,12 +1,10 @@
 use crate::{
-    models::customer_expenditure::{
-        CreateCustomerExpenditure, CustomerExpenditureGet, CustomerExpenditureGetWithPayload,
-    },
+    models::customer_expenditure::{CreateCustomerExpenditure, CustomerExpenditureGet},
     schema::customer_expenditures::dsl::*,
 };
 use bigdecimal::BigDecimal;
-use chrono::Duration;
-use diesel::{prelude::*, result::Error, sql_types::Timestamp};
+
+use diesel::{prelude::*, result::Error};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::{error, info};
 use serde_json::{json, Value};
@@ -159,10 +157,14 @@ pub async fn handle_get_all_expenditure(
 
 pub async fn handle_get_expenditure_by_time_range(
     connection: &mut AsyncPgConnection,
+    user: &String,
     start_date: chrono::NaiveDateTime,
     end_date: chrono::NaiveDateTime,
+    app: &Uuid,
 ) -> Result<Vec<CustomerExpenditureGet>, Error> {
     customer_expenditures
+        .filter(user_id.eq(user))
+        .filter(app_id.eq(app))
         .filter(created_at.ge(start_date))
         .filter(created_at.le(end_date))
         .select(CustomerExpenditureGet::as_select())

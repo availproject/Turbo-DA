@@ -475,9 +475,23 @@ pub async fn edit_app_account(
     if let Some(fallback_enabled) = payload.fallback_enabled {
         if fallback_enabled != account.fallback_enabled {
             account.fallback_enabled = fallback_enabled;
-            account
-                .fallback_updated_at
-                .push(Some(Status::new(chrono::Utc::now(), fallback_enabled)));
+            match account.fallback_updated_at {
+                Some(fallback_updated_at) => {
+                    account.fallback_updated_at = Some(
+                        [
+                            &fallback_updated_at[..],
+                            &[Some(Status::new(chrono::Utc::now(), fallback_enabled))],
+                        ]
+                        .concat(),
+                    );
+                }
+                None => {
+                    account.fallback_updated_at = Some(vec![Some(Status::new(
+                        chrono::Utc::now(),
+                        fallback_enabled,
+                    ))]);
+                }
+            }
         }
     }
 
