@@ -1,7 +1,8 @@
 "use client";
 import { cn, formatDataBytes } from "@/lib/utils";
 import HistoryService from "@/services/history";
-import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
@@ -27,18 +28,47 @@ const CreditHistory = ({ token }: { token?: string }) => {
     }
   };
 
-  const displayValues = useCallback((heading: string, value: any) => {
-    switch (heading) {
-      case "created_at":
-        return new Date(value).toLocaleDateString();
-      case "amount_credit":
-        return formatDataBytes(value, 2);
-      case "chain_id":
-        return value;
-      default:
-        return value ?? "-";
-    }
-  }, []);
+  const chainList: Record<string, { logo: string; name: string }> = useMemo(
+    () => ({
+      "11155111": {
+        logo: "/currency/eth.png",
+        name: "Ethereum",
+      },
+      "1": {
+        logo: "/currency/eth.png",
+        name: "Ethereum",
+      },
+    }),
+    []
+  );
+
+  const displayValues = useCallback(
+    (heading: string, value: any) => {
+      switch (heading) {
+        case "created_at":
+          return new Date(value).toLocaleDateString();
+        case "amount_credit":
+          return formatDataBytes(value, 2);
+        case "chain_id":
+          return (
+            <div className="flex items-center gap-x-2">
+              <Image
+                src={chainList[value].logo}
+                alt={chainList[value].name}
+                width={20}
+                height={20}
+              />
+              <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
+                {chainList[value].name}
+              </Text>
+            </div>
+          );
+        default:
+          return value ?? "-";
+      }
+    },
+    [chainList]
+  );
 
   return (
     <>
@@ -71,6 +101,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
                 size={"base"}
                 className={cn("py-3 px-4", !last && "text-right")}
                 variant={heading === "request_type" ? "green" : "white"}
+                as={heading === "chain_id" ? "div" : "p"}
               >
                 {displayValues(heading, value)}
               </Text>

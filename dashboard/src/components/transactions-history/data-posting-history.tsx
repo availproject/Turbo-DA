@@ -1,7 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 import HistoryService from "@/services/history";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import EmptyState from "./empty-state";
@@ -24,6 +24,15 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
       setHistoryList([]);
     }
   };
+
+  const displayValues = useCallback((heading: string, value: any) => {
+    switch (heading) {
+      case "created_at":
+        return new Date(value).toLocaleDateString();
+      default:
+        return value ?? "-";
+    }
+  }, []);
 
   return (
     <>
@@ -59,7 +68,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
                     className={cn("py-3 px-4", !last && "text-right")}
                     variant={heading === "converted_fees" ? "green" : "white"}
                   >
-                    {value}
+                    {displayValues(heading, value)}
                   </Text>
                 </div>
               );
