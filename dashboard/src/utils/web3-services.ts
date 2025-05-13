@@ -173,9 +173,6 @@ export async function transfer(
 ): Promise<Result<TransactionStatus, Error>> {
   try {
     const injector = getWalletBySource(account.source);
-    console.log({
-      injector,
-    });
 
     const options = {
       signer: injector?.signer,

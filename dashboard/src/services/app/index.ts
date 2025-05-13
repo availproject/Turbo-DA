@@ -114,6 +114,28 @@ class AppService {
     return await response.json();
   }
 
+  static async deleteApp({ token, appId }: { token: string; appId: string }) {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/delete_account`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          app_id: appId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   static async deleteAPIKey({
     token,
     identifier,

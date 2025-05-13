@@ -1,6 +1,5 @@
 "use client";
 import { config } from "@/config/walletConfig";
-import useBalance from "@/hooks/useBalance";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
@@ -90,7 +89,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [selectToken, setSelectedToken] = useState("");
   const [error, setError] = useState("");
   const account = useAccount();
-  const { updateCreditBalance } = useBalance();
   const { setOpen } = useDialog();
   const balance = useWagmiBalance({
     address: account.address,
@@ -124,7 +122,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         {
           token: token!,
           amount: amount,
-          tokenAddress: tokenAddress,
+          tokenAddress: tokenAddress.toLowerCase(),
         }
       );
 
@@ -193,7 +191,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             chainId: activeNetworkId,
           })
             .then(() => {
-              updateCreditBalance();
               setOpen("credit-added");
             })
             .catch((error) => {
@@ -355,10 +352,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 )}
                 <ConnectKitButton.Custom>
                   {(props) => {
-                    console.log({
-                      props,
-                    });
-
                     if (!props.isConnected) {
                       return (
                         <Button
@@ -424,7 +417,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CreditsAdded />
+      <CreditsAdded
+        credits={estimateData ? formatDataBytes(+estimateData) : ""}
+      />
     </Card>
   );
 };
