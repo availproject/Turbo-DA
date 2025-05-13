@@ -3,6 +3,7 @@ import Header from "@/components/header";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { template } from "@/lib/utils";
 import { OverviewProvider } from "@/providers/OverviewProvider";
+import AppService from "@/services/app";
 import AuthenticationService from "@/services/authentication";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
@@ -10,6 +11,7 @@ import { dark } from "@clerk/themes";
 import "@rainbow-me/rainbowkit/styles.css";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
+import { ToastContainer } from "react-toastify";
 import { ppmori } from "./fonts";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -39,12 +41,10 @@ export default async function Layout({ children }: { children: ReactNode }) {
     token: token!,
   })
     .then((response) => {
-      console.log("response", response);
       return response;
     })
     .catch((error) => {
-      console.log("error", error);
-      return {};
+      return undefined;
     });
 
   if (!getUserDetails) {
@@ -53,9 +53,17 @@ export default async function Layout({ children }: { children: ReactNode }) {
       name: user?.fullName!,
     })
       .then((response) => response)
-      .catch((error) => {});
+      .catch((error) => undefined);
 
-    if (!registerUser) {
+    if (registerUser) {
+      await AppService.createApp({
+        token: token!,
+        appId: 1,
+        appName: `${user?.fullName}'s App`,
+        avatar: "avatar_1",
+      })
+        .then((response) => response)
+        .catch((error) => {});
       getUserDetails = await AuthenticationService.fetchUser({
         token: token!,
       })
@@ -81,6 +89,10 @@ export default async function Layout({ children }: { children: ReactNode }) {
                 {children}
               </OverviewProvider>
               <Footer />
+              <ToastContainer
+                className={"backdrop-blur-lg"}
+                style={{ top: "80px" }}
+              />
             </Providers>
           </body>
         </html>

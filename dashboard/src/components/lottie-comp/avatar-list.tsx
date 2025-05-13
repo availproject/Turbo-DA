@@ -1,6 +1,7 @@
 import { avatarList } from "@/lib/constant";
 import { cn } from "@/lib/utils";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { memo } from "react";
 
 const AvatarList = ({
   selected,
@@ -17,8 +18,8 @@ const AvatarList = ({
             className={cn(
               "w-10 rounded overflow-hidden",
               selected === key
-                ? "p-1 border border-light-grey"
-                : "cursor-pointer"
+                ? "border border-light-grey"
+                : "cursor-pointer border border-transparent"
             )}
             key={key}
           >
@@ -26,7 +27,6 @@ const AvatarList = ({
               <DotLottieReact
                 src={value.path}
                 loop
-                autoplay
                 playOnHover={true}
                 width={40}
                 height={40}
@@ -40,4 +40,4 @@ const AvatarList = ({
   );
 };
 
-export default AvatarList;
+export default memo(AvatarList);

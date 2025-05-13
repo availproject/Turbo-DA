@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import Button from "../button";
 import { Text } from "../text";
 
@@ -14,7 +14,15 @@ const EmptyState = ({ message, cta }: EmptyStateProps) => {
   return (
     <div className="flex justify-center items-center flex-col h-[334px]">
       <div className="flex flex-col gap-4 items-center justify-center">
-        <Image src={"/empty.svg"} width={159} height={134} alt="empty-state" />
+        <div className="w-[140px]">
+          <DotLottieReact
+            src={"/turbo_during_meditation.lottie"}
+            loop
+            autoplay
+            width={140}
+            height={140}
+          />
+        </div>
         {message && (
           <Text weight={"semibold"} size={"base"}>
             {message}

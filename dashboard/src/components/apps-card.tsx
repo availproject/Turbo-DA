@@ -3,8 +3,7 @@ import useAPIKeys from "@/hooks/useApiKeys";
 import { Filter, useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { Plus } from "lucide-react";
-import { useEffect } from "react";
-import { ToastContainer } from "react-toastify";
+import { useEffect, useState } from "react";
 import { Text } from ".//text";
 import AppList from "./app-list";
 import Button from "./button";
@@ -12,6 +11,7 @@ import CreateApp from "./create-app";
 import { useDialog } from "./dialog/provider";
 import SecondarySelect from "./select/secondary-select";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
 
 type AppsCardProps = {
   token?: string;
@@ -19,6 +19,7 @@ type AppsCardProps = {
 
 const AppsCard = ({ token }: AppsCardProps) => {
   const { setOpen } = useDialog();
+  const [loading, setLoading] = useState(true);
   const { setFilter, filter, appsList, setAppsList } = useOverview();
   const { updateAPIKeys } = useAPIKeys();
 
@@ -31,6 +32,9 @@ const AppsCard = ({ token }: AppsCardProps) => {
       })
       .catch((error) => {
         console.log(error);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, []);
 
@@ -46,7 +50,6 @@ const AppsCard = ({ token }: AppsCardProps) => {
               </Text>
             </CardTitle>
             <div className="flex items-center gap-6">
-              <ToastContainer />
               <SecondarySelect
                 options={["All", "Unallocated", "Allocated"]}
                 onChange={(value) => setFilter(value as Filter)}
@@ -80,7 +83,14 @@ const AppsCard = ({ token }: AppsCardProps) => {
             Generate a key. Use this key to submit data. You can have multiple
             keys for the same app.
           </Text>
-          <AppList />
+          {loading ? (
+            <div className="flex flex-col gap-y-4 mt-4 px-4">
+              <Skeleton className="h-60 w-full bg-black/40 rounded-lg" />
+              <Skeleton className="h-60 w-full bg-black/40 rounded-lg" />
+            </div>
+          ) : (
+            <AppList />
+          )}
         </CardContent>
       </Card>
       <CreateApp />

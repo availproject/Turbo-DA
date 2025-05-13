@@ -27,7 +27,7 @@ class AppService {
     fallbackEnabled = false,
   }: {
     token: string;
-    appId: string;
+    appId: number;
     appName: string;
     avatar: string;
     id: string;
@@ -65,7 +65,7 @@ class AppService {
     avatar,
   }: {
     token: string;
-    appId: string;
+    appId: number;
     appName: string;
     avatar: string;
   }) {
@@ -104,6 +104,28 @@ class AppService {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  static async deleteApp({ token, appId }: { token: string; appId: string }) {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/delete_account`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          app_id: appId,
+        }),
       }
     );
 

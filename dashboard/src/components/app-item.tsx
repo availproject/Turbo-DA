@@ -7,13 +7,12 @@ import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Copy, Pencil, X } from "lucide-react";
+import { Copy, EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { memo, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { memo, useState } from "react";
 import AssignCredits from "./assign-credits";
-import Button from "./button";
 import CreateApp from "./create-app";
+import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import { useDialog } from "./dialog/provider";
 import PrimaryProgress from "./progress/primary-progress";
@@ -21,7 +20,14 @@ import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import { Text } from "./text";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Skeleton } from "./ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
@@ -29,21 +35,14 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(
-    +app.credit_balance
-      ? false
-      : app.fallback_enabled
-      ? !creditBalance
-        ? false
-        : true
-      : false
-  );
+  const [useMainBalance, setUseMainBalance] = useState(app?.fallback_enabled);
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
+  const { success } = useAppToast();
 
   const progress =
     (+app.credit_used / +app.credit_balance + +app.credit_used) * 100;
@@ -68,14 +67,11 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     try {
       const response = await AppService.updateApp({
         token: token!,
-        appId: `${app.app_id}`,
+        appId: app.app_id,
         appName: app.app_name,
         avatar: app.app_logo,
         id: app.id,
         fallbackEnabled: !useMainBalance,
-      });
-      console.log({
-        response,
       });
     } catch (error) {
       console.log({
@@ -84,13 +80,13 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  const disableToggle = useMemo(() => {
-    if (+app.credit_balance || !creditBalance) {
-      return true;
-    }
+  // const disableToggle = useMemo(() => {
+  //   if (+app.credit_balance || !creditBalance) {
+  //     return true;
+  //   }
 
-    return false;
-  }, [creditBalance]);
+  //   return false;
+  // }, [creditBalance]);
 
   return (
     <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
@@ -110,7 +106,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                 <DotLottieReact
                   src={avatarList?.[app?.app_logo]?.path}
                   loop
-                  autoplay
                   playOnHover={true}
                   width={40}
                   height={40}
@@ -124,13 +119,49 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <div className="flex flex-col justify-between">
             <div className="flex items-center gap-1.5 justify-between">
               <Text weight={"semibold"}>{app.app_name}</Text>
-              <Button
-                variant="ghost"
-                className="w-6 h-6 p-1 bg-[#2F4252] rounded-2xl hover:bg-[#2F4252] cursor-pointer"
-                onClick={() => setOpen("update-app" + app.id)}
-              >
-                <Pencil size={24} color="#FFF" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <EllipsisVertical
+                    color="#B3B3B3"
+                    size={20}
+                    className="cursor-pointer"
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-52 border border-[#586472] bg-[#112235] p-0 rounded overflow-hidden">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => setOpen("update-app" + app.id)}
+                      className="flex gap-x-2.5 group hover:bg-[#414E5D] cursor-pointer rounded-none items-center p-2"
+                    >
+                      <Pencil
+                        size={32}
+                        className="text-[#B3B3B3] group-hover:text-white"
+                      />
+                      <Text
+                        weight={"bold"}
+                        className="text-[#ccc] group-hover:text-white"
+                      >
+                        Edit App
+                      </Text>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setOpen("delete-app-alert" + app.id)}
+                      className="flex gap-x-2.5 group hover:bg-[#414E5D] cursor-pointer rounded-none items-center p-2"
+                    >
+                      <Trash2
+                        size={32}
+                        className="text-[#B3B3B3] group-hover:text-white"
+                      />
+                      <Text
+                        weight={"bold"}
+                        className="text-[#ccc] group-hover:text-white"
+                      >
+                        Delete App
+                      </Text>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-1.5">
               <Text variant={"light-grey"} weight={"medium"} size={"sm"}>
@@ -287,14 +318,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         </div>
         <SwitchDescription
           id={app.id}
-          disabled={disableToggle}
+          // disabled={disableToggle}
           checked={useMainBalance}
           onChecked={(value) => {
             setUseMainBalance(value);
             updateFallbackHandler();
           }}
         />
-        {!+app?.credit_balance && useMainBalance ? (
+        {useMainBalance && +creditBalance ? (
           <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-green" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -302,7 +333,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </Text>
           </div>
         ) : null}
-        {+app.credit_balance ? (
+        {+app.credit_balance && !useMainBalance ? (
           <div className="flex gap-x-1 border border-[#FF82C8CC] bg-[#FF82C829] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -318,7 +349,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </Text>
           </div>
         ) : null}
-        {!+creditBalance && +app?.credit_balance && useMainBalance ? (
+        {!+creditBalance && useMainBalance && !+app.credit_balance ? (
           <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -340,12 +371,12 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <X
             size={22}
             color="#fff"
-            className="cursor-pointer"
+            className={cn(loading ? "pointer-events-none" : "cursor-pointer")}
             onClick={() => setDisplayAPIKey(false)}
           />
         </div>
         {loading ? (
-          <Skeleton className="h-4 w-[250px]" />
+          <Skeleton className="h-[22px] w-[380px] bg-light-grey rounded-xs" />
         ) : (
           <div className="flex items-center gap-x-2 cursor-pointer w-fit">
             <Text size={"xl"} weight={"bold"}>
@@ -357,26 +388,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               strokeWidth={1}
               onClick={async () => {
                 await navigator.clipboard.writeText(apiKey);
-                toast(<Success label="API key copied" />, {
-                  theme: "colored",
-                  progressClassName: "bg-[#78C47B]",
-                  closeButton: () => (
-                    <X
-                      color="#FFF"
-                      size={20}
-                      className="cursor-pointer"
-                      onClick={() => toast.dismiss()}
-                    />
-                  ),
-                  style: {
-                    backgroundColor: "#78C47B29",
-                    width: "300px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderRadius: "8px",
-                    top: "60px",
-                  },
-                });
+                success({ label: "API key copied" });
               }}
             />
           </div>
@@ -410,6 +422,13 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           clearAlertCallback={() => {
             setOpenDeleteAlert(undefined);
           }}
+        />
+      )}
+      {open === "delete-app-alert" + app.id && (
+        <DeleteAppAlert
+          id={"delete-app-alert" + app.id}
+          appId={app.id}
+          appName={app.app_name}
         />
       )}
       {open === "update-app" + app.id && (

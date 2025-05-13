@@ -35,7 +35,7 @@ export default function ViewKeys({
         }
       }}
     >
-      <DialogContent className="w-full sm:max-w-[600px] h-[600px] rounded-2xl overflow-hidden border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey flex flex-col focus-within:outline-0 p-0">
+      <DialogContent className="backdrop-blur-lg w-full sm:max-w-[600px] h-[600px] rounded-2xl overflow-hidden border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey flex flex-col focus-within:outline-0 p-0">
         <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
         <div className="relative h-full flex flex-col z-1">
           <div className="flex justify-between items-center mb-0 p-4">

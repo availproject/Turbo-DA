@@ -1,4 +1,5 @@
 import Button from "@/components/button";
+import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
 import { baseImageUrl, formatDataBytes } from "@/lib/utils";
@@ -10,12 +11,11 @@ import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
 const ReclaimCredits = ({
@@ -30,6 +30,8 @@ const ReclaimCredits = ({
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const { updateCreditBalance } = useBalance();
+  const { success } = useAppToast();
+  const { updateAppList } = useApp();
 
   const handleSubmit = async () => {
     try {
@@ -39,39 +41,17 @@ const ReclaimCredits = ({
         amount,
         appId: appData.id,
       });
-      console.log({
-        response,
-      });
-      updateCreditBalance();
-      setOpen("");
-      toast(
-        <Success
-          label="Credits Reclaimed Successfully!"
-          description={`${formatDataBytes(
+      if (response?.state === "SUCCESS") {
+        updateCreditBalance();
+        updateAppList();
+        setOpen("");
+        success({
+          label: "Credits Reclaimed Successfully!",
+          description: `${formatDataBytes(
             +amount
-          )} credits successfully reclaimed from ${appData.app_name}`}
-        />,
-        {
-          theme: "colored",
-          progressClassName: "bg-[#78C47B]",
-          closeButton: () => (
-            <X
-              color="#FFF"
-              size={20}
-              className="cursor-pointer"
-              onClick={() => toast.dismiss()}
-            />
-          ),
-          style: {
-            backgroundColor: "#78C47B29",
-            width: "530px",
-            display: "flex",
-            justifyContent: "space-between",
-            borderRadius: "8px",
-            top: "60px",
-          },
-        }
-      );
+          )} credits successfully reclaimed from ${appData.app_name}`,
+        });
+      }
     } catch (error) {
     } finally {
       setLoading(false);

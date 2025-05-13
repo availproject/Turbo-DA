@@ -1,7 +1,7 @@
 "use client";
 import { config } from "@/config/walletConfig";
-import useBalance from "@/hooks/useBalance";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
@@ -77,6 +77,8 @@ export const depositAbi: Abi = [
   },
 ];
 
+const DESIRED_CHAIN = 11155111;
+
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
   const [tokenAmount, setTokenAmount] = useState("");
@@ -87,15 +89,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [selectToken, setSelectedToken] = useState("");
   const [error, setError] = useState("");
   const account = useAccount();
-  const { updateCreditBalance } = useBalance();
   const { setOpen } = useDialog();
   const balance = useWagmiBalance({
     address: account.address,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
+  const { isDesiredChain, chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
 
   useEffect(() => {
-    // setOpen("credit-added");
     if (!account.address) return;
     showBalance({ token: account.address })
       .then((response) => {
@@ -110,18 +111,22 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
-      calculateDataCredits();
+      calculateEstimateCredits({ amount: +debouncedValue });
     }
   }, [debouncedValue, tokenAmountError]);
 
-  const calculateDataCredits = async () => {
+  const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()]?.token_address;
     try {
-      const response = await CreditService.calculatePurchaseCost({
-        token: token!,
-        data: +debouncedValue,
-      });
+      const response = await CreditService.calculateEstimateCreditsAgainstToken(
+        {
+          token: token!,
+          amount: amount,
+          tokenAddress: tokenAddress.toLowerCase(),
+        }
+      );
 
-      setEstimateData(response.data);
+      setEstimateData(response?.data);
     } catch (error) {
       console.log(error);
     }
@@ -186,7 +191,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             chainId: activeNetworkId,
           })
             .then(() => {
-              updateCreditBalance();
               setOpen("credit-added");
             })
             .catch((error) => {
@@ -259,7 +263,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     Buy Using
                   </Text>
                   <IconSelectContainer
-                    onChange={(value) => setSelectedToken(value)}
+                    onChange={(value) => {
+                      if (isDesiredChain) {
+                        setSelectedToken(value);
+                      } else {
+                        chainChangerAsync(() => setSelectedToken(value));
+                      }
+                    }}
                     options={[
                       {
                         label: "Ethereum",
@@ -354,6 +364,18 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       );
                     }
 
+                    if (!props.chain || props.chain?.id !== DESIRED_CHAIN) {
+                      return (
+                        <Button
+                          onClick={(e) => chainChangerAsync()}
+                          variant={"secondary"}
+                          className="h-12"
+                        >
+                          Wrong Network
+                        </Button>
+                      );
+                    }
+
                     return (
                       <Button
                         onClick={handleBuyCredits}
@@ -395,7 +417,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CreditsAdded />
+      <CreditsAdded
+        credits={estimateData ? formatDataBytes(+estimateData) : ""}
+      />
     </Card>
   );
 };

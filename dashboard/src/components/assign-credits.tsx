@@ -1,4 +1,5 @@
 import Button from "@/components/button";
+import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
 import { baseImageUrl, formatDataBytes } from "@/lib/utils";
@@ -11,12 +12,11 @@ import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Wallet, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
 type AssignCreditsProps = {
@@ -31,6 +31,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const { updateCreditBalance } = useBalance();
+  const { updateAppList } = useApp();
+  const { success } = useAppToast();
 
   const handleSubmit = async () => {
     try {
@@ -40,39 +42,18 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         amount,
         appId: appData.id,
       });
-      console.log({
-        response,
-      });
-      toast(
-        <Success
-          label="Credits Assigned Successfully!"
-          description={`${formatDataBytes(
+
+      if (response?.state === "SUCCESS") {
+        success({
+          label: "Credits Assigned Successfully!",
+          description: `${formatDataBytes(
             +amount
-          )} credits successfully assigned from main credit balance`}
-        />,
-        {
-          theme: "colored",
-          progressClassName: "bg-[#78C47B]",
-          closeButton: () => (
-            <X
-              color="#FFF"
-              size={20}
-              className="cursor-pointer"
-              onClick={() => toast.dismiss()}
-            />
-          ),
-          style: {
-            backgroundColor: "#78C47B29",
-            width: "530px",
-            display: "flex",
-            justifyContent: "space-between",
-            borderRadius: "8px",
-            top: "60px",
-          },
-        }
-      );
-      updateCreditBalance();
-      setOpen("");
+          )} credits successfully assigned from main credit balance`,
+        });
+        updateCreditBalance();
+        updateAppList();
+        setOpen("");
+      }
     } catch (error) {
     } finally {
       setLoading(false);

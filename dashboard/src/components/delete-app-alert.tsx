@@ -1,5 +1,5 @@
 import Button from "@/components/button";
-import useAPIKeys from "@/hooks/useApiKeys";
+import useApp from "@/hooks/useApp";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
 import { Close } from "@radix-ui/react-dialog";
@@ -11,36 +11,35 @@ import { useDialog } from "./dialog/provider";
 import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
-const DeleteKeyAlert = ({
+const DeleteAppAlert = ({
   id,
-  identifier,
-  clearAlertCallback,
+  appId,
+  appName,
 }: {
   id: string;
-  identifier: string;
-  clearAlertCallback: () => void;
+  appId: string;
+  appName: string;
 }) => {
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
-  const { updateAPIKeys } = useAPIKeys();
+  const { updateAppList } = useApp();
   const [loading, setLoading] = useState(false);
   const { success } = useAppToast();
 
   const closeModal = () => {
-    clearAlertCallback();
     setOpen("");
   };
 
   const handleDelete = async () => {
     try {
       setLoading(true);
-      const response = await AppService.deleteAPIKey({
+      const response = await AppService.deleteApp({
         token: token!,
-        identifier,
+        appId,
       });
       if (response.state === "SUCCESS") {
-        updateAPIKeys();
-        success({ label: "Deleted Successfully!" });
+        updateAppList();
+        success({ label: "Deleted App Successfully!" });
         closeModal();
       }
     } catch (error) {
@@ -72,10 +71,10 @@ const DeleteKeyAlert = ({
             <DialogTitle>
               <>
                 <Text weight={"bold"} size={"4xl"}>
-                  Are you sure you want to delete your Key?
+                  Are you sure you want to delete?
                 </Text>
                 <Text weight={"bold"} size={"4xl"} className="mt-1">
-                  ....{identifier}
+                  {appName}
                 </Text>
               </>
             </DialogTitle>
@@ -115,4 +114,4 @@ const DeleteKeyAlert = ({
   );
 };
 
-export default DeleteKeyAlert;
+export default DeleteAppAlert;
