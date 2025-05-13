@@ -263,7 +263,15 @@ export default function CreateApp({
               label="App ID"
               type="text"
               value={`${appId}`}
-              onChange={(value) => setAppId(value)}
+              onChange={(value) => {
+                if (value === "") {
+                  setAppId("");
+                  return;
+                }
+                if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  setAppId(value);
+                }
+              }}
             />
           </div>
 
