@@ -2,6 +2,7 @@
 import { config } from "@/config/walletConfig";
 import useBalance from "@/hooks/useBalance";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
@@ -77,6 +78,8 @@ export const depositAbi: Abi = [
   },
 ];
 
+const DESIRED_CHAIN = 11155111;
+
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
   const [tokenAmount, setTokenAmount] = useState("");
@@ -93,9 +96,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     address: account.address,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
+  const { isDesiredChain, chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
 
   useEffect(() => {
-    // setOpen("credit-added");
     if (!account.address) return;
     showBalance({ token: account.address })
       .then((response) => {
@@ -259,7 +262,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     Buy Using
                   </Text>
                   <IconSelectContainer
-                    onChange={(value) => setSelectedToken(value)}
+                    onChange={(value) => {
+                      if (isDesiredChain) {
+                        setSelectedToken(value);
+                      } else {
+                        chainChangerAsync(() => setSelectedToken(value));
+                      }
+                    }}
                     options={[
                       {
                         label: "Ethereum",
@@ -342,6 +351,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 )}
                 <ConnectKitButton.Custom>
                   {(props) => {
+                    console.log({
+                      props,
+                    });
+
                     if (!props.isConnected) {
                       return (
                         <Button
@@ -350,6 +363,18 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           className="h-12"
                         >
                           Connect Wallet
+                        </Button>
+                      );
+                    }
+
+                    if (!props.chain || props.chain?.id !== DESIRED_CHAIN) {
+                      return (
+                        <Button
+                          onClick={(e) => chainChangerAsync()}
+                          variant={"secondary"}
+                          className="h-12"
+                        >
+                          Wrong Network
                         </Button>
                       );
                     }
