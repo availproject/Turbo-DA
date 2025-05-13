@@ -128,9 +128,7 @@ function DiscountEligibility({ token }: { token?: string }) {
                       For a batch size of{" "}
                     </Text>
                     <Text as="span" weight={"bold"} size={"sm"}>
-                      {batchSizeData.originalCredits
-                        ? batchSizeData.originalCredits
-                        : batchSizeData.size}
+                      {batchSizeData.size}
                     </Text>
                     <Text
                       as="span"

@@ -41,7 +41,7 @@ const ReclaimCredits = ({
         amount,
         appId: appData.id,
       });
-      if (response?.data?.state === "SUCCESS") {
+      if (response?.state === "SUCCESS") {
         updateCreditBalance();
         updateAppList();
         setOpen("");

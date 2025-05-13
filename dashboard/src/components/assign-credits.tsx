@@ -43,7 +43,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         appId: appData.id,
       });
 
-      if (response?.data?.state === "SUCCESS") {
+      if (response?.state === "SUCCESS") {
         success({
           label: "Credits Assigned Successfully!",
           description: `${formatDataBytes(
