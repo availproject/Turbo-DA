@@ -53,7 +53,7 @@ const SwitchDescription = ({
               ‘Assign Credits’
             </Text>{" "}
             to this app.{" "}
-            <Text
+            {/* <Text
               as="span"
               size={"sm"}
               className="text-[#E4A354]"
@@ -61,7 +61,7 @@ const SwitchDescription = ({
             >
               Once the credits are assigned, you cannot activate this before
               exhausting your assigned credits.
-            </Text>
+            </Text> */}
           </Text>
         </TooltipContent>
       </Tooltip>
