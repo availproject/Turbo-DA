@@ -91,10 +91,11 @@ where
             Ok(value) => {
                 let user = value.split(":").next().unwrap();
                 let account = value.split(":").nth(1).unwrap();
+
                 if let Err(e) = insert_headers(&mut headers, "user_id", &user) {
                     return e;
                 }
-                if let Err(e) = insert_headers(&mut headers, "account_id", &account) {
+                if let Err(e) = insert_headers(&mut headers, "app_id", &account) {
                     return e;
                 }
             }
@@ -133,6 +134,10 @@ where
                             return e;
                         }
 
+                        println!(
+                            "Setting API key in redis for user {}:{}",
+                            key.user_id, key.app_id
+                        );
                         match self.redis.set(
                             api_key_hash.as_str(),
                             format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())

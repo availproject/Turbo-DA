@@ -50,12 +50,18 @@ pub async fn submit_data(
     }
     let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "App Id not retrieved" }))
+        }
     };
 
     let user_id = match retrieve_user_id(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "User Id not retrieved" }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -134,7 +140,7 @@ pub async fn submit_raw_data(
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
-                .json(json!({ "error": "User Id not retrieved" }))
+                .json(json!({ "error": "App Id not retrieved" }))
         }
     };
 
