@@ -3,6 +3,7 @@ import Header from "@/components/header";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { template } from "@/lib/utils";
 import { OverviewProvider } from "@/providers/OverviewProvider";
+import AppService from "@/services/app";
 import AuthenticationService from "@/services/authentication";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
@@ -43,7 +44,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
       return response;
     })
     .catch((error) => {
-      return {};
+      return undefined;
     });
 
   if (!getUserDetails) {
@@ -52,9 +53,17 @@ export default async function Layout({ children }: { children: ReactNode }) {
       name: user?.fullName!,
     })
       .then((response) => response)
-      .catch((error) => {});
+      .catch((error) => undefined);
 
-    if (!registerUser) {
+    if (registerUser) {
+      await AppService.createApp({
+        token: token!,
+        appId: 1,
+        appName: `${user?.fullName}'s App`,
+        avatar: "avatar_1",
+      })
+        .then((response) => response)
+        .catch((error) => {});
       getUserDetails = await AuthenticationService.fetchUser({
         token: token!,
       })

@@ -1,6 +1,7 @@
 import { avatarList } from "@/lib/constant";
 import { cn } from "@/lib/utils";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { memo } from "react";
 
 const AvatarList = ({
   selected,
@@ -26,7 +27,6 @@ const AvatarList = ({
               <DotLottieReact
                 src={value.path}
                 loop
-                autoplay
                 playOnHover={true}
                 width={40}
                 height={40}
@@ -40,4 +40,4 @@ const AvatarList = ({
   );
 };
 
-export default AvatarList;
+export default memo(AvatarList);
