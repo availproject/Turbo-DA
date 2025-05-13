@@ -39,9 +39,6 @@ const ReclaimCredits = ({
         amount,
         appId: appData.id,
       });
-      console.log({
-        response,
-      });
       updateCreditBalance();
       setOpen("");
       toast(
