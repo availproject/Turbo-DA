@@ -458,15 +458,15 @@ pub async fn edit_app_account(
         }
     };
 
-    let mut account = db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id)
-        .await
-        .map_err(|e| {
-            HttpResponse::InternalServerError().json(json!({
-                "state": "ERROR",
-                "error": e.to_string(),
-            }))
-        })
-        .unwrap();
+    let app_result =
+        db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id).await;
+    if app_result.is_err() {
+        return HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": app_result.err().unwrap().to_string(),
+        }));
+    }
+    let mut account = app_result.unwrap();
 
     account.app_name = payload.app_name.clone();
     account.app_description = payload.app_description.clone();
