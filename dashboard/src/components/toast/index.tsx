@@ -20,6 +20,7 @@ export const useAppToast = () => {
         />,
         {
           theme: "colored",
+          className: "backdrop-blur-lg",
           progressClassName: "bg-[#78C47B]",
           closeButton: () => (
             <X
@@ -35,7 +36,7 @@ export const useAppToast = () => {
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
-            top: "60px",
+            marginBottom: "0px",
           },
         }
       ),
@@ -63,8 +64,9 @@ export const useAppToast = () => {
             display: "flex",
             justifyContent: "space-between",
             borderRadius: "8px",
-            top: "60px",
+            marginBottom: "0px",
           },
+          className: "backdrop-blur-lg",
         }
       ),
   };

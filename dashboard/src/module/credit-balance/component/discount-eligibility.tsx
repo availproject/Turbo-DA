@@ -48,10 +48,6 @@ function DiscountEligibility({ token }: { token?: string }) {
       });
   }, [debouncedValue]);
 
-  console.log({
-    credits,
-  });
-
   const batchSizeData = useMemo(() => {
     if (!debouncedValue) {
       return {
@@ -86,6 +82,7 @@ function DiscountEligibility({ token }: { token?: string }) {
       onOpenChange={(value) => !value && setOpen("")}
     >
       <DialogContent className="min-w-[600px] h-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl outline-0">
+        <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
         <div className="relative">
           <DialogHeader className="p-4 pb-0 flex justify-between flex-row">
             <DialogTitle>

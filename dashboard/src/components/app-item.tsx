@@ -7,12 +7,12 @@ import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Copy, Pencil, X } from "lucide-react";
+import { Copy, EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { memo, useState } from "react";
 import AssignCredits from "./assign-credits";
-import Button from "./button";
 import CreateApp from "./create-app";
+import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import { useDialog } from "./dialog/provider";
 import PrimaryProgress from "./progress/primary-progress";
@@ -21,6 +21,13 @@ import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import { Text } from "./text";
 import { useAppToast } from "./toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Skeleton } from "./ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
@@ -65,9 +72,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         avatar: app.app_logo,
         id: app.id,
         fallbackEnabled: !useMainBalance,
-      });
-      console.log({
-        response,
       });
     } catch (error) {
       console.log({
@@ -116,13 +120,52 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <div className="flex flex-col justify-between">
             <div className="flex items-center gap-1.5 justify-between">
               <Text weight={"semibold"}>{app.app_name}</Text>
-              <Button
-                variant="ghost"
-                className="w-6 h-6 p-1 bg-[#2F4252] rounded-2xl hover:bg-[#2F4252] cursor-pointer"
-                onClick={() => setOpen("update-app" + app.id)}
-              >
-                <Pencil size={24} color="#FFF" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <EllipsisVertical
+                    color="#B3B3B3"
+                    size={20}
+                    className="cursor-pointer"
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-52 border border-[#586472] bg-[#112235] p-0 rounded overflow-hidden"
+                  sideOffset={0}
+                >
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => setOpen("update-app" + app.id)}
+                      className="flex gap-x-2.5 group hover:bg-[#414E5D] cursor-pointer rounded-none items-center p-2"
+                    >
+                      <Pencil
+                        size={32}
+                        className="text-[#B3B3B3] group-hover:text-white"
+                      />
+                      <Text
+                        weight={"bold"}
+                        className="text-[#ccc] group-hover:text-white"
+                      >
+                        Edit App
+                      </Text>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setOpen("delete-app-alert" + app.id)}
+                      className="flex gap-x-2.5 group hover:bg-[#414E5D] cursor-pointer rounded-none items-center p-2"
+                    >
+                      <Trash2
+                        size={32}
+                        className="text-[#B3B3B3] group-hover:text-white"
+                      />
+                      <Text
+                        weight={"bold"}
+                        className="text-[#ccc] group-hover:text-white"
+                      >
+                        Delete App
+                      </Text>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-1.5">
               <Text variant={"light-grey"} weight={"medium"} size={"sm"}>
@@ -383,6 +426,13 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           clearAlertCallback={() => {
             setOpenDeleteAlert(undefined);
           }}
+        />
+      )}
+      {open === "delete-app-alert" + app.id && (
+        <DeleteAppAlert
+          id={"delete-app-alert" + app.id}
+          appId={app.id}
+          appName={app.app_name}
         />
       )}
       {open === "update-app" + app.id && (

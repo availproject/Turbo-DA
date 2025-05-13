@@ -4,7 +4,6 @@ import { Filter, useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ToastContainer } from "react-toastify";
 import { Text } from ".//text";
 import AppList from "./app-list";
 import Button from "./button";
@@ -51,7 +50,6 @@ const AppsCard = ({ token }: AppsCardProps) => {
               </Text>
             </CardTitle>
             <div className="flex items-center gap-6">
-              <ToastContainer />
               <SecondarySelect
                 options={["All", "Unallocated", "Allocated"]}
                 onChange={(value) => setFilter(value as Filter)}

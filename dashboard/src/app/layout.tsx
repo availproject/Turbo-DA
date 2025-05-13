@@ -10,6 +10,7 @@ import { dark } from "@clerk/themes";
 import "@rainbow-me/rainbowkit/styles.css";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
+import { ToastContainer } from "react-toastify";
 import { ppmori } from "./fonts";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -79,6 +80,10 @@ export default async function Layout({ children }: { children: ReactNode }) {
                 {children}
               </OverviewProvider>
               <Footer />
+              <ToastContainer
+                className={"backdrop-blur-lg"}
+                style={{ top: "80px" }}
+              />
             </Providers>
           </body>
         </html>
