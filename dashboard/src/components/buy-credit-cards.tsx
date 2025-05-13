@@ -12,7 +12,13 @@ import { writeContract } from "@wagmi/core";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
 import Image from "next/image";
-import { MouseEvent, useDeferredValue, useEffect, useState } from "react";
+import {
+  MouseEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
@@ -113,18 +119,25 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
-      calculateDataCredits();
+      calculateEstimateCredits({ amount: +debouncedValue });
     }
   }, [debouncedValue, tokenAmountError]);
 
-  const calculateDataCredits = async () => {
-    try {
-      const response = await CreditService.calculatePurchaseCost({
-        token: token!,
-        data: +debouncedValue,
-      });
+  const tokenAddress = useMemo(() => {
+    return TOKEN_MAP[selectToken.toLowerCase()].token_address;
+  }, [selectToken]);
 
-      setEstimateData(response.data);
+  const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    try {
+      const response = await CreditService.calculateEstimateCreditsAgainstToken(
+        {
+          token: token!,
+          amount: amount,
+          tokenAddress: tokenAddress,
+        }
+      );
+
+      setEstimateData(response?.data);
     } catch (error) {
       console.log(error);
     }

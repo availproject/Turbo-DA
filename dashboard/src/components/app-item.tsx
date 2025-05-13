@@ -10,7 +10,6 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, Pencil, X } from "lucide-react";
 import Image from "next/image";
 import { memo, useMemo, useState } from "react";
-import { toast } from "react-toastify";
 import AssignCredits from "./assign-credits";
 import Button from "./button";
 import CreateApp from "./create-app";
@@ -21,7 +20,7 @@ import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import { Text } from "./text";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 import { Skeleton } from "./ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import ViewKeys from "./view-keys";
@@ -44,6 +43,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
+  const { success } = useAppToast();
 
   const progress =
     (+app.credit_used / +app.credit_balance + +app.credit_used) * 100;
@@ -357,26 +357,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               strokeWidth={1}
               onClick={async () => {
                 await navigator.clipboard.writeText(apiKey);
-                toast(<Success label="API key copied" />, {
-                  theme: "colored",
-                  progressClassName: "bg-[#78C47B]",
-                  closeButton: () => (
-                    <X
-                      color="#FFF"
-                      size={20}
-                      className="cursor-pointer"
-                      onClick={() => toast.dismiss()}
-                    />
-                  ),
-                  style: {
-                    backgroundColor: "#78C47B29",
-                    width: "300px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderRadius: "8px",
-                    top: "60px",
-                  },
-                });
+                success({ label: "API key copied" });
               }}
             />
           </div>

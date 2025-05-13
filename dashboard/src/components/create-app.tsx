@@ -15,12 +15,11 @@ import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { ChangeEvent, useCallback, useRef, useState } from "react";
-import { toast } from "react-toastify";
 import { Text } from ".//text";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
 import AvatarList from "./lottie-comp/avatar-list";
-import Success from "./toast/success";
+import { useAppToast } from "./toast";
 
 type CreateAppProps = {
   type?: "create" | "edit";
@@ -46,6 +45,7 @@ export default function CreateApp({
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
   const { updateAppList } = useApp();
+  const { success } = useAppToast();
 
   const saveAppDetails = useCallback(async () => {
     if ((!selectedAvatar && !previewUploadedAvatar) || !appId || !appName) {
@@ -89,36 +89,16 @@ export default function CreateApp({
               avatar: uploadAvatar,
             });
 
+      if (response.state !== "SUCCESS") {
+        setLoading(false);
+        return;
+      }
+
       updateAppList();
-
-      toast(
-        <Success
-          label={
-            type === "edit" ? "Updated Successfully!" : "Created Successfully!"
-          }
-        />,
-        {
-          theme: "colored",
-          progressClassName: "bg-[#78C47B]",
-          closeButton: () => (
-            <X
-              color="#FFF"
-              size={20}
-              className="cursor-pointer"
-              onClick={() => toast.dismiss()}
-            />
-          ),
-          style: {
-            backgroundColor: "#78C47B29",
-            width: "300px",
-            display: "flex",
-            justifyContent: "space-between",
-            borderRadius: "8px",
-            top: "60px",
-          },
-        }
-      );
-
+      success({
+        label:
+          type === "edit" ? "Updated Successfully!" : "Created Successfully!",
+      });
       setOpen("");
     } catch (error) {
     } finally {

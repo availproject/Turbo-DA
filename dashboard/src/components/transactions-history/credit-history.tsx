@@ -30,9 +30,11 @@ const CreditHistory = ({ token }: { token?: string }) => {
   const displayValues = useCallback((heading: string, value: any) => {
     switch (heading) {
       case "created_at":
-        return new Date(value).toDateString();
+        return new Date(value).toLocaleDateString();
       case "amount_credit":
-        return formatDataBytes(value);
+        return formatDataBytes(value, 2);
+      case "chain_id":
+        return value;
       default:
         return value ?? "-";
     }

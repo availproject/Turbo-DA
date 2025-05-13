@@ -1,22 +1,22 @@
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { X } from "lucide-react";
 import { Text } from "../text";
 
-type SuccessProps = {
+type FailureProps = {
   label?: string;
   description?: string;
   className?: string;
 };
 
-const Success = ({ label, description, className }: SuccessProps) => {
+const Failure = ({ label, description, className }: FailureProps) => {
   return (
     <div className={cn("flex gap-x-4 items-center pr-4", className)}>
       <div className="bg-white rounded-lg p-2">
-        <Check
-          color="#1FC16B"
+        <X
+          color="#ff7360"
           size={24}
           strokeWidth={3}
-          className="border-2 border-[#1FC16B] rounded-full p-0.5"
+          className="border-2 border-[#ff7360] rounded-full p-0.5"
         />
       </div>
       <div>
@@ -31,4 +31,4 @@ const Success = ({ label, description, className }: SuccessProps) => {
   );
 };
 
-export default Success;
+export default Failure;
