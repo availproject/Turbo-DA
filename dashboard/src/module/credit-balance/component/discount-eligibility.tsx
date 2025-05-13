@@ -66,7 +66,9 @@ function DiscountEligibility({ token }: { token?: string }) {
         size: formatDataBytes(debouncedValue),
         discount: "50%",
         originalCredits,
-        equivalentCredits: +originalCredits * 2,
+        equivalentCredits: credits
+          ? formatDataBytes(+credits * 2)
+          : originalCredits,
       };
     }
 
