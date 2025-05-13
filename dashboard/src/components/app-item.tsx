@@ -106,7 +106,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                 <DotLottieReact
                   src={avatarList?.[app?.app_logo]?.path}
                   loop
-                  autoplay
                   playOnHover={true}
                   width={40}
                   height={40}
@@ -128,10 +127,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                     className="cursor-pointer"
                   />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-52 border border-[#586472] bg-[#112235] p-0 rounded overflow-hidden"
-                  sideOffset={0}
-                >
+                <DropdownMenuContent className="w-52 border border-[#586472] bg-[#112235] p-0 rounded overflow-hidden">
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       onClick={() => setOpen("update-app" + app.id)}
