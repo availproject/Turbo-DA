@@ -12,13 +12,7 @@ import { writeContract } from "@wagmi/core";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
 import Image from "next/image";
-import {
-  MouseEvent,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { MouseEvent, useDeferredValue, useEffect, useState } from "react";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
@@ -123,11 +117,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   }, [debouncedValue, tokenAmountError]);
 
-  const tokenAddress = useMemo(() => {
-    return TOKEN_MAP[selectToken.toLowerCase()].token_address;
-  }, [selectToken]);
-
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()]?.token_address;
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
