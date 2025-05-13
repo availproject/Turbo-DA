@@ -1,14 +1,17 @@
 "use client";
 import { cn, formatDataBytes } from "@/lib/utils";
 import HistoryService from "@/services/history";
+import { CreditRequest } from "@/services/history/response";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
+import { Skeleton } from "../ui/skeleton";
 import EmptyState from "./empty-state";
 
 const CreditHistory = ({ token }: { token?: string }) => {
-  const [historyList, setHistoryList] = useState<any[]>();
+  const [historyList, setHistoryList] = useState<CreditRequest[]>();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchHistory();
@@ -25,6 +28,8 @@ const CreditHistory = ({ token }: { token?: string }) => {
       setHistoryList(processedHistory);
     } catch (error) {
       setHistoryList([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,7 +78,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
   return (
     <>
       <div className="h-px bg-[#2B4761]" />
-      {!historyList?.length ? (
+      {!loading && !historyList?.length ? (
         <EmptyState
           message="Your Credit History Would Be Shown Here"
           cta={{
@@ -84,7 +89,14 @@ const CreditHistory = ({ token }: { token?: string }) => {
           }}
         />
       ) : null}
-      {historyList?.length ? (
+      {loading ? (
+        <div className="flex flex-col gap-y-4 mt-4">
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+        </div>
+      ) : historyList?.length ? (
         <DynamicTable
           headings={[
             { key: "created_at", label: "Purchasing Date" },

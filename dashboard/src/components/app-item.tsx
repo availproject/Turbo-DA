@@ -332,12 +332,12 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <X
             size={22}
             color="#fff"
-            className="cursor-pointer"
+            className={cn(loading ? "pointer-events-none" : "cursor-pointer")}
             onClick={() => setDisplayAPIKey(false)}
           />
         </div>
         {loading ? (
-          <Skeleton className="h-4 w-[250px]" />
+          <Skeleton className="h-[22px] w-[380px] bg-light-grey rounded-xs" />
         ) : (
           <div className="flex items-center gap-x-2 cursor-pointer w-fit">
             <Text size={"xl"} weight={"bold"}>

@@ -1,13 +1,16 @@
 "use client";
 import { cn } from "@/lib/utils";
 import HistoryService from "@/services/history";
+import { DataTransaction } from "@/services/history/response";
 import { useCallback, useEffect, useState } from "react";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
+import { Skeleton } from "../ui/skeleton";
 import EmptyState from "./empty-state";
 
 const DataPostingHistory = ({ token }: { token?: string }) => {
-  const [historyList, setHistoryList] = useState<any[]>();
+  const [historyList, setHistoryList] = useState<DataTransaction[]>();
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     fetchHistory();
@@ -22,6 +25,8 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
       setHistoryList(response?.data?.results ?? []);
     } catch (error) {
       setHistoryList([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -37,10 +42,17 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
   return (
     <>
       <div className="h-px bg-[#2B4761]" />
-      {!historyList?.length ? (
+      {!loading && !historyList?.length ? (
         <EmptyState message="Your Data Posting History Would Be Shown Here" />
       ) : null}
-      {historyList?.length ? (
+      {loading ? (
+        <div className="flex flex-col gap-y-4 mt-4">
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+        </div>
+      ) : historyList?.length ? (
         <>
           <Text
             variant={"light-grey"}
