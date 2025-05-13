@@ -81,7 +81,7 @@ impl EVM {
         let mut _stream = subscription.into_stream();
 
         while let Some(header) = _stream.next().await {
-            debug!("header: {:?}", header.number);
+            info!("header: {:?}", header.number);
             let finalised_block = header.inner.number - self.finalised_threshold;
 
             match self.check_deposits(finalised_block).await {
@@ -154,7 +154,7 @@ impl EVM {
             let deposit = EvmDeposit {
                 token_address: receipt.tokenAddress.to_string(),
                 amount: receipt.amount.to_string(),
-                from: receipt.from.to_string(),
+                _from: receipt.from.to_string(),
             };
             let result = self
                 .utils

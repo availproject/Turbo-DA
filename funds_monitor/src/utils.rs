@@ -1,4 +1,4 @@
-use std::{io::Read, str::FromStr};
+use std::str::FromStr;
 
 use reqwest::Client;
 use turbo_da_core::utils::{get_prices, TOKEN_MAP};
@@ -6,18 +6,18 @@ use turbo_da_core::utils::{get_prices, TOKEN_MAP};
 use avail_rust::{account, SDK};
 use bigdecimal::BigDecimal;
 use db::{
-    models::credit_requests::{CreditRequests, CreditRequestsGet},
+    models::credit_requests::CreditRequestsGet,
     schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
-use hex;
+
 use log::{debug, error, info};
 use turbo_da_core::utils::Convertor;
 
 pub struct Deposit {
     pub token_address: String,
     pub amount: String,
-    pub from: String,
+    pub _from: String,
 }
 
 pub struct Utils {
@@ -79,7 +79,7 @@ impl Utils {
                 format!("Failed to store fund request: {}", e)
             })?;
 
-        debug!("Success: {} status: {}", order_id, status);
+        info!("Success: {} status: {}", order_id, status);
         self.update_token_information_on_deposit(&amount, &row.user_id, connection)
             .await;
 

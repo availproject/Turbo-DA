@@ -122,7 +122,7 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
         let receipt = Deposit {
             token_address: "0x0000000000000000000000000000000000000000".to_string(),
             amount: value.to_string(),
-            from: account,
+            _from: account,
         };
 
         utils

@@ -1,7 +1,7 @@
 use dotenv::dotenv;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, error::Error, fs, io};
+use std::{collections::HashMap, env, error::Error, fs};
 
 use toml;
 
