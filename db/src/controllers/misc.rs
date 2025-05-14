@@ -82,11 +82,11 @@ pub async fn update_credit_balance(
             )
         })?;
 
-    if &billed_from_credit > &BigDecimal::from(0) {
+    if &billed_from_fallback > &BigDecimal::from(0) {
         diesel::update(users::users.filter(users::id.eq(&app.user_id)))
             .set((
-                users::credit_balance.eq(users::credit_balance - &billed_from_credit),
-                users::credit_used.eq(users::credit_used + &billed_from_credit),
+                users::credit_balance.eq(users::credit_balance - &billed_from_fallback),
+                users::credit_used.eq(users::credit_used + &billed_from_fallback),
             ))
             .execute(connection)
             .await
