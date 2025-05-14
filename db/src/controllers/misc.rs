@@ -58,8 +58,13 @@ pub async fn update_credit_balance(
     let mut billed_from_fallback = BigDecimal::from(0);
 
     if tx_params.amount_data_billed > app.credit_balance {
-        billed_from_credit = &tx_params.amount_data_billed - &app.credit_balance;
-        billed_from_fallback = &tx_params.amount_data_billed - &billed_from_credit;
+        if app.credit_balance >= BigDecimal::from(0) {
+            billed_from_credit = &tx_params.amount_data_billed - &app.credit_balance;
+            billed_from_fallback = &tx_params.amount_data_billed - &billed_from_credit;
+        } else {
+            billed_from_credit = BigDecimal::from(0);
+            billed_from_fallback = tx_params.amount_data_billed.clone();
+        }
     }
 
     diesel::update(apps::apps.filter(apps::id.eq(&app.id)))
