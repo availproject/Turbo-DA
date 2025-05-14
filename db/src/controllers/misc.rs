@@ -54,19 +54,31 @@ pub async fn update_credit_balance(
     app: &Apps,
     tx_params: &TxParams,
 ) -> Result<(), String> {
-    let mut billed_from_credit = BigDecimal::from(0);
-    let mut billed_from_fallback = BigDecimal::from(0);
-
-    if tx_params.amount_data_billed > app.credit_balance {
-        if app.credit_balance >= BigDecimal::from(0) {
-            billed_from_credit = &tx_params.amount_data_billed - &app.credit_balance;
-            billed_from_fallback = &tx_params.amount_data_billed - &billed_from_credit;
+    println!("app.credit_balance: {}", app.credit_balance);
+    println!(
+        "tx_params.amount_data_billed: {}",
+        tx_params.amount_data_billed
+    );
+    let (billed_from_credit, billed_from_fallback) = if app.credit_balance >= BigDecimal::from(0) {
+        if tx_params.amount_data_billed > app.credit_balance {
+            (
+                app.credit_balance.clone(),
+                &tx_params.amount_data_billed - &app.credit_balance,
+            )
         } else {
-            billed_from_credit = BigDecimal::from(0);
-            billed_from_fallback = tx_params.amount_data_billed.clone();
+            (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
         }
-    }
+    } else {
+        (BigDecimal::from(0), tx_params.amount_data_billed.clone())
+    };
 
+    println!("billed_from_credit: {}", billed_from_credit);
+    println!("billed_from_fallback: {}", billed_from_fallback);
+    println!("app.credit_balance: {}", app.credit_balance);
+    println!(
+        "tx_params.amount_data_billed: {}",
+        tx_params.amount_data_billed
+    );
     diesel::update(apps::apps.filter(apps::id.eq(&app.id)))
         .set((
             apps::credit_balance.eq(apps::credit_balance - &billed_from_credit),
