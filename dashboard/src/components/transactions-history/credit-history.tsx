@@ -51,7 +51,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
     (heading: string, value: any) => {
       switch (heading) {
         case "created_at":
-          return new Date(value).toLocaleDateString();
+          return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
           return formatDataBytes(value, 2);
         case "chain_id":

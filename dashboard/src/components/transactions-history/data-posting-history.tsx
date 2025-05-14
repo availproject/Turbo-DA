@@ -33,7 +33,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
   const displayValues = useCallback((heading: string, value: any) => {
     switch (heading) {
       case "created_at":
-        return new Date(value).toLocaleDateString();
+        return new Date(value).toLocaleDateString().replaceAll("/", "-");
       default:
         return value ?? "-";
     }

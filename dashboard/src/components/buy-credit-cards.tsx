@@ -84,6 +84,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [tokenAmount, setTokenAmount] = useState("");
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
+  const [estimateDataLoading, setEstimateDataLoading] = useState(false);
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
@@ -117,6 +118,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()]?.token_address;
+    setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
@@ -129,6 +131,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       setEstimateData(response?.data);
     } catch (error) {
       console.log(error);
+    } finally {
+      setEstimateDataLoading(false);
     }
   };
 
@@ -195,7 +199,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             })
             .catch((error) => {
               const message = error.message.split(".")[0];
-              setError(message);
+              if (message === "User rejected the request") {
+                setError("You have rejected the request");
+              } else {
+                setError(message);
+              }
             })
             .finally(() => {
               setLoading(false);
@@ -203,7 +211,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         })
         .catch((err) => {
           const message = err.message.split(".")[0];
-          setError(message);
+          if (message === "User rejected the request") {
+            setError("You have rejected the request");
+          } else {
+            setError(message);
+          }
           setLoading(false);
         });
     } catch (error) {
@@ -264,6 +276,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   </Text>
                   <IconSelectContainer
                     onChange={(value) => {
+                      if (!account) {
+                        return;
+                      }
                       if (isDesiredChain) {
                         setSelectedToken(value);
                       } else {
@@ -338,7 +353,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               </div>
               <PrimaryInput
                 label="Amount of Credits"
-                value={estimateData ? formatDataBytes(+estimateData) : ""}
+                value={
+                  estimateData && !estimateDataLoading
+                    ? formatDataBytes(+estimateData)
+                    : ""
+                }
                 className="pointer-events-none"
               />
             </div>
@@ -346,7 +365,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             <div className="flex-1 flex flex-col gap-y-3 items-center pt-28">
               <SignedIn>
                 {!!error && (
-                  <Text variant={"error"} size={"sm"}>
+                  <Text variant={"error"} size={"sm"} weight={"medium"}>
                     {error}
                   </Text>
                 )}
