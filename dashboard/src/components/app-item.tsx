@@ -9,7 +9,7 @@ import { AppDetails } from "@/services/app/response";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import AssignCredits from "./assign-credits";
 import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
@@ -43,9 +43,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
   const { success } = useAppToast();
-
-  const progress =
-    (+app.credit_used / +app.credit_balance + +app.credit_used) * 100;
 
   const generateApiKey = async () => {
     if (!token) return;
@@ -87,6 +84,30 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   //   return false;
   // }, [creditBalance]);
+
+  const creditsData = useMemo(() => {
+    if (useMainBalance) {
+      const totalMainCredit = creditBalance
+        ? +app.fallback_credit_used + creditBalance
+        : +app.fallback_credit_used;
+
+      return {
+        usedCredit: +app.fallback_credit_used,
+        totalCredit: +totalMainCredit,
+        remainingCredits: creditBalance,
+      };
+    }
+    return {
+      usedCredit: +app.credit_used,
+      totalCredit: +app.credit_balance + +app.credit_used,
+      remainingCredits: +app.credit_balance,
+    };
+  }, [useMainBalance, creditBalance]);
+
+  const progress = useMemo(
+    () => (creditsData?.usedCredit / creditsData?.totalCredit) * 100,
+    [creditsData?.usedCredit, creditsData?.totalCredit]
+  );
 
   return (
     <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
@@ -173,70 +194,71 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </div>
           </div>
 
-          {+app.credit_balance ? (
-            <div className="flex flex-col w-[200px] items-end gap-2">
-              <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-                Used: {+app.credit_used ? formatDataBytes(+app.credit_used) : 0}
-                /{formatDataBytes(+app.credit_balance + +app.credit_used)}
-              </Text>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="w-full">
-                    {!+app.credit_balance ? (
-                      <PrimaryProgress progress={progress} color={"green"} />
-                    ) : (
-                      <SecondaryProgress progress={progress} />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent className="bg-black w-[147px] p-2">
-                  <div className="flex flex-col gap-y-2">
-                    <div className="flex gap-x-1.5">
-                      <div
-                        className={cn(
-                          "h-3 w-3 rounded-full mt-0.5",
-                          app.fallback_enabled ? "bg-[#7DC372]" : "bg-[#FF82C8]"
-                        )}
-                      />
-                      <div>
-                        <Text
-                          variant={"light-grey"}
-                          weight={"medium"}
-                          size={"xs"}
-                        >
-                          Used
-                        </Text>
-                        <Text weight={"medium"} size={"xs"}>
-                          {formatDataBytes(+app.credit_used)}
-                        </Text>
-                      </div>
-                    </div>
-                    <div className="flex gap-x-1.5">
-                      {!+app.credit_balance ? (
-                        <div className="h-3 w-3 bg-[#FF82C8] rounded-full" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
-                          <div className="h-3 w-0.5 bg-[#dadada33]" />
-                        </div>
+          <div className="flex flex-col w-[200px] items-end gap-2">
+            <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
+              Used:{" "}
+              {creditsData.usedCredit
+                ? formatDataBytes(creditsData.usedCredit)
+                : 0}
+              /{formatDataBytes(creditsData.totalCredit)}
+            </Text>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  {useMainBalance ? (
+                    <PrimaryProgress progress={progress} color={"green"} />
+                  ) : (
+                    <SecondaryProgress progress={progress} />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="bg-black w-[147px] p-2">
+                <div className="flex flex-col gap-y-2">
+                  <div className="flex gap-x-1.5">
+                    <div
+                      className={cn(
+                        "h-3 w-3 rounded-full mt-0.5",
+                        useMainBalance ? "bg-[#7DC372]" : "bg-[#FF82C8]"
                       )}
-                      <div>
-                        <Text
-                          variant={"light-grey"}
-                          weight={"medium"}
-                          size={"xs"}
-                        >
-                          Unused
-                        </Text>
-                        <Text weight={"medium"} size={"xs"}>
-                          {formatDataBytes(+app.credit_used)}
-                        </Text>
-                      </div>
+                    />
+                    <div>
+                      <Text
+                        variant={"light-grey"}
+                        weight={"medium"}
+                        size={"xs"}
+                      >
+                        Used
+                      </Text>
+                      <Text weight={"medium"} size={"xs"}>
+                        {formatDataBytes(creditsData.usedCredit)}
+                      </Text>
                     </div>
                   </div>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : null}
+                  <div className="flex gap-x-1.5">
+                    {useMainBalance ? (
+                      <div className="h-3 w-3 bg-grey-800 rounded-full" />
+                    ) : (
+                      <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
+                        <div className="h-3 w-0.5 bg-[#dadada33]" />
+                      </div>
+                    )}
+                    <div>
+                      <Text
+                        variant={"light-grey"}
+                        weight={"medium"}
+                        size={"xs"}
+                      >
+                        Unused
+                      </Text>
+                      <Text weight={"medium"} size={"xs"}>
+                        {formatDataBytes(creditsData.remainingCredits)}
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
