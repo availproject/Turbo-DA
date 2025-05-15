@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import useBalance from "@/hooks/useBalance";
+import { useOverview } from "@/providers/OverviewProvider";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -10,16 +11,30 @@ import { Dialog, DialogContent } from "./ui/dialog";
 
 type CreditsAddedProps = {
   credits?: string;
+  previousBalance?: number;
 };
-export default function CreditsAdded({ credits }: CreditsAddedProps) {
+export default function CreditsAdded({
+  credits,
+  previousBalance,
+}: CreditsAddedProps) {
   const { open, setOpen } = useDialog();
-  const { updateCreditBalance } = useBalance();
+  const { creditBalance } = useOverview();
+  const { updateCreditBalance, loading } = useBalance();
 
   useEffect(() => {
-    if (open) {
-      updateCreditBalance();
-    }
+    let updateBalnceCallback = setTimeout(() => {
+      if (open) {
+        updateCreditBalance();
+      }
+    }, 5000);
+    return () => {
+      clearTimeout(updateBalnceCallback);
+    };
   }, [open]);
+
+  console.log({
+    creditBalance,
+  });
 
   return (
     <Dialog
@@ -30,18 +45,17 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
         }
       }}
     >
-      <DialogContent className="p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] text-white max-w-[600px] w-[600px] rounded-2xl">
-        <div className="bg-[url('/credits-added-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
-
-        <Card className="relative w-[600px] h-[400px] bg-[#192a3d] rounded-2xl overflow-hidden border border-solid border-transparent">
+      <DialogContent className="p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] text-white w-[600px] rounded-2xl h-[400px]">
+        <div className="bg-[url('/credits-added-noise.png')] bg-repeat absolute flex w-full h-full opacity-80 z-1" />
+        <Card className="relative w-full h-full bg-[#192a3d] rounded-2xl overflow-hidden border border-solid border-transparent">
           <DialogTitle></DialogTitle>
-          <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-4 right-4">
+          <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-4 right-4 z-2">
             <X color="#FFF" size={24} strokeWidth={1} />
           </Close>
 
           <CardContent className="flex flex-col items-center justify-center h-full pt-0">
-            <div className="w-[328px] gap-4 flex flex-col items-center">
-              <div className="gap-2 relative self-stretch w-full flex flex-col items-center">
+            <div className="w-[328px] gap-y-1 flex flex-col items-center">
+              <div className="relative self-stretch w-full flex flex-col items-center">
                 <div className="w-44 flex items-center justify-center">
                   <DotLottieReact
                     src={"credit-added.lottie"}
@@ -55,7 +69,7 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
 
                 <Text
                   weight={"semibold"}
-                  size={"sxl"}
+                  size={"4xl"}
                   className="relative self-stretch text-center"
                 >
                   {credits}
@@ -66,6 +80,9 @@ export default function CreditsAdded({ credits }: CreditsAddedProps) {
                 size={"2xl"}
                 weight={"semibold"}
                 className="text-[#78C47B] text-center"
+                style={{
+                  textShadow: "0px 0px 26.04px rgba(120, 196, 123, 0.60)",
+                }}
               >
                 Credits Added Successfully
               </Text>

@@ -5,6 +5,7 @@ import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
+import { useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
@@ -88,6 +89,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
+  const { creditBalance } = useOverview();
   const [error, setError] = useState("");
   const account = useAccount();
   const { setOpen } = useDialog();
@@ -99,6 +101,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (!account.address) return;
+    // setOpen("credit-added");
     showBalance({ token: account.address })
       .then((response) => {
         console.log({
@@ -287,7 +290,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     }}
                     options={[
                       {
-                        label: "Ethereum",
+                        label: "ETH",
                         icon: (
                           <Image
                             src={"/currency/eth.png"}

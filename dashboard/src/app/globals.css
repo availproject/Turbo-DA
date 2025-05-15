@@ -28,9 +28,18 @@
   --shadow-primary: 0px 4.37px 96.133px -17.479px #13161e;
   --shadow-primary-button: 0px 0px 200px 0px rgba(60, 163, 252, 0.4);
   --shadow-green: 0px 0px 26.04px rgba(120, 196, 123, 0.6);
+
   --font-sxl: 40px;
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: #ffffff;
+  box-shadow: inset 0 0 20px 20px #23232300;
+}
 /* @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -22,6 +22,7 @@ const AvatarList = ({
                 : "cursor-pointer border border-transparent"
             )}
             key={key}
+            onClick={() => onClick(key)}
           >
             {value?.path ? (
               <DotLottieReact
@@ -30,7 +31,6 @@ const AvatarList = ({
                 playOnHover={true}
                 width={40}
                 height={40}
-                onClick={() => onClick(key)}
               />
             ) : null}
           </div>
