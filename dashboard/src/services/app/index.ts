@@ -1,3 +1,6 @@
+import { BaseResponse } from "../response";
+import { AppDetails } from "./response";
+
 class AppService {
   static async getApps({ token }: { token: string }) {
     const response = await fetch(
@@ -68,7 +71,7 @@ class AppService {
     appId: number;
     appName: string;
     avatar: string;
-  }) {
+  }): Promise<BaseResponse<AppDetails[]>> {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/generate_app_account`,
       {
@@ -86,8 +89,12 @@ class AppService {
       }
     );
 
+    console.log({
+      response,
+    });
+
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      return { state: "ERROR", message: "Failed to save app data" };
     }
 
     return await response.json();
