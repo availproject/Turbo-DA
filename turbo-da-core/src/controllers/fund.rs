@@ -79,13 +79,36 @@ async fn register_credit_request(
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
-
+/// Parameters for adding inclusion details to a transaction
+///
+/// # Fields
+/// * `order_id` - The ID of the order to update
+/// * `tx_hash` - The transaction hash to associate with the order
 #[derive(Deserialize, Serialize, Clone)]
 struct AddInclusionDetailsParams {
     pub order_id: i32,
     pub tx_hash: String,
 }
 
+/// Add inclusion details to a transaction
+///
+/// # Description
+/// This endpoint allows a user to add inclusion details (transaction hash) to an existing order.
+/// The details are updated in the database for the specified order.
+///
+/// # Route
+/// `POST /v1/user/add_inclusion_details`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
+///
+/// # Request Body
+/// * `order_id` - The ID of the order to update
+/// * `tx_hash` - The transaction hash to associate with the order
+///
+/// # Returns
+/// * Success: JSON response with status "success" and the updated transaction data
+/// * Error: Internal server error with appropriate error message
 #[post("/add_inclusion_details")]
 pub async fn add_inclusion_details(
     payload: web::Json<AddInclusionDetailsParams>,
