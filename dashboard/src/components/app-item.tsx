@@ -6,7 +6,6 @@ import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { memo, useMemo, useState } from "react";
@@ -15,6 +14,7 @@ import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import { useDialog } from "./dialog/provider";
+import AvatarWrapper from "./lottie-comp/avatar-container";
 import PrimaryProgress from "./progress/primary-progress";
 import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
@@ -124,10 +124,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           ) : (
             <div className="w-10 rounded overflow-hidden">
               {avatarList?.[app?.app_logo]?.path ? (
-                <DotLottieReact
-                  src={avatarList?.[app?.app_logo]?.path}
-                  loop
-                  playOnHover={true}
+                <AvatarWrapper
+                  path={avatarList?.[app?.app_logo]?.path}
                   width={40}
                   height={40}
                 />
@@ -194,71 +192,75 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </div>
           </div>
 
-          <div className="flex flex-col w-[200px] items-end gap-2">
-            <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-              Used:{" "}
-              {creditsData.usedCredit
-                ? formatDataBytes(creditsData.usedCredit)
-                : 0}
-              /{formatDataBytes(creditsData.totalCredit)}
-            </Text>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="w-full">
-                  {useMainBalance ? (
-                    <PrimaryProgress progress={progress} color={"green"} />
-                  ) : (
-                    <SecondaryProgress progress={progress} />
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-black w-[147px] p-2">
-                <div className="flex flex-col gap-y-2">
-                  <div className="flex gap-x-1.5">
-                    <div
-                      className={cn(
-                        "h-3 w-3 rounded-full mt-0.5",
-                        useMainBalance ? "bg-[#7DC372]" : "bg-[#FF82C8]"
-                      )}
-                    />
-                    <div>
-                      <Text
-                        variant={"light-grey"}
-                        weight={"medium"}
-                        size={"xs"}
-                      >
-                        Used
-                      </Text>
-                      <Text weight={"medium"} size={"xs"}>
-                        {formatDataBytes(creditsData.usedCredit)}
-                      </Text>
-                    </div>
-                  </div>
-                  <div className="flex gap-x-1.5">
+          {creditsData.totalCredit ? (
+            <div className="flex flex-col w-[200px] items-end gap-2">
+              <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
+                Used:{" "}
+                {creditsData.usedCredit
+                  ? formatDataBytes(creditsData.usedCredit)
+                  : 0}
+                /{formatDataBytes(creditsData.totalCredit)}
+              </Text>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full">
                     {useMainBalance ? (
-                      <div className="h-3 w-3 bg-grey-800 rounded-full" />
+                      <PrimaryProgress progress={progress} color={"green"} />
                     ) : (
-                      <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
-                        <div className="h-3 w-0.5 bg-[#dadada33]" />
-                      </div>
+                      <SecondaryProgress progress={progress} />
                     )}
-                    <div>
-                      <Text
-                        variant={"light-grey"}
-                        weight={"medium"}
-                        size={"xs"}
-                      >
-                        Unused
-                      </Text>
-                      <Text weight={"medium"} size={"xs"}>
-                        {formatDataBytes(creditsData.remainingCredits)}
-                      </Text>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-black w-[147px] p-2">
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex gap-x-1.5">
+                      <div
+                        className={cn(
+                          "h-3 w-3 rounded-full mt-0.5",
+                          useMainBalance ? "bg-[#7DC372]" : "bg-[#FF82C8]"
+                        )}
+                      />
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Used
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {formatDataBytes(creditsData.usedCredit)}
+                        </Text>
+                      </div>
+                    </div>
+                    <div className="flex gap-x-1.5">
+                      {useMainBalance ? (
+                        <div className="h-3 w-3 bg-grey-800 rounded-full" />
+                      ) : (
+                        <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
+                          <div className="h-3 w-0.5 bg-[#dadada33]" />
+                        </div>
+                      )}
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Unused
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {creditsData.remainingCredits
+                            ? formatDataBytes(creditsData.remainingCredits)
+                            : "0 Bytes"}
+                        </Text>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -314,7 +316,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             }
             className={cn(
               "underline underline-offset-[2.5px]",
-              !useMainBalance && creditBalance ? "cursor-pointer" : "opacity-30"
+              !useMainBalance && +creditBalance
+                ? "cursor-pointer"
+                : "opacity-30"
             )}
           >
             Assign Credits

@@ -6,7 +6,6 @@ import { baseImageUrl, formatDataBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import Image from "next/image";
@@ -15,6 +14,7 @@ import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import AvatarWrapper from "./lottie-comp/avatar-container";
 import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
@@ -95,11 +95,8 @@ const ReclaimCredits = ({
               ) : (
                 <div className="w-10 h-10 rounded overflow-hidden mb-1">
                   {avatarList?.[appData?.app_logo]?.path ? (
-                    <DotLottieReact
-                      src={avatarList?.[appData.app_logo].path}
-                      loop
-                      autoplay
-                      playOnHover={true}
+                    <AvatarWrapper
+                      path={avatarList?.[appData.app_logo].path}
                       width={40}
                       height={40}
                     />
@@ -133,11 +130,8 @@ const ReclaimCredits = ({
                   ) : (
                     <div className="w-6 rounded overflow-hidden">
                       {avatarList?.[appData?.app_logo]?.path ? (
-                        <DotLottieReact
-                          src={avatarList?.[appData.app_logo].path}
-                          loop
-                          autoplay
-                          playOnHover={true}
+                        <AvatarWrapper
+                          path={avatarList?.[appData.app_logo].path}
                           width={24}
                           height={24}
                         />

@@ -4,6 +4,7 @@ import { DialogProvider } from "@/components/dialog/provider";
 import { config } from "@/config/walletConfig";
 import { ConfigProvider } from "@/providers/ConfigProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// import { AvailWalletProvider } from "avail-wallet";
 import { ConnectKitProvider } from "connectkit";
 import { ReactNode } from "react";
 import { State, WagmiProvider } from "wagmi";
@@ -24,9 +25,11 @@ export function Providers({
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider>
+          {/* <AvailWalletProvider> */}
           <ConfigProvider accessToken={token}>
             <DialogProvider>{children}</DialogProvider>
           </ConfigProvider>
+          {/* </AvailWalletProvider> */}
         </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

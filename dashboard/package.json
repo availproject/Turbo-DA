@@ -33,7 +33,7 @@
     "@wagmi/core": "^2.16.7",
     "avail-js-sdk": "^0.4.2",
     "avail-ui": "^0.0.0",
-    "avail-wallet": "^0.1.1",
+    "avail-wallet": "^0.1.6",
     "bignumber.js": "^9.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

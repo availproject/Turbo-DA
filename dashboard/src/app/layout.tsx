@@ -40,12 +40,8 @@ export default async function Layout({ children }: { children: ReactNode }) {
   let getUserDetails = await AuthenticationService.fetchUser({
     token: token!,
   })
-    .then((response) => {
-      return response;
-    })
-    .catch((error) => {
-      return undefined;
-    });
+    .then((response) => response)
+    .catch((error) => undefined);
 
   if (!getUserDetails) {
     const registerUser = await AuthenticationService.registerUser({
@@ -59,16 +55,17 @@ export default async function Layout({ children }: { children: ReactNode }) {
       await AppService.createApp({
         token: token!,
         appId: 1,
-        appName: `${user?.fullName}'s App`,
+        appName: `${user?.fullName ?? "Your First"}'s App`,
         avatar: "avatar_1",
       })
         .then((response) => response)
         .catch((error) => {});
+
       getUserDetails = await AuthenticationService.fetchUser({
         token: token!,
       })
         .then((response) => response)
-        .catch((error) => {});
+        .catch((error) => undefined);
     }
   }
 
@@ -84,7 +81,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
             <Providers token={token!}>
               <Header />
               <OverviewProvider
-                creditBalance={+getUserDetails?.data?.credit_balance}
+                creditBalance={getUserDetails?.data?.credit_balance ?? 0}
               >
                 {children}
               </OverviewProvider>

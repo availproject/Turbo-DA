@@ -267,6 +267,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             className="mt-0 space-y-6 h-full justify-between flex flex-col"
           >
             <div className="flex flex-col gap-y-8">
+              {/* <AvailWalletConnect></AvailWalletConnect> */}
               <div className="flex gap-2 w-full">
                 <div className="flex flex-col gap-2 flex-1">
                   <Text
