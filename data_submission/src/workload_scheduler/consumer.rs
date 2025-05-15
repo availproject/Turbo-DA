@@ -74,75 +74,77 @@ impl Consumer {
 
                 runtime.block_on(async move {
                     while let Ok(response) = receiver.recv().await {
-                        if response.thread_id != i {
+                        if &response.thread_id != &i {
                             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                             continue;
                         }
 
-                        let mut connection = match get_connection(&injected_dependency).await {
-                            Ok(conn) => conn,
-                            Err(e) => {
-                                error!(
-                                    "Couldn't establish db connection while processing response: {:?}",
-                                    e
-                                );
-                                return;
-                            }
-                        };
-
-                        let sdk = generate_avail_sdk(&endpoints).await;
-
-                        info!(
-                            "Submission Id: {:?} picked up by thread id {:?}",
-                            response.submission_id, response.thread_id
-                        );
-
-                        let submit_data_class =
-                            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
-
-                        let mut process_response = ProcessSubmitResponse::new(
+                        let result = response_handler(
                             &response,
-                            &mut connection,
-                            submit_data_class,
-                        );
-
-                        match timeout(
-                            Duration::from_secs(120),
-                            process_response.process_response(),
+                            &injected_dependency,
+                            &endpoints,
+                            &keygen,
+                            i,
                         )
-                        .await
-                        {
-                            Ok(result) => match result {
-                                Ok(response) => {
-                                    log_txn(&response.submission_id.to_string(), response.thread_id, "success");
-                                    info!(
-                                        "Successfully submitted response for submission_id {}",
-                                        response.submission_id
-                                    );
-                                }
-                                Err(e) => {
-                                    log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                                    update_error_entry(response, &mut connection, e.to_string())
-                                        .await;
-                                    error!("Failed to process the request with error: {:?}", e);
-                                }
-                            },
-                            Err(_) => {
-                                log_txn(&response.submission_id.to_string(), response.thread_id, "timeout");
-                                update_error_entry(
-                                    response,
-                                    &mut connection,
-                                    TIMEOUT_ERROR.to_string(),
-                                )
-                                .await;
+                        .await;
 
-                                error!("Request processing timed out after 2 minutes");
-                            }
+                        if let Err(e) = result {
+                            log_txn(&response.submission_id.to_string(), response.thread_id, &e);
+                            error!("Failed to process response: {}", e);
                         }
+
                         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     }
                 });
             });
+        }
+    }
+}
+
+async fn response_handler(
+    response: &Response,
+    injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
+    endpoints: &Arc<Vec<String>>,
+    keygen: &Vec<Keypair>,
+    i: i32,
+) -> Result<(), String> {
+    let mut connection = get_connection(&injected_dependency)
+        .await
+        .map_err(|_| format!("Failed to get connection"))?;
+
+    let sdk = generate_avail_sdk(&endpoints).await;
+
+    info!(
+        "Submission Id: {:?} picked up by thread id {:?}",
+        response.submission_id, response.thread_id
+    );
+
+    let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
+
+    let mut process_response =
+        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class);
+
+    match timeout(
+        Duration::from_secs(120),
+        process_response.process_response(),
+    )
+    .await
+    {
+        Ok(result) => {
+            if result.is_err() {
+                let err = result.err().unwrap().to_string();
+                update_error_entry(response, &mut connection, err.clone()).await;
+                return Err(err);
+            }
+            info!(
+                "Successfully submitted response for submission_id {}",
+                response.submission_id
+            );
+            Ok(())
+        }
+        Err(_) => {
+            update_error_entry(response, &mut connection, TIMEOUT_ERROR.to_string()).await;
+            Err(TIMEOUT_ERROR.to_string())
         }
     }
 }
@@ -223,7 +225,7 @@ impl<'a> ProcessSubmitResponse<'a> {
 }
 
 async fn update_error_entry(
-    response_clone: Response,
+    response_clone: &Response,
     injected_dependency: &mut AsyncPgConnection,
     err: String,
 ) {
