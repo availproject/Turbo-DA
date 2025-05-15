@@ -1,8 +1,8 @@
 use crate::{
     config::AppConfig,
     utils::{
-        calculate_avail_token_equivalent, generate_avail_sdk, get_connection,
-        retrieve_user_id_from_jwt, Convertor, TOKEN_MAP,
+        generate_avail_sdk, get_amount_to_be_credited, get_connection, retrieve_user_id_from_jwt,
+        Convertor, TOKEN_MAP,
     },
 };
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use actix_web::{
 
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
-use db::controllers::fund::{create_credit_request, get_fund_status};
+use db::controllers::fund::{create_credit_request, get_fund_status, update_inclusion_details};
 
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 
@@ -76,6 +76,65 @@ async fn register_credit_request(
     let tx = create_credit_request(user, payload.0.chain, &mut connection).await;
     match tx {
         Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit request created successfully", "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
+    }
+}
+/// Parameters for adding inclusion details to a transaction
+///
+/// # Fields
+/// * `order_id` - The ID of the order to update
+/// * `tx_hash` - The transaction hash to associate with the order
+#[derive(Deserialize, Serialize, Clone)]
+struct AddInclusionDetailsParams {
+    pub order_id: i32,
+    pub tx_hash: String,
+}
+
+/// Add inclusion details to a transaction
+///
+/// # Description
+/// This endpoint allows a user to add inclusion details (transaction hash) to an existing order.
+/// The details are updated in the database for the specified order.
+///
+/// # Route
+/// `POST /v1/user/add_inclusion_details`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - A Bearer token for authenticating the request
+///
+/// # Request Body
+/// * `order_id` - The ID of the order to update
+/// * `tx_hash` - The transaction hash to associate with the order
+///
+/// # Returns
+/// * Success: JSON response with status "success" and the updated transaction data
+/// * Error: Internal server error with appropriate error message
+#[post("/add_inclusion_details")]
+pub async fn add_inclusion_details(
+    payload: web::Json<AddInclusionDetailsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx = update_inclusion_details(user, payload.0.order_id, payload.0.tx_hash, &mut connection)
+        .await;
+
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Inclusion details added successfully", "data": tx})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
@@ -372,16 +431,17 @@ pub async fn estimate_credits_against_token(
     query: web::Query<EstimateCreditsToken>,
     config: web::Data<AppConfig>,
 ) -> impl Responder {
-    let price = calculate_avail_token_equivalent(
+    let amount = get_amount_to_be_credited(
         &config.coingecko_api_url,
         &config.coingecko_api_key,
-        &query.0.amount,
+        &config.avail_rpc_endpoint.first().unwrap(),
         &query.0.token_address,
+        &query.0.amount,
     )
     .await;
 
-    match price {
-        Ok(price) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": price})),
+    match amount {
+        Ok(amount) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": amount})),
         Err(e) => HttpResponse::InternalServerError().json(json!({"state": "ERROR", "message": e})),
     }
 }

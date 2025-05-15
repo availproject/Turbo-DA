@@ -6,7 +6,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{Keypair, Options, SDK};
+use avail_rust::{account, Keypair, Options, SDK};
 
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
@@ -390,4 +390,33 @@ pub async fn calculate_avail_token_equivalent(
         / BigDecimal::from(10_u64.pow(source_token_decimals as u32));
 
     Ok(equivalent_amount.round(0))
+}
+
+pub async fn get_amount_to_be_credited(
+    coin_gecho_api_url: &String,
+    coin_gecho_api_key: &String,
+    avail_rpc_url: &String,
+    address: &String,
+    amount: &BigDecimal,
+) -> Result<BigDecimal, String> {
+    let price = calculate_avail_token_equivalent(
+        &coin_gecho_api_url,
+        &coin_gecho_api_key,
+        &amount,
+        &address,
+    )
+    .await
+    .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
+
+    let client = SDK::new(avail_rpc_url)
+        .await
+        .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
+
+    let account = account::alice();
+    let converter = Convertor::new(&client, &account);
+    let price_per_kb = converter
+        .get_gas_price_for_data(converter.one_kb.clone())
+        .await;
+
+    Ok((price / price_per_kb * BigDecimal::from(converter.one_kb.len() as u128)).round(3))
 }

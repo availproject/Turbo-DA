@@ -631,9 +631,11 @@ Register a new credit request for a specific blockchain.
 
 - **Method**: `POST`
 - **Headers**:
-  - `Authorization: Bearer <token>`
-- **Body Parameters**:
-  - `chain` (required): The chain ID for which the credit request is being registered.
+  - `Authorization: Bearer <token>` - JWT token for authentication
+- **Request Body**:
+  - `chain` - The chain ID for which the credit request is being registered
+  - `amount_credit` - The amount of credit being requested
+  - `request_type` - The type of credit request (e.g., "DEPOSIT", "WITHDRAWAL")
 
 **Example Request:**
 
@@ -642,7 +644,9 @@ curl -X POST "https://api.example.com/v1/user/register_credit_request" \
      -H "Authorization: Bearer YOUR_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
-           "chain": 1
+           "chain": 1,
+           "amount_credit": "100.00",
+           "request_type": "DEPOSIT"
          }'
 ```
 
@@ -651,16 +655,25 @@ curl -X POST "https://api.example.com/v1/user/register_credit_request" \
 ```json
 {
   "state": "SUCCESS",
-  "message": "Credit request created successfully",
+  "message": "Credit request registered successfully",
   "data": {
-    "request_id": "123e4567-e89b-12d3-a456-426614174000",
-    "user_id": "user123",
+    "id": 123,
+    "user_id": "user@example.com",
+    "amount_credit": "100.00",
     "chain_id": 1,
-    "request_status": "pending",
-    "created_at": "2023-01-01T12:00:00Z"
+    "request_status": "PENDING",
+    "tx_hash": null,
+    "request_type": "DEPOSIT",
+    "created_at": "2024-03-20T10:00:00Z"
   }
 }
 ```
+
+**Notes:**
+
+- The combination of `chain_id` and `tx_hash` must be unique to prevent duplicate credit requests
+- The request status will be updated once the transaction is confirmed on the blockchain
+- Use the `add_inclusion_details` endpoint to update the transaction hash once the transaction is confirmed
 
 #### 18. GET /v1/user/request_fund_status
 

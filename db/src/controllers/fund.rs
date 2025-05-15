@@ -36,6 +36,25 @@ pub async fn create_credit_request(
     Ok(res)
 }
 
+pub async fn update_inclusion_details(
+    user: String,
+    order_id: i32,
+    tx: String,
+    connection: &mut AsyncPgConnection,
+) -> Result<CreditRequestsGet, String> {
+    let res = diesel::update(
+        credit_requests
+            .filter(id.eq(order_id))
+            .filter(user_id.eq(user)),
+    )
+    .set((tx_hash.eq(tx), request_status.eq("INCLUDED")))
+    .returning(CreditRequestsGet::as_returning())
+    .get_result::<CreditRequestsGet>(connection)
+    .await
+    .map_err(|e| format!("Error creating credit request: {}", e))?;
+    Ok(res)
+}
+
 pub async fn get_fund_list(
     user: String,
     connection: &mut AsyncPgConnection,
