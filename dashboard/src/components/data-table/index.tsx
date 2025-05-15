@@ -59,7 +59,7 @@ const DynamicTable: FC<DynamicTableProps> = ({
           listdata.map((data, index) => (
             <div
               key={index}
-              className="flex justify-between rounded-lg mb-4  border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey overflow-hidden z-1 relative"
+              className="flex justify-between rounded-lg mb-4 border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey overflow-hidden z-1 relative"
             >
               <div className="bg-[url('/table-row-noise.png')] bg-no-repeat absolute h-[50px] opacity-80 w-full z-0" />
               {headings.map((heading, index, array) => (

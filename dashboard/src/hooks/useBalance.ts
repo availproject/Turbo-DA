@@ -1,14 +1,16 @@
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AuthenticationService from "@/services/authentication";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 const useBalance = () => {
+  const [loading, setLoading] = useState(false);
   const { setCreditBalance, creditBalance } = useOverview();
   const { token } = useConfig();
 
   const updateCreditBalance = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     AuthenticationService.fetchUser({ token })
       .then((response) => {
         setCreditBalance(
@@ -17,10 +19,13 @@ const useBalance = () => {
       })
       .catch((error) => {
         console.log(error);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [token]);
 
-  return { updateCreditBalance, creditBalance: +creditBalance };
+  return { loading, updateCreditBalance, creditBalance: +creditBalance };
 };
 
 export default useBalance;

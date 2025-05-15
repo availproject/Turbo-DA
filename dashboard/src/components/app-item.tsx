@@ -115,10 +115,10 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
           {app?.app_logo?.includes(".") ? (
             <Image
-              className="w-8 h-auto"
+              className="w-10 h-10"
               alt={app.app_name}
               src={baseImageUrl(app.app_logo)}
-              width={32}
+              width={40}
               height={40}
             />
           ) : (
@@ -138,7 +138,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
         <div className="flex items-center justify-between flex-1">
           <div className="flex flex-col justify-between">
-            <div className="flex items-center gap-1.5 justify-between">
+            <div className="flex items-center gap-x-1.5">
               <Text weight={"semibold"}>{app.app_name}</Text>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -340,7 +340,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         </div>
         <SwitchDescription
           id={app.id}
-          // disabled={disableToggle}
+          disabled={!creditBalance}
           checked={useMainBalance}
           onChecked={(value) => {
             setUseMainBalance(value);
@@ -351,7 +351,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-green" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-              Using Main Credit Balance Only
+              Using Main Credit Balance
             </Text>
           </div>
         ) : null}
@@ -359,7 +359,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <div className="flex gap-x-1 border border-[#FF82C8CC] bg-[#FF82C829] py-0.5 px-2 rounded-full w-fit items-center mt-3">
             <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
             <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-              Using Assigned Credits Only
+              Using Assigned Credits
             </Text>
           </div>
         ) : null}

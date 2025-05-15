@@ -26,7 +26,7 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
         <div className="flex flex-col gap-4">
           <div>
             <Text size={"3mxl"} weight={"semibold"}>
-              Turbo DA
+              TurboDA
             </Text>
             <Text size={"base"} weight={"medium"} variant={"secondary-grey"}>
               Buy credits, post data at a guaranteed rate.

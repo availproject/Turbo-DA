@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import Input from ".";
-import { Text } from "..//text";
+import { Text } from "../text";
 
 export interface PrimaryInputProps {
   label?: string;
