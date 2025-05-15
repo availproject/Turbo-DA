@@ -1,18 +1,14 @@
 use std::str::FromStr;
 
-use reqwest::Client;
-use turbo_da_core::utils::{get_amount_to_be_credited, get_prices, TOKEN_MAP};
-
-use avail_rust::{account, SDK};
 use bigdecimal::BigDecimal;
 use db::{
     models::credit_requests::CreditRequestsGet,
     schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
+use turbo_da_core::utils::get_amount_to_be_credited;
 
 use log::{debug, error, info};
-use turbo_da_core::utils::Convertor;
 
 pub struct Deposit {
     pub token_address: String,
