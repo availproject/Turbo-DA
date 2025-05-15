@@ -1,8 +1,8 @@
 use crate::{
     config::AppConfig,
     utils::{
-        calculate_avail_token_equivalent, generate_avail_sdk, get_amount_to_be_credited,
-        get_connection, retrieve_user_id_from_jwt, Convertor, TOKEN_MAP,
+        generate_avail_sdk, get_amount_to_be_credited, get_connection, retrieve_user_id_from_jwt,
+        Convertor, TOKEN_MAP,
     },
 };
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use actix_web::{
 
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
-use db::controllers::fund::{create_credit_request, get_fund_status};
+use db::controllers::fund::{create_credit_request, get_fund_status, update_inclusion_details};
 
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 
@@ -76,6 +76,42 @@ async fn register_credit_request(
     let tx = create_credit_request(user, payload.0.chain, &mut connection).await;
     match tx {
         Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit request created successfully", "data": tx})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+struct AddInclusionDetailsParams {
+    pub order_id: i32,
+    pub tx_hash: String,
+}
+
+#[post("/add_inclusion_details")]
+pub async fn add_inclusion_details(
+    payload: web::Json<AddInclusionDetailsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx = update_inclusion_details(user, payload.0.order_id, payload.0.tx_hash, &mut connection)
+        .await;
+
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Inclusion details added successfully", "data": tx})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),
     }
 }
