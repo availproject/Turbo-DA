@@ -1,5 +1,6 @@
 "use client";
-import { cn, formatDataBytes } from "@/lib/utils";
+import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
+import { useOverview } from "@/providers/OverviewProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
 import Image from "next/image";
@@ -12,6 +13,7 @@ import EmptyState from "./empty-state";
 const CreditHistory = ({ token }: { token?: string }) => {
   const [historyList, setHistoryList] = useState<CreditRequest[]>();
   const [loading, setLoading] = useState(true);
+  const { setMainTabSelected } = useOverview();
 
   useEffect(() => {
     fetchHistory();
@@ -83,7 +85,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
           message="Your Credit History Would Be Shown Here"
           cta={{
             action: () => {
-              window.location.reload();
+              setMainTabSelected(APP_TABS.OVERVIEW);
             },
             label: "Buy Credits",
           }}

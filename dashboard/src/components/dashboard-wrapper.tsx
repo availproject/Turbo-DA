@@ -1,11 +1,13 @@
 "use client";
 import { APP_TABS } from "@/lib/utils";
+import { useOverview } from "@/providers/OverviewProvider";
 import { SignedIn } from "@clerk/nextjs";
 import { Fragment, memo, ReactNode } from "react";
 import { Tabs, TabsList, TabsTrigger } from "./tabs";
 import { Text } from "./text";
 
 const DashboardWrapper = ({ children }: { children: ReactNode }) => {
+  const { setMainTabSelected, mainTabSelected } = useOverview();
   const mainTabs = [
     {
       value: "overview",
@@ -31,21 +33,30 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
             <Text size={"base"} weight={"medium"} variant={"secondary-grey"}>
               Buy credits, post data at a guaranteed rate.
             </Text>
-            <Tabs
-              defaultValue={APP_TABS.OVERVIEW}
-              className="w-full gap-y-0 mt-3"
-            >
+            <Tabs value={mainTabSelected} className="w-full gap-y-0 mt-3">
               <TabsList className="bg-transparent p-0 h-auto pb-4">
                 {mainTabs.map((tab) => (
                   <Fragment key={tab.value}>
                     {tab.isAuthRequired ? (
                       <SignedIn>
-                        <TabsTrigger value={tab.value} variant="outline">
+                        <TabsTrigger
+                          value={tab.value}
+                          variant="outline"
+                          onClick={() => {
+                            setMainTabSelected(APP_TABS.HISTORY);
+                          }}
+                        >
                           {tab.label}
                         </TabsTrigger>
                       </SignedIn>
                     ) : (
-                      <TabsTrigger value={tab.value} variant="outline">
+                      <TabsTrigger
+                        value={tab.value}
+                        variant="outline"
+                        onClick={() => {
+                          setMainTabSelected(APP_TABS.OVERVIEW);
+                        }}
+                      >
                         {tab.label}
                       </TabsTrigger>
                     )}
