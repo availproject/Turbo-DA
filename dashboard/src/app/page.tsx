@@ -64,9 +64,9 @@ export default async function Page() {
             </div>
             <div className="flex flex-col w-full min-lg:w-[721px] gap-4">
               <BuyCreditsCard token={token} />
-              <SignedIn>
+              {/* <SignedIn>
                 <CreditUsage token={token} />
-              </SignedIn>
+              </SignedIn> */}
             </div>
           </div>
         </Suspense>

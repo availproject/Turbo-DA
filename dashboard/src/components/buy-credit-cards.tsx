@@ -5,6 +5,7 @@ import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
+import { useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
@@ -84,9 +85,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [tokenAmount, setTokenAmount] = useState("");
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
+  const [estimateDataLoading, setEstimateDataLoading] = useState(false);
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
+  const { creditBalance } = useOverview();
   const [error, setError] = useState("");
   const account = useAccount();
   const { setOpen } = useDialog();
@@ -98,6 +101,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (!account.address) return;
+    // setOpen("credit-added");
     showBalance({ token: account.address })
       .then((response) => {
         console.log({
@@ -117,6 +121,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     const tokenAddress = TOKEN_MAP[selectToken.toLowerCase()]?.token_address;
+    setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
@@ -129,6 +134,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       setEstimateData(response?.data);
     } catch (error) {
       console.log(error);
+    } finally {
+      setEstimateDataLoading(false);
     }
   };
 
@@ -195,7 +202,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             })
             .catch((error) => {
               const message = error.message.split(".")[0];
-              setError(message);
+              if (message === "User rejected the request") {
+                setError("You have rejected the request");
+              } else {
+                setError(message);
+              }
             })
             .finally(() => {
               setLoading(false);
@@ -203,7 +214,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         })
         .catch((err) => {
           const message = err.message.split(".")[0];
-          setError(message);
+          if (message === "User rejected the request") {
+            setError("You have rejected the request");
+          } else {
+            setError(message);
+          }
           setLoading(false);
         });
     } catch (error) {
@@ -264,6 +279,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   </Text>
                   <IconSelectContainer
                     onChange={(value) => {
+                      if (!account) {
+                        return;
+                      }
                       if (isDesiredChain) {
                         setSelectedToken(value);
                       } else {
@@ -272,7 +290,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     }}
                     options={[
                       {
-                        label: "Ethereum",
+                        label: "ETH",
                         icon: (
                           <Image
                             src={"/currency/eth.png"}
@@ -338,7 +356,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               </div>
               <PrimaryInput
                 label="Amount of Credits"
-                value={estimateData ? formatDataBytes(+estimateData) : ""}
+                value={
+                  estimateData && !estimateDataLoading
+                    ? formatDataBytes(+estimateData)
+                    : ""
+                }
                 className="pointer-events-none"
               />
             </div>
@@ -346,7 +368,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             <div className="flex-1 flex flex-col gap-y-3 items-center pt-28">
               <SignedIn>
                 {!!error && (
-                  <Text variant={"error"} size={"sm"}>
+                  <Text variant={"error"} size={"sm"} weight={"medium"}>
                     {error}
                   </Text>
                 )}

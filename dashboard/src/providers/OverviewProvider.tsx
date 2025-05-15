@@ -58,12 +58,16 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
     [appsList, filter]
   );
 
+  const allAppList = useMemo(() => {
+    return filterAppList.filter((app) => app.app_name);
+  }, [filterAppList]);
+
   return (
     <OverviewContext.Provider
       value={{
         creditBalance,
         setCreditBalance,
-        appsList: filterAppList,
+        appsList: allAppList,
         setAppsList,
         supportedTokens,
         setSupportedTokens,

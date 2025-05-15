@@ -33,7 +33,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
   const displayValues = useCallback((heading: string, value: any) => {
     switch (heading) {
       case "created_at":
-        return new Date(value).toLocaleDateString();
+        return new Date(value).toLocaleDateString().replaceAll("/", "-");
       default:
         return value ?? "-";
     }
@@ -47,10 +47,10 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
       ) : null}
       {loading ? (
         <div className="flex flex-col gap-y-4 mt-4">
-          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
-          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
-          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
-          <Skeleton className="h-14 w-full bg-black/40 rounded-xs" />
+          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
+          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
+          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
+          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
         </div>
       ) : historyList?.length ? (
         <>
