@@ -1,8 +1,8 @@
 use crate::{
     config::AppConfig,
     utils::{
-        calculate_avail_token_equivalent, generate_avail_sdk, get_connection,
-        retrieve_user_id_from_jwt, Convertor, TOKEN_MAP,
+        calculate_avail_token_equivalent, generate_avail_sdk, get_amount_to_be_credited,
+        get_connection, retrieve_user_id_from_jwt, Convertor, TOKEN_MAP,
     },
 };
 use std::sync::Arc;
@@ -372,16 +372,17 @@ pub async fn estimate_credits_against_token(
     query: web::Query<EstimateCreditsToken>,
     config: web::Data<AppConfig>,
 ) -> impl Responder {
-    let price = calculate_avail_token_equivalent(
+    let amount = get_amount_to_be_credited(
         &config.coingecko_api_url,
         &config.coingecko_api_key,
-        &query.0.amount,
+        &config.avail_rpc_endpoint.first().unwrap(),
         &query.0.token_address,
+        &query.0.amount,
     )
     .await;
 
-    match price {
-        Ok(price) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": price})),
+    match amount {
+        Ok(amount) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": amount})),
         Err(e) => HttpResponse::InternalServerError().json(json!({"state": "ERROR", "message": e})),
     }
 }
