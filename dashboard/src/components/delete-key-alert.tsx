@@ -72,7 +72,7 @@ const DeleteKeyAlert = ({
             <DialogTitle>
               <>
                 <Text weight={"bold"} size={"4xl"}>
-                  Are you sure you want to delete your Key?
+                  Are you sure you want to delete your key?
                 </Text>
                 <Text weight={"bold"} size={"4xl"} className="mt-1">
                   ....{identifier}
@@ -82,7 +82,7 @@ const DeleteKeyAlert = ({
           </div>
 
           <div className="mt-auto pt-20 flex gap-x-4 max-w-[444px] mx-auto w-full">
-            <Button variant={"secondary"} onClick={closeModal}>
+            <Button onClick={closeModal}>
               <Text weight={"semibold"} size={"lg"}>
                 Cancel
               </Text>

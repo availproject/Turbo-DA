@@ -79,10 +79,7 @@ export default function CreditsAdded({
               <Text
                 size={"2xl"}
                 weight={"semibold"}
-                className="text-[#78C47B] text-center"
-                style={{
-                  textShadow: "0px 0px 26.04px rgba(120, 196, 123, 0.60)",
-                }}
+                className="text-[#78C47B] drop-shadow-[0_0_26.04px_rgba(120,196,123,0.60)]"
               >
                 Credits Added Successfully
               </Text>

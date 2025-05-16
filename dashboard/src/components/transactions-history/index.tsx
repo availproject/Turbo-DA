@@ -9,7 +9,6 @@ const HistoryWrapper = ({ children }: { children: ReactNode }) => {
     {
       value: HISTORY_TYPES.PUBLISH,
       label: "Data Posting History",
-      isAuthRequired: true,
     },
   ];
 

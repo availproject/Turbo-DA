@@ -1,5 +1,6 @@
 "use client";
 import { Tokens } from "@/lib/types";
+import { APP_TABS } from "@/lib/utils";
 import { AppDetails } from "@/services/app/response";
 import React, {
   createContext,
@@ -21,6 +22,8 @@ interface OverviewContextType {
   setSupportedTokens: Dispatch<SetStateAction<Tokens[]>>;
   setAPIKeys: Dispatch<SetStateAction<Record<string, string[]> | undefined>>;
   apiKeys?: Record<string, string[]>;
+  mainTabSelected: APP_TABS;
+  setMainTabSelected: Dispatch<SetStateAction<APP_TABS>>;
 }
 
 export type Filter = "All" | "Allocated" | "Unallocated";
@@ -45,6 +48,9 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [appsList, setAppsList] = useState<AppDetails[]>([]);
   const [apiKeys, setAPIKeys] = useState<Record<string, string[]>>();
   const [filter, setFilter] = useState<Filter>("All");
+  const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
+    APP_TABS.OVERVIEW
+  );
 
   const filterAppList = useMemo(
     () =>
@@ -75,6 +81,8 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         setAPIKeys,
         setFilter,
         filter,
+        mainTabSelected,
+        setMainTabSelected,
       }}
     >
       {children}

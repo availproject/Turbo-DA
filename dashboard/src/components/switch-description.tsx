@@ -23,6 +23,7 @@ const SwitchDescription = ({
         checked={checked}
         disabled={disabled}
         onCheckedChange={(value) => onChecked?.(value)}
+        className="cursor-pointer"
       />
       <Text
         size={"sm"}
@@ -32,15 +33,8 @@ const SwitchDescription = ({
         Use Main Credit Balance
       </Text>
       <Tooltip>
-        <TooltipTrigger
-          className={disabled ? "pointer-events-none" : ""}
-          asChild
-        >
-          <InfoIcon
-            size={20}
-            color={disabled ? "#B3B3B3" : "#FFF"}
-            className="cursor-pointer"
-          />
+        <TooltipTrigger asChild>
+          <InfoIcon size={20} color={"#B3B3B3"} className="cursor-pointer" />
         </TooltipTrigger>
         <TooltipContent className="bg-black w-[300px]">
           <Text size={"sm"} weight={"medium"} className="text-[#949494] py-2">
@@ -53,15 +47,15 @@ const SwitchDescription = ({
               ‘Assign Credits’
             </Text>{" "}
             to this app.{" "}
-            {/* <Text
+            <Text
               as="span"
               size={"sm"}
               className="text-[#E4A354]"
               weight={"medium"}
             >
-              Once the credits are assigned, you cannot activate this before
+              Once the credits are assigned, you should not activate this before
               exhausting your assigned credits.
-            </Text> */}
+            </Text>
           </Text>
         </TooltipContent>
       </Tooltip>

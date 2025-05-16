@@ -45,7 +45,7 @@ export default function CreateApp({
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
   const { updateAppList } = useApp();
-  const { success } = useAppToast();
+  const { success, error: failure } = useAppToast();
 
   const saveAppDetails = useCallback(async () => {
     if ((!selectedAvatar && !previewUploadedAvatar) || !appId || !appName) {
@@ -91,6 +91,7 @@ export default function CreateApp({
 
       if (response.state !== "SUCCESS") {
         setLoading(false);
+        failure({ label: response?.message ?? "Failed to create app" });
         return;
       }
 
@@ -99,6 +100,7 @@ export default function CreateApp({
         label:
           type === "edit" ? "Updated Successfully!" : "Created Successfully!",
       });
+      resetFields();
       setOpen("");
     } catch (error) {
     } finally {

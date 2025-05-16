@@ -6,7 +6,6 @@ import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Copy, EllipsisVertical, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { memo, useMemo, useState } from "react";
@@ -15,10 +14,12 @@ import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import { useDialog } from "./dialog/provider";
+import AvatarWrapper from "./lottie-comp/avatar-container";
 import PrimaryProgress from "./progress/primary-progress";
 import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
+import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import { Text } from "./text";
 import { useAppToast } from "./toast";
 import {
@@ -35,7 +36,9 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(app?.fallback_enabled);
+  const [useMainBalance, setUseMainBalance] = useState(
+    creditBalance ? app?.fallback_enabled : false
+  );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
@@ -77,14 +80,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  // const disableToggle = useMemo(() => {
-  //   if (+app.credit_balance || !creditBalance) {
-  //     return true;
-  //   }
-
-  //   return false;
-  // }, [creditBalance]);
-
   const creditsData = useMemo(() => {
     if (useMainBalance) {
       const totalMainCredit = creditBalance
@@ -115,7 +110,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
           {app?.app_logo?.includes(".") ? (
             <Image
-              className="w-10 h-10"
+              className="w-10 h-10 rounded"
               alt={app.app_name}
               src={baseImageUrl(app.app_logo)}
               width={40}
@@ -124,10 +119,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           ) : (
             <div className="w-10 rounded overflow-hidden">
               {avatarList?.[app?.app_logo]?.path ? (
-                <DotLottieReact
-                  src={avatarList?.[app?.app_logo]?.path}
-                  loop
-                  playOnHover={true}
+                <AvatarWrapper
+                  path={avatarList?.[app?.app_logo]?.path}
                   width={40}
                   height={40}
                 />
@@ -160,7 +153,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       />
                       <Text
                         weight={"bold"}
-                        className="text-[#ccc] group-hover:text-white"
+                        variant={"secondary-grey"}
+                        className="group-hover:text-white"
                       >
                         Edit App
                       </Text>
@@ -175,7 +169,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       />
                       <Text
                         weight={"bold"}
-                        className="text-[#ccc] group-hover:text-white"
+                        variant={"secondary-grey"}
+                        className="group-hover:text-white"
                       >
                         Delete App
                       </Text>
@@ -194,76 +189,80 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             </div>
           </div>
 
-          <div className="flex flex-col w-[200px] items-end gap-2">
-            <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
-              Used:{" "}
-              {creditsData.usedCredit
-                ? formatDataBytes(creditsData.usedCredit)
-                : 0}
-              /{formatDataBytes(creditsData.totalCredit)}
-            </Text>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="w-full">
-                  {useMainBalance ? (
-                    <PrimaryProgress progress={progress} color={"green"} />
-                  ) : (
-                    <SecondaryProgress progress={progress} />
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-black w-[147px] p-2">
-                <div className="flex flex-col gap-y-2">
-                  <div className="flex gap-x-1.5">
-                    <div
-                      className={cn(
-                        "h-3 w-3 rounded-full mt-0.5",
-                        useMainBalance ? "bg-[#7DC372]" : "bg-[#FF82C8]"
-                      )}
-                    />
-                    <div>
-                      <Text
-                        variant={"light-grey"}
-                        weight={"medium"}
-                        size={"xs"}
-                      >
-                        Used
-                      </Text>
-                      <Text weight={"medium"} size={"xs"}>
-                        {formatDataBytes(creditsData.usedCredit)}
-                      </Text>
-                    </div>
-                  </div>
-                  <div className="flex gap-x-1.5">
+          {creditsData.totalCredit ? (
+            <div className="flex flex-col w-[200px] items-end gap-2">
+              <Text size={"sm"} weight={"medium"} variant={"light-grey"}>
+                Used:{" "}
+                {creditsData.usedCredit
+                  ? formatDataBytes(creditsData.usedCredit)
+                  : 0}
+                /{formatDataBytes(creditsData.totalCredit)}
+              </Text>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-full">
                     {useMainBalance ? (
-                      <div className="h-3 w-3 bg-grey-800 rounded-full" />
+                      <PrimaryProgress progress={progress} color={"green"} />
                     ) : (
-                      <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
-                        <div className="h-3 w-0.5 bg-[#dadada33]" />
-                      </div>
+                      <SecondaryProgress progress={progress} />
                     )}
-                    <div>
-                      <Text
-                        variant={"light-grey"}
-                        weight={"medium"}
-                        size={"xs"}
-                      >
-                        Unused
-                      </Text>
-                      <Text weight={"medium"} size={"xs"}>
-                        {formatDataBytes(creditsData.remainingCredits)}
-                      </Text>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-black w-[147px] p-2">
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex gap-x-1.5">
+                      <div
+                        className={cn(
+                          "h-3 w-3 rounded-full mt-0.5",
+                          useMainBalance ? "bg-[#7DC372]" : "bg-[#FF82C8]"
+                        )}
+                      />
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Used
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {formatDataBytes(creditsData.usedCredit)}
+                        </Text>
+                      </div>
+                    </div>
+                    <div className="flex gap-x-1.5">
+                      {useMainBalance ? (
+                        <div className="h-3 w-3 bg-grey-800 rounded-full" />
+                      ) : (
+                        <div className="h-3 w-3 rounded-full bg-[#62768C] flex justify-between items-center pl-[5px] -rotate-45 mt-0.5">
+                          <div className="h-3 w-0.5 bg-[#dadada33]" />
+                        </div>
+                      )}
+                      <div>
+                        <Text
+                          variant={"light-grey"}
+                          weight={"medium"}
+                          size={"xs"}
+                        >
+                          Unused
+                        </Text>
+                        <Text weight={"medium"} size={"xs"}>
+                          {creditsData.remainingCredits
+                            ? formatDataBytes(creditsData.remainingCredits)
+                            : "0 B"}
+                        </Text>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div className="flex flex-col gap-2 w-full mt-4">
-        <div className="flex items-start gap-x-4 mt-1 justify-between">
+        <div className="flex items-start gap-4 mt-1 justify-between flex-wrap">
           <Text
             size={"sm"}
             weight={"bold"}
@@ -314,7 +313,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             }
             className={cn(
               "underline underline-offset-[2.5px]",
-              !useMainBalance && creditBalance ? "cursor-pointer" : "opacity-30"
+              !useMainBalance && +creditBalance
+                ? "cursor-pointer"
+                : "opacity-30"
             )}
           >
             Assign Credits
@@ -335,7 +336,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               setOpen("reclaim-credits" + app.id)
             }
           >
-            Reclaim Credits
+            Unassigned Credits
           </Text>
         </div>
         <SwitchDescription
@@ -343,8 +344,17 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           disabled={!creditBalance}
           checked={useMainBalance}
           onChecked={(value) => {
-            setUseMainBalance(value);
-            updateFallbackHandler();
+            if (app?.credit_balance && +app?.credit_balance > 0) {
+              setUseMainBalance(value);
+              updateFallbackHandler();
+            } else {
+              if (value) {
+                setUseMainBalance(value);
+                updateFallbackHandler();
+                return;
+              }
+              setOpen("switch-to-main-balance" + app.id);
+            }
           }}
         />
         {useMainBalance && +creditBalance ? (
@@ -398,7 +408,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           />
         </div>
         {loading ? (
-          <Skeleton className="h-[22px] w-[380px] bg-light-grey rounded-xs" />
+          <Skeleton className="h-[24px] w-[380px] bg-black/40 rounded-xs" />
         ) : (
           <div className="flex items-center gap-x-2 cursor-pointer w-fit">
             <Text size={"xl"} weight={"bold"}>
@@ -455,6 +465,16 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       )}
       {open === "update-app" + app.id && (
         <CreateApp type="edit" appData={app} id={"update-app" + app.id} />
+      )}
+      {open === "switch-to-main-balance" + app.id && (
+        <SwitchToMainBalanceAlert
+          id={"switch-to-main-balance" + app.id}
+          callback={() => {
+            setUseMainBalance(false);
+            updateFallbackHandler();
+            setOpen("");
+          }}
+        />
       )}
     </div>
   );

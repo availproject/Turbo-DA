@@ -10,6 +10,7 @@ import Button from "./button";
 import CreateApp from "./create-app";
 import { useDialog } from "./dialog/provider";
 import SecondarySelect from "./select/secondary-select";
+import EmptyState from "./transactions-history/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 
@@ -51,10 +52,14 @@ const AppsCard = ({ token }: AppsCardProps) => {
             </CardTitle>
             <div className="flex items-center gap-6">
               <SecondarySelect
-                options={["All", "Unallocated", "Allocated"]}
+                options={[
+                  "All",
+                  "Using Main Credits",
+                  "Using Assigned Credits",
+                ]}
                 onChange={(value) => setFilter(value as Filter)}
                 value={filter}
-                className="w-36"
+                className="w-52"
               />
               <Button
                 variant="link"
@@ -74,19 +79,24 @@ const AppsCard = ({ token }: AppsCardProps) => {
           </div>
         </CardHeader>
         <CardContent className="px-0">
-          <Text
-            size={"sm"}
-            weight={"medium"}
-            variant={"light-grey"}
-            className="mb-4 px-4 pt-4"
-          >
-            Generate a key. Use this key to submit data. You can have multiple
-            keys for the same app.
-          </Text>
+          {!loading && !appsList?.length ? (
+            <EmptyState message="No App Found" />
+          ) : null}
+          {!loading && appsList?.length ? (
+            <Text
+              size={"sm"}
+              weight={"medium"}
+              variant={"light-grey"}
+              className="mb-4 px-4 pt-4"
+            >
+              Generate a key. Use this key to submit data. You can have multiple
+              keys for the same app.
+            </Text>
+          ) : null}
           {loading ? (
             <div className="flex flex-col gap-y-4 mt-4 px-4">
-              <Skeleton className="h-60 w-full bg-black/40 rounded-lg" />
-              <Skeleton className="h-60 w-full bg-black/40 rounded-lg" />
+              <Skeleton className="h-52" sheen={false} />
+              <Skeleton className="h-52" sheen={false} />
             </div>
           ) : (
             <AppList />

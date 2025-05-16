@@ -24,9 +24,11 @@ export function Providers({
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider>
+          {/* <AvailWalletProvider> */}
           <ConfigProvider accessToken={token}>
             <DialogProvider>{children}</DialogProvider>
           </ConfigProvider>
+          {/* </AvailWalletProvider> */}
         </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

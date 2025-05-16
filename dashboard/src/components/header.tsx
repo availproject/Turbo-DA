@@ -8,13 +8,13 @@ import Button from "./button";
 
 async function Header() {
   return (
-    <header className="sticky top-0 z-2 w-full h-16 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-10 flex items-center justify-between">
+    <header className="sticky top-0 z-2 w-full h-18 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-6 flex items-center justify-between">
       <div className="flex gap-x-3 items-center">
         <Image alt="Avail logo" src="/logo.svg" width={110} height={32} />
         <Text
           size={"xs"}
           weight={"semibold"}
-          className="border border-grey rounded-full px-3 h-[26px] flex justify-center items-center pt-px"
+          className="border border-border-button rounded-full px-3 h-[26px] flex justify-center items-center pt-px text-white/80"
         >
           Mainnet
         </Text>

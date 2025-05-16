@@ -5,10 +5,10 @@ import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
-import { useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { writeContract } from "@wagmi/core";
+// import { AvailWalletConnect } from "avail-wallet";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
 import Image from "next/image";
@@ -89,7 +89,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
-  const { creditBalance } = useOverview();
   const [error, setError] = useState("");
   const account = useAccount();
   const { setOpen } = useDialog();
@@ -161,6 +160,35 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     return await response.json();
   };
 
+  const postInclusionDetails = async ({
+    orderId,
+    txnHash,
+  }: {
+    orderId: string;
+    txnHash: string;
+  }) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          tx_hash: txnHash,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw undefined;
+    }
+
+    return await response.json();
+  };
+
   const handleBuyCredits = async () => {
     if (!tokenAmount) return;
     try {
@@ -197,8 +225,18 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             ],
             chainId: activeNetworkId,
           })
-            .then(() => {
-              setOpen("credit-added");
+            .then(async (txnHash) => {
+              await postInclusionDetails({
+                orderId: orderResponse.data.id,
+                txnHash: txnHash,
+              })
+                .then((resp) => {
+                  console.log(resp);
+                  setOpen("credit-added");
+                })
+                .catch((error) => {
+                  console.log(error);
+                });
             })
             .catch((error) => {
               const message = error.message.split(".")[0];
@@ -267,6 +305,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             className="mt-0 space-y-6 h-full justify-between flex flex-col"
           >
             <div className="flex flex-col gap-y-8">
+              {/* <AvailWalletConnect /> */}
               <div className="flex gap-2 w-full">
                 <div className="flex flex-col gap-2 flex-1">
                   <Text
@@ -376,11 +415,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   {(props) => {
                     if (!props.isConnected) {
                       return (
-                        <Button
-                          onClick={(e) => handleClick(e, props.show)}
-                          variant={"secondary"}
-                          className="h-12"
-                        >
+                        <Button onClick={(e) => handleClick(e, props.show)}>
                           Connect Wallet
                         </Button>
                       );
@@ -388,11 +423,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                     if (!props.chain || props.chain?.id !== DESIRED_CHAIN) {
                       return (
-                        <Button
-                          onClick={(e) => chainChangerAsync()}
-                          variant={"secondary"}
-                          className="h-12"
-                        >
+                        <Button onClick={(e) => chainChangerAsync()}>
                           Wrong Network
                         </Button>
                       );
@@ -404,7 +435,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         variant={
                           !selectToken || !tokenAmount || tokenAmount === "0"
                             ? "disabled"
-                            : "secondary"
+                            : "primary"
                         }
                         disabled={
                           loading ||
@@ -432,7 +463,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               </SignedIn>
               <SignedOut>
                 <SignInButton mode="modal" component="div">
-                  <Button variant={"secondary"}>Sign In</Button>
+                  <Button>Sign In</Button>
                 </SignInButton>
               </SignedOut>
             </div>

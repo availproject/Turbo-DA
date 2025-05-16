@@ -1,9 +1,13 @@
 "use client";
-import { cn, formatDataBytes } from "@/lib/utils";
+import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
+import { useOverview } from "@/providers/OverviewProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
+import { SignedIn, SignInButton } from "@clerk/clerk-react";
+import { SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Button from "../button";
 import DynamicTable from "../data-table";
 import { Text } from "../text";
 import { Skeleton } from "../ui/skeleton";
@@ -12,6 +16,7 @@ import EmptyState from "./empty-state";
 const CreditHistory = ({ token }: { token?: string }) => {
   const [historyList, setHistoryList] = useState<CreditRequest[]>();
   const [loading, setLoading] = useState(true);
+  const { setMainTabSelected } = useOverview();
 
   useEffect(() => {
     fetchHistory();
@@ -22,10 +27,10 @@ const CreditHistory = ({ token }: { token?: string }) => {
       const response = await HistoryService.getCreditHistory({
         token: token!,
       });
-      const processedHistory = response?.data?.filter(
-        (credit: any) => credit?.request_status === "Processed"
-      );
-      setHistoryList(processedHistory);
+      // const processedHistory = response?.data?.filter(
+      //   (credit: any) => credit?.request_status === "Processed"
+      // );
+      setHistoryList(response?.data ?? []);
     } catch (error) {
       setHistoryList([]);
     } finally {
@@ -53,7 +58,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
-          return formatDataBytes(value, 2);
+          return value ? formatDataBytes(value, 2) : "-";
         case "chain_id":
           return (
             <div className="flex items-center gap-x-2">
@@ -81,20 +86,33 @@ const CreditHistory = ({ token }: { token?: string }) => {
       {!loading && !historyList?.length ? (
         <EmptyState
           message="Your Credit History Would Be Shown Here"
-          cta={{
-            action: () => {
-              window.location.reload();
-            },
-            label: "Buy Credits",
-          }}
+          cta={
+            <>
+              <SignedOut>
+                <SignInButton mode="modal" component="div">
+                  <Button className="w-[195px]">Sign In</Button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <Button
+                  className="w-[195px]"
+                  onClick={() => {
+                    setMainTabSelected(APP_TABS.OVERVIEW);
+                  }}
+                >
+                  Buy Credits
+                </Button>
+              </SignedIn>
+            </>
+          }
         />
       ) : null}
       {loading ? (
         <div className="flex flex-col gap-y-4 mt-4">
-          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
-          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
-          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
-          <Skeleton className="h-14 w-full bg-[#13334F] rounded-lg" />
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
         </div>
       ) : historyList?.length ? (
         <DynamicTable
