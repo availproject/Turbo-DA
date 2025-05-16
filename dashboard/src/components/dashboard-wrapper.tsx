@@ -21,7 +21,7 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
   ];
 
   return (
-    <div className="relative min-h-[90vh] pb-12">
+    <div className="relative min-h-[90vh] pb-12 pt-2">
       <main className="container max-w-[1200px] mx-auto px-4 py-10 w-full">
         <div className="flex flex-col gap-4">
           <div>
