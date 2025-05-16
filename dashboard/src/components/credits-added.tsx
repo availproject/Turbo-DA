@@ -32,10 +32,6 @@ export default function CreditsAdded({
     };
   }, [open]);
 
-  console.log({
-    creditBalance,
-  });
-
   return (
     <Dialog
       open={"credit-added" === open}

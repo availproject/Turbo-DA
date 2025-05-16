@@ -155,8 +155,9 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                     setAmount("");
                     return;
                   }
+                  const validValue = /^\d+(\.\d*)?$/.test(value);
 
-                  if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  if (validValue) {
                     setAmount(value);
                   }
                 }}

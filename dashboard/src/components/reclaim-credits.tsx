@@ -171,7 +171,9 @@ const ReclaimCredits = ({
                     setAmount("");
                     return;
                   }
-                  if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  const validValue = /^\d+(\.\d*)?$/.test(value);
+
+                  if (validValue) {
                     setAmount(value);
                   }
                 }}
