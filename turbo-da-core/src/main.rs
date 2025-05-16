@@ -29,8 +29,8 @@ use controllers::{
     customer_expenditure::get_expenditure_by_time_range,
     file::{download_file, upload_file},
     fund::{
-        add_inclusion_details, estimate_credits_against_token, get_fund_list, purchase_cost,
-        register_credit_request,
+        add_inclusion_details, estimate_credits_against_size, estimate_credits_against_token,
+        get_fund_list, purchase_cost, register_credit_request,
     },
     users::{
         allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
@@ -163,6 +163,7 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(purchase_cost)
                             .service(estimate_credits_for_bytes)
                             .service(estimate_credits)
+                            .service(estimate_credits_against_size)
                             .service(allocate_credit)
                             .service(delete_account)
                             .service(generate_app_account)
