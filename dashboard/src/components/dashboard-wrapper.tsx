@@ -1,8 +1,7 @@
 "use client";
 import { APP_TABS } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
-import { SignedIn } from "@clerk/nextjs";
-import { Fragment, memo, ReactNode } from "react";
+import { memo, ReactNode } from "react";
 import { Tabs, TabsList, TabsTrigger } from "./tabs";
 import { Text } from "./text";
 
@@ -10,20 +9,19 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
   const { setMainTabSelected, mainTabSelected } = useOverview();
   const mainTabs = [
     {
-      value: "overview",
+      value: APP_TABS.OVERVIEW,
       label: "Overview",
       link: "/",
     },
     {
-      value: "history",
+      value: APP_TABS.HISTORY,
       label: "History",
       link: "/history",
-      isAuthRequired: true,
     },
   ];
 
   return (
-    <div className="relative min-h-[90vh] pb-10">
+    <div className="relative min-h-[90vh] pb-12">
       <main className="container max-w-[1200px] mx-auto px-4 py-10 w-full">
         <div className="flex flex-col gap-4">
           <div>
@@ -36,31 +34,14 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
             <Tabs value={mainTabSelected} className="w-full gap-y-0 mt-3">
               <TabsList className="bg-transparent p-0 h-auto pb-4">
                 {mainTabs.map((tab) => (
-                  <Fragment key={tab.value}>
-                    {tab.isAuthRequired ? (
-                      <SignedIn>
-                        <TabsTrigger
-                          value={tab.value}
-                          variant="outline"
-                          onClick={() => {
-                            setMainTabSelected(APP_TABS.HISTORY);
-                          }}
-                        >
-                          {tab.label}
-                        </TabsTrigger>
-                      </SignedIn>
-                    ) : (
-                      <TabsTrigger
-                        value={tab.value}
-                        variant="outline"
-                        onClick={() => {
-                          setMainTabSelected(APP_TABS.OVERVIEW);
-                        }}
-                      >
-                        {tab.label}
-                      </TabsTrigger>
-                    )}
-                  </Fragment>
+                  <TabsTrigger
+                    value={tab.value}
+                    variant="outline"
+                    key={tab.value}
+                    onClick={() => setMainTabSelected(tab.value)}
+                  >
+                    {tab.label}
+                  </TabsTrigger>
                 ))}
               </TabsList>
               {children}

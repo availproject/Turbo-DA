@@ -176,7 +176,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
               variant={
                 !amount || !creditBalance || creditBalance < +amount
                   ? "disabled"
-                  : "secondary"
+                  : "primary"
               }
               disabled={
                 loading || !amount || !creditBalance || creditBalance < +amount

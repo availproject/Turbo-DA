@@ -190,7 +190,7 @@ const ReclaimCredits = ({
               variant={
                 !amount || +appData.credit_balance < +amount
                   ? "disabled"
-                  : "secondary"
+                  : "primary"
               }
               disabled={loading || !amount || +appData.credit_balance < +amount}
               onClick={handleSubmit}

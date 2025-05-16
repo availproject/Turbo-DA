@@ -100,6 +100,7 @@ export default function CreateApp({
         label:
           type === "edit" ? "Updated Successfully!" : "Created Successfully!",
       });
+      resetFields();
       setOpen("");
     } catch (error) {
     } finally {

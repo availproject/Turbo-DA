@@ -7,7 +7,7 @@ class CreditService {
     data: number;
   }) {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits?data=${data}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_size?size=${data}`,
       {
         method: "GET",
         headers: {

@@ -19,6 +19,7 @@ import PrimaryProgress from "./progress/primary-progress";
 import SecondaryProgress from "./progress/secondary-progress";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
+import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import { Text } from "./text";
 import { useAppToast } from "./toast";
 import {
@@ -35,7 +36,9 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(app?.fallback_enabled);
+  const [useMainBalance, setUseMainBalance] = useState(
+    creditBalance ? app?.fallback_enabled : false
+  );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
@@ -77,14 +80,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  // const disableToggle = useMemo(() => {
-  //   if (+app.credit_balance || !creditBalance) {
-  //     return true;
-  //   }
-
-  //   return false;
-  // }, [creditBalance]);
-
   const creditsData = useMemo(() => {
     if (useMainBalance) {
       const totalMainCredit = creditBalance
@@ -115,7 +110,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
           {app?.app_logo?.includes(".") ? (
             <Image
-              className="w-10 h-10"
+              className="w-10 h-10 rounded"
               alt={app.app_name}
               src={baseImageUrl(app.app_logo)}
               width={40}
@@ -158,7 +153,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       />
                       <Text
                         weight={"bold"}
-                        className="text-[#ccc] group-hover:text-white"
+                        variant={"secondary-grey"}
+                        className="group-hover:text-white"
                       >
                         Edit App
                       </Text>
@@ -173,7 +169,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       />
                       <Text
                         weight={"bold"}
-                        className="text-[#ccc] group-hover:text-white"
+                        variant={"secondary-grey"}
+                        className="group-hover:text-white"
                       >
                         Delete App
                       </Text>
@@ -252,7 +249,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                         <Text weight={"medium"} size={"xs"}>
                           {creditsData.remainingCredits
                             ? formatDataBytes(creditsData.remainingCredits)
-                            : "0 Bytes"}
+                            : "0 B"}
                         </Text>
                       </div>
                     </div>
@@ -265,7 +262,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       </div>
 
       <div className="flex flex-col gap-2 w-full mt-4">
-        <div className="flex items-start gap-x-4 mt-1 justify-between">
+        <div className="flex items-start gap-4 mt-1 justify-between flex-wrap">
           <Text
             size={"sm"}
             weight={"bold"}
@@ -339,7 +336,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               setOpen("reclaim-credits" + app.id)
             }
           >
-            Reclaim Credits
+            Unassigned Credits
           </Text>
         </div>
         <SwitchDescription
@@ -347,8 +344,17 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           disabled={!creditBalance}
           checked={useMainBalance}
           onChecked={(value) => {
-            setUseMainBalance(value);
-            updateFallbackHandler();
+            if (app?.credit_balance && +app?.credit_balance > 0) {
+              setUseMainBalance(value);
+              updateFallbackHandler();
+            } else {
+              if (value) {
+                setUseMainBalance(value);
+                updateFallbackHandler();
+                return;
+              }
+              setOpen("switch-to-main-balance" + app.id);
+            }
           }}
         />
         {useMainBalance && +creditBalance ? (
@@ -402,7 +408,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           />
         </div>
         {loading ? (
-          <Skeleton className="h-[22px] w-[380px] bg-light-grey rounded-xs" />
+          <Skeleton className="h-[24px] w-[380px] bg-black/40 rounded-xs" />
         ) : (
           <div className="flex items-center gap-x-2 cursor-pointer w-fit">
             <Text size={"xl"} weight={"bold"}>
@@ -459,6 +465,16 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       )}
       {open === "update-app" + app.id && (
         <CreateApp type="edit" appData={app} id={"update-app" + app.id} />
+      )}
+      {open === "switch-to-main-balance" + app.id && (
+        <SwitchToMainBalanceAlert
+          id={"switch-to-main-balance" + app.id}
+          callback={() => {
+            setUseMainBalance(false);
+            updateFallbackHandler();
+            setOpen("");
+          }}
+        />
       )}
     </div>
   );

@@ -37,5 +37,4 @@ export const turboDADocLink =
 export const privacyPolicy =
   "https://avail-project.notion.site/Privacy-Policy-e5f47df2f3a64055a7966bbaabe9a2eb";
 
-export const tnc =
-  "https://avail-project.notion.site/Privacy-Policy-e5f47df2f3a64055a7966bbaabe9a2eb";
+export const tnc = "https://avail-project.notion.site/turbo-da-terms";

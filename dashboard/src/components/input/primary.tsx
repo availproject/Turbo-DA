@@ -31,7 +31,7 @@ const PrimaryInput = ({
   return (
     <div className={cn("flex flex-col gap-2 w-full", className)}>
       {label && (
-        <Text size={"sm"} weight={"medium"} color="secondary-grey" as="label">
+        <Text size={"sm"} weight={"medium"} color="light-grey" as="label">
           {label}
         </Text>
       )}
@@ -50,7 +50,7 @@ const PrimaryInput = ({
           name="input"
           disabled={disabled}
           className={cn(
-            "text-light-grey bg-transparent text-base font-medium",
+            "bg-transparent text-base font-semibold",
             rightElement
               ? "border-none"
               : error && error !== ""

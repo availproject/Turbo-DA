@@ -7,7 +7,7 @@ const Footer = () => {
   const socialLinks = [
     {
       icon: <Image src="/discord.svg" alt="Discord" width={20} height={20} />,
-      url: "https://discord.com/AvailProject",
+      url: "https://discord.com/invite/AvailProject",
       name: "Discord",
     },
     {
@@ -33,14 +33,14 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="fixed bottom-0 w-full bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] border-t border-border-grey px-4 py-1.5 z-1">
+    <footer className="fixed bottom-0 w-full bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] border-t border-border-grey px-6 py-1.5 z-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-x-2">
           <Text size={"xs"} className="text-[#FFFFFFB2]" weight={"bold"}>
             V1
           </Text>
-          <div className="w-px bg-border-grey h-5" />
-          <Image src="/wifi.svg" alt="Wifi" width={20} height={20} />
+          {/* <div className="w-px bg-border-grey h-5" />
+          <Image src="/wifi.svg" alt="Wifi" width={20} height={20} /> */}
           <div className="w-px bg-border-grey h-5" />
           <Link href={tnc} target="_blank">
             <Text weight={"bold"} size={"xs"}>

@@ -4,7 +4,6 @@ import { DialogProvider } from "@/components/dialog/provider";
 import { config } from "@/config/walletConfig";
 import { ConfigProvider } from "@/providers/ConfigProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-// import { AvailWalletProvider } from "avail-wallet";
 import { ConnectKitProvider } from "connectkit";
 import { ReactNode } from "react";
 import { State, WagmiProvider } from "wagmi";
