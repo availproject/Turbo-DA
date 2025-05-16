@@ -7,12 +7,18 @@ import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { writeContract } from "@wagmi/core";
+import { readContract, writeContract } from "@wagmi/core";
 // import { AvailWalletConnect } from "avail-wallet";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
 import Image from "next/image";
-import { MouseEvent, useDeferredValue, useEffect, useState } from "react";
+import {
+  MouseEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
@@ -78,6 +84,16 @@ export const depositAbi: Abi = [
   },
 ];
 
+const erc20Abi = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+];
+
 const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
@@ -100,6 +116,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (!account.address) return;
+    getERC20AvailBalance();
+
     // setOpen("credit-added");
     showBalance({ token: account.address })
       .then((response) => {
@@ -188,6 +206,26 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
     return await response.json();
   };
+
+  const getERC20AvailBalance = useCallback(async () => {
+    const balance = await readContract(config, {
+      address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44" as `0x${string}`,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [account.address],
+      chainId: activeNetworkId,
+    }).then((res) => {
+      console.log("res", res);
+    });
+
+    // console.log({
+    //   balance: BigInt(balance as bigint),
+    // });
+
+    // if (!balance) return new BigNumber(0);
+
+    // return new BigNumber(balance as bigint);
+  }, [account, activeNetworkId]);
 
   const handleBuyCredits = async () => {
     if (!tokenAmount) return;
