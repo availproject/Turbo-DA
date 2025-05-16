@@ -8,6 +8,7 @@ import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { readContract, writeContract } from "@wagmi/core";
+import BigNumber from "bignumber.js";
 // import { AvailWalletConnect } from "avail-wallet";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
@@ -117,8 +118,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   useEffect(() => {
     if (!account.address) return;
     getERC20AvailBalance();
-
-    // setOpen("credit-added");
     showBalance({ token: account.address })
       .then((response) => {
         console.log({
@@ -214,17 +213,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       functionName: "balanceOf",
       args: [account.address],
       chainId: activeNetworkId,
-    }).then((res) => {
-      console.log("res", res);
-    });
-
-    // console.log({
-    //   balance: BigInt(balance as bigint),
-    // });
-
-    // if (!balance) return new BigNumber(0);
-
-    // return new BigNumber(balance as bigint);
+    })
+      .then((balance) => {
+        if (!balance) return new BigNumber(0);
+        return new BigNumber(balance as bigint);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
   }, [account, activeNetworkId]);
 
   const handleBuyCredits = async () => {
@@ -269,7 +265,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 txnHash: txnHash,
               })
                 .then((resp) => {
-                  console.log(resp);
                   setOpen("credit-added");
                 })
                 .catch((error) => {
@@ -297,9 +292,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           }
           setLoading(false);
         });
-    } catch (error) {
-      // setError(error.message);
-    }
+    } catch (error) {}
   };
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
