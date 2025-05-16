@@ -394,6 +394,54 @@ pub async fn estimate_credits_for_bytes(
 
     HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
 }
+/// Structure for estimating credits based on data size
+///
+/// # Fields
+/// * `size` - The size of data in bytes for which to estimate credit requirements
+#[derive(Deserialize, Serialize, Clone)]
+pub struct EstimateCreditsSize {
+    pub size: u64, // in Bytes
+}
+
+/// Estimate the credits required for a specific data size.
+///
+/// # Description
+/// This endpoint calculates the credit cost for submitting data of a specified size to the Avail network.
+///
+/// # Route
+/// `GET /v1/user/estimate_credits_against_size?size={size}`
+///
+/// # Query Parameters
+/// * `size` - The size of data in bytes for which to estimate credit requirements.
+///
+/// # Returns
+/// A JSON object containing the estimated credit cost for the specified data size.
+///
+/// # Example Response
+///
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Credit cost calculated successfully",
+///   "data": "0.0123456789"
+/// }
+/// ```
+#[get("/estimate_credits_against_size")]
+pub async fn estimate_credits_against_size(
+    query: web::Query<EstimateCreditsSize>,
+    config: web::Data<AppConfig>,
+) -> impl Responder {
+    let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+    let account = account::alice();
+
+    let convertor = Convertor::new(&sdk, &account);
+
+    let vec = vec![0; query.0.size as usize];
+
+    let credits_cost = convertor.calculate_credit_utlisation(vec).await;
+
+    HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
+}
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct EstimateCreditsToken {
