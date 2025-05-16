@@ -59,9 +59,9 @@ const DeleteKeyAlert = ({
         }
       }}
     >
-      <DialogContent className="w-full sm:max-w-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden border flex flex-col focus-within:outline-0">
+      <DialogContent className="w-full sm:max-w-[600px] h-[400px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden border flex flex-col focus-within:outline-0">
         <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
-        <div className=" h-full flex flex-col p-4 z-1">
+        <div className=" h-full flex flex-col p-6 z-1">
           <div className="flex justify-end items-center mb-6">
             <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
               <X color="#FFF" size={24} strokeWidth={1} />

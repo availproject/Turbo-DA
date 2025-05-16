@@ -2,7 +2,7 @@ import Button from "@/components/button";
 import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
-import { baseImageUrl, formatDataBytes } from "@/lib/utils";
+import { baseImageUrl, formatDataBytes, formatInBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
@@ -179,8 +179,8 @@ const ReclaimCredits = ({
                 }}
                 value={amount}
                 error={
-                  +appData.credit_balance < +amount
-                    ? `Amount can’t exceed the app balance ${appData.credit_balance}`
+                  +appData.credit_balance < formatInBytes(+amount)
+                    ? `Amount can’t exceed the app balance`
                     : ""
                 }
               />
@@ -190,11 +190,15 @@ const ReclaimCredits = ({
           <div className="mt-auto pt-20 ">
             <Button
               variant={
-                !amount || +appData.credit_balance < +amount
+                !amount || +appData.credit_balance < formatInBytes(+amount)
                   ? "disabled"
                   : "primary"
               }
-              disabled={loading || !amount || +appData.credit_balance < +amount}
+              disabled={
+                loading ||
+                !amount ||
+                +appData.credit_balance < formatInBytes(+amount)
+              }
               onClick={handleSubmit}
             >
               {loading ? (

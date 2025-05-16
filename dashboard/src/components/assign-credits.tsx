@@ -2,7 +2,7 @@ import Button from "@/components/button";
 import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
-import { baseImageUrl, formatDataBytes } from "@/lib/utils";
+import { baseImageUrl, formatDataBytes, formatInBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
@@ -10,7 +10,7 @@ import { AppDetails } from "@/services/app/response";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Wallet, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
@@ -59,6 +59,10 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
       setLoading(false);
     }
   };
+
+  const inValid = useMemo(() => {
+    return !amount || !creditBalance || creditBalance < formatInBytes(+amount);
+  }, [amount, creditBalance]);
 
   return (
     <Dialog
@@ -164,8 +168,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 value={amount}
                 className="px-0 text-white w-full"
                 error={
-                  creditBalance < +amount
-                    ? `Amount can’t exceed the main credit balance. ${creditBalance}`
+                  creditBalance < formatInBytes(+amount)
+                    ? `Amount should be less than main credit balance.`
                     : ""
                 }
               />
@@ -174,14 +178,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
 
           <div className="mt-auto pt-20 relative z-1">
             <Button
-              variant={
-                !amount || !creditBalance || creditBalance < +amount
-                  ? "disabled"
-                  : "primary"
-              }
-              disabled={
-                loading || !amount || !creditBalance || creditBalance < +amount
-              }
+              variant={inValid ? "disabled" : "primary"}
+              disabled={loading || inValid}
               onClick={handleSubmit}
             >
               {loading ? (

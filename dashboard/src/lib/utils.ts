@@ -35,11 +35,26 @@ export const maskNumber = (value: string) => {
   return "..." + value.slice(-5);
 };
 
-export const formatDataBytes = (bytes: number) => {
+export const formatInKB = (bytes: number) => {
   const kb = bytes / 1024;
-  return (
-    (Number.isInteger(kb) ? kb : kb.toFixed(2)) + ` Credit${kb > 1 ? "s" : ""}`
-  );
+  return {
+    fixedValue: Number.isInteger(kb) ? kb : truncateToFixed(kb),
+    kbValue: kb,
+  };
+};
+
+export const truncateToFixed = (num: number, decimals = 2) => {
+  const factor = Math.pow(10, decimals);
+  return (Math.floor(num * factor) / factor).toFixed(decimals);
+};
+
+export const formatInBytes = (bytes: number) => bytes * 1024;
+
+export const formatDataBytes = (bytes: number) => {
+  const formatBytes = formatInKB(bytes);
+  const kb = formatBytes.kbValue as number;
+  const fixedValue = formatBytes.fixedValue as number;
+  return fixedValue + ` Credit${kb > 1 ? "s" : ""}`;
 };
 
 export function formatBalance(balance: string) {
