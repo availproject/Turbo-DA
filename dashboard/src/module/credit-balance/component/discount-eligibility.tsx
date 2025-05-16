@@ -107,7 +107,9 @@ function DiscountEligibility({ token }: { token?: string }) {
                   setBatchValue(undefined);
                   return;
                 }
-                if (value.match(/\b\d+(\.\d+)?\b/)) {
+                const validValue = /^\d+(\.\d*)?$/.test(value);
+
+                if (validValue) {
                   setBatchValue(+value);
                 }
               }}

@@ -270,7 +270,9 @@ export default function CreateApp({
                   setAppId("");
                   return;
                 }
-                if (value.match(/\b\d+(\.\d+)?\b/)) {
+                const validValue = /^\d+(\.\d*)?$/.test(value);
+
+                if (validValue) {
                   setAppId(value);
                 }
               }}

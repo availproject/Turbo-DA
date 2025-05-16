@@ -372,15 +372,24 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   placeholder="eg. 1000"
                   className={"flex-1"}
                   onChange={(value) => {
-                    if (value === "" || !selectToken) {
+                    if (!selectToken) {
+                      setTokenAmountError("Select token");
+                      setTokenAmount("");
+                      return;
+                    }
+                    if (value === "") {
                       setTokenAmount("");
                       setEstimateData(undefined);
                       setTokenAmountError("");
                       return;
                     }
+                    const validValue = /^\d+(\.\d*)?$/.test(value);
 
-                    if (value.match(/\b\d+(\.\d+)?\b/)) {
+                    if (validValue) {
                       setTokenAmount(value);
+                    } else {
+                      setTokenAmountError("Enter valid amount");
+                      return;
                     }
                     if (Number(balance.data?.formatted) < +value) {
                       setTokenAmountError(`Insufficent Balance`);
@@ -433,7 +442,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       <Button
                         onClick={handleBuyCredits}
                         variant={
-                          !selectToken || !tokenAmount || tokenAmount === "0"
+                          !selectToken ||
+                          !tokenAmount ||
+                          tokenAmount === "0" ||
+                          tokenAmountError !== ""
                             ? "disabled"
                             : "primary"
                         }
@@ -441,7 +453,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           loading ||
                           !selectToken ||
                           !tokenAmount ||
-                          tokenAmount === "0"
+                          tokenAmount === "0" ||
+                          tokenAmountError !== ""
                         }
                       >
                         {loading ? (
