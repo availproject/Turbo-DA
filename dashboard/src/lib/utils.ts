@@ -35,24 +35,11 @@ export const maskNumber = (value: string) => {
   return "..." + value.slice(-5);
 };
 
-export const formatDataBytes = (bytes: number, decimals = 4) => {
-  if (bytes === 0) return "0 B";
-
-  const k = 1024;
-  const dm = Math.max(0, decimals);
-  const sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  if (!sizes[i]) {
-    return `${Math.floor(
-      parseFloat((bytes / Math.pow(k, i)).toFixed(dm))
-    )} ${sizes.at(-1)}+`;
-  }
-
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-    sizes[i] ?? `${sizes.at(-1)}+`
-  }`;
+export const formatDataBytes = (bytes: number) => {
+  const kb = bytes / 1024;
+  return (
+    (Number.isInteger(kb) ? kb : kb.toFixed(2)) + ` Credit${kb > 1 ? "s" : ""}`
+  );
 };
 
 export function formatBalance(balance: string) {

@@ -49,7 +49,7 @@ const ReclaimCredits = ({
           label: "Credits Reclaimed Successfully!",
           description: `${formatDataBytes(
             +amount
-          )} credits successfully reclaimed from ${appData.app_name}`,
+          )} successfully reclaimed from ${appData.app_name}`,
         });
       }
     } catch (error) {
@@ -86,7 +86,7 @@ const ReclaimCredits = ({
             <div className="flex items-center gap-x-2">
               {appData?.app_logo?.includes(".") ? (
                 <Image
-                  className="w-10 h-auto mb-1"
+                  className="w-10 h-10 mb-1 rounded"
                   alt={appData.app_name}
                   src={baseImageUrl(appData.app_logo)}
                   width={40}
@@ -121,10 +121,10 @@ const ReclaimCredits = ({
                 <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
                   {appData?.app_logo?.includes(".") ? (
                     <Image
-                      className="w-8 h-auto"
+                      className="w-8 h-8 rounded"
                       alt={appData.app_name}
                       src={baseImageUrl(appData.app_logo)}
-                      width={32}
+                      width={40}
                       height={40}
                     />
                   ) : (
@@ -158,11 +158,11 @@ const ReclaimCredits = ({
                 label="Amount"
                 rightElement={
                   <Text
-                    className="opacity-40 w-[120px] text-end"
+                    className="opacity-40 w-[180px] text-end"
                     size={"base"}
                     weight={"bold"}
                   >
-                    of {formatDataBytes(+appData.credit_balance, 2)}
+                    of {formatDataBytes(+appData.credit_balance)}
                   </Text>
                 }
                 className="border-0 px-0 text-white w-full"

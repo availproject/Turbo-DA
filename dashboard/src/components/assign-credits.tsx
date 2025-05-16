@@ -48,7 +48,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
           label: "Credits Assigned Successfully!",
           description: `${formatDataBytes(
             +amount
-          )} credits successfully assigned from main credit balance`,
+          )} successfully assigned from main credit balance`,
         });
         updateCreditBalance();
         updateAppList();
@@ -116,10 +116,10 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
                   {appData?.app_logo?.includes(".") ? (
                     <Image
-                      className="w-8 h-auto"
+                      className="w-8 h-8 rounded"
                       alt={appData.app_name}
                       src={baseImageUrl(appData.app_logo)}
-                      width={32}
+                      width={40}
                       height={40}
                     />
                   ) : (
@@ -143,11 +143,11 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 label="Amount"
                 rightElement={
                   <Text
-                    className="opacity-40 w-[120px] text-end"
+                    className="opacity-40 w-[180px] text-end"
                     size={"base"}
                     weight={"bold"}
                   >
-                    of {formatDataBytes(creditBalance, 2)}
+                    of {formatDataBytes(creditBalance)}
                   </Text>
                 }
                 onChange={(value) => {
