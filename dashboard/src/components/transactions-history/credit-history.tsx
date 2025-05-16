@@ -58,7 +58,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
-          return value ? formatDataBytes(value, 2) : "-";
+          return value ? formatDataBytes(value) : "-";
         case "chain_id":
           return (
             <div className="flex items-center gap-x-2">
