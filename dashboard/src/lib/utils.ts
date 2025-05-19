@@ -35,24 +35,26 @@ export const maskNumber = (value: string) => {
   return "..." + value.slice(-5);
 };
 
-export const formatDataBytes = (bytes: number, decimals = 4) => {
-  if (bytes === 0) return "0 Bytes";
+export const formatInKB = (bytes: number) => {
+  const kb = bytes / 1024;
+  return {
+    fixedValue: Number.isInteger(kb) ? kb : truncateToFixed(kb),
+    kbValue: kb,
+  };
+};
 
-  const k = 1024;
-  const dm = Math.max(0, decimals);
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+export const truncateToFixed = (num: number, decimals = 2) => {
+  const factor = Math.pow(10, decimals);
+  return (Math.floor(num * factor) / factor).toFixed(decimals);
+};
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+export const formatInBytes = (bytes: number) => bytes * 1024;
 
-  if (!sizes[i]) {
-    return `${Math.floor(
-      parseFloat((bytes / Math.pow(k, i)).toFixed(dm))
-    )} ${sizes.at(-1)}+`;
-  }
-
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-    sizes[i] ?? `${sizes.at(-1)}+`
-  }`;
+export const formatDataBytes = (bytes: number) => {
+  const formatBytes = formatInKB(bytes);
+  const kb = formatBytes.kbValue as number;
+  const fixedValue = formatBytes.fixedValue as number;
+  return fixedValue + ` Credit${kb > 1 ? "s" : ""}`;
 };
 
 export function formatBalance(balance: string) {

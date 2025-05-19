@@ -54,7 +54,7 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
                 weight={"semibold"}
                 variant={"grey-500"}
               >
-                Check Fees Discount Eligibility
+                Fee Discount Calculator
               </Text>
             </Button>
           </div>

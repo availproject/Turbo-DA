@@ -58,29 +58,27 @@ const DeleteAppAlert = ({
         }
       }}
     >
-      <DialogContent className="w-full sm:max-w-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden border flex flex-col focus-within:outline-0">
+      <DialogContent className="w-full sm:max-w-[600px] h-[400px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden border flex flex-col focus-within:outline-0">
         <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
-        <div className=" h-full flex flex-col p-4 z-1">
-          <div className="flex justify-end items-center mb-6">
+        <div className=" h-full flex flex-col p-6 z-1 justify-between">
+          <div className="flex justify-end items-center">
             <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer">
               <X color="#FFF" size={24} strokeWidth={1} />
             </Close>
           </div>
 
-          <div className="flex flex-col gap-y-2 text-center">
+          <div className="flex flex-col gap-y-5 text-center max-w-[444px] mx-auto">
             <DialogTitle>
-              <>
-                <Text weight={"bold"} size={"4xl"}>
-                  Are you sure you want to delete?
-                </Text>
-                <Text weight={"bold"} size={"4xl"} className="mt-1">
-                  {appName}
-                </Text>
-              </>
+              <Text weight={"bold"} size={"2xl"}>
+                Are you sure you want to delete {appName} app?
+              </Text>
             </DialogTitle>
+            <Text weight={"medium"} variant={"secondary-grey"} size={"base"}>
+              Your unused credits would be credited back to the main balance.
+            </Text>
           </div>
 
-          <div className="mt-auto pt-20 flex gap-x-4 max-w-[444px] mx-auto w-full">
+          <div className="flex gap-x-4 max-w-[444px] mx-auto w-full">
             <Button variant={"secondary"} onClick={closeModal}>
               <Text weight={"semibold"} size={"lg"}>
                 Cancel

@@ -45,20 +45,20 @@ const SecondarySelect = ({
                   {placeholder}
                 </Text>
               }
-              className="font-bold text-white font-inter text-sm flex-1 data-[placeholder]:text-white cursor-pointer"
+              className="font-bold text-white text-sm flex-1 data-[placeholder]:text-white cursor-pointer"
             />
           </SelectTrigger>
           <SelectContent
-            className="bg-bg-primary p-0 border border-border-blue mt-1"
+            className="bg-grey-700 p-0 border border-border-blue mt-1"
             defaultValue={defaultValue}
           >
             {options.map((option) => (
               <SelectItem
                 key={option}
                 value={option}
-                className="cursor-pointer hover:bg-border-blue focus:bg-border-blue"
+                className="cursor-pointer hover:bg-grey-800 focus:bg-grey-800 h-10"
               >
-                <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
+                <Text weight={"bold"} size={"base"}>
                   {option}
                 </Text>
               </SelectItem>

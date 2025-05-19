@@ -2,20 +2,20 @@ import Button from "@/components/button";
 import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
-import { baseImageUrl, formatDataBytes } from "@/lib/utils";
+import { baseImageUrl, formatDataBytes, formatInBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Wallet, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import AvatarWrapper from "./lottie-comp/avatar-container";
 import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
@@ -48,7 +48,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
           label: "Credits Assigned Successfully!",
           description: `${formatDataBytes(
             +amount
-          )} credits successfully assigned from main credit balance`,
+          )} successfully assigned from main credit balance`,
         });
         updateCreditBalance();
         updateAppList();
@@ -59,6 +59,10 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
       setLoading(false);
     }
   };
+
+  const inValid = useMemo(() => {
+    return !amount || !creditBalance || creditBalance < formatInBytes(+amount);
+  }, [amount, creditBalance]);
 
   return (
     <Dialog
@@ -116,20 +120,17 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
                   {appData?.app_logo?.includes(".") ? (
                     <Image
-                      className="w-8 h-auto"
+                      className="w-8 h-8 rounded"
                       alt={appData.app_name}
                       src={baseImageUrl(appData.app_logo)}
-                      width={32}
+                      width={40}
                       height={40}
                     />
                   ) : (
                     <div className="w-6 rounded overflow-hidden">
                       {avatarList?.[appData?.app_logo]?.path ? (
-                        <DotLottieReact
-                          src={avatarList?.[appData?.app_logo]?.path}
-                          loop
-                          autoplay
-                          playOnHover={true}
+                        <AvatarWrapper
+                          path={avatarList?.[appData?.app_logo]?.path}
                           width={24}
                           height={24}
                         />
@@ -146,11 +147,11 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                 label="Amount"
                 rightElement={
                   <Text
-                    className="opacity-40 w-[120px] text-end"
+                    className="opacity-40 w-[180px] text-end"
                     size={"base"}
                     weight={"bold"}
                   >
-                    of {formatDataBytes(creditBalance, 2)}
+                    of {formatDataBytes(creditBalance)}
                   </Text>
                 }
                 onChange={(value) => {
@@ -158,16 +159,17 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
                     setAmount("");
                     return;
                   }
+                  const validValue = /^\d+(\.\d*)?$/.test(value);
 
-                  if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  if (validValue) {
                     setAmount(value);
                   }
                 }}
                 value={amount}
                 className="px-0 text-white w-full"
                 error={
-                  creditBalance < +amount
-                    ? `Amount can’t exceed the main credit balance. ${creditBalance}`
+                  creditBalance < formatInBytes(+amount)
+                    ? `Amount should be less than main credit balance.`
                     : ""
                 }
               />
@@ -176,14 +178,8 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
 
           <div className="mt-auto pt-20 relative z-1">
             <Button
-              variant={
-                !amount || !creditBalance || creditBalance < +amount
-                  ? "disabled"
-                  : "secondary"
-              }
-              disabled={
-                loading || !amount || !creditBalance || creditBalance < +amount
-              }
+              variant={inValid ? "disabled" : "primary"}
+              disabled={loading || inValid}
               onClick={handleSubmit}
             >
               {loading ? (

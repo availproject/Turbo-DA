@@ -1,13 +1,10 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import Button from "../button";
+import { ReactNode } from "react";
 import { Text } from "../text";
 
 type EmptyStateProps = {
   message?: string;
-  cta?: {
-    label: string;
-    action: () => void;
-  };
+  cta?: ReactNode;
 };
 
 const EmptyState = ({ message, cta }: EmptyStateProps) => {
@@ -28,11 +25,7 @@ const EmptyState = ({ message, cta }: EmptyStateProps) => {
             {message}
           </Text>
         )}
-        {cta && (
-          <Button className="w-[195px]" onClick={cta.action}>
-            {cta.label}
-          </Button>
-        )}
+        {cta}
       </div>
     </div>
   );

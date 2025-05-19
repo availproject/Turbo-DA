@@ -2,11 +2,10 @@ import Button from "@/components/button";
 import useApp from "@/hooks/useApp";
 import useBalance from "@/hooks/useBalance";
 import { avatarList } from "@/lib/constant";
-import { baseImageUrl, formatDataBytes } from "@/lib/utils";
+import { baseImageUrl, formatDataBytes, formatInBytes } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import Image from "next/image";
@@ -15,6 +14,7 @@ import { Text } from ".//text";
 import { DialogTitle } from "./dialog";
 import { useDialog } from "./dialog/provider";
 import PrimaryInput from "./input/primary";
+import AvatarWrapper from "./lottie-comp/avatar-container";
 import { useAppToast } from "./toast";
 import { Dialog, DialogContent } from "./ui/dialog";
 
@@ -49,7 +49,7 @@ const ReclaimCredits = ({
           label: "Credits Reclaimed Successfully!",
           description: `${formatDataBytes(
             +amount
-          )} credits successfully reclaimed from ${appData.app_name}`,
+          )} successfully reclaimed from ${appData.app_name}`,
         });
       }
     } catch (error) {
@@ -86,7 +86,7 @@ const ReclaimCredits = ({
             <div className="flex items-center gap-x-2">
               {appData?.app_logo?.includes(".") ? (
                 <Image
-                  className="w-10 h-auto mb-1"
+                  className="w-10 h-10 mb-1 rounded"
                   alt={appData.app_name}
                   src={baseImageUrl(appData.app_logo)}
                   width={40}
@@ -95,11 +95,8 @@ const ReclaimCredits = ({
               ) : (
                 <div className="w-10 h-10 rounded overflow-hidden mb-1">
                   {avatarList?.[appData?.app_logo]?.path ? (
-                    <DotLottieReact
-                      src={avatarList?.[appData.app_logo].path}
-                      loop
-                      autoplay
-                      playOnHover={true}
+                    <AvatarWrapper
+                      path={avatarList?.[appData.app_logo].path}
                       width={40}
                       height={40}
                     />
@@ -124,20 +121,17 @@ const ReclaimCredits = ({
                 <div className="relative border border-border-blue rounded-lg items-center p-3 h-12 flex gap-x-2">
                   {appData?.app_logo?.includes(".") ? (
                     <Image
-                      className="w-8 h-auto"
+                      className="w-8 h-8 rounded"
                       alt={appData.app_name}
                       src={baseImageUrl(appData.app_logo)}
-                      width={32}
+                      width={40}
                       height={40}
                     />
                   ) : (
                     <div className="w-6 rounded overflow-hidden">
                       {avatarList?.[appData?.app_logo]?.path ? (
-                        <DotLottieReact
-                          src={avatarList?.[appData.app_logo].path}
-                          loop
-                          autoplay
-                          playOnHover={true}
+                        <AvatarWrapper
+                          path={avatarList?.[appData.app_logo].path}
                           width={24}
                           height={24}
                         />
@@ -164,11 +158,11 @@ const ReclaimCredits = ({
                 label="Amount"
                 rightElement={
                   <Text
-                    className="opacity-40 w-[120px] text-end"
+                    className="opacity-40 w-[180px] text-end"
                     size={"base"}
                     weight={"bold"}
                   >
-                    of {formatDataBytes(+appData.credit_balance, 2)}
+                    of {formatDataBytes(+appData.credit_balance)}
                   </Text>
                 }
                 className="border-0 px-0 text-white w-full"
@@ -177,14 +171,16 @@ const ReclaimCredits = ({
                     setAmount("");
                     return;
                   }
-                  if (value.match(/\b\d+(\.\d+)?\b/)) {
+                  const validValue = /^\d+(\.\d*)?$/.test(value);
+
+                  if (validValue) {
                     setAmount(value);
                   }
                 }}
                 value={amount}
                 error={
-                  +appData.credit_balance < +amount
-                    ? `Amount can’t exceed the app balance ${appData.credit_balance}`
+                  +appData.credit_balance < formatInBytes(+amount)
+                    ? `Amount can’t exceed the app balance`
                     : ""
                 }
               />
@@ -194,11 +190,15 @@ const ReclaimCredits = ({
           <div className="mt-auto pt-20 ">
             <Button
               variant={
-                !amount || +appData.credit_balance < +amount
+                !amount || +appData.credit_balance < formatInBytes(+amount)
                   ? "disabled"
-                  : "secondary"
+                  : "primary"
               }
-              disabled={loading || !amount || +appData.credit_balance < +amount}
+              disabled={
+                loading ||
+                !amount ||
+                +appData.credit_balance < formatInBytes(+amount)
+              }
               onClick={handleSubmit}
             >
               {loading ? (

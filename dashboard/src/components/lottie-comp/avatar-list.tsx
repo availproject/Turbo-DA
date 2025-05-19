@@ -1,7 +1,7 @@
 import { avatarList } from "@/lib/constant";
 import { cn } from "@/lib/utils";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { memo } from "react";
+import AvatarWrapper from "./avatar-container";
 
 const AvatarList = ({
   selected,
@@ -12,27 +12,23 @@ const AvatarList = ({
 }) => {
   return (
     <div className="flex gap-x-2 justify-between">
-      {Object.entries(avatarList).map(([key, value], index) => {
+      {Object.entries(avatarList).map(([key, value]) => {
         return (
           <div
             className={cn(
-              "w-10 rounded overflow-hidden",
+              "w-[52px] rounded-lg overflow-hidden p-1",
               selected === key
-                ? "border border-light-grey"
+                ? "border border-light-grey bg-[#44515F]"
                 : "cursor-pointer border border-transparent"
             )}
             key={key}
             onClick={() => onClick(key)}
           >
-            {value?.path ? (
-              <DotLottieReact
-                src={value.path}
-                loop
-                playOnHover={true}
-                width={40}
-                height={40}
-              />
-            ) : null}
+            <div className="w-fit rounded overflow-hidden">
+              {value.path ? (
+                <AvatarWrapper path={value.path} width={40} height={40} />
+              ) : null}
+            </div>
           </div>
         );
       })}

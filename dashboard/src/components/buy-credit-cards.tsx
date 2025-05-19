@@ -5,14 +5,21 @@ import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
-import { useOverview } from "@/providers/OverviewProvider";
 import CreditService from "@/services/credit";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { writeContract } from "@wagmi/core";
+import { readContract, writeContract } from "@wagmi/core";
+import BigNumber from "bignumber.js";
+// import { AvailWalletConnect } from "avail-wallet";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
 import Image from "next/image";
-import { MouseEvent, useDeferredValue, useEffect, useState } from "react";
+import {
+  MouseEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import Button from "./button";
@@ -78,6 +85,16 @@ export const depositAbi: Abi = [
   },
 ];
 
+const erc20Abi = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+];
+
 const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
@@ -89,7 +106,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [selectToken, setSelectedToken] = useState("");
-  const { creditBalance } = useOverview();
   const [error, setError] = useState("");
   const account = useAccount();
   const { setOpen } = useDialog();
@@ -101,7 +117,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
   useEffect(() => {
     if (!account.address) return;
-    // setOpen("credit-added");
+    getERC20AvailBalance();
     showBalance({ token: account.address })
       .then((response) => {
         console.log({
@@ -161,6 +177,52 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     return await response.json();
   };
 
+  const postInclusionDetails = async ({
+    orderId,
+    txnHash,
+  }: {
+    orderId: string;
+    txnHash: string;
+  }) => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          tx_hash: txnHash,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw undefined;
+    }
+
+    return await response.json();
+  };
+
+  const getERC20AvailBalance = useCallback(async () => {
+    const balance = await readContract(config, {
+      address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44" as `0x${string}`,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [account.address],
+      chainId: activeNetworkId,
+    })
+      .then((balance) => {
+        if (!balance) return new BigNumber(0);
+        return new BigNumber(balance as bigint);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  }, [account, activeNetworkId]);
+
   const handleBuyCredits = async () => {
     if (!tokenAmount) return;
     try {
@@ -197,8 +259,17 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             ],
             chainId: activeNetworkId,
           })
-            .then(() => {
-              setOpen("credit-added");
+            .then(async (txnHash) => {
+              await postInclusionDetails({
+                orderId: orderResponse.data.id,
+                txnHash: txnHash,
+              })
+                .then((resp) => {
+                  setOpen("credit-added");
+                })
+                .catch((error) => {
+                  console.log(error);
+                });
             })
             .catch((error) => {
               const message = error.message.split(".")[0];
@@ -221,9 +292,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           }
           setLoading(false);
         });
-    } catch (error) {
-      // setError(error.message);
-    }
+    } catch (error) {}
   };
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
@@ -267,6 +336,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             className="mt-0 space-y-6 h-full justify-between flex flex-col"
           >
             <div className="flex flex-col gap-y-8">
+              {/* <AvailWalletConnect /> */}
               <div className="flex gap-2 w-full">
                 <div className="flex flex-col gap-2 flex-1">
                   <Text
@@ -333,15 +403,24 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   placeholder="eg. 1000"
                   className={"flex-1"}
                   onChange={(value) => {
-                    if (value === "" || !selectToken) {
+                    if (!selectToken) {
+                      setTokenAmountError("Select token");
+                      setTokenAmount("");
+                      return;
+                    }
+                    if (value === "") {
                       setTokenAmount("");
                       setEstimateData(undefined);
                       setTokenAmountError("");
                       return;
                     }
+                    const validValue = /^\d+(\.\d*)?$/.test(value);
 
-                    if (value.match(/\b\d+(\.\d+)?\b/)) {
+                    if (validValue) {
                       setTokenAmount(value);
+                    } else {
+                      setTokenAmountError("Enter valid amount");
+                      return;
                     }
                     if (Number(balance.data?.formatted) < +value) {
                       setTokenAmountError(`Insufficent Balance`);
@@ -376,11 +455,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   {(props) => {
                     if (!props.isConnected) {
                       return (
-                        <Button
-                          onClick={(e) => handleClick(e, props.show)}
-                          variant={"secondary"}
-                          className="h-12"
-                        >
+                        <Button onClick={(e) => handleClick(e, props.show)}>
                           Connect Wallet
                         </Button>
                       );
@@ -388,11 +463,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                     if (!props.chain || props.chain?.id !== DESIRED_CHAIN) {
                       return (
-                        <Button
-                          onClick={(e) => chainChangerAsync()}
-                          variant={"secondary"}
-                          className="h-12"
-                        >
+                        <Button onClick={(e) => chainChangerAsync()}>
                           Wrong Network
                         </Button>
                       );
@@ -402,15 +473,19 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       <Button
                         onClick={handleBuyCredits}
                         variant={
-                          !selectToken || !tokenAmount || tokenAmount === "0"
+                          !selectToken ||
+                          !tokenAmount ||
+                          tokenAmount === "0" ||
+                          tokenAmountError !== ""
                             ? "disabled"
-                            : "secondary"
+                            : "primary"
                         }
                         disabled={
                           loading ||
                           !selectToken ||
                           !tokenAmount ||
-                          tokenAmount === "0"
+                          tokenAmount === "0" ||
+                          tokenAmountError !== ""
                         }
                       >
                         {loading ? (
@@ -432,7 +507,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               </SignedIn>
               <SignedOut>
                 <SignInButton mode="modal" component="div">
-                  <Button variant={"secondary"}>Sign In</Button>
+                  <Button>Sign In</Button>
                 </SignInButton>
               </SignedOut>
             </div>
