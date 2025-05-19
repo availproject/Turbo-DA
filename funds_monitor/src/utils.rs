@@ -61,6 +61,10 @@ impl Utils {
         let parsed_id = i32::from_str_radix(order_id.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse order ID: {}", e))?;
 
+        debug!("Order ID: {}", order_id);
+        debug!("Parsed ID: {}", parsed_id);
+        debug!("Transaction hash: {}", transaction_hash);
+
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
             .set((

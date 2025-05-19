@@ -1,9 +1,6 @@
 use crate::redis::Redis;
 use actix_cors::Cors;
-use actix_extensible_rate_limit::{
-    backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
-    RateLimiter,
-};
+
 use actix_web::{
     middleware::Logger,
     web::{self},
@@ -76,24 +73,9 @@ async fn main() -> Result<(), std::io::Error> {
 
     HttpServer::new(move || {
         let shared_producer_send = web::Data::new(sender.clone());
-        // let redis_client = Redis::new(shared_config.redis_url.as_str());
-        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-        // let manager = ConnectionManager::new(client).await.unwrap();
-        // let redis_backend = RedisBackend::builder(manager).build();
-        let backend = InMemoryBackend::builder().build();
-        let input = SimpleInputFunctionBuilder::new(
-            Duration::from_secs(shared_config.rate_limit_window_size),
-            shared_config.rate_limit_max_requests,
-        )
-        .custom_key("X-API-KEY")
-        .build();
-        let rate_limiter = RateLimiter::builder(backend.clone(), input)
-            .add_headers()
-            .build();
 
         App::new()
             .wrap(Cors::permissive())
-            .wrap(rate_limiter)
             .wrap(Logger::default())
             .service(health_check)
             .service(
