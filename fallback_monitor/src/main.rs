@@ -65,7 +65,14 @@ async fn main() {
         let mut connection = AsyncPgConnection::establish(&app_config.database_url)
             .await
             .expect("Failed to connect to db");
-        monitor_failed_transactions(&mut connection, &sdk, &keypair, app_config.retry_count).await;
+        monitor_failed_transactions(
+            &mut connection,
+            &sdk,
+            &keypair,
+            app_config.retry_count,
+            app_config.limit,
+        )
+        .await;
     }
 }
 

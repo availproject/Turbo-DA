@@ -8,7 +8,9 @@ use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
-        customer_expenditure::{add_error_entry, update_customer_expenditure},
+        customer_expenditure::{
+            add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
+        },
         misc::{get_account_by_id, update_credit_balance},
         users::TxParams,
     },
@@ -111,6 +113,13 @@ async fn response_handler(
     let mut connection = get_connection(&injected_dependency)
         .await
         .map_err(|_| format!("Failed to get connection"))?;
+
+    let did_fallback_resolved =
+        get_did_fallback_resolved(&mut connection, &response.submission_id).await?;
+
+    if did_fallback_resolved {
+        return Err("Fallback resolved transaction".to_string());
+    }
 
     let sdk = generate_avail_sdk(&endpoints).await;
 

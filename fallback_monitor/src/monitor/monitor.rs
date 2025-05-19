@@ -37,8 +37,9 @@ pub async fn monitor_failed_transactions(
     client: &SDK,
     account: &Keypair,
     retry_count: i32,
+    limit: i64,
 ) {
-    let unresolved_transactions = get_unresolved_transactions(connection, retry_count).await;
+    let unresolved_transactions = get_unresolved_transactions(connection, retry_count, limit).await;
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {

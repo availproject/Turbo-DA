@@ -118,6 +118,7 @@ pub async fn update_credit_balance(
 pub async fn get_unresolved_transactions(
     connection: &mut AsyncPgConnection,
     retry: i32,
+    limit: i64,
 ) -> Result<Vec<(CustomerExpenditureGetWithPayload, Apps, User)>, String> {
     customer_expenditures::customer_expenditures
         .inner_join(apps::apps)
@@ -130,6 +131,7 @@ pub async fn get_unresolved_transactions(
         ))
         .filter(customer_expenditures::retry_count.lt(retry))
         .order(customer_expenditures::created_at.desc())
+        .limit(limit)
         .select((
             CustomerExpenditureGetWithPayload::as_select(),
             Apps::as_select(),
