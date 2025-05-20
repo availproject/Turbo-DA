@@ -4,6 +4,6 @@ use actix_web::{get, HttpResponse, Responder};
 pub async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "OK",
-        "message": "Service is running"
+        "message": "Data Submission Service is running"
     }))
 }
