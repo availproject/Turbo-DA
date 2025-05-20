@@ -9,6 +9,7 @@ WORKDIR ./contracts
 RUN git init . && \
     git config --global user.email "docker@example.com" && \
     git config --global user.name "Docker Build"
+RUN forge install foundry-rs/forge-std --no-commit
 RUN forge install
 RUN forge build
 WORKDIR /build
