@@ -35,3 +35,5 @@
 **/.DS_Store
 **/._.DS_Store
 target
+node_modules
+node_modules
