@@ -50,7 +50,7 @@ const PrimaryInput = ({
           name="input"
           disabled={disabled}
           className={cn(
-            "bg-transparent text-base font-semibold",
+            "text-base font-semibold",
             rightElement
               ? "border-none"
               : error && error !== ""

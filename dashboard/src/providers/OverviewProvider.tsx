@@ -1,15 +1,19 @@
 "use client";
+import useTokenMap from "@/hooks/useTokenMap";
 import { Tokens } from "@/lib/types";
 import { APP_TABS } from "@/lib/utils";
+import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
 import React, {
   createContext,
   Dispatch,
   SetStateAction,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
+import { useConfig } from "./ConfigProvider";
 
 interface OverviewContextType {
   creditBalance: number;
@@ -24,9 +28,15 @@ interface OverviewContextType {
   apiKeys?: Record<string, string[]>;
   mainTabSelected: APP_TABS;
   setMainTabSelected: Dispatch<SetStateAction<APP_TABS>>;
+  transactionProgress: TransactionProgress[];
+  setTransactionProgress: Dispatch<SetStateAction<TransactionProgress[]>>;
 }
 
-export type Filter = "All" | "Allocated" | "Unallocated";
+type TransactionProgress = {
+  id: 1;
+};
+
+export type Filter = "All" | "Using Assigned Credits" | "Using Main Credits";
 
 export const OverviewContext = createContext<OverviewContextType | undefined>(
   undefined
@@ -51,22 +61,41 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
     APP_TABS.OVERVIEW
   );
+  const [tokenList, setTokenList] =
+    useState<Record<string, Record<string, any>>>();
+  const [transactionProgress, setTransactionProgress] = useState<
+    TransactionProgress[]
+  >([]);
+  const tokenMap = useTokenMap();
+  const { token } = useConfig();
+
+  useEffect(() => {
+    token &&
+      AppService.getTokens({ token })
+        .then((response) => {
+          console.log(response);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+  }, [token]);
 
   const filterAppList = useMemo(
     () =>
       appsList.filter((app) =>
-        filter === "Allocated"
+        filter === "Using Assigned Credits"
           ? app.credit_balance !== "0"
-          : filter === "Unallocated"
+          : filter === "Using Main Credits"
           ? app.credit_balance === "0"
           : true
       ),
     [appsList, filter]
   );
 
-  const allAppList = useMemo(() => {
-    return filterAppList.filter((app) => app.app_name);
-  }, [filterAppList]);
+  const allAppList = useMemo(
+    () => filterAppList.filter((app) => app.app_name),
+    [filterAppList]
+  );
 
   return (
     <OverviewContext.Provider
@@ -83,6 +112,8 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         filter,
         mainTabSelected,
         setMainTabSelected,
+        transactionProgress,
+        setTransactionProgress,
       }}
     >
       {children}
