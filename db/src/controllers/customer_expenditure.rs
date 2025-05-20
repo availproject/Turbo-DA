@@ -244,14 +244,14 @@ pub async fn increase_retry_count(
 pub async fn get_did_fallback_resolved(
     connection: &mut AsyncPgConnection,
     submission_id: &Uuid,
-) -> Result<bool, String> {
+) -> bool {
     match customer_expenditures
         .filter(id.eq(submission_id))
         .select(CustomerExpenditureGet::as_select())
         .first::<CustomerExpenditureGet>(connection)
         .await
     {
-        Ok(sub) => Ok(sub.tx_hash.is_some()),
-        Err(_) => Err("Failed to get did fallback resolved".to_string()),
+        Ok(sub) => sub.tx_hash.is_some(),
+        Err(_) => false,
     }
 }

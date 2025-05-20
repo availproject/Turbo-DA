@@ -115,7 +115,7 @@ async fn response_handler(
         .map_err(|_| format!("Failed to get connection"))?;
 
     let did_fallback_resolved =
-        get_did_fallback_resolved(&mut connection, &response.submission_id).await?;
+        get_did_fallback_resolved(&mut connection, &response.submission_id).await;
 
     if did_fallback_resolved {
         return Err("Fallback resolved transaction".to_string());
