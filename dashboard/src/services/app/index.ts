@@ -279,6 +279,25 @@ class AppService {
 
     return await response.json();
   }
+
+  static async getTokens({ token }: { token: string }) {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/token_map`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw [];
+    }
+
+    return await response.json();
+  }
 }
 
 export default AppService;
