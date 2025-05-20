@@ -1,15 +1,15 @@
 FROM docker.io/library/rust:1.85.1-bookworm AS foundry-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y git curl cmake
+COPY . .
 RUN curl -L https://foundry.paradigm.xyz | bash
 ENV PATH="/root/.foundry/bin:${PATH}"
 RUN bash -c "source /root/.bashrc && foundryup"
-COPY . .
 WORKDIR ./contracts
 RUN git init . && \
     git config --global user.email "docker@example.com" && \
     git config --global user.name "Docker Build"
-RUN forge install --force
+RUN forge install -- --force
 RUN forge build
 WORKDIR /build
 
