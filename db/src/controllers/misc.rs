@@ -167,9 +167,7 @@ pub async fn allocate_credit_balance(
         return Err("Cannot allocate negative credits".to_string());
     }
     let user_obj = get_user(connection, user).await?;
-    if amount > &BigDecimal::from(0)
-        && user_obj.credit_balance - user_obj.allocated_credit_balance < *amount
-    {
+    if amount > &BigDecimal::from(0) && user_obj.credit_balance < *amount {
         return Err("Insufficient balance".to_string());
     }
 
