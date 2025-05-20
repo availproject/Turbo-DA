@@ -4,12 +4,12 @@ import { Filter, useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Text } from ".//text";
 import AppList from "./app-list";
 import Button from "./button";
 import CreateApp from "./create-app";
 import { useDialog } from "./dialog/provider";
 import SecondarySelect from "./select/secondary-select";
+import { Text } from "./text";
 import EmptyState from "./transactions-history/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
@@ -59,7 +59,6 @@ const AppsCard = ({ token }: AppsCardProps) => {
                 ]}
                 onChange={(value) => setFilter(value as Filter)}
                 value={filter}
-                className="w-52"
               />
               <Button
                 variant="link"

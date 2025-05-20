@@ -45,7 +45,7 @@ function TabsTrigger({
     outline:
       "flex justify-center items-center h-10 px-4 data-[state=inactive]:text-[#949494] data-[state=active]:text-white data-[state=active]:border-border-blue data-[state=active]:bg-[#2B4761] data-[state=active]:shadow-none rounded-3xl cursor-pointer text-base font-semibold",
     regular:
-      "h-10 px-4 data-[state=inactive]:text-[#999] data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none data-[state=active]:box-shadow-[0_0_74.76px_rgba(255, 255, 255)] cursor-pointer text-base font-medium",
+      "h-10 px-4 data-[state=inactive]:text-[#999] data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none data-[state=active]:text-shadow-secondary-tab cursor-pointer text-base font-medium",
   };
   return (
     <TabsPrimitive.Trigger

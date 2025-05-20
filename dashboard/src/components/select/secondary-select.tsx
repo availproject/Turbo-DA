@@ -28,7 +28,7 @@ const SecondarySelect = ({
   return (
     <div
       className={cn(
-        "relative w-32 h-10 rounded-lg overflow-hidden border border-border-blue",
+        "relative rounded-lg overflow-hidden border border-border-blue",
         className
       )}
     >
@@ -38,14 +38,14 @@ const SecondarySelect = ({
           value={value}
           onValueChange={onChange}
         >
-          <SelectTrigger className="h-12 w-full flex-1 border-0 outline-none cursor-pointer">
+          <SelectTrigger className="h-12 w-32 [&>span>p]:truncate border-0 outline-none cursor-pointer">
             <SelectValue
               placeholder={
                 <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
                   {placeholder}
                 </Text>
               }
-              className="font-bold text-white text-sm flex-1 data-[placeholder]:text-white cursor-pointer"
+              className="font-bold text-white text-sm data-[placeholder]:text-white cursor-pointer selected-value"
             />
           </SelectTrigger>
           <SelectContent
