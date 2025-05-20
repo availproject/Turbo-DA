@@ -10,13 +10,7 @@
 /funds_monitor/target
 /funds_monitor/config.toml
 /funds_monitor/.env
-/contracts/out
 /*/dump.rdb
-/contracts/cache
-/contracts/broadcast
-/contracts/github
-/contracts/cache
-/contracts/broadcast
 /fallback_monitor/.env
 /fallback_monitor/config.toml
 /fallback_monitor/target
