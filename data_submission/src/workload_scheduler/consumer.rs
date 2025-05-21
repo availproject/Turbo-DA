@@ -18,13 +18,13 @@ use db::{
     models::apps::Apps,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use log::{error, info};
 use observability::log_txn;
 use std::sync::Arc;
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
+use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
@@ -60,14 +60,14 @@ impl Consumer {
             let keygen = self.keypair.clone();
             let mut receiver = self.sender.subscribe();
 
-            info!("Spawning thread number {}", i);
+            info(&format!("Spawning thread number {}", i));
             let arc_endpoints = self.endpoints.clone();
 
             std::thread::spawn(move || {
                 let runtime = match tokio::runtime::Runtime::new() {
                     Ok(runtime) => runtime,
                     Err(e) => {
-                        error!("Failed to create runtime: {}", e);
+                        error(&format!("Failed to create runtime: {}", e));
                         return;
                     }
                 };
@@ -92,7 +92,7 @@ impl Consumer {
 
                         if let Err(e) = result {
                             log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                            error!("Failed to process response: {}", e);
+                            error(&format!("Failed to process response: {}", e));
                         }
 
                         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -123,10 +123,10 @@ async fn response_handler(
 
     let sdk = generate_avail_sdk(&endpoints).await;
 
-    info!(
+    info(&format!(
         "Submission Id: {:?} picked up by thread id {:?}",
         response.submission_id, response.thread_id
-    );
+    ));
 
     let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
@@ -145,10 +145,10 @@ async fn response_handler(
                 update_error_entry(response, &mut connection, err.clone()).await;
                 return Err(err);
             }
-            info!(
+            info(&format!(
                 "Successfully submitted response for submission_id {}",
                 response.submission_id
-            );
+            ));
             Ok(())
         }
         Err(_) => {

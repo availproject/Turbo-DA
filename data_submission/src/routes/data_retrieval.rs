@@ -8,11 +8,13 @@ use db::{
 };
 use diesel::{prelude::*, result::Error};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
-use turbo_da_core::utils::{generate_avail_sdk, get_connection};
+use turbo_da_core::{
+    logger::debug,
+    utils::{generate_avail_sdk, get_connection},
+};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -78,7 +80,10 @@ pub async fn get_pre_image(
         .await
     {
         Ok(sub) => {
-            info!("Found expenditure for submission ID: {:?}", submission_id);
+            debug(&format!(
+                "Found expenditure for submission ID: {:?}",
+                submission_id
+            ));
             if sub.extrinsic_index.is_none() || sub.block_hash.is_none() {
                 return HttpResponse::NotImplemented()
                     .body("Customer Expenditure found but tx isn't finalised yet.");

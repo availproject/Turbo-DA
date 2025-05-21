@@ -11,14 +11,14 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
     health::health_check,
 };
 use std::sync::Arc;
-use tokio::{sync::broadcast, time::Duration};
+use tokio::sync::broadcast;
+use turbo_da_core::logger::info;
 use turbo_da_core::utils::generate_keygen_list;
 mod auth;
 mod config;
@@ -33,7 +33,7 @@ use workload_scheduler::consumer::Consumer;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting Data Submission server....");
+    info(&format!("Starting Data Submission server...."));
 
     init_meter("data_submission");
 

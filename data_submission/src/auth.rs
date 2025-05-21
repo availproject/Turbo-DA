@@ -12,12 +12,12 @@ use db::{
 use diesel::prelude::*;
 use diesel::QueryDsl;
 use futures_util::future::LocalBoxFuture;
-use log::{debug, error, info};
 use sha3::{Digest, Keccak256};
 use std::{
     fmt::Display,
     future::{ready, Ready},
 };
+use turbo_da_core::logger::{debug, error, info, warn};
 
 pub struct Auth {
     redis: Redis,
@@ -103,7 +103,7 @@ where
                 let mut conn = match PgConnection::establish(&self.database_url) {
                     Ok(conn) => conn,
                     Err(e) => {
-                        error!("Failed to connect to database: {}", e);
+                        error(&format!("Failed to connect to database: {}", e));
                         return Box::pin(async move {
                             Err(actix_error::ErrorInternalServerError(
                                 "Internal error. Contact admin",
@@ -144,13 +144,13 @@ where
                                 .as_str(),
                         ) {
                             Ok(_) => {
-                                info!(
+                                info(&format!(
                                     "API key set in redis for user {}:{}",
                                     key.user_id, key.app_id
-                                );
+                                ));
                             }
                             Err(e) => {
-                                error!("Failed to set API key in redis: {}", e);
+                                error(&format!("Failed to set API key in redis: {}", e));
                             }
                         }
                     }
@@ -163,7 +163,7 @@ where
         Box::pin(async move {
             let res = fut.await?;
 
-            debug!("API key {} is valid", api_key_hash);
+            debug(&format!("API key {} is valid", api_key_hash));
             Ok(res)
         })
     }
@@ -184,7 +184,7 @@ fn insert_headers<B, T: Display>(
         Ok(())
     } else {
         let error_message = format!("Failed to parse {} or its value", key);
-        log::warn!("{}", error_message);
+        warn(&error_message);
         Err(Box::pin(async move {
             Err(actix_error::ErrorInternalServerError(error_message))
         }))
