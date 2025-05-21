@@ -83,6 +83,7 @@ impl AppConfig {
         let private_key = env::var("PRIVATE_KEY")?;
         let mut avail_rpc_endpoint = Vec::new();
         let mut index = 1;
+
         while let Ok(endpoint) = env::var(format!("AVAIL_RPC_ENDPOINT_{}", index)) {
             avail_rpc_endpoint.push(endpoint);
             index += 1;
@@ -91,6 +92,9 @@ impl AppConfig {
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
         let limit = env::var("LIMIT")?.parse::<i64>()?;
+
+        info!("Config loaded from environment variables");
+
         Ok(AppConfig {
             database_url,
             private_key,
