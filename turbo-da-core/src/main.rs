@@ -4,6 +4,7 @@
 /// The service generates the extrinsic and published it to Avail network.
 pub mod config;
 pub mod controllers;
+pub mod logger;
 pub mod routes;
 pub mod s3;
 pub mod utils;
@@ -48,12 +49,12 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
+use logger::{info, warn};
 use routes::health::health_check;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting API server....");
+    info(&"Starting API server....".to_string());
 
     let app_config = AppConfig::default().load_config()?;
     let port = app_config.port;
@@ -102,7 +103,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert CSP headers");
+                        warn(&"Failed to insert CSP headers".to_string());
                     }
 
                     if let (Ok(name), Ok(value)) = (
@@ -111,7 +112,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert X-Content-Type-Options");
+                        warn(&"Failed to insert X-Content-Type-Options".to_string());
                     }
 
                     Ok(res)

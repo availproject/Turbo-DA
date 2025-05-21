@@ -4097,7 +4097,6 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "log",
  "observability",
  "r2d2",
  "r2d2_redis",

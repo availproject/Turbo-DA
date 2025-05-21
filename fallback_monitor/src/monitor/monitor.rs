@@ -17,8 +17,8 @@ use db::{
 };
 
 use diesel_async::AsyncPgConnection;
-use log::{error, info};
 use observability::{log_fallback_txn_error, log_retry_count};
+use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::{format_size, Convertor};
 
 /// Monitors and processes failed transactions from the database
@@ -53,7 +53,7 @@ pub async fn monitor_failed_transactions(
             .await;
         }
         Err(_) => {
-            error!("Couldn't fetch unresolved transactions from db")
+            error(&format!("Couldn't fetch unresolved transactions from db"));
         }
     }
 }
@@ -80,10 +80,10 @@ async fn process_failed_transactions(
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
 ) {
     for (customer_expenditure_details, account_details, user_details) in failed_transactions_list {
-        info!(
+        info(&format!(
             "Processing failed transaction submission id: {:?} ",
             customer_expenditure_details.id
-        );
+        ));
         let result = increase_retry_count(customer_expenditure_details.id, connection).await;
         if result.is_err() {
             log_error(
@@ -171,9 +171,9 @@ async fn process_failed_transactions(
 }
 
 fn log_error(id: &str, message: &str) {
-    error!(
+    error(&format!(
         "Fallback transaction error: id {:?}, message: {:?}",
         id, message
-    );
+    ));
     log_fallback_txn_error(id, message);
 }

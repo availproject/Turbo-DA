@@ -8,6 +8,7 @@ use actix_web::{
 use alloy::primitives::Address;
 use avail_rust::{account, Keypair, Options, SDK};
 
+use crate::logger::{debug_json, error, info};
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
 use diesel_async::{
@@ -15,7 +16,6 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use lazy_static::lazy_static;
-use log::{debug, error, info};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -105,7 +105,7 @@ pub async fn get_connection(
     match pool.get().await {
         Ok(conn) => Ok(conn),
         Err(err) => {
-            error!("Failed to get a database connection: {}", err);
+            error(&format!("Failed to get a database connection: {}", err));
             return Err(HttpResponse::InternalServerError().json(json!({
                 "state": "ERROR",
                 "error": "Database connection error"
@@ -248,7 +248,7 @@ impl<'a> Convertor<'a> {
         {
             Ok(info) => info,
             Err(e) => {
-                error!("Failed to get payment query info: {:?}", e);
+                error(&format!("Failed to get payment query info: {:?}", e));
                 return BigDecimal::from(u128::MAX);
             }
         };
@@ -307,19 +307,24 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
+        info(&format!("Attempting to connect endpoint: {:?}", endpoint));
         match SDK::new(endpoint).await {
             Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
+                info(&format!("Connected successfully to endpoint: {}", endpoint));
                 return sdk;
             }
             Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                error(&format!(
+                    "Failed to connect to endpoint {}: {:?}",
+                    endpoint, e
+                ));
                 attempts += 1;
             }
         }
 
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        info(&format!(
+            "All endpoints failed. Waiting 5 seconds before next retry...."
+        ));
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
 }
@@ -353,15 +358,17 @@ pub async fn calculate_avail_token_equivalent(
 ) -> Result<BigDecimal, String> {
     let http_client = Client::new();
 
-    debug!("Fetching current price for token: {}", token_address);
+    debug_json(json!({
+        "message": "Token Address",
+        "token_address": token_address,
+        "level": "debug"
+    }));
+
     let token_symbol = TOKEN_MAP
         .iter()
         .find(|(_, token)| token.token_address == token_address)
         .map(|(key, _)| key.clone())
-        .ok_or_else(|| {
-            error!("Token address not found in token mapping");
-            String::from("Token address not found in token mapping")
-        })?;
+        .ok_or_else(|| String::from("Token address not found in token mapping"))?;
 
     let (token_usd_price, avail_usd_price) = get_prices(
         &http_client,
@@ -372,17 +379,28 @@ pub async fn calculate_avail_token_equivalent(
     .await
     .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-    debug!("Current Token USD price: {}", token_usd_price);
-    debug!("Current AVAIL USD price: {}", avail_usd_price);
+    debug_json(json!({
+        "message": "Current Token USD price",
+        "token_usd_price": token_usd_price,
+        "level": "debug"
+    }));
+    debug_json(json!({
+        "message": "Current AVAIL USD price",
+        "avail_usd_price": avail_usd_price,
+        "level": "debug"
+    }));
 
     let token_avail_ratio = token_usd_price / avail_usd_price;
-    let source_token_decimals = TOKEN_MAP.get(token_symbol.as_str()).unwrap().token_decimals;
-    let avail_token_decimals = TOKEN_MAP.get("avail").unwrap().token_decimals;
+    let source_token_decimals = TOKEN_MAP
+        .get(token_symbol.as_str())
+        .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
+        .token_decimals;
+    let avail_token_decimals = TOKEN_MAP
+        .get("avail")
+        .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
+        .token_decimals;
     let token_avail_ratio_decimal = BigDecimal::from_str(token_avail_ratio.to_string().as_str())
-        .map_err(|e| {
-            error!("Failed to convert price ratio to decimal: {}", e);
-            format!("Failed to convert price ratio to decimal: {}", e)
-        })?;
+        .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 
     let equivalent_amount = token_avail_ratio_decimal
         * token_amount

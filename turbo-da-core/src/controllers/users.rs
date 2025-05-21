@@ -1,3 +1,5 @@
+/// Logging utilities
+use crate::logger::{error, info};
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
@@ -24,8 +26,6 @@ use db::{
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-/// Logging utilities
-use log::{error, info};
 /// Redis caching functionality
 use redis::Commands;
 /// Serialization/deserialization
@@ -974,10 +974,10 @@ async fn delete_api_key(
             match redis::Client::open(config.redis_url.clone().as_str()) {
                 Ok(mut client) => {
                     let _result: Result<(), redis::RedisError> = client.del(hashed_key);
-                    info!("Deleted API key from Redis: {}", hashed_key);
+                    info(&format!("Deleted API key from Redis: {}", hashed_key));
                 }
                 Err(e) => {
-                    error!("Error connecting to Redis: {}", e);
+                    error(&format!("Error connecting to Redis: {}", e));
                 }
             }
             return HttpResponse::Ok().json(json!({

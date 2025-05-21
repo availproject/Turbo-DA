@@ -12,6 +12,26 @@ use uuid::Uuid;
 
 use avail_utils::submit_data::TransactionInfo;
 
+pub fn error_log(message: &String) {
+    error!(
+        "{}",
+        serde_json::json!({
+            "message": message,
+            "level": "error"
+        })
+    );
+}
+
+pub fn info_log(message: &String) {
+    info!(
+        "{}",
+        serde_json::json!({
+            "message": message,
+            "level": "info"
+        })
+    );
+}
+
 /// Retrieves information about a specific customer expenditure submission
 ///
 /// # Arguments
@@ -109,15 +129,17 @@ pub async fn create_customer_expenditure_entry(
         .await
     {
         Ok(_) => {
-            info!(
+            info_log(&format!(
                 "Customer Expenditure entry created {}",
                 &customer_expendire_entry.id
-            );
+            ));
         }
         Err(e) => {
-            error!(
-                "Couldn't create a new customer expenditure entry with submission id {}. Error {:?}",
-                customer_expendire_entry.id, e
+            error_log(
+                &format!(
+                    "Couldn't create a new customer expenditure entry with submission id {}. Error {:?}",
+                    customer_expendire_entry.id, e
+                )
             );
         }
     };
@@ -192,10 +214,13 @@ pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgC
 
     match tx {
         Ok(_) => {
-            info!("Error logged updated for submission id {:?} ", sub_id);
+            info_log(&format!(
+                "Error logged updated for submission id {:?}",
+                sub_id
+            ));
         }
         Err(e) => {
-            error!("Couldn't insert error log value. Error: {:?}", e);
+            error_log(&format!("Couldn't insert error log value. Error: {:?}", e));
         }
     }
 }
@@ -226,16 +251,19 @@ pub async fn increase_retry_count(
     {
         Ok(size) => {
             if size == 0 {
-                error!(
+                error_log(&format!(
                     "Failed to increase retry count for entry id: {:?}",
                     entry_id
-                );
+                ));
                 return Err("Failed to increase retry count for entry id".to_string());
             }
             Ok(())
         }
         Err(e) => {
-            error!("Failed to increase retry count for entry id: {:?}", e);
+            error_log(&format!(
+                "Failed to increase retry count for entry id: {:?}",
+                e
+            ));
             return Err("Failed to increase retry count for entry id".to_string());
         }
     }

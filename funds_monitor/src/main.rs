@@ -2,8 +2,6 @@ mod avail;
 mod config;
 mod evm;
 mod utils;
-use std::sync::Arc;
-
 use avail::run;
 use config::Config;
 use config::Network;
@@ -11,15 +9,16 @@ use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::ds
 use diesel::prelude::*;
 use diesel::PgConnection;
 use evm::EVM;
-use log::debug;
-use log::{error, info};
+use serde_json::json;
+use std::sync::Arc;
+use turbo_da_core::logger::{debug, debug_json, error, info};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let cfg = match Config::default().load_config() {
         Ok(c) => c,
         Err(e) => {
-            info!("Error loading config: {}", e);
+            info(&format!("Error loading config: {}", e));
             return;
         }
     };
@@ -30,11 +29,11 @@ async fn main() {
 
     let mut handles = Vec::new();
     handles.push(tokio::spawn(async move {
-        info!("Starting Avail Chain Monitor");
+        info(&format!("Starting Avail Chain Monitor"));
 
         let result = run(cfg_ref.clone()).await;
         if let Err(e) = result {
-            error!("Error running Avail Chain Monitor: {:?}", e);
+            error(&format!("Error running Avail Chain Monitor: {:?}", e));
         }
     }));
 
@@ -43,21 +42,25 @@ async fn main() {
         let network_config = network_config.clone();
 
         let cfg_ref_4 = cfg_ref_3.clone();
-        debug!("Task for network: {}", network_name);
+        debug_json(json!({
+            "message": "Task for network",
+            "network_name": network_name,
+            "level": "debug"
+        }));
 
         handles.push(tokio::spawn(async move {
-            debug!("Spawning new task");
+            debug(&format!("Spawning new task"));
 
             match monitor(network_config, cfg_ref_4).await {
-                Ok(_) => info!("Monitor task completed successfully"),
-                Err(e) => error!("Error running monitor task: {}", e),
+                Ok(_) => info(&format!("Monitor task completed successfully")),
+                Err(e) => error(&format!("Error running monitor task: {}", e)),
             }
         }));
     }
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
-            info!("Ctrl+C pressed, shutting down...");
+            info(&format!("Ctrl+C pressed, shutting down..."));
         }
         _ = futures::future::join_all(handles) => {}
     }
@@ -100,7 +103,7 @@ fn query_finalised_block_number(
     match row {
         Ok(row) => row,
         Err(e) => {
-            error!("Failed to query finalised block number: {}", e);
+            error(&format!("Failed to query finalised block number: {}", e));
             return IndexerBlockNumbers {
                 id: 0,
                 chain_id: 0,

@@ -5,22 +5,18 @@ use crate::{
         Convertor, TOKEN_MAP,
     },
 };
-use std::sync::Arc;
-
 use actix_web::{
     get, post,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
 use db::controllers::fund::{create_credit_request, get_fund_status, update_inclusion_details};
-
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 
 /// Parameters for registering a credit request
 ///

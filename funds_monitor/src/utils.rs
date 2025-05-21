@@ -6,9 +6,9 @@ use db::{
     schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
+use serde_json::json;
+use turbo_da_core::logger::{debug_json, error, error_json, info};
 use turbo_da_core::utils::get_amount_to_be_credited;
-
-use log::{debug, error, info};
 
 pub struct Deposit {
     pub token_address: String,
@@ -61,9 +61,14 @@ impl Utils {
         let parsed_id = i32::from_str_radix(order_id.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse order ID: {}", e))?;
 
-        debug!("Order ID: {}", order_id);
-        debug!("Parsed ID: {}", parsed_id);
-        debug!("Transaction hash: {}", transaction_hash);
+        debug_json(json!({
+            "order_id": order_id,
+            "level": "debug"
+        }));
+        debug_json(json!({
+            "parsed_id": parsed_id,
+            "level": "debug"
+        }));
 
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
@@ -73,15 +78,16 @@ impl Utils {
                 credit_requests::chain_id.eq(Some(chain_identifier)),
                 credit_requests::tx_hash.eq(Some(transaction_hash.clone())),
                 credit_requests::request_type.eq("DEPOSIT".to_string()),
+                credit_requests::token_address.eq(Some(address.clone())),
             ))
             .returning(CreditRequestsGet::as_returning())
             .get_result::<CreditRequestsGet>(&mut *connection)
             .map_err(|e| {
-                error!("Couldn't store fund request: {:?}", e);
+                error(&format!("Couldn't store fund request: {:?}", e));
                 format!("Failed to store fund request: {}", e)
             })?;
 
-        info!("Success: {} status: {}", order_id, status);
+        info(&format!("Success: {} status: {}", order_id, status));
         self.update_token_information_on_deposit(&amount, &row.user_id, connection)
             .await;
 
@@ -99,17 +105,23 @@ impl Utils {
             .execute(connection);
 
         let updated_rows = updated_rows_query.unwrap_or_else(|_| {
-            error!("Update token balances query failed");
+            error(&format!("Update token balances query failed"));
             0
         });
 
         if updated_rows > 0 {
-            debug!(
-                "Successfully updated token balances with user ID {} with amount {}",
-                user_id, amount
-            );
+            debug_json(json!({
+                "message": "Successfully updated token balances",
+                "user_id": user_id,
+                "amount": amount,
+                "level": "debug"
+            }));
         } else {
-            error!("No rows updated for user ID: {}", user_id);
+            error_json(json!({
+                "message": "No rows updated for user ID",
+                "user_id": user_id,
+                "level": "error"
+            }));
         }
     }
 
@@ -128,7 +140,11 @@ impl Utils {
         match row {
             Ok(row) => {
                 if row > 0 {
-                    debug!("Updated finalised block number: {}", row);
+                    debug_json(json!({
+                        "message": "Updated finalised block number",
+                        "row": row,
+                        "level": "debug"
+                    }));
                     Ok(())
                 } else {
                     Err(format!("No rows updated for finalised block number"))
