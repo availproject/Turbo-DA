@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use avail::runtime_types::da_runtime::RuntimeCall;
 use avail::runtime_types::frame_system::pallet::Call::remark_with_event as RemarkWithEvent;
 use avail::runtime_types::pallet_balances::pallet::Call::transfer_keep_alive as TransferKeepAlive;
@@ -7,15 +5,17 @@ use avail::utility::calls::types::BatchAll;
 use avail_rust::prelude::*;
 use avail_rust::{avail, block, error::ClientError, subxt, Block, Filter, SDK};
 use diesel::PgConnection;
-use log::{error, info};
+use serde_json::json;
+use std::sync::Arc;
 use subxt::utils::MultiAddress;
+use turbo_da_core::logger::{debug, debug_json, error, info};
 
 use crate::config::Config;
 use crate::query_finalised_block_number;
 use crate::utils::{Deposit, Utils};
 // Remark is the user id in hex format
 pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
-    info!("Starting Avail Chain Monitor");
+    debug(&format!("Starting Avail Chain Monitor"));
     let sdk = SDK::new(cfg.avail_rpc_url.as_str()).await?;
     let utils = Utils::new(
         cfg.coin_gecho_api_url.clone(),
@@ -23,11 +23,12 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
         cfg.database_url.clone(),
         cfg.avail_rpc_url.clone(),
     );
-    info!("SDK initialized with local endpoint");
+
+    debug(&format!("SDK initialized with local endpoint"));
 
     let mut connection = utils.establish_connection()?;
 
-    sync_database(&mut connection, &sdk, &utils).await?;
+    let _ = sync_database(&mut connection, &sdk, &utils).await;
 
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
@@ -37,12 +38,11 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
                 process_block(block, &utils).await?;
             }
             Err(e) => {
-                error!("Error fetching block: {}", e);
+                error(&format!("Error fetching block: {}", e));
             }
         }
     }
 
-    info!("Avail run completed successfully");
     Ok(())
 }
 
@@ -62,10 +62,9 @@ async fn sync_database(
 }
 
 async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
-    info!("Filtering batch calls from block");
+    debug(&format!("Filtering batch calls from block"));
 
     let all_batch_calls = block.transactions_static::<BatchAll>(Filter::new());
-    info!("Filtering batch calls from block");
 
     // Filtering
     for batch_all in all_batch_calls {
@@ -76,66 +75,65 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
         let calls = batch_all.value.calls;
         // We know that our batch calls needs to have exactly 2 transactions.
         if calls.len() != 2 {
-            info!("Skipping batch with {} calls (expected 2)", calls.len());
+            info(&format!(
+                "Skipping batch with {} calls (expected 2)",
+                calls.len()
+            ));
             continue;
         }
 
         // Balance/Transfer Call
         let RuntimeCall::Balances(balances_call) = &calls[0] else {
-            info!("First call is not a Balances call, skipping");
+            info(&format!("First call is not a Balances call, skipping"));
             continue;
         };
         let TransferKeepAlive { dest, value } = balances_call else {
-            info!("Balances call is not TransferKeepAlive, skipping");
+            info(&format!("Balances call is not TransferKeepAlive, skipping"));
             continue;
         };
 
         // System/Remark call
         let RuntimeCall::System(system_call) = &calls[1] else {
-            info!("Second call is not a System call, skipping");
+            info(&format!("Second call is not a System call, skipping"));
             continue;
         };
 
         let RemarkWithEvent { remark } = system_call else {
-            info!("System call is not RemarkWithEvent, skipping");
+            info(&format!("System call is not RemarkWithEvent, skipping"));
             continue;
         };
 
         let MultiAddress::Id(acc) = dest else {
-            info!("Destination is not an Id address, skipping");
+            info(&format!("Destination is not an Id address, skipping"));
             continue;
         };
 
         let acc_string = std::format!("{}", acc);
         let ascii_remark = block::to_ascii(remark.clone()).unwrap();
-        info!(
-            "Found matching batch call - Destination: {}, Value: {}, Remark: {:?}",
-            acc_string, value, ascii_remark
-        );
+        debug_json(json!({
+            "message": "Found matching batch call",
+            "destination": acc_string,
+            "value": value,
+            "remark": ascii_remark,
+            "level": "debug"
+        }));
 
         let mut connection = utils.establish_connection()?;
 
-        match utils
+        utils
             .update_finalised_block_number(number as i32, hash, &mut connection, 0)
             .await
-        {
-            Ok(_) => {
-                info!("Updated finalised block number: {}", number);
-            }
-            Err(e) => {
-                error!("Failed to update finalised block number: {}", e);
-            }
-        }
+            .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
         let receipt = Deposit {
-            user_id: ascii_remark,
-            token_address: "0x0000000000000000000000000000000000000000".to_string(),
+            token_address: "0x0000000000000000000000000000000000000000".to_string(), // todo: fix
             amount: value.to_string(),
-            from: account,
+            _from: account,
         };
 
         utils
             .update_database_on_deposit(
+                &ascii_remark,
                 &receipt,
                 &tx_hash,
                 &mut connection,
@@ -143,6 +141,10 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
                 &"Processed".to_string(),
             )
             .await
+            .map_err(|e| {
+                error(&format!("Failed to update database on deposit: {}", e));
+                format!("Failed to update database on deposit: {}", e)
+            })?;
     }
 
     Ok(())

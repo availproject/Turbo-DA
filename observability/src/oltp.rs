@@ -93,7 +93,7 @@ pub fn init_meter<T: Into<Value>>(service_name: T) {
 
 pub fn boolean_env(env_name: &'static str) -> bool {
     env::var(env_name)
-        .unwrap_or("false".to_string())
+        .unwrap_or("true".to_string())
         .parse()
         .unwrap_or_else(|_| panic!("{} must be a boolean", env_name))
 }

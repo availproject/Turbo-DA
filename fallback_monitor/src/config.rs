@@ -2,10 +2,10 @@
 /// Checks presence of `config.toml`
 /// Else checks environment variables to populate Application Configurations
 use dotenv::dotenv;
-use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io};
 use toml;
+use turbo_da_core::logger::{error, info, warn};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
@@ -15,6 +15,7 @@ pub struct AppConfig {
     pub avail_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
+    pub limit: i64,
 }
 
 impl Default for AppConfig {
@@ -26,6 +27,7 @@ impl Default for AppConfig {
             avail_rpc_endpoint: vec![],
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
+            limit: 10,
         }
     }
 }
@@ -38,15 +40,15 @@ impl AppConfig {
             return Ok(config);
         }
 
-        info!("Trying to read from environment variables");
+        info(&format!("Trying to read from environment variables"));
 
         match self.load_from_env() {
             Ok(config) => Ok(config),
             Err(env_error) => {
-                error!(
+                error(&format!(
                     "Couldn't load configuration: TOML error, and ENVIRONMENT error: {:?}",
                     env_error
-                );
+                ));
                 Err(io::Error::new(
                     io::ErrorKind::Other,
                     "Couldn't fetch configuration from either TOML file or environment variables",
@@ -61,7 +63,7 @@ impl AppConfig {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn!("Failed to read file: {:?}", e);
+            warn(&format!("Failed to read file: {:?}", e));
             e.to_string()
         })?;
 
@@ -70,7 +72,7 @@ impl AppConfig {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                warn!("Coudln't read from TOML File");
+                warn(&format!("Coudln't read from TOML File"));
                 Err(e.into())
             }
         }
@@ -81,6 +83,7 @@ impl AppConfig {
         let private_key = env::var("PRIVATE_KEY")?;
         let mut avail_rpc_endpoint = Vec::new();
         let mut index = 1;
+
         while let Ok(endpoint) = env::var(format!("AVAIL_RPC_ENDPOINT_{}", index)) {
             avail_rpc_endpoint.push(endpoint);
             index += 1;
@@ -88,6 +91,10 @@ impl AppConfig {
         let retry_count = env::var("RETRY_COUNT")?;
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
+        let limit = env::var("LIMIT")?.parse::<i64>()?;
+
+        info(&format!("Config loaded from environment variables"));
+
         Ok(AppConfig {
             database_url,
             private_key,
@@ -95,6 +102,7 @@ impl AppConfig {
             avail_rpc_endpoint,
             coingecko_api_url,
             coingecko_api_key,
+            limit,
         })
     }
 }

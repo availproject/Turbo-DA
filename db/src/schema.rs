@@ -1,5 +1,15 @@
 // @generated automatically by Diesel CLI.
 
+pub mod sql_types {
+    #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "assigned_credits_log"))]
+    pub struct AssignedCreditsLog;
+
+    #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "fallback_status"))]
+    pub struct FallbackStatus;
+}
+
 diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
@@ -9,6 +19,31 @@ diesel::table! {
         user_id -> Varchar,
         #[max_length = 255]
         identifier -> Varchar,
+        app_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::FallbackStatus;
+    use super::sql_types::AssignedCreditsLog;
+
+    apps (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        app_id -> Int4,
+        app_name -> Nullable<Varchar>,
+        app_description -> Nullable<Varchar>,
+        app_logo -> Nullable<Varchar>,
+        credit_balance -> Numeric,
+        credit_used -> Numeric,
+        fallback_credit_used -> Numeric,
+        fallback_enabled -> Bool,
+        fallback_updated_at -> Nullable<Array<Nullable<FallbackStatus>>>,
+        assigned_credits_logs -> Nullable<Array<Nullable<AssignedCreditsLog>>>,
+        metadata_path -> Nullable<Varchar>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -16,7 +51,7 @@ diesel::table! {
     credit_requests (id) {
         id -> Int4,
         user_id -> Varchar,
-        amount_credit -> Numeric,
+        amount_credit -> Nullable<Numeric>,
         chain_id -> Nullable<Int4>,
         #[max_length = 50]
         request_status -> Varchar,
@@ -24,6 +59,10 @@ diesel::table! {
         tx_hash -> Nullable<Varchar>,
         #[max_length = 50]
         request_type -> Varchar,
+        app_id -> Nullable<Uuid>,
+        updated_at -> Timestamp,
+        #[max_length = 255]
+        token_address -> Nullable<Varchar>,
     }
 }
 
@@ -44,6 +83,8 @@ diesel::table! {
         retry_count -> Int4,
         error -> Nullable<Varchar>,
         payload -> Nullable<Bytea>,
+        updated_at -> Timestamp,
+        app_id -> Uuid,
     }
 }
 
@@ -61,18 +102,23 @@ diesel::table! {
     users (id) {
         id -> Varchar,
         name -> Varchar,
-        app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,
+        allocated_credit_balance -> Numeric,
     }
 }
 
+diesel::joinable!(api_keys -> apps (app_id));
 diesel::joinable!(api_keys -> users (user_id));
+diesel::joinable!(apps -> users (user_id));
+diesel::joinable!(credit_requests -> apps (app_id));
 diesel::joinable!(credit_requests -> users (user_id));
+diesel::joinable!(customer_expenditures -> apps (app_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     api_keys,
+    apps,
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
