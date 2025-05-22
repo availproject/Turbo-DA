@@ -1,4 +1,4 @@
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 pub fn warn(message: &String) {
     warn!(
