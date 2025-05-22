@@ -2,6 +2,7 @@ mod avail;
 mod config;
 mod evm;
 mod utils;
+
 use avail::run;
 use config::Config;
 use config::Network;
@@ -9,6 +10,7 @@ use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::ds
 use diesel::prelude::*;
 use diesel::PgConnection;
 use evm::EVM;
+use observability::{init_meter, init_tracer};
 use serde_json::json;
 use std::sync::Arc;
 use turbo_da_core::logger::{debug, debug_json, error, info};
@@ -22,6 +24,9 @@ async fn main() {
             return;
         }
     };
+
+    init_tracer("funds_monitor");
+    init_meter("funds_monitor");
 
     let cfg_ref = Arc::new(cfg);
     let cfg_ref_2 = cfg_ref.clone();

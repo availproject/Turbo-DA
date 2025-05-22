@@ -50,6 +50,7 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use logger::{info, warn};
+use observability::init_tracer;
 use routes::health::health_check;
 
 #[actix_web::main]
@@ -57,6 +58,8 @@ async fn main() -> Result<(), std::io::Error> {
     info(&"Starting API server....".to_string());
 
     let app_config = AppConfig::default().load_config()?;
+    init_tracer("turbo-da-core");
+
     let port = app_config.port;
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);

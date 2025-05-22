@@ -7,10 +7,12 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::Auth;
+use config::AppConfig;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use observability::{init_meter, init_tracer};
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
@@ -20,6 +22,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use turbo_da_core::logger::info;
 use turbo_da_core::utils::generate_keygen_list;
+use workload_scheduler::consumer::Consumer;
+
 mod auth;
 mod config;
 mod redis;
@@ -27,17 +31,14 @@ mod routes;
 mod utils;
 mod workload_scheduler;
 
-use config::AppConfig;
-use observability::init_meter;
-use workload_scheduler::consumer::Consumer;
-
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     info(&format!("Starting Data Submission server...."));
 
-    init_meter("data_submission");
-
     let app_config = AppConfig::default().load_config()?;
+
+    init_meter("data_submission");
+    init_tracer("data_submission");
 
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;

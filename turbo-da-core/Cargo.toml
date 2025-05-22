@@ -49,9 +49,10 @@ cron = { version = "0.8", optional = true }
 toml = { workspace = true }
 confy = {version = "0.3.1"}
 db = {path = "../db" }
+observability = { path = "../observability" }
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
-
+tracing = {workspace=true}
 
 [dev-dependencies]
 actix-http = "3.9.0"
