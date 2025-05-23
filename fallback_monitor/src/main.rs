@@ -2,7 +2,6 @@ use avail_rust::SDK;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
-use diesel_async::{AsyncConnection, AsyncPgConnection};
 use monitor::monitor::monitor_failed_transactions;
 use observability::{init_meter, init_tracer};
 use std::str::FromStr;
@@ -11,8 +10,11 @@ use tokio::{
     self,
     time::{self, sleep, Duration},
 };
-use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::create_keypair;
+use turbo_da_core::{
+    logger::{error, info},
+    utils::generate_keygen_list,
+};
 
 mod config;
 mod monitor;
@@ -49,7 +51,7 @@ async fn main() {
 
     let mut interval = schedule.upcoming(Utc);
 
-    let keypair = create_keypair(&app_config.private_key);
+    let keypair = generate_keygen_list(app_config.limit as i32, &app_config.private_keys).await;
 
     while let Some(next_time) = interval.next() {
         let now = Utc::now();
@@ -65,11 +67,9 @@ async fn main() {
         ));
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
-        let mut connection = AsyncPgConnection::establish(&app_config.database_url)
-            .await
-            .expect("Failed to connect to db");
+
         monitor_failed_transactions(
-            &mut connection,
+            &app_config.database_url,
             &sdk,
             &keypair,
             app_config.retry_count,
