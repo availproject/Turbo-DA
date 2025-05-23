@@ -19,7 +19,7 @@ use db::{
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use observability::log_txn;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -54,52 +54,122 @@ impl Consumer {
 
     pub async fn start_workers(&self) {
         let number_of_threads = self.number_of_threads;
+        let (heartbeat_tx, mut heartbeat_rx) =
+            tokio::sync::mpsc::channel::<i32>(number_of_threads as usize * 3);
 
         for i in 0..number_of_threads {
             let injected_dependency = self.injected_dependency.clone();
             let keygen = self.keypair.clone();
-            let mut receiver = self.sender.subscribe();
-
-            info(&format!("Spawning thread number {}", i));
+            let sender = self.sender.clone();
             let arc_endpoints = self.endpoints.clone();
+            let heartbeat_tx = heartbeat_tx.clone();
 
-            std::thread::spawn(move || {
-                let runtime = match tokio::runtime::Runtime::new() {
-                    Ok(runtime) => runtime,
-                    Err(e) => {
-                        error(&format!("Failed to create runtime: {}", e));
-                        return;
-                    }
-                };
+            self.spawn_thread(
+                i,
+                sender,
+                keygen,
+                injected_dependency,
+                arc_endpoints,
+                heartbeat_tx,
+            )
+            .await;
+        }
 
-                let endpoints = arc_endpoints.clone();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            info(&format!(
+                "Checking for any threads that are not responding..."
+            ));
+            let mut active_threads = HashMap::<i32, bool>::new();
+            for i in 0..number_of_threads {
+                active_threads.insert(i, false);
+            }
+            while let Ok(thread_id) = heartbeat_rx.try_recv() {
+                info(&format!("Received heartbeat for thread {}", thread_id));
+                active_threads.insert(thread_id, true);
+            }
 
-                runtime.block_on(async move {
-                    while let Ok(response) = receiver.recv().await {
-                        if &response.thread_id != &i {
-                            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-                            continue;
-                        }
+            for (thread_id, is_active) in active_threads {
+                if !is_active {
+                    error(&format!(
+                        "Thread {} not responding, restarting...",
+                        thread_id
+                    ));
+                    let injected_dependency = self.injected_dependency.clone();
+                    let keygen = self.keypair.clone();
+                    let sender = self.sender.clone();
+                    let arc_endpoints = self.endpoints.clone();
+                    let heartbeat_tx = heartbeat_tx.clone();
 
-                        let result = response_handler(
-                            &response,
-                            &injected_dependency,
-                            &endpoints,
-                            &keygen,
-                            i,
-                        )
-                        .await;
+                    self.spawn_thread(
+                        thread_id,
+                        sender,
+                        keygen,
+                        injected_dependency,
+                        arc_endpoints,
+                        heartbeat_tx,
+                    )
+                    .await;
+                }
+            }
+        }
+    }
 
-                        if let Err(e) = result {
-                            log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                            error(&format!("Failed to process response: {}", e));
-                        }
+    pub async fn spawn_thread(
+        &self,
+        i: i32,
+        sender: Sender<Response>,
+        keypair: web::Data<Vec<Keypair>>,
+        injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+        endpoints: Arc<Vec<String>>,
+        heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
+    ) {
+        std::thread::spawn(move || {
+            info(&format!("Spawning thread number {}", i));
 
-                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let endpoints = endpoints.clone();
+
+            let runtime = match tokio::runtime::Runtime::new() {
+                Ok(runtime) => runtime,
+                Err(e) => {
+                    error(&format!("Failed to create runtime: {}", e));
+                    return;
+                }
+            };
+            let mut receiver = sender.subscribe();
+            let injected_dependency = injected_dependency.clone();
+            let keygen = keypair.clone();
+            let heartbeat_tx = heartbeat_tx.clone();
+
+            runtime.block_on(async move {
+                tokio::spawn(async move {
+                    info(&format!("Sending heartbeat for thread {}", i));
+                    let mut interval = tokio::time::interval(Duration::from_secs(120));
+                    loop {
+                        interval.tick().await;
+                        let _ = heartbeat_tx.send(i).await;
                     }
                 });
+
+                while let Ok(response) = receiver.recv().await {
+                    if &response.thread_id != &i {
+                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        continue;
+                    }
+
+                    let result =
+                        response_handler(&response, &injected_dependency, &endpoints, &keygen, i)
+                            .await;
+
+                    if let Err(e) = result {
+                        log_txn(&response.submission_id.to_string(), response.thread_id, &e);
+                        error(&format!("Failed to process response: {}", e));
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
             });
-        }
+        });
     }
 }
 
