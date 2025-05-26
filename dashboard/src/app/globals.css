@@ -15,6 +15,7 @@
   --color-grey: #62768c;
   --color-grey-600: #c3c3c3;
   --color-error: #ff7360;
+  --color-font-error: #cb6262;
   --color-darker-blue: #091b2b;
   --color-dark-blue: #100c14;
   --color-border-grey: #444753;
@@ -23,7 +24,7 @@
   --color-bg-primary: #0d2335;
   --color-bg-secondary: #141b29;
   --color-button-light-blue: #2677c8;
-
+  --color-border-secondary: #151723;
   --shadow-primary: 0px 4.37px 96.133px -17.479px #13161e;
   --shadow-secondary-tab: 0px 0px 74.76px #ffffff;
   --shadow-primary-button: 0px 0px 200px 0px rgba(60, 163, 252, 0.4);

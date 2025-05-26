@@ -1,23 +1,18 @@
+"use client";
+import Button from "@/components/button";
+import { Text } from "@/components/text";
 import { turboDADocLink } from "@/lib/constant";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { Text } from ".//text";
-import Button from "./button";
+import WalletsMenu from "./components/wallets-menu";
 
-async function Header() {
+function Header() {
   return (
     <header className="sticky top-0 z-2 w-full h-18 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-6 flex items-center justify-between">
       <div className="flex gap-x-3 items-center">
         <Image alt="Avail logo" src="/logo.svg" width={110} height={32} />
-        <Text
-          size={"xs"}
-          weight={"semibold"}
-          className="border border-border-button rounded-full px-3 h-[26px] flex justify-center items-center pt-px text-white/80"
-        >
-          Mainnet
-        </Text>
       </div>
       <div className="flex items-center justify-between gap-x-6 h-full">
         <Link
@@ -31,6 +26,7 @@ async function Header() {
           <ArrowUpRight size={20} color="#FFFFFF" />
         </Link>
         <SignedIn>
+          <WalletsMenu />
           <UserButton />
         </SignedIn>
         <SignedOut>

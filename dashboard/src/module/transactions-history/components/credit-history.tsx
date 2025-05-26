@@ -7,10 +7,11 @@ import { SignedIn, SignInButton } from "@clerk/clerk-react";
 import { SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Button from "../button";
-import DynamicTable from "../data-table";
-import { Text } from "../text";
-import { Skeleton } from "../ui/skeleton";
+
+import Button from "@/components/button";
+import DynamicTable from "@/components/data-table";
+import { Text } from "@/components/text";
+import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "./empty-state";
 
 const CreditHistory = ({ token }: { token?: string }) => {
@@ -32,6 +33,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
       // );
       setHistoryList(response?.data ?? []);
     } catch (error) {
+      console.log(error);
       setHistoryList([]);
     } finally {
       setLoading(false);

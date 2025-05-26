@@ -58,30 +58,36 @@ const DynamicTable: FC<DynamicTableProps> = ({
         {listdata.length > 0 ? (
           listdata.map((data, index) => (
             <div
+              className="relative w-full h-[50px] rounded-lg mb-4"
               key={index}
-              className="flex justify-between rounded-lg mb-4 border bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary border-border-grey overflow-hidden z-1 relative"
             >
-              <div className="bg-[url('/table-row-noise.png')] bg-no-repeat absolute h-[50px] opacity-80 w-full z-0" />
-              {headings.map((heading, index, array) => (
-                <div
-                  key={heading.key}
-                  className={cn(
-                    "flex min-w-[150px] relative",
-                    array.length - 1 === index ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {renderCell?.(
-                    heading.key,
-                    data[heading.key],
-                    array.length - 1 === index
-                  ) ??
-                    defaultRenderCell(
-                      heading.key,
-                      data[heading.key],
-                      array.length - 1 === index
-                    )}
+              <div className="absolute w-full h-full rounded-lg bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
+                <div className="flex justify-between rounded-lg bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] shadow-primary overflow-hidden z-1 relative">
+                  <div className="bg-[url('/table-row-noise.png')] bg-no-repeat absolute h-[50px] opacity-80 w-full z-0" />
+                  {headings.map((heading, index, array) => (
+                    <div
+                      key={heading.key}
+                      className={cn(
+                        "flex min-w-[150px] relative",
+                        array.length - 1 === index
+                          ? "justify-end"
+                          : "justify-start"
+                      )}
+                    >
+                      {renderCell?.(
+                        heading.key,
+                        data[heading.key],
+                        array.length - 1 === index
+                      ) ??
+                        defaultRenderCell(
+                          heading.key,
+                          data[heading.key],
+                          array.length - 1 === index
+                        )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           ))
         ) : (

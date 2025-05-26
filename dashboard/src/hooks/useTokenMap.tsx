@@ -6,7 +6,7 @@ const useTokenMap = () => {
       label: "AVAIL",
       icon: (
         <Image
-          src={"/avail-icon.ico"}
+          src={"/avail-icon.svg"}
           alt="avail logo"
           width={18}
           height={18}

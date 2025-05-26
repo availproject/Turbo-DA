@@ -43,9 +43,13 @@ export const formatInKB = (bytes: number) => {
   };
 };
 
-export const truncateToFixed = (num: number, decimals = 2) => {
+export const truncateToFixed = (num: number, decimals = 4) => {
   const factor = Math.pow(10, decimals);
   return (Math.floor(num * factor) / factor).toFixed(decimals);
+};
+
+export const truncateAddress = (address: string): string => {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 };
 
 export const formatInBytes = (bytes: number) => bytes * 1024;

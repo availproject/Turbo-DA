@@ -1,6 +1,6 @@
+import { Text } from "@/components/text";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { ReactNode } from "react";
-import { Text } from "../text";
 
 type EmptyStateProps = {
   message?: string;

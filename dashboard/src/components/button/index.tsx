@@ -15,6 +15,8 @@ export const buttonVariants = cva("cursor-pointer", {
         "bg-[#13334F] rounded-full w-full text-base font-semibold text-white/40 cursor-not-allowed h-12",
       ghost: "inline-flex justify-center items-center has-[>svg]:p-1",
       danger: "w-full h-12 bg-[#CB62623D] hover:bg-[#CB62623D]/90 rounded-full",
+      outline:
+        "border data-[state=active]:border-blue data-[state=active]:bg-[#3ca3fc3d] rounded-lg data-[state=inactive]:border-border-blue data-[state=inactive]:bg-[#2b47613d] w-full h-12 py-2 px-4",
       link: "text-light-grey underline",
     },
   },
