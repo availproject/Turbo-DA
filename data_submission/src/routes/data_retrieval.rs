@@ -5,11 +5,8 @@ use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::{
     get_customer_expenditure_by_submission_id, handle_submission_info,
 };
-use db::{
-    models::customer_expenditure::CustomerExpenditureGet, schema::customer_expenditures::dsl::*,
-};
-use diesel::{prelude::*, result::Error};
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use diesel::result::Error;
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
