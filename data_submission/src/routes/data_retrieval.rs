@@ -2,7 +2,9 @@ use crate::config::AppConfig;
 use actix_web::{get, web, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
-use db::controllers::customer_expenditure::handle_submission_info;
+use db::controllers::customer_expenditure::{
+    get_customer_expenditure_by_submission_id, handle_submission_info,
+};
 use db::{
     models::customer_expenditure::CustomerExpenditureGet, schema::customer_expenditures::dsl::*,
 };
@@ -73,17 +75,16 @@ pub async fn get_pre_image(
         }
     };
 
-    match customer_expenditures
-        .filter(id.eq(submission_id))
-        .select(CustomerExpenditureGet::as_select())
-        .first::<CustomerExpenditureGet>(&mut connection)
-        .await
-    {
+    match get_customer_expenditure_by_submission_id(&mut connection, submission_id).await {
         Ok(sub) => {
             debug(&format!(
                 "Found expenditure for submission ID: {:?}",
                 submission_id
             ));
+            if sub.payload.is_some() {
+                return HttpResponse::Ok().body(sub.payload.unwrap());
+            }
+
             if sub.extrinsic_index.is_none() || sub.block_hash.is_none() {
                 return HttpResponse::NotImplemented()
                     .body("Customer Expenditure found but tx isn't finalised yet.");

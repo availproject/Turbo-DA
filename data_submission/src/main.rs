@@ -20,8 +20,7 @@ use routes::{
 };
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use turbo_da_core::logger::info;
-use turbo_da_core::utils::generate_keygen_list;
+use turbo_da_core::{logger::info, utils::generate_keygen_list};
 use workload_scheduler::consumer::Consumer;
 
 mod auth;

@@ -1,5 +1,7 @@
 use crate::{
-    models::customer_expenditure::{CreateCustomerExpenditure, CustomerExpenditureGet},
+    models::customer_expenditure::{
+        CreateCustomerExpenditure, CustomerExpenditureGet, CustomerExpenditureGetWithPayload,
+    },
     schema::customer_expenditures::dsl::*,
 };
 use bigdecimal::BigDecimal;
@@ -143,6 +145,17 @@ pub async fn create_customer_expenditure_entry(
             );
         }
     };
+}
+
+pub async fn get_customer_expenditure_by_submission_id(
+    connection: &mut AsyncPgConnection,
+    submission_id: Uuid,
+) -> Result<CustomerExpenditureGetWithPayload, Error> {
+    customer_expenditures
+        .filter(id.eq(submission_id))
+        .select(CustomerExpenditureGetWithPayload::as_select())
+        .first::<CustomerExpenditureGetWithPayload>(connection)
+        .await
 }
 
 /// Retrieves all expenditure entries for a specific user
