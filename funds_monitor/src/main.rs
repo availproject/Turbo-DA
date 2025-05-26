@@ -77,7 +77,10 @@ async fn monitor(network_config: Network, cfg: Arc<Config>) -> Result<(), String
 
     let finalised_block_number =
         query_finalised_block_number(network_config.chain_id, &mut connection);
-
+    info(&format!(
+        "Finalised block number: {}, chain id: {}",
+        finalised_block_number.block_number, network_config.chain_id
+    ));
     drop(connection);
 
     let mut evm = EVM::new(

@@ -82,10 +82,7 @@ impl Utils {
             ))
             .returning(CreditRequestsGet::as_returning())
             .get_result::<CreditRequestsGet>(&mut *connection)
-            .map_err(|e| {
-                error(&format!("Couldn't store fund request: {:?}", e));
-                format!("Failed to store fund request: {}", e)
-            })?;
+            .map_err(|e| format!("Failed to store fund request: {}", e))?;
 
         info(&format!("Success: {} status: {}", order_id, status));
         self.update_token_information_on_deposit(&amount, &row.user_id, connection)
