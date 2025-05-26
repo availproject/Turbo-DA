@@ -57,9 +57,9 @@ async fn main() -> Result<(), std::io::Error> {
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
     let consumer_server = Consumer::new(
-        sender.clone(),
-        shared_keypair.clone(),
-        shared_pool.clone(),
+        Arc::new(sender.clone()),
+        Arc::new(shared_keypair.clone()),
+        Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
         app_config.number_of_threads,
     );

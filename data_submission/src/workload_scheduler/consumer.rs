@@ -28,18 +28,18 @@ use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
-    sender: Sender<Response>,
-    keypair: web::Data<Vec<Keypair>>,
-    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    sender: Arc<Sender<Response>>,
+    keypair: Arc<web::Data<Vec<Keypair>>>,
+    injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
     number_of_threads: i32,
 }
 
 impl Consumer {
     pub fn new(
-        sender: Sender<Response>,
-        keypair: web::Data<Vec<Keypair>>,
-        injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+        sender: Arc<Sender<Response>>,
+        keypair: Arc<web::Data<Vec<Keypair>>>,
+        injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
         number_of_threads: i32,
     ) -> Self {
@@ -118,9 +118,9 @@ impl Consumer {
     pub async fn spawn_thread(
         &self,
         i: i32,
-        sender: Sender<Response>,
-        keypair: web::Data<Vec<Keypair>>,
-        injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+        sender: Arc<Sender<Response>>,
+        keypair: Arc<web::Data<Vec<Keypair>>>,
+        injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
     ) {
