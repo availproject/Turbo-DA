@@ -13,9 +13,13 @@ use opentelemetry_sdk::{
 use std::{env, io::stdout, time::Duration};
 use tracing::Level;
 use tracing_subscriber::{
-    fmt::{self, writer::MakeWriterExt},
+    fmt::{
+        self,
+        format::{Format, Json, JsonFields},
+        writer::MakeWriterExt,
+    },
     prelude::*,
-    Registry,
+    EnvFilter, Registry,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -54,7 +58,8 @@ fn otel_exporter() -> TonicExporterBuilder {
 pub fn init_tracer<T: Into<Value>>(service_name: T) {
     let stdout_layer = boolean_env("ENABLE_STDOUT_LOGGING")
         .then(|| Layer::default().with_writer(stdout.with_max_level(log_level_env("LOG_LEVEL"))));
-
+    let env_filter = EnvFilter::from_default_env().add_directive(log_level_env("LOG_LEVEL").into());
+    let fmt_layer: Layer<Registry, JsonFields, Format<Json>> = fmt::Layer::default().json();
     let otel_layer = if boolean_env("ENABLE_OTEL_TRACING") {
         let batch_config = BatchConfigBuilder::default()
             .with_max_queue_size(1000000)
@@ -75,7 +80,11 @@ pub fn init_tracer<T: Into<Value>>(service_name: T) {
         None
     };
 
-    let subscriber = Registry::default().with(otel_layer).with(stdout_layer);
+    let subscriber = Registry::default()
+        .with(fmt_layer)
+        .with(otel_layer)
+        .with(env_filter)
+        .with(stdout_layer);
     tracing::subscriber::set_global_default(subscriber).expect("Сould not set default for tracer");
 }
 
