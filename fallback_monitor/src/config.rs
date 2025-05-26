@@ -10,7 +10,7 @@ use turbo_da_core::logger::{error, info, warn};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
-    pub private_key: String,
+    pub private_keys: Vec<String>,
     pub retry_count: i32,
     pub avail_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
@@ -22,7 +22,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             database_url: String::new(),
-            private_key: String::new(),
+            private_keys: Vec::new(),
             retry_count: 0,
             avail_rpc_endpoint: vec![],
             coingecko_api_url: String::new(),
@@ -80,7 +80,6 @@ impl AppConfig {
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL")?;
-        let private_key = env::var("PRIVATE_KEY")?;
         let mut avail_rpc_endpoint = Vec::new();
         let mut index = 1;
 
@@ -92,12 +91,18 @@ impl AppConfig {
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
         let limit = env::var("LIMIT")?.parse::<i64>()?;
+        let mut private_keys = Vec::new();
+        let mut index = 0;
+        while let Ok(key) = env::var(format!("PRIVATE_KEY_{}", index)) {
+            private_keys.push(key);
+            index += 1;
+        }
 
         info(&format!("Config loaded from environment variables"));
 
         Ok(AppConfig {
             database_url,
-            private_key,
+            private_keys,
             retry_count: retry_count.parse::<i32>().unwrap(),
             avail_rpc_endpoint,
             coingecko_api_url,
