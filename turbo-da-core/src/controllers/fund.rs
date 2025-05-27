@@ -233,6 +233,12 @@ struct GetAllFundRequestsParams {
 /// * 200 OK with a list of fund transactions if successful
 /// * 500 Internal Server Error if database errors occur
 ///
+/// # Example Request
+/// ```bash
+/// curl -X GET "https://api.example.com/v1/admin/get_all_fund_requests?limit=10&user_id=user@example.com" \
+///      -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+/// ```
+///
 /// # Example Response
 /// ```json
 /// {
@@ -278,12 +284,59 @@ pub async fn get_all_fund_requests(
     }
 }
 
+/// Request payload for funding a user's account
+///
+/// # Description
+/// Parameters required to fund a user's account with credits
+///
+/// # Example Request
+/// ```bash
+/// curl -X POST "https://api.example.com/v1/admin/fund_user" \
+///      -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+///      -H "Content-Type: application/json" \
+///      -d '{
+///        "user_id": "user@example.com",
+///        "amount": "100.00"
+///      }'
+/// ```
 #[derive(Deserialize, Serialize, Clone)]
 pub struct FundUserParams {
+    /// The ID of the user to fund
     pub user_id: String,
+    /// The amount of credits to add to the user's account
     pub amount: BigDecimal,
 }
 
+/// Fund a user's account with credits
+///
+/// # Description
+/// This endpoint allows admins to add credits to a user's account
+///
+/// # Route
+/// `POST /v1/admin/fund_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication (requires admin privileges)
+/// * `Content-Type: application/json`
+///
+/// # Request Body
+/// * `user_id` - The ID of the user to fund
+/// * `amount` - The amount of credits to add
+///
+/// # Returns
+/// JSON response indicating success or failure
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Funds Granted Successfully",
+///   "data": {
+///     "user_id": "user@example.com",
+///     "amount": "100.00"
+///   }
+/// }
+/// ```
 #[post("/fund_user")]
 pub async fn fund_user(
     payload: web::Json<FundUserParams>,

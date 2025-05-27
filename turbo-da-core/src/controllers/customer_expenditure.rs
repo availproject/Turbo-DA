@@ -153,17 +153,41 @@ struct ResetRetryCountParams {
 /// # Route
 /// `POST /v1/user/reset_retry_count`
 ///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+/// * `Content-Type: application/json`
+///
 /// # Request Body
 /// ```json
 /// {
 ///   "retry_count": 0,
-///   "app_id": "optional-uuid"
+///   "app_id": "optional-uuid",
+///   "expenditure_id": "optional-uuid"
 /// }
+/// ```
+///
+/// # Example Request
+/// ```bash
+/// curl -X POST "https://api.example.com/v1/user/reset_retry_count" \
+///      -H "Authorization: Bearer YOUR_TOKEN" \
+///      -H "Content-Type: application/json" \
+///      -d '{
+///        "retry_count": 0,
+///        "app_id": "123e4567-e89b-12d3-a456-426614174000"
+///      }'
 /// ```
 ///
 /// # Returns
 /// * Success: 200 OK with success message
 /// * Error: 500 Internal Server Error with error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Retry count reset successfully"
+/// }
+/// ```
 #[post("/reset_retry_count")]
 pub async fn reset_retry_count(
     payload: web::Json<ResetRetryCountParams>,
