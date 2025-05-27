@@ -858,3 +858,235 @@ curl -X GET "https://api.example.com/v1/user/get_fund_list" \
   ]
 }
 ```
+
+### Admin Endpoints
+
+These endpoints are restricted to users with admin privileges. All requests require admin-level authentication via a bearer token.
+
+#### 1. GET /v1/admin/get_all_users
+
+Retrieve details about all users in the system.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+- **Query Parameters**:
+  - `limit` (optional): The limit of users to query
+  - `user_id` (optional): Filter users by specific user ID
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/admin/get_all_users?limit=10&user_id=user@example.com" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Users retrieved successfully",
+  "data": [
+    {
+      "id": "user1@example.com",
+      "name": "User One",
+      "credit_balance": "100.00",
+      "credit_used": "25.50",
+      "allocated_credit_balance": "200.00"
+    }
+  ]
+}
+```
+
+#### 2. GET /v1/admin/get_all_apps
+
+Retrieve details about all application accounts in the system.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+- **Query Parameters**:
+  - `user_id` (optional): Filter apps by user ID
+  - `app_id` (optional): Filter by specific app ID
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/admin/get_all_apps?user_id=user@example.com" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Apps retrieved successfully",
+  "data": [
+    {
+      "id": "uuid-string",
+      "user_id": "user@example.com",
+      "app_id": 1001,
+      "credit_balance": "25.00",
+      "credit_used": "5.50",
+      "fallback_enabled": true,
+      "app_name": "My Application",
+      "app_description": "Description of my application",
+      "app_logo": "https://example.com/logo.png",
+      "metadata_path": "path/to/metadata",
+      "created_at": "2024-01-01T12:00:00Z",
+      "updated_at": "2024-01-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+#### 3. GET /v1/admin/get_all_fund_requests
+
+Retrieve all fund requests across all users.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+- **Query Parameters**:
+  - `limit` (optional): Limit the number of results
+  - `user_id` (optional): Filter by user ID
+  - `app_id` (optional): Filter by app ID
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/admin/get_all_fund_requests?limit=10&user_id=user@example.com" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Fund list retrieved successfully",
+  "data": [
+    {
+      "id": "uuid-string",
+      "user_id": "user@example.com",
+      "chain_id": 1,
+      "amount_credit": "100.00",
+      "request_status": "PENDING",
+      "request_type": "DEPOSIT",
+      "tx_hash": null,
+      "created_at": "2024-03-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 4. POST /v1/admin/fund_user
+
+Fund a user's account with credits.
+
+- **Method**: `POST`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+  - `Content-Type: application/json`
+- **Body Parameters**:
+  - `user_id` (required): The ID of the user to fund
+  - `amount` (required): The amount of credits to add
+
+**Example Request:**
+
+```bash
+curl -X POST "https://api.example.com/v1/admin/fund_user" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "user_id": "user@example.com",
+           "amount": "100.00"
+         }'
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Funds Granted Successfully",
+  "data": {
+    "user_id": "user@example.com",
+    "amount": "100.00"
+  }
+}
+```
+
+#### 5. GET /v1/admin/indexer_status
+
+Retrieve the current status of the indexer service.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/admin/indexer_status" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Indexer status retrieved successfully",
+  "data": {
+    "status": "RUNNING",
+    "last_block_processed": 12345,
+    "last_processed_at": "2024-03-20T10:00:00Z"
+  }
+}
+```
+
+#### 6. POST /v1/admin/reset_retry_count
+
+Reset the retry count for customer expenditures.
+
+- **Method**: `POST`
+- **Headers**:
+  - `Authorization: Bearer <token>` (requires admin privileges)
+  - `Content-Type: application/json`
+- **Body Parameters**:
+  - `retry_count` (required): The new retry count value
+  - `app_id` (optional): UUID of the app to reset retry count for
+  - `expenditure_id` (optional): UUID of specific expenditure to reset
+
+**Example Request:**
+
+```bash
+curl -X POST "https://api.example.com/v1/admin/reset_retry_count" \
+     -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "retry_count": 0,
+           "app_id": "optional-uuid",
+           "expenditure_id": "optional-uuid"
+         }'
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Retry count reset successfully"
+}
+```
+
+**Notes for Admin Endpoints:**
+
+- All admin endpoints require a valid admin-level bearer token
+- Unauthorized access attempts will result in a 401 Unauthorized response
+- These endpoints are intended for system administration and monitoring purposes
+- Exercise caution when using these endpoints as they can affect system-wide operations
+- The admin role is verified through the JWT token's "role" claim, which must be "admin"

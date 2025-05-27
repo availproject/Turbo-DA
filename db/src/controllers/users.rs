@@ -16,11 +16,17 @@ pub struct TxParams {
 
 pub async fn get_all_users(
     connection: &mut AsyncPgConnection,
-    final_limit: i64,
+    user_id: &Option<String>,
+    limit: &Option<i64>,
 ) -> Result<Vec<User>, String> {
-    let result = users
-        .limit(final_limit)
-        .select(User::as_select())
+    let mut query = users.select(User::as_select()).into_boxed();
+    if let Some(user_id) = user_id {
+        query = query.filter(id.eq(user_id));
+    }
+    if let Some(limit) = limit {
+        query = query.limit(*limit);
+    }
+    let result = query
         .load(&mut *connection)
         .await
         .map_err(|e| e.to_string())?;
@@ -72,4 +78,18 @@ pub async fn user_exists(
         .await
         .map_err(|e| e.to_string())?;
     Ok(query)
+}
+
+pub async fn fund_user(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    amount: &BigDecimal,
+) -> Result<User, String> {
+    let result = diesel::update(users.filter(id.eq(user)))
+        .set(credit_balance.eq(credit_balance + amount))
+        .returning(User::as_returning())
+        .get_result(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(result)
 }
