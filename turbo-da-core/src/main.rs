@@ -156,7 +156,6 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })
@@ -204,7 +203,6 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })

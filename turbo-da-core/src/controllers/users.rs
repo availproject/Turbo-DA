@@ -119,21 +119,16 @@ pub(crate) struct UpdateAppID {
 #[get("/get_all_users")]
 pub async fn get_all_users(
     payload: web::Query<GetAllUsersParams>,
-    config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let limit = payload.limit;
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let final_limit = match limit {
-        Some(l) => l,
-        None => config.total_users_query_limit,
-    };
     let results =
-        db::controllers::users::get_all_users(&mut connection, &payload.user_id, final_limit).await;
+        db::controllers::users::get_all_users(&mut connection, &payload.user_id, &payload.limit)
+            .await;
 
     HttpResponse::Ok().json(json!({
         "state": "SUCCESS",

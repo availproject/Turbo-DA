@@ -141,6 +141,7 @@ pub async fn get_expenditure_by_time_range(
 struct ResetRetryCountParams {
     retry_count: i32,
     app_id: Option<Uuid>,
+    expenditure_id: Option<Uuid>,
 }
 
 /// Resets the retry count for all customer expenditures
@@ -173,7 +174,14 @@ pub async fn reset_retry_count(
         Err(response) => return response,
     };
 
-    match handle_reset_retry_count(&mut connection, &payload.app_id, &payload.retry_count).await {
+    match handle_reset_retry_count(
+        &mut connection,
+        &payload.app_id,
+        &payload.retry_count,
+        &payload.expenditure_id,
+    )
+    .await
+    {
         Ok(_) => HttpResponse::Ok().json(json!({
             "state": "SUCCESS",
             "message": "Retry count reset successfully"
