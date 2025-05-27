@@ -2,10 +2,10 @@ use crate::{
     config::AppConfig,
     utils::{get_connection, retrieve_user_id_from_jwt},
 };
-use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDateTime;
 use db::controllers::customer_expenditure::{
-    handle_get_all_expenditure, handle_get_expenditure_by_time_range,
+    handle_get_all_expenditure, handle_get_expenditure_by_time_range, handle_reset_retry_count,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
@@ -134,5 +134,53 @@ pub async fn get_expenditure_by_time_range(
     match handle_get_expenditure_by_time_range(&mut connection, &user, request_payload.start_date, request_payload.end_date, &request_payload.app_id).await {
         Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct ResetRetryCountParams {
+    retry_count: i32,
+    app_id: Option<Uuid>,
+}
+
+/// Resets the retry count for all customer expenditures
+///
+/// # Description
+/// This endpoint allows administrators to reset the retry count for all customer expenditures.
+/// This is useful when there is a need to reprocess all transactions that have failed due to temporary issues.
+///
+/// # Route
+/// `POST /v1/user/reset_retry_count`
+///
+/// # Request Body
+/// ```json
+/// {
+///   "retry_count": 0,
+///   "app_id": "optional-uuid"
+/// }
+/// ```
+///
+/// # Returns
+/// * Success: 200 OK with success message
+/// * Error: 500 Internal Server Error with error message
+#[post("/reset_retry_count")]
+pub async fn reset_retry_count(
+    payload: web::Json<ResetRetryCountParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    match handle_reset_retry_count(&mut connection, &payload.app_id, &payload.retry_count).await {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Retry count reset successfully"
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string()
+        })),
     }
 }

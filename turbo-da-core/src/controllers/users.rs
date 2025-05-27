@@ -42,6 +42,7 @@ use validator::Validate;
 #[derive(Deserialize, Serialize)]
 struct GetAllUsersParams {
     limit: Option<i64>,
+    user_id: Option<String>,
 }
 
 /// Request payload for user registration
@@ -121,7 +122,7 @@ pub async fn get_all_users(
     config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let limit = payload.into_inner().limit;
+    let limit = payload.limit;
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -131,13 +132,81 @@ pub async fn get_all_users(
         Some(l) => l,
         None => config.total_users_query_limit,
     };
-    let results = db::controllers::users::get_all_users(&mut connection, final_limit).await;
+    let results =
+        db::controllers::users::get_all_users(&mut connection, &payload.user_id, final_limit).await;
 
     HttpResponse::Ok().json(json!({
         "state": "SUCCESS",
         "message": "Users retrieved successfully",
         "data": results,
     }))
+}
+
+/// Query parameters for retrieving apps with optional limit
+#[derive(Deserialize, Serialize)]
+struct GetAllAppsParams {
+    limit: Option<i64>,
+    user_id: Option<String>,
+    app_id: Option<Uuid>,
+}
+
+/// Retrieves all apps for the authenticated user
+///
+/// # Description
+/// Gets a list of all applications associated with the authenticated user.
+///
+/// # Route
+/// `GET /v1/user/get_apps`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Returns
+/// JSON response containing the list of apps or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Apps retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "app_id": 1001,
+///       "credit_balance": "25.00",
+///       "credit_used": "5.50",
+///       "fallback_enabled": true
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_all_apps")]
+pub async fn get_all_apps(
+    payload: web::Query<GetAllAppsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let apps =
+        db::controllers::apps::get_all_apps(&mut connection, &payload.user_id, &payload.app_id)
+            .await;
+
+    match apps {
+        Ok(apps) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Apps retrieved successfully",
+            "data": apps,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
 }
 
 /// Retrieves details for the authenticated user

@@ -296,3 +296,30 @@ pub async fn get_did_fallback_resolved(
         Err(_) => false,
     }
 }
+
+pub async fn handle_reset_retry_count(
+    connection: &mut AsyncPgConnection,
+    app: &Option<Uuid>,
+    retry: &i32,
+) -> Result<(), String> {
+    let result = match app {
+        Some(app) => {
+            diesel::update(customer_expenditures.filter(app_id.eq(app)))
+                .set(retry_count.eq(retry))
+                .execute(connection)
+                .await
+        }
+        None => {
+            diesel::update(customer_expenditures)
+                .set(retry_count.eq(retry))
+                .execute(connection)
+                .await
+        }
+    }
+    .map_err(|e| e.to_string());
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}

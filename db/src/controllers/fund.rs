@@ -4,6 +4,7 @@ use crate::{
 };
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use uuid::Uuid;
 
 pub async fn get_fund_status(
     user: String,
@@ -61,6 +62,27 @@ pub async fn get_fund_list(
 ) -> Result<Vec<CreditRequestInfo>, String> {
     credit_requests
         .filter(user_id.eq(user))
+        .select(CreditRequestInfo::as_select())
+        .load(&mut *connection)
+        .await
+        .map_err(|e| format!("Error loading fund list: {}", e))
+}
+
+pub async fn get_all_fund_requests(
+    user: &Option<String>,
+    app: &Option<Uuid>,
+    connection: &mut AsyncPgConnection,
+) -> Result<Vec<CreditRequestInfo>, String> {
+    let mut query = credit_requests
+        .select(CreditRequestInfo::as_select())
+        .into_boxed();
+    if let Some(user) = user {
+        query = query.filter(user_id.eq(user));
+    }
+    if let Some(app) = app {
+        query = query.filter(app_id.eq(app));
+    }
+    query
         .select(CreditRequestInfo::as_select())
         .load(&mut *connection)
         .await
