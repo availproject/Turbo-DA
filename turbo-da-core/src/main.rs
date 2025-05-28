@@ -18,10 +18,7 @@ use crate::controllers::{
     users::{get_all_users, get_user, register_new_user, update_app_id},
 };
 use actix_cors::Cors;
-use actix_extensible_rate_limit::{
-    backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
-    RateLimiter,
-};
+
 use actix_web::{
     dev::Service,
     middleware::Logger,
@@ -42,7 +39,6 @@ use controllers::{
         generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
     },
 };
-use tokio::time::Duration;
 
 use clerk_rs::{
     clerk::Clerk,
@@ -86,17 +82,6 @@ async fn main() -> Result<(), std::io::Error> {
         );
         let clerk = Clerk::new(config);
 
-        let backend = InMemoryBackend::builder().build();
-        let input = SimpleInputFunctionBuilder::new(
-            Duration::from_secs(shared_config.rate_limit_window_size),
-            shared_config.rate_limit_max_requests,
-        )
-        .custom_key("authorization")
-        .build();
-        let rate_limiter = RateLimiter::builder(backend.clone(), input)
-            .add_headers()
-            .build();
-
         App::new()
             .service(health_check)
             .wrap_fn(|req, srv| {
@@ -139,7 +124,6 @@ async fn main() -> Result<(), std::io::Error> {
                     ))
                     .service(
                         web::scope("/user")
-                            .wrap(rate_limiter)
                             .wrap_fn(|req, srv| {
                                 let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
                                 let fut = srv.call(req);
