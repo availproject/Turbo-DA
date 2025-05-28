@@ -1,15 +1,5 @@
 // @generated automatically by Diesel CLI.
 
-pub mod sql_types {
-    #[derive(diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "assigned_credits_log"))]
-    pub struct AssignedCreditsLog;
-
-    #[derive(diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "fallback_status"))]
-    pub struct FallbackStatus;
-}
-
 diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
@@ -24,10 +14,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    use diesel::sql_types::*;
-    use super::sql_types::FallbackStatus;
-    use super::sql_types::AssignedCreditsLog;
-
     apps (id) {
         id -> Uuid,
         user_id -> Varchar,
@@ -39,8 +25,6 @@ diesel::table! {
         credit_used -> Numeric,
         fallback_credit_used -> Numeric,
         fallback_enabled -> Bool,
-        fallback_updated_at -> Nullable<Array<Nullable<FallbackStatus>>>,
-        assigned_credits_logs -> Nullable<Array<Nullable<AssignedCreditsLog>>>,
         metadata_path -> Nullable<Varchar>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -85,6 +69,7 @@ diesel::table! {
         payload -> Nullable<Bytea>,
         updated_at -> Timestamp,
         app_id -> Uuid,
+        wallet -> Nullable<Bytea>,
     }
 }
 

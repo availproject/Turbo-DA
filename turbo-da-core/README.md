@@ -1048,11 +1048,11 @@ curl -X GET "https://api.example.com/v1/admin/indexer_status" \
 }
 ```
 
-#### 6. POST /v1/admin/reset_retry_count
+#### 6. PUT /v1/admin/reset_retry_count
 
 Reset the retry count for customer expenditures.
 
-- **Method**: `POST`
+- **Method**: `PUT`
 - **Headers**:
   - `Authorization: Bearer <token>` (requires admin privileges)
   - `Content-Type: application/json`
@@ -1064,7 +1064,7 @@ Reset the retry count for customer expenditures.
 **Example Request:**
 
 ```bash
-curl -X POST "https://api.example.com/v1/admin/reset_retry_count" \
+curl -X PUT "https://api.example.com/v1/admin/reset_retry_count" \
      -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{

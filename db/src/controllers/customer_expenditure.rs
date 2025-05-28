@@ -92,6 +92,7 @@ pub async fn update_customer_expenditure(
     result: TransactionInfo,
     fees_as_bigdecimal: &BigDecimal,
     fees_as_bigdecimal_in_avail: &BigDecimal,
+    wallet_store: &Vec<u8>,
     submission_id: Uuid,
     connection: &mut AsyncPgConnection,
 ) -> Result<(), String> {
@@ -104,6 +105,7 @@ pub async fn update_customer_expenditure(
         tx_hash.eq(Some(result.tx_hash)),
         extrinsic_index.eq(Some(result.extrinsic_index as i32)),
         block_number.eq(Some(result.block_number as i32)),
+        wallet.eq(wallet_store),
         payload.eq(None::<Vec<u8>>),
         error.eq(None::<String>),
     );
@@ -331,4 +333,58 @@ pub async fn handle_reset_retry_count(
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
+}
+
+pub async fn handle_get_wallet_usage(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    app: &Uuid,
+    start_date: chrono::NaiveDateTime,
+    end_date: chrono::NaiveDateTime,
+) -> Result<Vec<CustomerExpenditureGet>, Error> {
+    customer_expenditures
+        .filter(user_id.eq(user))
+        .filter(app_id.eq(app))
+        .filter(created_at.ge(start_date))
+        .filter(created_at.le(end_date))
+        .select(CustomerExpenditureGet::as_select())
+        .load::<CustomerExpenditureGet>(&mut *connection)
+        .await
+}
+
+// todo : for migration only, remove this function after migration
+pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(), String> {
+    let list = customer_expenditures
+        .select(CustomerExpenditureGet::as_select())
+        .load::<CustomerExpenditureGet>(connection)
+        .await
+        .unwrap();
+
+    println!("list: {:?}", list.len());
+
+    for item in list.iter() {
+        if item.converted_fees.is_some() {
+            let mut wallet_store = vec![0u8; 32];
+
+            wallet_store[16..32].copy_from_slice(
+                &item
+                    .converted_fees
+                    .as_ref()
+                    .unwrap()
+                    .to_string()
+                    .parse::<i128>()
+                    .unwrap()
+                    .to_be_bytes(),
+            );
+
+            let i = diesel::update(customer_expenditures.filter(id.eq(item.id)))
+                .set(wallet.eq(wallet_store))
+                .execute(connection)
+                .await
+                .map_err(|e| e.to_string());
+
+            println!("submission id: {:?}", item.id);
+        }
+    }
+    Ok(())
 }

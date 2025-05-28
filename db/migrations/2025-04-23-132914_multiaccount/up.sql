@@ -15,7 +15,6 @@ INSERT INTO apps (
     credit_balance, 
     credit_used, 
     fallback_enabled, 
-    fallback_updated_at,
     created_at, 
     updated_at
 )
@@ -26,7 +25,6 @@ SELECT
     0,                  -- default credit_balance
     0,                  -- default credit_used
     TRUE,               -- default fallback_enabled
-    ARRAY[ROW(CURRENT_TIMESTAMP, TRUE)::fallback_status],
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP          
 FROM users;
@@ -37,12 +35,14 @@ DROP COLUMN app_id;
 
 ALTER TABLE customer_expenditures
 ADD COLUMN updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-ADD COLUMN app_id UUID;
+ADD COLUMN app_id UUID,
+ADD COLUMN wallet BYTEA;
 
 UPDATE customer_expenditures
 SET app_id = apps.id
 FROM apps
 WHERE customer_expenditures.user_id = apps.user_id;
+
 
 ALTER TABLE customer_expenditures
 ADD CONSTRAINT fk_customer_expenditure_app_id FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE ON UPDATE CASCADE;

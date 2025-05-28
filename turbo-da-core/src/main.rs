@@ -30,7 +30,7 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
-    customer_expenditure::{get_expenditure_by_time_range, reset_retry_count},
+    customer_expenditure::{get_expenditure_by_time_range, get_wallet_usage, reset_retry_count},
     file::{download_file, upload_file},
     fund::{
         add_inclusion_details, estimate_credits_against_size, estimate_credits_against_token,
@@ -74,6 +74,11 @@ async fn main() -> Result<(), std::io::Error> {
         .expect("Failed to create pool");
 
     let shared_pool = web::Data::new(pool);
+
+    let mut connection = shared_pool.get().await.unwrap();
+    db::controllers::customer_expenditure::update_wallet_store(&mut connection)
+        .await
+        .unwrap();
 
     let shared_config = web::Data::new(app_config);
 
@@ -183,7 +188,8 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(get_fund_list)
                             .service(reclaim_credits)
                             .service(estimate_credits_against_token)
-                            .service(add_inclusion_details),
+                            .service(add_inclusion_details)
+                            .service(get_wallet_usage),
                     )
                     .service(
                         web::scope("/admin")

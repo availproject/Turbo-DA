@@ -2,10 +2,11 @@ use crate::{
     config::AppConfig,
     utils::{get_connection, retrieve_user_id_from_jwt},
 };
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
-use chrono::NaiveDateTime;
+use actix_web::{get, put, web, HttpRequest, HttpResponse, Responder};
+use chrono::{DateTime, Datelike, NaiveDateTime};
 use db::controllers::customer_expenditure::{
-    handle_get_all_expenditure, handle_get_expenditure_by_time_range, handle_reset_retry_count,
+    handle_get_all_expenditure, handle_get_expenditure_by_time_range, handle_get_wallet_usage,
+    handle_reset_retry_count,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
@@ -151,7 +152,7 @@ struct ResetRetryCountParams {
 /// This is useful when there is a need to reprocess all transactions that have failed due to temporary issues.
 ///
 /// # Route
-/// `POST /v1/user/reset_retry_count`
+/// `PUT /v1/user/reset_retry_count`
 ///
 /// # Headers
 /// * `Authorization: Bearer <token>` - JWT token for authentication
@@ -168,7 +169,7 @@ struct ResetRetryCountParams {
 ///
 /// # Example Request
 /// ```bash
-/// curl -X POST "https://api.example.com/v1/user/reset_retry_count" \
+/// curl -X PUT "https://api.example.com/v1/user/reset_retry_count" \
 ///      -H "Authorization: Bearer YOUR_TOKEN" \
 ///      -H "Content-Type: application/json" \
 ///      -d '{
@@ -188,7 +189,7 @@ struct ResetRetryCountParams {
 ///   "message": "Retry count reset successfully"
 /// }
 /// ```
-#[post("/reset_retry_count")]
+#[put("/reset_retry_count")]
 pub async fn reset_retry_count(
     payload: web::Json<ResetRetryCountParams>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
@@ -214,5 +215,81 @@ pub async fn reset_retry_count(
             "state": "ERROR",
             "error": e.to_string()
         })),
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct GetWalletUsageParams {
+    app_id: Uuid,
+    pub start_date: i64, // UTC timestamp in seconds
+    pub end_date: i64,   // UTC timestamp in seconds
+}
+
+#[get("/get_wallet_usage")]
+pub async fn get_wallet_usage(
+    params: web::Query<GetWalletUsageParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "state": "ERROR", "error": "User Id not retrieved" }))
+        }
+    };
+
+    let start_date = match DateTime::from_timestamp(params.start_date, 0) {
+        Some(date) => date.naive_utc(),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "state": "ERROR", "error": "Invalid start date" }))
+        }
+    };
+
+    let end_date = match DateTime::from_timestamp(params.end_date, 0) {
+        Some(date) => date.naive_utc(),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "state": "ERROR", "error": "Invalid end date" }))
+        }
+    };
+    match handle_get_wallet_usage(&mut connection, &user, &params.app_id, start_date, end_date)
+        .await
+    {
+        Ok(response) => {
+            let wallet_usage: Vec<(i128, i128)> =
+                response
+                    .iter()
+                    .fold(vec![(0i128, 0i128); 12], |mut acc, item| {
+                        if let Some(wallet) = &item.wallet {
+                            let month = item.created_at.month() as usize - 1; // 0-based index
+                            let fallback = acc[month].0
+                                + i128::from_be_bytes(
+                                    wallet[0..16].try_into().unwrap_or_else(|_| [0; 16]),
+                                );
+                            let credit = acc[month].1
+                                + i128::from_be_bytes(
+                                    wallet[16..32].try_into().unwrap_or_else(|_| [0; 16]),
+                                );
+                            acc[month] = (fallback, credit);
+                        }
+                        acc
+                    });
+
+            let data = json!({
+                "wallet_usage": wallet_usage,
+                "list": response
+            });
+
+            HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Wallet usage retrieved successfully", "data": data}))
+        }
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "state": "ERROR", "error": e.to_string() })),
     }
 }
