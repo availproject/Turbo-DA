@@ -16,7 +16,7 @@ const AvailChainConnect = () => {
       }
       onClick={() => {
         setSelectedChain(availChain.avail);
-        setSelectedToken(undefined);
+        setSelectedToken(availChain.avail.tokens[0]);
       }}
     >
       <div className="flex gap-x-2 items-center">
