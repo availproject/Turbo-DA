@@ -132,7 +132,6 @@ pub async fn update_app_account(
             app_description.eq(&payload.app_description),
             app_logo.eq(&payload.app_logo),
             fallback_enabled.eq(&payload.fallback_enabled),
-            fallback_updated_at.eq(&payload.fallback_updated_at),
         ))
         .execute(connection)
         .await

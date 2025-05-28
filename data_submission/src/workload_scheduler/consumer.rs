@@ -19,7 +19,7 @@ use db::{
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use observability::log_txn;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -288,16 +288,64 @@ impl<'a> ProcessSubmitResponse<'a> {
         tx_params: TxParams,
     ) -> Result<(), String> {
         let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
+        let (billed_from_credit, billed_from_fallback) =
+            if account.credit_balance >= BigDecimal::from(0) {
+                if tx_params.amount_data_billed > account.credit_balance {
+                    (
+                        account.credit_balance.clone(),
+                        &tx_params.amount_data_billed - &account.credit_balance,
+                    )
+                } else {
+                    (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
+                }
+            } else {
+                (BigDecimal::from(0), tx_params.amount_data_billed.clone())
+            };
+
+        println!("billed_from_fallback: {}", billed_from_fallback);
+        println!("billed_from_credit: {}", billed_from_credit);
+
+        // Convert BigDecimal values to u64 and create wallet store
+        let fallback_u64 = billed_from_fallback
+            .round(0)
+            .to_string()
+            .parse::<i128>()
+            .unwrap_or(0);
+        let credit_u64 = billed_from_credit
+            .round(0)
+            .to_string()
+            .parse::<i128>()
+            .unwrap_or(0);
+
+        let mut wallet_store = vec![0u8; 32];
+        wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
+        wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
+
+        let retrieve_original_fallback =
+            i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
+        let retrieve_original_credit =
+            i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
+
+        println!("retrieve_original_fallback: {}", retrieve_original_fallback);
+        println!("retrieve_original_credit: {}", retrieve_original_credit);
 
         update_customer_expenditure(
             result,
             &fees_as_bigdecimal,
             &tx_params.amount_data_billed,
+            &wallet_store,
             self.response.submission_id,
             self.connection,
         )
         .await?;
-        update_credit_balance(self.connection, &account, &tx_params).await?;
+        update_credit_balance(
+            self.connection,
+            &account,
+            &tx_params,
+            &billed_from_credit,
+            &billed_from_fallback,
+        )
+        .await?;
 
         Ok(())
     }

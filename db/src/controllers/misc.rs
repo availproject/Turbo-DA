@@ -1,9 +1,7 @@
 use crate::{
     models::{
-        apps::{Apps, AssignedCreditsLog},
-        customer_expenditure::CustomerExpenditureGetWithPayload,
-        indexer::IndexerBlockNumbers,
-        user_model::User,
+        apps::Apps, customer_expenditure::CustomerExpenditureGetWithPayload,
+        indexer::IndexerBlockNumbers, user_model::User,
     },
     schema::{
         apps::dsl as apps, customer_expenditures::dsl as customer_expenditures,
@@ -55,20 +53,9 @@ pub async fn update_credit_balance(
     connection: &mut AsyncPgConnection,
     app: &Apps,
     tx_params: &TxParams,
+    billed_from_credit: &BigDecimal,
+    billed_from_fallback: &BigDecimal,
 ) -> Result<(), String> {
-    let (billed_from_credit, billed_from_fallback) = if app.credit_balance >= BigDecimal::from(0) {
-        if tx_params.amount_data_billed > app.credit_balance {
-            (
-                app.credit_balance.clone(),
-                &tx_params.amount_data_billed - &app.credit_balance,
-            )
-        } else {
-            (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
-        }
-    } else {
-        (BigDecimal::from(0), tx_params.amount_data_billed.clone())
-    };
-
     diesel::update(apps::apps.filter(apps::id.eq(&app.id)))
         .set((
             apps::credit_balance.eq(apps::credit_balance - &billed_from_credit),
@@ -84,7 +71,7 @@ pub async fn update_credit_balance(
             )
         })?;
 
-    if &billed_from_fallback > &BigDecimal::from(0) {
+    if billed_from_fallback > &BigDecimal::from(0) {
         diesel::update(users::users.filter(users::id.eq(&app.user_id)))
             .set((
                 users::credit_balance.eq(users::credit_balance - &billed_from_fallback),
@@ -173,24 +160,12 @@ pub async fn allocate_credit_balance(
         return Err("Insufficient balance".to_string());
     }
 
-    let app_obj = get_app_by_id(connection, user, account_id).await?;
-
     diesel::update(
         apps::apps
             .filter(apps::id.eq(account_id))
             .filter(apps::user_id.eq(user)),
     )
-    .set((
-        apps::credit_balance.eq(apps::credit_balance + amount),
-        apps::assigned_credits_logs.eq(apps::assigned_credits_logs.concat(Some(vec![Some(
-            AssignedCreditsLog::new(
-                app_obj.credit_balance,
-                app_obj.credit_used,
-                amount.clone(),
-                chrono::Utc::now(),
-            ),
-        )]))),
-    ))
+    .set((apps::credit_balance.eq(apps::credit_balance + amount),))
     .execute(connection)
     .await
     .map_err(|e| e.to_string())?;
