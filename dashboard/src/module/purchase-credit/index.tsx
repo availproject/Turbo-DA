@@ -24,7 +24,7 @@ import { ApiPromise } from "avail-js-sdk";
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
-import { err, ok, Result } from "neverthrow";
+import { err, ok } from "neverthrow";
 import {
   MouseEvent,
   useCallback,
@@ -309,7 +309,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     account: WalletAccount,
     atomicAmount: string,
     remarkMessage: string
-  ): Promise<Result<TransactionStatus, Error>> {
+  ) {
     try {
       const injector = getWalletBySource(account.source);
       const options: Partial<LegacySignerOptions> = {

@@ -15,8 +15,8 @@ interface ConfigContextType {
   fetchToken: () => void;
   selectedChain: Chain;
   setSelectedChain: Dispatch<SetStateAction<Chain>>;
-  setSelectedToken: Dispatch<SetStateAction<Token>>;
-  selectedToken: Token;
+  setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;
+  selectedToken?: Token;
   transactionStatusList: TransactionStatus[];
   setTransactionStatusList: Dispatch<SetStateAction<TransactionStatus[]>>;
   showTransaction?: TransactionStatus;
@@ -61,7 +61,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
     name: "Ethereum",
     icon: "/currency/eth.png",
   });
-  const [selectedToken, setSelectedToken] = useState<Token>({
+  const [selectedToken, setSelectedToken] = useState<Token | undefined>({
     name: "ETH",
     icon: "/currency/eth.png",
   });

@@ -1,8 +1,5 @@
-import { ISubmittableResult, Signer } from "@polkadot/types/types";
-import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
+import { Signer } from "@polkadot/types/types";
 import { base, baseSepolia, mainnet, sepolia } from "@wagmi/core/chains";
-import { ApiPromise } from "avail-js-sdk";
-import { err, ok, Result } from "neverthrow";
 
 type TransactionStatus = {
   status: "success" | "failed";
@@ -165,56 +162,3 @@ export const chainToAddresses = (chain: Chain) => {
       throw new Error(`Unsupported chain: ${chain}`);
   }
 };
-
-export async function transfer(
-  atomicAmount: string,
-  account: WalletAccount,
-  api: ApiPromise
-): Promise<Result<TransactionStatus, Error>> {
-  try {
-    const injector = getWalletBySource(account.source);
-
-    const options = {
-      signer: injector?.signer,
-      app_id: 0,
-    } as Partial<LegacySignerOptions>;
-
-    const txResult = await new Promise<ISubmittableResult>((resolve) => {
-      api.tx.balances
-        .transferKeepAlive(
-          chainToAddresses(Chain.AVAIL).liquidityBridgeAddress,
-          atomicAmount
-        )
-        .signAndSend(account.address, options, (result: ISubmittableResult) => {
-          console.log(`Tx status: ${result.status}`);
-          if (result.isInBlock || result.isError) {
-            resolve(result);
-          }
-        });
-    });
-
-    const error = txResult.dispatchError;
-    if (txResult.isError) {
-      return err(new Error(`Transaction failed with error: ${error}`));
-    } else if (error != undefined) {
-      if (error.isModule) {
-        const decoded = api.registry.findMetaError(error.asModule);
-        const { docs, name, section } = decoded;
-        return err(new Error(`${section}.${name}: ${docs.join(" ")}`));
-      } else {
-        return err(new Error(error.toString()));
-      }
-    }
-
-    return ok({
-      status: "success",
-      blockhash: txResult.status.asInBlock.toString(),
-      txHash: txResult.txHash.toString(),
-      txIndex: txResult.txIndex,
-    });
-  } catch (error) {
-    return err(
-      error instanceof Error ? error : new Error("Unknown error occurred")
-    );
-  }
-}
