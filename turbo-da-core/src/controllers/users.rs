@@ -1,3 +1,5 @@
+/// Logging utilities
+use crate::logger::{error, info};
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
@@ -24,8 +26,6 @@ use db::{
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-/// Logging utilities
-use log::{error, info};
 /// Redis caching functionality
 use redis::Commands;
 /// Serialization/deserialization
@@ -42,6 +42,7 @@ use validator::Validate;
 #[derive(Deserialize, Serialize)]
 struct GetAllUsersParams {
     limit: Option<i64>,
+    user_id: Option<String>,
 }
 
 /// Request payload for user registration
@@ -74,20 +75,23 @@ pub(crate) struct EditAccount {
 /// Request payload for updating a user's app ID
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct UpdateAppID {
+    /// The available app ID to be assigned
     pub avail_app_id: i32,
+    /// The UUID of the app to update
     pub app_id: Uuid,
 }
 
-/// Retrieves a list of all users with optional limit
+/// Retrieves a list of all users with optional filtering
 ///
 /// # Description
-/// Returns a list of all users in the system, with an optional limit parameter to restrict the number of results.
+/// Returns a paginated list of users in the system, with optional filtering by user ID and limit parameters.
 ///
 /// # Route
 /// `GET /v1/user/get_all_users`
 ///
 /// # Query Parameters
-/// * `limit` - Optional parameter to limit the number of users returned
+/// * `limit` - Optional parameter to limit the number of users returned (default: no limit)
+/// * `user_id` - Optional parameter to filter users by specific user ID
 ///
 /// # Returns
 /// JSON response containing a list of users or an appropriate error message
@@ -118,26 +122,100 @@ pub(crate) struct UpdateAppID {
 #[get("/get_all_users")]
 pub async fn get_all_users(
     payload: web::Query<GetAllUsersParams>,
-    config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let limit = payload.into_inner().limit;
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let final_limit = match limit {
-        Some(l) => l,
-        None => config.total_users_query_limit,
-    };
-    let results = db::controllers::users::get_all_users(&mut connection, final_limit).await;
+    let results =
+        db::controllers::users::get_all_users(&mut connection, &payload.user_id, &payload.limit)
+            .await;
 
     HttpResponse::Ok().json(json!({
         "state": "SUCCESS",
         "message": "Users retrieved successfully",
         "data": results,
     }))
+}
+
+/// Query parameters for retrieving apps with optional limit
+#[derive(Deserialize, Serialize)]
+struct GetAllAppsParams {
+    limit: Option<i64>,
+    user_id: Option<String>,
+    app_id: Option<Uuid>,
+}
+/// Retrieves all apps in the system (admin only)
+///
+/// # Description
+/// Gets a list of all applications in the system. This endpoint is restricted to admin users only.
+///
+/// # Route
+/// `GET /v1/admin/get_all_apps`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication (requires admin privileges)
+///
+/// # Query Parameters
+/// * `limit` (optional): Maximum number of apps to return
+/// * `user_id` (optional): Filter apps by user ID
+/// * `app_id` (optional): Filter apps by app ID
+///
+/// # Returns
+/// JSON response containing the list of apps or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Apps retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "app_id": 1001,
+///       "app_name": "My App",
+///       "app_description": "App description",
+///       "app_logo": "logo_url",
+///       "credit_balance": "25.00",
+///       "credit_used": "5.50",
+///       "fallback_credit_used": "0.00",
+///       "fallback_enabled": true,
+///       "metadata_path": "path/to/metadata",
+///       "created_at": "2024-01-01T12:00:00Z",
+///       "updated_at": "2024-01-01T12:00:00Z"
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_all_apps")]
+pub async fn get_all_apps(
+    payload: web::Query<GetAllAppsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let apps =
+        db::controllers::apps::get_all_apps(&mut connection, &payload.user_id, &payload.app_id)
+            .await;
+
+    match apps {
+        Ok(apps) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Apps retrieved successfully",
+            "data": apps,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
 }
 
 /// Retrieves details for the authenticated user
@@ -974,10 +1052,10 @@ async fn delete_api_key(
             match redis::Client::open(config.redis_url.clone().as_str()) {
                 Ok(mut client) => {
                     let _result: Result<(), redis::RedisError> = client.del(hashed_key);
-                    info!("Deleted API key from Redis: {}", hashed_key);
+                    info(&format!("Deleted API key from Redis: {}", hashed_key));
                 }
                 Err(e) => {
-                    error!("Error connecting to Redis: {}", e);
+                    error(&format!("Error connecting to Redis: {}", e));
                 }
             }
             return HttpResponse::Ok().json(json!({

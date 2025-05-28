@@ -2,10 +2,8 @@ use avail_rust::SDK;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
-use diesel_async::{AsyncConnection, AsyncPgConnection};
-use log::{error, info};
 use monitor::monitor::monitor_failed_transactions;
-use observability::init_meter;
+use observability::{init_meter, init_tracer};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::{
@@ -13,6 +11,10 @@ use tokio::{
     time::{self, sleep, Duration},
 };
 use turbo_da_core::utils::create_keypair;
+use turbo_da_core::{
+    logger::{error, info},
+    utils::generate_keygen_list,
+};
 
 mod config;
 mod monitor;
@@ -36,20 +38,20 @@ async fn main() {
     let app_config: AppConfig = match AppConfig::default().load_config() {
         Ok(conf) => conf,
         Err(e) => {
-            error!("Couldn't load the config. Error: {:?}", e);
+            error(&format!("Couldn't load the config. Error: {:?}", e));
             return;
         }
     };
     init_meter("fallback_service");
-
+    init_tracer("fallback_service");
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
-    info!("Cron is starting...");
+    info(&format!("Cron is starting..."));
 
     let mut interval = schedule.upcoming(Utc);
 
-    let keypair = create_keypair(&app_config.private_key);
+    let keypair = generate_keygen_list(app_config.limit as i32, &app_config.private_keys).await;
 
     while let Some(next_time) = interval.next() {
         let now = Utc::now();
@@ -59,14 +61,15 @@ async fn main() {
             time::sleep(Duration::from_secs(duration.num_seconds() as u64)).await
         }
 
-        info!("Checking Failed Transactions at {} .....", Utc::now());
+        info(&format!(
+            "Checking Failed Transactions at {} .....",
+            Utc::now()
+        ));
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
-        let mut connection = AsyncPgConnection::establish(&app_config.database_url)
-            .await
-            .expect("Failed to connect to db");
+
         monitor_failed_transactions(
-            &mut connection,
+            &app_config.database_url,
             &sdk,
             &keypair,
             app_config.retry_count,
@@ -99,19 +102,24 @@ async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
+        info(&format!("Attempting to connect endpoint: {:?}", endpoint));
         match SDK::new(endpoint).await {
             Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
+                info(&format!("Connected successfully to endpoint: {}", endpoint));
                 return sdk;
             }
             Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                error(&format!(
+                    "Failed to connect to endpoint {}: {:?}",
+                    endpoint, e
+                ));
                 attempts += 1;
             }
         }
 
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        info(&format!(
+            "All endpoints failed. Waiting 5 seconds before next retry...."
+        ));
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
 }

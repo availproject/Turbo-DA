@@ -1,5 +1,7 @@
 use crate::{
-    models::customer_expenditure::{CreateCustomerExpenditure, CustomerExpenditureGet},
+    models::customer_expenditure::{
+        CreateCustomerExpenditure, CustomerExpenditureGet, CustomerExpenditureGetWithPayload,
+    },
     schema::customer_expenditures::dsl::*,
 };
 use bigdecimal::BigDecimal;
@@ -11,6 +13,26 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use avail_utils::submit_data::TransactionInfo;
+
+pub fn error_log(message: &String) {
+    error!(
+        "{}",
+        serde_json::json!({
+            "message": message,
+            "level": "error"
+        })
+    );
+}
+
+pub fn info_log(message: &String) {
+    info!(
+        "{}",
+        serde_json::json!({
+            "message": message,
+            "level": "info"
+        })
+    );
+}
 
 /// Retrieves information about a specific customer expenditure submission
 ///
@@ -109,18 +131,31 @@ pub async fn create_customer_expenditure_entry(
         .await
     {
         Ok(_) => {
-            info!(
+            info_log(&format!(
                 "Customer Expenditure entry created {}",
                 &customer_expendire_entry.id
-            );
+            ));
         }
         Err(e) => {
-            error!(
-                "Couldn't create a new customer expenditure entry with submission id {}. Error {:?}",
-                customer_expendire_entry.id, e
+            error_log(
+                &format!(
+                    "Couldn't create a new customer expenditure entry with submission id {}. Error {:?}",
+                    customer_expendire_entry.id, e
+                )
             );
         }
     };
+}
+
+pub async fn get_customer_expenditure_by_submission_id(
+    connection: &mut AsyncPgConnection,
+    submission_id: Uuid,
+) -> Result<CustomerExpenditureGetWithPayload, Error> {
+    customer_expenditures
+        .filter(id.eq(submission_id))
+        .select(CustomerExpenditureGetWithPayload::as_select())
+        .first::<CustomerExpenditureGetWithPayload>(connection)
+        .await
 }
 
 /// Retrieves all expenditure entries for a specific user
@@ -192,10 +227,13 @@ pub async fn add_error_entry(sub_id: &Uuid, e: String, connection: &mut AsyncPgC
 
     match tx {
         Ok(_) => {
-            info!("Error logged updated for submission id {:?} ", sub_id);
+            info_log(&format!(
+                "Error logged updated for submission id {:?}",
+                sub_id
+            ));
         }
         Err(e) => {
-            error!("Couldn't insert error log value. Error: {:?}", e);
+            error_log(&format!("Couldn't insert error log value. Error: {:?}", e));
         }
     }
 }
@@ -226,16 +264,19 @@ pub async fn increase_retry_count(
     {
         Ok(size) => {
             if size == 0 {
-                error!(
+                error_log(&format!(
                     "Failed to increase retry count for entry id: {:?}",
                     entry_id
-                );
+                ));
                 return Err("Failed to increase retry count for entry id".to_string());
             }
             Ok(())
         }
         Err(e) => {
-            error!("Failed to increase retry count for entry id: {:?}", e);
+            error_log(&format!(
+                "Failed to increase retry count for entry id: {:?}",
+                e
+            ));
             return Err("Failed to increase retry count for entry id".to_string());
         }
     }
@@ -244,14 +285,50 @@ pub async fn increase_retry_count(
 pub async fn get_did_fallback_resolved(
     connection: &mut AsyncPgConnection,
     submission_id: &Uuid,
-) -> Result<bool, String> {
+) -> bool {
     match customer_expenditures
         .filter(id.eq(submission_id))
         .select(CustomerExpenditureGet::as_select())
         .first::<CustomerExpenditureGet>(connection)
         .await
     {
-        Ok(sub) => Ok(sub.tx_hash.is_some()),
-        Err(_) => Err("Failed to get did fallback resolved".to_string()),
+        Ok(sub) => sub.tx_hash.is_some(),
+        Err(_) => false,
+    }
+}
+
+pub async fn handle_reset_retry_count(
+    connection: &mut AsyncPgConnection,
+    app: &Option<Uuid>,
+    retry: &i32,
+    expenditure_id: &Option<Uuid>,
+) -> Result<(), String> {
+    let result;
+    if let Some(expenditure_id) = expenditure_id {
+        result = diesel::update(customer_expenditures.filter(id.eq(expenditure_id)))
+            .set(retry_count.eq(retry))
+            .execute(connection)
+            .await
+            .map_err(|e| e.to_string());
+    } else {
+        result = match app {
+            Some(app) => {
+                diesel::update(customer_expenditures.filter(app_id.eq(app)))
+                    .set(retry_count.eq(retry))
+                    .execute(connection)
+                    .await
+            }
+            None => {
+                diesel::update(customer_expenditures)
+                    .set(retry_count.eq(retry))
+                    .execute(connection)
+                    .await
+            }
+        }
+        .map_err(|e| e.to_string());
+    }
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
     }
 }

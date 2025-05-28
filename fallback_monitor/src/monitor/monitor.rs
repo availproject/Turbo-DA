@@ -16,9 +16,12 @@ use db::{
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
 };
 
-use diesel_async::AsyncPgConnection;
-use log::{error, info};
+use diesel_async::{
+    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    AsyncConnection, AsyncPgConnection,
+};
 use observability::{log_fallback_txn_error, log_retry_count};
+use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::{format_size, Convertor};
 
 /// Monitors and processes failed transactions from the database
@@ -33,13 +36,17 @@ use turbo_da_core::utils::{format_size, Convertor};
 /// Fetches unresolved transactions from the database and processes them
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
-    connection: &mut AsyncPgConnection,
+    connection: &String,
     client: &SDK,
-    account: &Keypair,
+    account: &Vec<Keypair>,
     retry_count: i32,
     limit: i64,
 ) {
-    let unresolved_transactions = get_unresolved_transactions(connection, retry_count, limit).await;
+    let mut connection_client = AsyncPgConnection::establish(connection)
+        .await
+        .expect("Failed to connect to db");
+    let unresolved_transactions =
+        get_unresolved_transactions(&mut connection_client, retry_count, limit).await;
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {
@@ -53,7 +60,7 @@ pub async fn monitor_failed_transactions(
             .await;
         }
         Err(_) => {
-            error!("Couldn't fetch unresolved transactions from db")
+            error(&format!("Couldn't fetch unresolved transactions from db"));
         }
     }
 }
@@ -73,107 +80,129 @@ pub async fn monitor_failed_transactions(
 /// 2. Attempts to resubmit the transaction data
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
-    connection: &mut AsyncPgConnection,
+    connection: &String,
     client: &SDK,
-    account: &Keypair,
+    account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
 ) {
-    for (customer_expenditure_details, account_details, user_details) in failed_transactions_list {
-        info!(
-            "Processing failed transaction submission id: {:?} ",
-            customer_expenditure_details.id
-        );
-        let result = increase_retry_count(customer_expenditure_details.id, connection).await;
-        if result.is_err() {
-            log_error(
-                &customer_expenditure_details.id.to_string(),
-                "Failed to increase retry count",
-            );
-            continue;
-        }
+    let db_config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(connection);
 
-        log_retry_count(
-            &customer_expenditure_details.id.to_string(),
-            customer_expenditure_details.retry_count as usize,
-        );
+    let pool: Pool<AsyncPgConnection> = Pool::builder(db_config)
+        .max_size(failed_transactions_list.len())
+        .build()
+        .expect("Failed to create pool");
 
-        if customer_expenditure_details.retry_count > retry_count {
-            log_error(
-                &customer_expenditure_details.id.to_string(),
-                "Retry count exceeded",
-            );
-            continue;
-        }
-        let Some(data) = customer_expenditure_details.payload else {
-            log_error(
-                &customer_expenditure_details.id.to_string(),
-                "No payload found for transaction id",
-            );
-            continue;
-        };
+    let pool_ref = &pool;
 
-        let convertor = Convertor::new(client, account);
-        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
-
-        if credits_used >= account_details.credit_balance {
-            if !account_details.fallback_enabled
-                || &credits_used - &account_details.credit_balance >= user_details.credit_balance
-            {
+    let futures = failed_transactions_list.into_iter().enumerate().map(
+        |(index, (customer_expenditure_details, account_details, user_details))| async move {
+            let mut connection = pool_ref.get().await.unwrap();
+            info(&format!(
+                "Processing failed transaction submission id: {:?} ",
+                customer_expenditure_details.id
+            ));
+            let result =
+                increase_retry_count(customer_expenditure_details.id, &mut connection).await;
+            if result.is_err() {
                 log_error(
                     &customer_expenditure_details.id.to_string(),
-                    "Insufficient credits for user id",
+                    "Failed to increase retry count",
                 );
-                continue;
+                return;
             }
-        }
 
-        let submit_data_class = SubmitDataAvail::new(client, account, account_details.app_id);
-        let submission = submit_data_class.submit_data(&data).await;
+            log_retry_count(
+                &customer_expenditure_details.id.to_string(),
+                customer_expenditure_details.retry_count as usize,
+            );
 
-        match submission {
-            Ok(success) => {
-                let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
+            if customer_expenditure_details.retry_count > retry_count {
+                log_error(
+                    &customer_expenditure_details.id.to_string(),
+                    "Retry count exceeded",
+                );
+                return;
+            }
+            let Some(data) = customer_expenditure_details.payload else {
+                log_error(
+                    &customer_expenditure_details.id.to_string(),
+                    "No payload found for transaction id",
+                );
+                return;
+            };
 
-                let tx_params = TxParams {
-                    amount_data: format_size(data.len()),
-                    amount_data_billed: credits_used,
-                    fees: success.gas_fee,
-                };
-                let result = update_customer_expenditure(
-                    success,
-                    &fees_as_bigdecimal,
-                    &tx_params.amount_data_billed,
-                    customer_expenditure_details.id,
-                    connection,
-                )
-                .await;
-                if result.is_err() {
+            let convertor = Convertor::new(client, &account[index]);
+            let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
+
+            if credits_used >= account_details.credit_balance {
+                if !account_details.fallback_enabled
+                    || &credits_used - &account_details.credit_balance
+                        >= user_details.credit_balance
+                {
                     log_error(
                         &customer_expenditure_details.id.to_string(),
-                        "Failed to update customer expenditure",
+                        "Insufficient credits for user id",
                     );
-                }
-                let result = update_credit_balance(connection, &account_details, &tx_params).await;
-                if result.is_err() {
-                    log_error(
-                        &customer_expenditure_details.id.to_string(),
-                        "Failed to update credit balance",
-                    );
-                    continue;
+                    return;
                 }
             }
-            Err(e) => {
-                log_error(&customer_expenditure_details.id.to_string(), &e);
+
+            let submit_data_class =
+                SubmitDataAvail::new(client, &account[index], account_details.app_id);
+            let submission = submit_data_class.submit_data(&data).await;
+
+            match submission {
+                Ok(success) => {
+                    let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
+
+                    let tx_params = TxParams {
+                        amount_data: format_size(data.len()),
+                        amount_data_billed: credits_used,
+                        fees: success.gas_fee,
+                    };
+                    let result = update_customer_expenditure(
+                        success,
+                        &fees_as_bigdecimal,
+                        &tx_params.amount_data_billed,
+                        customer_expenditure_details.id,
+                        &mut connection,
+                    )
+                    .await;
+                    if result.is_err() {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "Failed to update customer expenditure",
+                        );
+                    }
+                    let result =
+                        update_credit_balance(&mut connection, &account_details, &tx_params).await;
+                    if result.is_err() {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "Failed to update credit balance",
+                        );
+                        return;
+                    }
+                    info(&format!(
+                        "Successfully processed failed transaction submission id: {:?} ",
+                        customer_expenditure_details.id
+                    ));
+                }
+                Err(e) => {
+                    log_error(&customer_expenditure_details.id.to_string(), &e);
+                }
             }
-        }
-    }
+        },
+    );
+
+    futures::future::join_all(futures).await;
 }
 
 fn log_error(id: &str, message: &str) {
-    error!(
+    error(&format!(
         "Fallback transaction error: id {:?}, message: {:?}",
         id, message
-    );
+    ));
     log_fallback_txn_error(id, message);
 }

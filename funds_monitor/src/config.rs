@@ -1,9 +1,8 @@
 use dotenv::dotenv;
-use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, error::Error, fs};
-
 use toml;
+use turbo_da_core::logger::{error, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Network {
@@ -56,12 +55,12 @@ impl Config {
             return Ok(config);
         }
 
-        info!("Trying to read from environment variables");
+        info(&format!("Trying to read from environment variables"));
         self.load_from_env().map_err(|env_error| {
-            error!(
+            error(&format!(
                 "Failed to load configuration from environment variables: {:?}",
                 env_error
-            );
+            ));
             env_error.to_string()
         })
     }
@@ -72,7 +71,7 @@ impl Config {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn!("Failed to read file: {:?}", e);
+            warn(&format!("Failed to read file: {:?}", e));
             e.to_string()
         })?;
 
@@ -80,7 +79,7 @@ impl Config {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                error!("Couldn't parse TOML file: {:?}", e);
+                error(&format!("Couldn't parse TOML file: {:?}", e));
                 Err(e.into())
             }
         }
@@ -88,28 +87,34 @@ impl Config {
 
     fn load_from_env(&self) -> Result<Config, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL").map_err(|e| {
-            error!("Failed to get DATABASE_URL environment variable: {:?}", e);
+            error(&format!(
+                "Failed to get DATABASE_URL environment variable: {:?}",
+                e
+            ));
             e
         })?;
 
         let avail_rpc_url = env::var("AVAIL_RPC_URL").map_err(|e| {
-            error!("Failed to get AVAIL_RPC_URL environment variable: {:?}", e);
+            error(&format!(
+                "Failed to get AVAIL_RPC_URL environment variable: {:?}",
+                e
+            ));
             e
         })?;
 
         let coin_gecho_api_url = env::var("COINGECKO_API_URL").map_err(|e| {
-            error!(
+            error(&format!(
                 "Failed to get COINGECKO_API_URL environment variable: {:?}",
                 e
-            );
+            ));
             e
         })?;
 
         let coin_gecho_api_key = env::var("COINGECKO_API_KEY").map_err(|e| {
-            error!(
+            error(&format!(
                 "Failed to get COINGECKO_API_KEY environment variable: {:?}",
                 e
-            );
+            ));
             e
         })?;
 

@@ -61,6 +61,8 @@ diesel::table! {
         request_type -> Varchar,
         app_id -> Nullable<Uuid>,
         updated_at -> Timestamp,
+        #[max_length = 255]
+        token_address -> Nullable<Varchar>,
     }
 }
 

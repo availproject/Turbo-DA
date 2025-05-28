@@ -8,12 +8,13 @@ use alloy::{
     sol,
     sol_types::SolEvent,
 };
+use serde_json::json;
 
 use crate::utils::{Deposit as EvmDeposit, Utils};
 use crate::Config;
 use futures_util::stream::StreamExt;
-use log::{debug, error, info};
 use std::sync::Arc;
+use turbo_da_core::logger::{debug, debug_json, error, info_json};
 
 sol! {
     struct Encoder{bytes userID; address tokenAddress; uint256 amount; address recipient; uint256 nonce;}
@@ -69,24 +70,29 @@ impl EVM {
     }
 
     pub async fn monitor_evm_chain(&mut self) {
-        info!(
-            "Monitor service started for contract_address: {} with threshold: {}",
-            self.contract_address, self.finalised_threshold
-        );
+        info_json(json!({
+            "message": "Monitor service started",
+            "contract_address": self.contract_address,
+            "finalised_threshold": self.finalised_threshold,
+            "level": "info"
+        }));
 
         let subscription = match self.provider.subscribe_blocks().await {
             Ok(s) => s,
-            Err(e) => return error!("{}", e.to_string()),
+            Err(e) => return error(&format!("{}", e.to_string())),
         };
         let mut _stream = subscription.into_stream();
 
         while let Some(header) = _stream.next().await {
-            info!("header: {:?}", header.number);
+            info_json(json!({
+                "header": header.number,
+                "level": "info"
+            }));
             let finalised_block = header.inner.number - self.finalised_threshold;
 
             match self.check_deposits(finalised_block).await {
-                Ok(_) => debug!("Deposits checked successfully"),
-                Err(e) => error!("Failed to check deposits: {}", e),
+                Ok(_) => debug(&format!("Deposits checked successfully")),
+                Err(e) => error(&format!("Failed to check deposits: {}", e)),
             }
         }
     }
@@ -104,11 +110,19 @@ impl EVM {
             .map_err(|e| format!("Failed to get logs: {}", e))?;
         self.start_block = number + 1;
         for log in logs {
-            debug!("Log from our contract: {:?}", log.block_hash);
+            debug_json(json!({
+                "message": "Log from our contract",
+                "block_hash": log.block_hash,
+                "block_number": log.block_number,
+                "transaction_hash": log.transaction_hash,
+                "transaction_index": log.transaction_index,
+                "log_index": log.log_index,
+                "level": "debug"
+            }));
             let receipt = match self.process_deposit_event(&log) {
                 Ok(receipt) => receipt,
                 Err(e) => {
-                    error!("Failed to process deposit event: {}", e);
+                    error(&format!("Failed to process deposit event: {}", e));
                     continue;
                 }
             };
@@ -116,17 +130,17 @@ impl EVM {
             let mut connection = match self.utils.establish_connection() {
                 Ok(conn) => conn,
                 Err(e) => {
-                    error!("Failed to establish database connection: {}", e);
+                    error(&format!("Failed to establish database connection: {}", e));
                     continue;
                 }
             };
 
             let Some(number) = log.block_number else {
-                error!("Block number not found");
+                error(&format!("Block number not found"));
                 continue;
             };
             let Some(hash) = log.block_hash else {
-                error!("Block hash not found");
+                error(&format!("Block hash not found"));
                 continue;
             };
 
@@ -140,13 +154,13 @@ impl EVM {
                 )
                 .await
             {
-                error!("Failed to update finalised block number: {}", e);
+                error(&format!("Failed to update finalised block number: {}", e));
             }
 
             let tx_hash = match log.transaction_hash {
                 Some(tx_hash) => tx_hash.to_string(),
                 None => {
-                    error!("Transaction hash not found");
+                    error(&format!("Transaction hash not found"));
                     continue;
                 }
             };
@@ -168,7 +182,7 @@ impl EVM {
                 )
                 .await;
             if let Err(e) = result {
-                error!("Failed to update database: {}", e);
+                error(&format!("Failed to update database: {}", e));
             }
         }
         Ok(())

@@ -2,10 +2,12 @@ use crate::{
     models::{
         apps::{Apps, AssignedCreditsLog},
         customer_expenditure::CustomerExpenditureGetWithPayload,
+        indexer::IndexerBlockNumbers,
         user_model::User,
     },
     schema::{
-        apps::dsl as apps, customer_expenditures::dsl as customer_expenditures, users::dsl as users,
+        apps::dsl as apps, customer_expenditures::dsl as customer_expenditures,
+        indexer_block_numbers::dsl as indexer_block_numbers, users::dsl as users,
     },
 };
 use bigdecimal::BigDecimal;
@@ -238,4 +240,14 @@ pub async fn reclaim_credits(
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+pub async fn indexer_status(
+    connection: &mut AsyncPgConnection,
+) -> Result<Vec<IndexerBlockNumbers>, String> {
+    indexer_block_numbers::indexer_block_numbers
+        .select(IndexerBlockNumbers::as_select())
+        .load(connection)
+        .await
+        .map_err(|e| e.to_string())
 }

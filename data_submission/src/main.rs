@@ -7,19 +7,22 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::Auth;
+use config::AppConfig;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
+use observability::{init_meter, init_tracer};
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
     health::health_check,
 };
 use std::sync::Arc;
-use tokio::{sync::broadcast, time::Duration};
-use turbo_da_core::utils::generate_keygen_list;
+use tokio::sync::broadcast;
+use turbo_da_core::{logger::info, utils::generate_keygen_list};
+use workload_scheduler::consumer::Consumer;
+
 mod auth;
 mod config;
 mod redis;
@@ -27,17 +30,14 @@ mod routes;
 mod utils;
 mod workload_scheduler;
 
-use config::AppConfig;
-use observability::init_meter;
-use workload_scheduler::consumer::Consumer;
-
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting Data Submission server....");
-
-    init_meter("data_submission");
+    info(&format!("Starting Data Submission server...."));
 
     let app_config = AppConfig::default().load_config()?;
+
+    init_meter("data_submission");
+    init_tracer("data_submission");
 
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
@@ -56,9 +56,9 @@ async fn main() -> Result<(), std::io::Error> {
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
     let consumer_server = Consumer::new(
-        sender.clone(),
-        shared_keypair.clone(),
-        shared_pool.clone(),
+        Arc::new(sender.clone()),
+        Arc::new(shared_keypair.clone()),
+        Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
         app_config.number_of_threads,
     );

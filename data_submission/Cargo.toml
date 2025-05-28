@@ -9,7 +9,6 @@ serde.workspace = true
 tokio.workspace = true
 actix-cors.workspace = true
 serde_json.workspace = true
-log.workspace = true
 env_logger.workspace = true
 avail-rust.workspace = true
 uuid.workspace = true

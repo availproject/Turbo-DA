@@ -4,13 +4,17 @@
 /// The service generates the extrinsic and published it to Avail network.
 pub mod config;
 pub mod controllers;
+pub mod logger;
 pub mod routes;
 pub mod s3;
 pub mod utils;
 
 use crate::controllers::{
     customer_expenditure::get_all_expenditure,
-    fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
+    fund::{
+        estimate_credits, estimate_credits_for_bytes, get_all_fund_requests, get_token_map,
+        request_funds_status,
+    },
     users::{get_all_users, get_user, register_new_user, update_app_id},
 };
 use actix_cors::Cors;
@@ -26,15 +30,16 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
-    customer_expenditure::get_expenditure_by_time_range,
+    customer_expenditure::{get_expenditure_by_time_range, reset_retry_count},
     file::{download_file, upload_file},
     fund::{
         add_inclusion_details, estimate_credits_against_size, estimate_credits_against_token,
-        get_fund_list, purchase_cost, register_credit_request,
+        fund_user, get_fund_list, purchase_cost, register_credit_request,
     },
+    misc::indexer_status,
     users::{
         allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
-        generate_app_account, get_api_keys, get_apps, reclaim_credits,
+        generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
     },
 };
 use tokio::time::Duration;
@@ -48,14 +53,17 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
+use logger::{info, warn};
+use observability::init_tracer;
 use routes::health::health_check;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting API server....");
+    info(&"Starting API server....".to_string());
 
     let app_config = AppConfig::default().load_config()?;
+    init_tracer("turbo-da-core");
+
     let port = app_config.port;
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
@@ -102,7 +110,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert CSP headers");
+                        warn(&"Failed to insert CSP headers".to_string());
                     }
 
                     if let (Ok(name), Ok(value)) = (
@@ -111,7 +119,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert X-Content-Type-Options");
+                        warn(&"Failed to insert X-Content-Type-Options".to_string());
                     }
 
                     Ok(res)
@@ -148,7 +156,6 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })
@@ -196,11 +203,15 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })
-                            .service(get_all_users),
+                            .service(get_all_users)
+                            .service(get_all_apps)
+                            .service(get_all_fund_requests)
+                            .service(fund_user)
+                            .service(indexer_status)
+                            .service(reset_retry_count),
                     ),
             )
     })

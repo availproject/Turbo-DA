@@ -24,17 +24,21 @@ pub struct CreditRequestsGet {
     pub created_at: chrono::NaiveDateTime,
     pub request_type: String,
     pub tx_hash: Option<String>,
+    pub token_address: Option<String>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::credit_requests)]
 pub struct CreditRequestInfo {
+    pub id: i32,
+    pub user_id: String,
     pub amount_credit: Option<BigDecimal>,
     pub chain_id: Option<i32>,
     pub request_status: String,
     pub request_type: String,
     pub tx_hash: Option<String>,
     pub created_at: chrono::NaiveDateTime,
+    pub token_address: Option<String>,
 }
 
 #[derive(Queryable, Selectable)]

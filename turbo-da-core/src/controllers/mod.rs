@@ -3,5 +3,6 @@
 pub mod customer_expenditure;
 pub mod file;
 pub mod fund;
+pub mod misc;
 mod test;
 pub mod users;

@@ -13,10 +13,10 @@ use db::{
     models::customer_expenditure::CreateCustomerExpenditure,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
+use turbo_da_core::logger::error;
 use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
 
 /// Request payload for submitting string data
@@ -100,7 +100,7 @@ pub async fn submit_data(
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                error(&format!("couldn't connect to db with error "));
                 return;
             }
         };
@@ -188,7 +188,7 @@ pub async fn submit_raw_data(
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                error(&format!("couldn't connect to db with error "));
                 return;
             }
         };

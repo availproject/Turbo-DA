@@ -80,6 +80,24 @@ pub async fn get_app_id(connection: &mut AsyncPgConnection, app: &Uuid) -> Resul
     Ok(account.app_id)
 }
 
+pub async fn get_all_apps(
+    connection: &mut AsyncPgConnection,
+    user: &Option<String>,
+    app: &Option<Uuid>,
+) -> Result<Vec<Apps>, String> {
+    let mut query = apps.select(Apps::as_select()).into_boxed();
+    if let Some(app) = app {
+        query = query.filter(id.eq(app));
+    }
+    if let Some(user) = user {
+        query = query.filter(user_id.eq(user));
+    }
+    query
+        .load::<Apps>(connection)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 pub async fn get_apps(
     connection: &mut AsyncPgConnection,
     user: &String,

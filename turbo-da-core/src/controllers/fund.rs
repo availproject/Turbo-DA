@@ -5,22 +5,19 @@ use crate::{
         Convertor, TOKEN_MAP,
     },
 };
-use std::sync::Arc;
-
 use actix_web::{
     get, post,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-
 use avail_rust::prelude::*;
 use bigdecimal::BigDecimal;
 use db::controllers::fund::{create_credit_request, get_fund_status, update_inclusion_details};
-
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
+use uuid::Uuid;
 
 /// Parameters for registering a credit request
 ///
@@ -198,6 +195,163 @@ pub async fn get_fund_list(
         Ok(tx) => HttpResponse::Ok().json(
             json!({"state": "SUCCESS", "message": "Fund list retrieved successfully", "data": tx}),
         ),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
+        }
+    }
+}
+
+/// Query parameters for retrieving fund requests with optional filters
+#[derive(Deserialize, Serialize)]
+struct GetAllFundRequestsParams {
+    /// Optional limit on number of results to return
+    limit: Option<i64>,
+    /// Optional user ID to filter results by
+    user_id: Option<String>,
+    /// Optional app ID to filter results by
+    app_id: Option<Uuid>,
+}
+
+/// Retrieve a list of all fund transactions with optional filtering
+///
+/// # Description
+/// This endpoint retrieves fund transactions with optional filtering by user ID and app ID.
+/// The transactions are fetched from the database and returned in a structured format.
+///
+/// # Route
+/// `GET /v1/admin/get_all_fund_requests`
+///
+/// # Query Parameters
+/// * `limit` - Optional limit on number of results to return
+/// * `user_id` - Optional user ID to filter results by
+/// * `app_id` - Optional app ID to filter results by
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication (requires admin role)
+///
+/// # Returns
+/// * 200 OK with a list of fund transactions if successful
+/// * 500 Internal Server Error if database errors occur
+///
+/// # Example Request
+/// ```bash
+/// curl -X GET "https://api.example.com/v1/admin/get_all_fund_requests?limit=10&user_id=user@example.com" \
+///      -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+/// ```
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Fund list retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "chain_id": 1,
+///       "amount_credit": "100000000000000000000",
+///       "request_status": "completed",
+///       "request_type": "credit",
+///       "tx_hash": "0x123abc456def789ghi",
+///       "created_at": "2023-01-01T12:00:00Z"
+///     }
+///   ]
+/// }
+/// ```
+#[get("/get_all_fund_requests")]
+pub async fn get_all_fund_requests(
+    payload: web::Query<GetAllFundRequestsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx = db::controllers::fund::get_all_fund_requests(
+        &payload.user_id,
+        &payload.app_id,
+        &mut connection,
+    )
+    .await;
+    match tx {
+        Ok(tx) => HttpResponse::Ok().json(
+            json!({"state": "SUCCESS", "message": "Fund list retrieved successfully", "data": tx}),
+        ),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
+        }
+    }
+}
+
+/// Request payload for funding a user's account
+///
+/// # Description
+/// Parameters required to fund a user's account with credits
+///
+/// # Example Request
+/// ```bash
+/// curl -X POST "https://api.example.com/v1/admin/fund_user" \
+///      -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+///      -H "Content-Type: application/json" \
+///      -d '{
+///        "user_id": "user@example.com",
+///        "amount": "100.00"
+///      }'
+/// ```
+#[derive(Deserialize, Serialize, Clone)]
+pub struct FundUserParams {
+    /// The ID of the user to fund
+    pub user_id: String,
+    /// The amount of credits to add to the user's account
+    pub amount: BigDecimal,
+}
+
+/// Fund a user's account with credits
+///
+/// # Description
+/// This endpoint allows admins to add credits to a user's account
+///
+/// # Route
+/// `POST /v1/admin/fund_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication (requires admin privileges)
+/// * `Content-Type: application/json`
+///
+/// # Request Body
+/// * `user_id` - The ID of the user to fund
+/// * `amount` - The amount of credits to add
+///
+/// # Returns
+/// JSON response indicating success or failure
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Funds Granted Successfully",
+///   "data": {
+///     "user_id": "user@example.com",
+///     "amount": "100.00"
+///   }
+/// }
+/// ```
+#[post("/fund_user")]
+pub async fn fund_user(
+    payload: web::Json<FundUserParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let tx =
+        db::controllers::users::fund_user(&mut connection, &payload.user_id, &payload.amount).await;
+    match tx {
+        Ok(tx) => HttpResponse::Ok()
+            .json(json!({"state": "SUCCESS", "message": "Funds Granted Successfully", "data": tx})),
         Err(e) => {
             HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
         }
