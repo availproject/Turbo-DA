@@ -15,11 +15,16 @@ import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import CreditService from "@/services/credit";
+import { LegacySignerOptions } from "@/utils/web3-services";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import { ISubmittableResult } from "@polkadot/types/types";
+import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
 import { readContract, writeContract } from "@wagmi/core";
+import { ApiPromise } from "avail-js-sdk";
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
+import { err, ok, Result } from "neverthrow";
 import {
   MouseEvent,
   useCallback,
@@ -30,7 +35,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
-import { AvailWalletConnect, useApi } from "wallet-sdk";
+import { AvailWalletConnect, useApi, useAvailAccount } from "wallet-sdk-v2";
 
 export const abi: Abi = [
   {
@@ -107,6 +112,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const account = useAccount();
+  const { selected } = useAvailAccount();
   const { setOpen } = useDialog();
   const { error: errorToast } = useAppToast();
   const {
@@ -121,7 +127,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
   const { chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
-
   console.log({
     api,
   });
@@ -299,7 +304,70 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  const handleBuyCreditsByAvail = async () => {};
+  async function batchTransferAndRemark(
+    api: ApiPromise,
+    account: WalletAccount,
+    atomicAmount: string,
+    remarkMessage: string
+  ): Promise<Result<TransactionStatus, Error>> {
+    try {
+      const injector = getWalletBySource(account.source);
+      const options: Partial<LegacySignerOptions> = {
+        signer: injector?.signer,
+        app_id: 0,
+      };
+
+      const transfer = api.tx.balances.transferKeepAlive(
+        selected?.address as `0x${string}`,
+        atomicAmount
+      );
+      const remark = api.tx.system.remark(remarkMessage);
+
+      //using batchall, so in case of the transfer not being successful, remark will not be executed.
+      const batchCall = api.tx.utility.batchAll([transfer, remark]);
+      const txResult = await new Promise<ISubmittableResult>((resolve) => {
+        batchCall.signAndSend(
+          selected?.address as `0x${string}`,
+          // @ts-expect-error
+          options,
+          (result: ISubmittableResult) => {
+            console.log(`Tx status: ${result.status}`);
+            if (result.isInBlock || result.isError) {
+              resolve(result);
+            }
+          }
+        );
+      });
+
+      const error = txResult.dispatchError;
+
+      if (txResult.isError) {
+        return err(new Error(`Transaction failed with error: ${error}`));
+      } else if (error !== undefined) {
+        if (error.isModule) {
+          const decoded = api.registry.findMetaError(error.asModule);
+          const { docs, name, section } = decoded;
+          return err(new Error(`${section}.${name}: ${docs.join(" ")}`));
+        } else {
+          return err(new Error(error.toString()));
+        }
+      }
+
+      return ok({
+        status: "success",
+        blockhash: txResult.status.asInBlock?.toString() || "",
+        txHash: txResult.txHash.toString(),
+        txIndex: txResult.txIndex,
+      });
+    } catch (error) {
+      console.error("Error during batch transfer and remark:", error);
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to batch transfer and remark")
+      );
+    }
+  }
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
@@ -329,7 +397,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       weight={"medium"}
                       variant="secondary-grey"
                     >
-                      You Pay
+                      You Pay{" "}
+                      {selectedToken?.name ? `(${selectedToken.name})` : ""}
                     </Text>
                     <Input
                       className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0"
@@ -372,8 +441,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         >
                           Balance:{" "}
                           <Text as="span" size={"sm"} weight={"semibold"}>
-                            {Number(balance.data?.formatted).toFixed(4)}{" "}
-                            {balance.data?.symbol}
+                            {Number(balance.data?.formatted).toFixed(4)}
                           </Text>
                         </Text>
                       </div>
@@ -389,7 +457,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     weight={"medium"}
                     variant="secondary-grey"
                   >
-                    Amount of Credits
+                    You Receive (Credits)
                   </Text>
                   <Input
                     className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
@@ -427,7 +495,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         if (!props.isConnected) {
                           return (
                             <Button onClick={(e) => handleClick(e, props.show)}>
-                              Connect Wallet
+                              Connect EVM Wallet
                             </Button>
                           );
                         }
@@ -482,7 +550,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <AvailWalletConnect
                       connectedChildren={
                         <Button
-                          onClick={handleBuyCreditsByAvail}
+                          onClick={() =>
+                            batchTransferAndRemark(
+                              api!,
+                              selected!,
+                              parseUnits(tokenAmount, 18).toString(),
+                              "Buy Credits"
+                            )
+                          }
                           variant={
                             !selectedToken ||
                             !selectedChain ||

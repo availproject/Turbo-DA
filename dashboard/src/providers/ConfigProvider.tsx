@@ -13,10 +13,10 @@ import React, {
 interface ConfigContextType {
   token?: string;
   fetchToken: () => void;
-  selectedChain?: Chain;
-  setSelectedChain: Dispatch<SetStateAction<Chain | undefined>>;
-  setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;
-  selectedToken?: Token;
+  selectedChain: Chain;
+  setSelectedChain: Dispatch<SetStateAction<Chain>>;
+  setSelectedToken: Dispatch<SetStateAction<Token>>;
+  selectedToken: Token;
   transactionStatusList: TransactionStatus[];
   setTransactionStatusList: Dispatch<SetStateAction<TransactionStatus[]>>;
   showTransaction?: TransactionStatus;
@@ -57,8 +57,14 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
 }) => {
   const { getToken } = useAuth();
   const [token, setToken] = useState<string>(accessToken ?? "");
-  const [selectedChain, setSelectedChain] = useState<Chain>();
-  const [selectedToken, setSelectedToken] = useState<Token>();
+  const [selectedChain, setSelectedChain] = useState<Chain>({
+    name: "Ethereum",
+    icon: "/currency/eth.png",
+  });
+  const [selectedToken, setSelectedToken] = useState<Token>({
+    name: "ETH",
+    icon: "/currency/eth.png",
+  });
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
   >([]);

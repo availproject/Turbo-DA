@@ -1,6 +1,7 @@
 "use client";
 import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
+import { chainList } from "@/module/purchase-credit/utils/constant";
 import { useConfig } from "@/providers/ConfigProvider";
 import { ConnectKitButton } from "connectkit";
 import { Copy, LogOut } from "lucide-react";
@@ -41,7 +42,7 @@ const EVMWallet = () => {
                   variant={"secondary-grey"}
                   className="underline underline-offset-2"
                 >
-                  Connect Ethereum Wallet
+                  Connect EVM Wallet
                 </Text>
               </div>
             );
@@ -84,8 +85,8 @@ const EVMWallet = () => {
                       strokeWidth={2}
                       onClick={() => {
                         if (selectedChain?.name === "Ethereum") {
-                          setSelectedChain(undefined);
-                          setSelectedToken(undefined);
+                          setSelectedChain(chainList.ethereum);
+                          setSelectedToken(chainList.ethereum.tokens[0]);
                         }
                         disconnect();
                       }}

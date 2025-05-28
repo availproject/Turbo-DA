@@ -11,7 +11,6 @@ import { dark } from "@clerk/themes";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import { ToastContainer } from "react-toastify";
-import "wallet-sdk/index.css";
 import { ppmori } from "./fonts";
 import "./globals.css";
 import { Providers } from "./providers";

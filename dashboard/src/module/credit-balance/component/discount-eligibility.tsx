@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import { turboDADocLink } from "@/lib/constant";
-import { formatDataBytes } from "@/lib/utils";
+import { formatDataBytes, formatInKB } from "@/lib/utils";
 import CreditService from "@/services/credit";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -38,7 +38,7 @@ function DiscountEligibility({ token }: { token?: string }) {
 
     CreditService.creditEstimates({
       token,
-      data: debouncedValue ?? 0,
+      data: +formatInKB(debouncedValue) || 0,
     })
       .then((response) => {
         setCredits(response?.data);

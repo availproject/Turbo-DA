@@ -100,7 +100,7 @@ const DeleteAppAlert = ({
                   <Text
                     weight={"semibold"}
                     size={"lg"}
-                    className="text-[#CB6262]"
+                    // className="text-[#CB6262]"
                   >
                     Confirm
                   </Text>

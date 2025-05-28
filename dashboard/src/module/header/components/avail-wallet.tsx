@@ -1,9 +1,10 @@
 import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
+import { chainList } from "@/module/purchase-credit/utils/constant";
 import { useConfig } from "@/providers/ConfigProvider";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
-import { AvailWalletConnect, useAvailAccount } from "wallet-sdk";
+import { AvailWalletConnect, useAvailAccount } from "wallet-sdk-v2";
 
 const AvailWallet = () => {
   const { selected, selectedWallet, clearWalletState } = useAvailAccount();
@@ -33,7 +34,7 @@ const AvailWallet = () => {
                   />
                   {selected?.address && (
                     <Text weight={"semibold"}>
-                      {truncateAddress(selected?.address!)}
+                      {truncateAddress(selected?.address)}
                     </Text>
                   )}
                 </div>
@@ -44,7 +45,8 @@ const AvailWallet = () => {
                     strokeWidth={2}
                     className="cursor-pointer"
                     onClick={() =>
-                      navigator.clipboard.writeText(selected?.address!)
+                      selected?.address &&
+                      navigator.clipboard.writeText(selected?.address)
                     }
                   />
                   <LogOut
@@ -54,8 +56,8 @@ const AvailWallet = () => {
                     className="cursor-pointer"
                     onClick={() => {
                       if (selectedChain?.name === "Avail") {
-                        setSelectedChain(undefined);
-                        setSelectedToken(undefined);
+                        setSelectedChain(chainList.ethereum);
+                        setSelectedToken(chainList.ethereum.tokens[0]);
                       }
                       clearWalletState();
                     }}

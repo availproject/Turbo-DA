@@ -90,11 +90,7 @@ export default function ViewKeys({
                       className="h-8 w-[98px] flex justify-center items-center"
                       onClick={() => openDeleteAlert(apiKey)}
                     >
-                      <Text
-                        weight={"medium"}
-                        size={"sm"}
-                        className="w-[100px] text-[#CB6262]"
-                      >
+                      <Text weight={"medium"} size={"sm"} className="w-[100px]">
                         Delete
                       </Text>
                     </Button>

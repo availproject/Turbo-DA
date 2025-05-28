@@ -61,7 +61,7 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
                     weight={"semibold"}
                     variant={"grey-500"}
                   >
-                    Fee Discount Calculator
+                    Calculate Credit Consumption
                   </Text>
                 </Button>
               </div>

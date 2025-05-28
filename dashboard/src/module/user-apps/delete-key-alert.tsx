@@ -100,7 +100,7 @@ const DeleteKeyAlert = ({
                     size={24}
                   />
                 ) : (
-                  <Text weight={"semibold"} size={"lg"} variant={"error"}>
+                  <Text weight={"semibold"} size={"lg"}>
                     Confirm
                   </Text>
                 )}

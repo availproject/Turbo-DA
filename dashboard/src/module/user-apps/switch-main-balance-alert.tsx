@@ -45,9 +45,10 @@ const SwitchToMainBalanceAlert = ({
                 </Text>
               </DialogTitle>
               <Text weight={"bold"} variant={"secondary-grey"} size={"base"}>
-                You're about to disable the fallback to your main balance. Since
-                this app has already exhausted its assigned credits, it will
-                immediately stop functioning unless new credits are assigned.
+                You&apos;re about to disable the fallback to your main balance.
+                Since this app has already exhausted its assigned credits, it
+                will immediately stop functioning unless new credits are
+                assigned.
               </Text>
             </div>
 
@@ -61,7 +62,7 @@ const SwitchToMainBalanceAlert = ({
                 <Text
                   weight={"semibold"}
                   size={"lg"}
-                  className="text-[#CB6262]"
+                  // className="text-[#CB6262]"
                 >
                   Confirm
                 </Text>
