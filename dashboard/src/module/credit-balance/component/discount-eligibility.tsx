@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import { turboDADocLink } from "@/lib/constant";
-import { formatDataBytes, formatInKB } from "@/lib/utils";
+import { convertBytes, formatDataBytes, formatInKB } from "@/lib/utils";
 import CreditService from "@/services/credit";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -25,10 +25,6 @@ function DiscountEligibility({ token }: { token?: string }) {
   const debouncedValue = useDebounce(deferredQuery, 500);
   const [credits, setCredits] = useState();
   const { open, setOpen } = useDialog();
-  // const state = useFetch({
-  //   url: `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits`,
-  //   params: { data: debouncedValue },
-  // });
 
   useEffect(() => {
     if (!token) return;
@@ -58,12 +54,12 @@ function DiscountEligibility({ token }: { token?: string }) {
       };
     }
 
-    const entervalue = formatDataBytes(debouncedValue);
-
-    if (debouncedValue >= 100 * 1024) {
-      const originalCredits = credits ? formatDataBytes(credits) : entervalue;
+    if (debouncedValue >= 100) {
+      const originalCredits = credits
+        ? formatDataBytes(credits)
+        : formatDataBytes(debouncedValue);
       return {
-        size: formatDataBytes(debouncedValue),
+        size: `${convertBytes(debouncedValue)}`,
         discount: "50%",
         originalCredits,
         equivalentCredits: credits
@@ -73,8 +69,8 @@ function DiscountEligibility({ token }: { token?: string }) {
     }
 
     return {
-      size: entervalue,
-      originalCredits: entervalue,
+      size: `${convertBytes(debouncedValue)}`,
+      originalCredits: formatDataBytes(debouncedValue),
     };
   }, [debouncedValue, credits]);
 

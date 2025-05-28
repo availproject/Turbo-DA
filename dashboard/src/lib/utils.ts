@@ -54,6 +54,15 @@ export const truncateAddress = (address: string): string => {
 
 export const formatInBytes = (bytes: number) => bytes * 1024;
 
+export const convertBytes = (kb: number) => {
+  if (kb >= 1024) {
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+  } else {
+    return `${kb.toFixed(2)} KB`;
+  }
+};
+
 export const formatDataBytes = (bytes: number) => {
   const formatBytes = formatInKB(bytes);
   const kb = formatBytes.kbValue as number;
