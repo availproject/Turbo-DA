@@ -217,14 +217,59 @@ pub async fn reset_retry_count(
         })),
     }
 }
-
+/// Parameters for retrieving wallet usage statistics
 #[derive(Deserialize, Serialize)]
 struct GetWalletUsageParams {
+    /// The unique identifier of the application
     app_id: Uuid,
-    pub start_date: i64, // UTC timestamp in seconds
-    pub end_date: i64,   // UTC timestamp in seconds
+    /// Start date in UTC timestamp (seconds)
+    pub start_date: i64,
+    /// End date in UTC timestamp (seconds)
+    pub end_date: i64,
 }
 
+/// Retrieves wallet usage statistics for a given time period
+///
+/// # Description
+/// This endpoint returns monthly wallet usage statistics including fallback and credit usage
+/// for the specified application within the given date range.
+///
+/// # Route
+/// `GET /v1/user/get_wallet_usage?app_id={app_id}&start_date={start_date}&end_date={end_date}`
+///
+/// # Query Parameters
+/// * `app_id` - UUID of the application
+/// * `start_date` - Start date as UTC timestamp in seconds
+/// * `end_date` - End date as UTC timestamp in seconds
+///
+/// # Returns
+/// * Success: JSON response with monthly wallet usage statistics
+/// * Error: 500 status code with error message if parameters are invalid or database access fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "data": {
+///     "list": [...],
+///     "wallet_usage": [
+///       [100, 200],  // January: [fallback_usage, credit_usage]
+///       [150, 250],  // February
+///       [200, 300],  // March
+///       [250, 350],  // April
+///       [300, 400],  // May
+///       [350, 450],  // June
+///       [400, 500],  // July
+///       [450, 550],  // August
+///       [500, 600],  // September
+///       [550, 650],  // October
+///       [600, 700],  // November
+///       [650, 750]   // December
+///     ]
+///   },
+///   "message": "Wallet usage retrieved successfully",
+///   "state": "SUCCESS"
+/// }
+/// ```
 #[get("/get_wallet_usage")]
 pub async fn get_wallet_usage(
     params: web::Query<GetWalletUsageParams>,

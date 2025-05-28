@@ -464,9 +464,54 @@ curl -X PUT "https://api.example.com/v1/user/update_app_id" \
 }
 ```
 
+#### 13. GET /v1/user/get_wallet_usage
+
+Retrieve wallet usage statistics for a given time period.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>`
+- **URL Parameters**:
+  - `app_id` (required): UUID of the application
+  - `start_date` (required): Start date as UTC timestamp in seconds
+  - `end_date` (required): End date as UTC timestamp in seconds
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/user/get_wallet_usage?app_id=uuid-string&start_date=1709251200&end_date=1711929600" \
+     -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Wallet usage retrieved successfully",
+  "data": {
+    "list": [...],
+    "wallet_usage": [
+      [100, 200],
+      [150, 250],
+      [200, 300],
+      [250, 350],
+      [300, 400],
+      [350, 450],
+      [400, 500],
+      [450, 550],
+      [500, 600],
+      [550, 650],
+      [600, 700],
+      [650, 750]
+    ]
+  }
+}
+```
+
 ### Customer Expenditure Endpoints
 
-#### 13. GET /v1/user/get_all_expenditure
+#### 14. GET /v1/user/get_all_expenditure
 
 Retrieve all expenditure records for an authenticated customer.
 
@@ -512,7 +557,7 @@ curl -X GET "https://api.example.com/v1/user/get_all_expenditure?limit=10" \
 }
 ```
 
-#### 14. GET /v1/user/get_expenditure_by_time_range
+#### 15. GET /v1/user/get_expenditure_by_time_range
 
 Retrieve expenditure records for an authenticated customer within a specified time range.
 
@@ -568,7 +613,7 @@ curl -X GET "https://api.example.com/v1/user/get_expenditure_by_time_range?start
 
 ### File Management Endpoints
 
-#### 15. POST /v1/user/upload_file
+#### 16. POST /v1/user/upload_file
 
 Upload a file to S3-compatible storage.
 
@@ -596,7 +641,7 @@ curl -X POST "https://api.example.com/v1/user/upload_file" \
 }
 ```
 
-#### 16. GET /v1/user/download_file
+#### 17. GET /v1/user/download_file
 
 Download a file from S3-compatible storage.
 
@@ -625,7 +670,7 @@ curl -X GET "https://api.example.com/v1/user/download_file?key=64a5b3c2-1234-567
 
 ### Fund Management Endpoints
 
-#### 17. POST /v1/user/register_credit_request
+#### 18. POST /v1/user/register_credit_request
 
 Register a new credit request for a specific blockchain.
 
@@ -675,7 +720,7 @@ curl -X POST "https://api.example.com/v1/user/register_credit_request" \
 - The request status will be updated once the transaction is confirmed on the blockchain
 - Use the `add_inclusion_details` endpoint to update the transaction hash once the transaction is confirmed
 
-#### 18. GET /v1/user/request_fund_status
+#### 19. GET /v1/user/request_fund_status
 
 Retrieve the status and details of a user's fund request.
 
@@ -708,7 +753,7 @@ curl -X GET "https://api.example.com/v1/user/request_fund_status" \
 }
 ```
 
-#### 19. GET /v1/user/purchase_cost
+#### 20. GET /v1/user/purchase_cost
 
 Calculate the credit cost for a given data size.
 
@@ -735,7 +780,7 @@ curl -X GET "https://api.example.com/v1/user/purchase_cost?data_size=1024" \
 }
 ```
 
-#### 20. GET /v1/user/estimate_credits
+#### 21. GET /v1/user/estimate_credits
 
 Estimate the credits required for a given data amount.
 
@@ -762,7 +807,7 @@ curl -X GET "https://api.example.com/v1/user/estimate_credits?data=1024.5" \
 }
 ```
 
-#### 21. GET /v1/user/estimate_credits_for_bytes
+#### 22. GET /v1/user/estimate_credits_for_bytes
 
 Estimate the credits required for raw byte data.
 
@@ -789,7 +834,7 @@ curl -X GET "https://api.example.com/v1/user/estimate_credits_for_bytes" \
 }
 ```
 
-#### 22. GET /v1/user/token_map
+#### 23. GET /v1/user/token_map
 
 Retrieve the list of supported tokens and their corresponding addresses.
 
@@ -823,7 +868,7 @@ curl -X GET "https://api.example.com/v1/user/token_map" \
 }
 ```
 
-#### 23. GET /v1/user/get_fund_list
+#### 24. GET /v1/user/get_fund_list
 
 Retrieve a list of all fund transactions for a user.
 
