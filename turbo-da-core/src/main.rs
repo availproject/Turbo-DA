@@ -18,7 +18,6 @@ use crate::controllers::{
     users::{get_all_users, get_user, register_new_user, update_app_id},
 };
 use actix_cors::Cors;
-
 use actix_web::{
     dev::Service,
     middleware::Logger,
@@ -70,6 +69,10 @@ async fn main() -> Result<(), std::io::Error> {
         .expect("Failed to create pool");
 
     let shared_pool = web::Data::new(pool);
+    // let mut connection = shared_pool.get().await.unwrap();
+    // db::controllers::customer_expenditure::update_wallet_store(&mut connection)
+    //     .await
+    //     .unwrap();
 
     let shared_config = web::Data::new(app_config);
 

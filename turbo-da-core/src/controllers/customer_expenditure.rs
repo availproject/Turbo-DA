@@ -220,8 +220,6 @@ pub async fn reset_retry_count(
 /// Parameters for retrieving wallet usage statistics
 #[derive(Deserialize, Serialize)]
 struct GetWalletUsageParams {
-    /// The unique identifier of the application
-    app_id: Uuid,
     /// Start date in UTC timestamp (seconds)
     pub start_date: i64,
     /// End date in UTC timestamp (seconds)
@@ -235,10 +233,9 @@ struct GetWalletUsageParams {
 /// for the specified application within the given date range.
 ///
 /// # Route
-/// `GET /v1/user/get_wallet_usage?app_id={app_id}&start_date={start_date}&end_date={end_date}`
+/// `GET /v1/user/get_wallet_usage?start_date={start_date}&end_date={end_date}`
 ///
 /// # Query Parameters
-/// * `app_id` - UUID of the application
 /// * `start_date` - Start date as UTC timestamp in seconds
 /// * `end_date` - End date as UTC timestamp in seconds
 ///
@@ -304,35 +301,33 @@ pub async fn get_wallet_usage(
                 .json(json!({ "state": "ERROR", "error": "Invalid end date" }))
         }
     };
-    match handle_get_wallet_usage(&mut connection, &user, &params.app_id, start_date, end_date)
-        .await
-    {
+    match handle_get_wallet_usage(&mut connection, &user, start_date, end_date).await {
         Ok(response) => {
-            let wallet_usage: Vec<(i128, i128)> =
-                response
-                    .iter()
-                    .fold(vec![(0i128, 0i128); 12], |mut acc, item| {
-                        if let Some(wallet) = &item.wallet {
-                            let month = item.created_at.month() as usize - 1; // 0-based index
-                            let fallback = acc[month].0
-                                + i128::from_be_bytes(
-                                    wallet[0..16].try_into().unwrap_or_else(|_| [0; 16]),
-                                );
-                            let credit = acc[month].1
-                                + i128::from_be_bytes(
-                                    wallet[16..32].try_into().unwrap_or_else(|_| [0; 16]),
-                                );
-                            acc[month] = (fallback, credit);
-                        }
-                        acc
-                    });
+            let wallet_usage: std::collections::HashMap<Uuid, Vec<(i128, i128)>> = response
+                .iter()
+                .fold(std::collections::HashMap::new(), |mut acc, item| {
+                    if let Some(wallet) = &item.wallet {
+                        let app_id = item.app_id;
+                        let month = item.created_at.month() as usize - 1; // 0-based index
 
-            let data = json!({
-                "wallet_usage": wallet_usage,
-                "list": response
-            });
+                        let usage = acc
+                            .entry(app_id)
+                            .or_insert_with(|| vec![(0i128, 0i128); 12]);
+                        let fallback = usage[month].0
+                            + i128::from_be_bytes(
+                                wallet[0..16].try_into().unwrap_or_else(|_| [0; 16]),
+                            );
+                        let credit = usage[month].1
+                            + i128::from_be_bytes(
+                                wallet[16..32].try_into().unwrap_or_else(|_| [0; 16]),
+                            );
 
-            HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Wallet usage retrieved successfully", "data": data}))
+                        usage[month] = (fallback, credit);
+                    }
+                    acc
+                });
+
+            HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Wallet usage retrieved successfully", "data": wallet_usage}))
         }
         Err(e) => HttpResponse::InternalServerError()
             .json(json!({ "state": "ERROR", "error": e.to_string() })),
