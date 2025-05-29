@@ -1,0 +1,102 @@
+name: Development Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (follow semantic versioning: v1.2.3 or v0.1.0-alpha.1)'
+        required: true
+        default: 'v0.0.0'
+        type: string
+      force_build:
+        description: 'Force build all services'
+        required: false
+        default: 'false'
+        type: boolean
+      services:
+        description: 'Comma-separated list of services to build (leave empty for all)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [funds_monitor, fallback_monitor, turbo-da-core, data_submission]
+        network: [hex]
+        stage: [development]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check if service should be built
+        id: should_build
+        run: |
+          if [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          elif [[ -n "${{ github.event.inputs.services }}" ]]; then
+            IFS=',' read -ra SERVICES <<< "${{ github.event.inputs.services }}"
+            for service in "${SERVICES[@]}"; do
+              if [[ "$service" == "${{ matrix.service }}" ]]; then
+                echo "build=true" >> $GITHUB_OUTPUT
+                exit 0
+              fi
+            done
+            echo "build=false" >> $GITHUB_OUTPUT
+          else
+            echo "build=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set up Docker Buildx
+        if: steps.should_build.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to DockerHub
+        if: steps.should_build.outputs.build == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extract metadata and set version
+        if: steps.should_build.outputs.build == 'true'
+        id: meta
+        run: |
+          DOCKERHUB_ORG="availj"
+          DOCKERHUB_REPO="turboda"
+          NETWORK="${{ matrix.network }}"
+          STAGE="${{ matrix.stage }}"
+          IMAGE_TAG="${{ github.event.inputs.version }}"
+          
+          echo "image=$DOCKERHUB_ORG/$DOCKERHUB_REPO" >> $GITHUB_OUTPUT
+          echo "version=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "network=$NETWORK" >> $GITHUB_OUTPUT
+          echo "stage=$STAGE" >> $GITHUB_OUTPUT
+          echo "service=${{ matrix.service }}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push
+        if: steps.should_build.outputs.build == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: ${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-buildcache
+          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-buildcache,mode=max
+          build-args: |
+            NETWORK=${{ steps.meta.outputs.network }}
+            STAGE=${{ steps.meta.outputs.stage }}
+      
+      - name: Output build information
+        if: steps.should_build.outputs.build == 'true'
+        run: |
+          echo "Built and pushed: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}"
+          echo "Network: ${{ steps.meta.outputs.network }}"
+          echo "Stage: ${{ steps.meta.outputs.stage }}"
+          echo "Service: ${{ matrix.service }}"

@@ -1,0 +1,27 @@
+export interface CreditRequest {
+  id: string;
+  user_id: string;
+  chain_id: number;
+  amount_credit: string;
+  request_status: "completed" | "pending" | "failed";
+  request_type: "credit" | "debit";
+  tx_hash: string;
+  created_at: string;
+}
+
+export interface DataTransaction {
+  id: string;
+  user_id: string;
+  extrinsic_index: number;
+  amount_data: string;
+  fees: string;
+  to_address: string;
+  block_number: number;
+  block_hash: string;
+  data_hash: string;
+  tx_hash: string;
+  created_at: string;
+  error: string | null;
+  converted_fees: string;
+  app_id: string;
+}

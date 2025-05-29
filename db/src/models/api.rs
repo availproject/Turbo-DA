@@ -1,5 +1,6 @@
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::api_keys)]
@@ -9,12 +10,14 @@ pub struct ApiKey {
     pub created_at: chrono::NaiveDateTime,
     pub user_id: String,
     pub identifier: String,
+    pub app_id: Uuid,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]
 #[diesel(table_name = crate::schema::api_keys)]
 pub struct ApiKeyCreate {
-    pub api_key: String,
     pub user_id: String,
+    pub api_key: String,
+    pub app_id: Uuid,
     pub identifier: String,
 }
