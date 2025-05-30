@@ -29,7 +29,7 @@ const textVariants = cva("", {
       blue: "text-blue",
       yellow: "text-yellow",
       green: "text-green",
-      error: "text-error",
+      error: "text-font-error",
       "secondary-grey": "text-secondary-grey",
       "grey-500": "text-grey-500",
       disabled: "text-[#DADADA]",

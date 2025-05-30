@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import useBalance from "@/hooks/useBalance";
-import { useOverview } from "@/providers/OverviewProvider";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -13,16 +12,12 @@ type CreditsAddedProps = {
   credits?: string;
   previousBalance?: number;
 };
-export default function CreditsAdded({
-  credits,
-  previousBalance,
-}: CreditsAddedProps) {
+export default function CreditsAdded({ credits }: CreditsAddedProps) {
   const { open, setOpen } = useDialog();
-  const { creditBalance } = useOverview();
-  const { updateCreditBalance, loading } = useBalance();
+  const { updateCreditBalance } = useBalance();
 
   useEffect(() => {
-    let updateBalnceCallback = setTimeout(() => {
+    const updateBalnceCallback = setTimeout(() => {
       if (open) {
         updateCreditBalance();
       }

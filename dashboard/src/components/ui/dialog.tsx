@@ -52,7 +52,7 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay className=" backdrop-blur-[2px]" />
+      <DialogOverlay className="backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
@@ -61,7 +61,11 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
+        <div className="relative w-full h-full">
+          <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
+            {children}
+          </div>
+        </div>
       </DialogPrimitive.Content>
     </DialogPortal>
   );

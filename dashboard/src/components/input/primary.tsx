@@ -28,6 +28,11 @@ const PrimaryInput = ({
   className = "",
   error,
 }: PrimaryInputProps) => {
+  const handleClick = (event: any) => {
+    const { value } = event.target;
+    const position = value.length;
+    event.target.setSelectionRange(position, position);
+  };
   return (
     <div className={cn("flex flex-col gap-2 w-full", className)}>
       {label && (
@@ -60,6 +65,7 @@ const PrimaryInput = ({
           )}
           placeholder={placeholder}
           onChange={(e) => onChange?.(e.target.value)}
+          onClick={handleClick}
         />
         {rightElement}
       </div>

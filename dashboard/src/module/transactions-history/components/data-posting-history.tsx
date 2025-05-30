@@ -3,9 +3,10 @@ import { cn } from "@/lib/utils";
 import HistoryService from "@/services/history";
 import { DataTransaction } from "@/services/history/response";
 import { useCallback, useEffect, useState } from "react";
-import DynamicTable from "../data-table";
-import { Text } from "../text";
-import { Skeleton } from "../ui/skeleton";
+
+import DynamicTable from "@/components/data-table";
+import { Text } from "@/components/text";
+import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "./empty-state";
 
 const DataPostingHistory = ({ token }: { token?: string }) => {
@@ -24,6 +25,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
 
       setHistoryList(response?.data?.results ?? []);
     } catch (error) {
+      console.log(error);
       setHistoryList([]);
     } finally {
       setLoading(false);
@@ -34,6 +36,8 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
     switch (heading) {
       case "created_at":
         return new Date(value).toLocaleDateString().replaceAll("/", "-");
+      case "amount_data":
+        return value;
       default:
         return value ?? "-";
     }
@@ -66,7 +70,7 @@ const DataPostingHistory = ({ token }: { token?: string }) => {
             headings={[
               { key: "created_at", label: "Date Posted" },
               { key: "amount_data", label: "Data Posted" },
-              { key: "converted_fees", label: "Discount Received" },
+              { key: "converted_fees", label: "Cost Incurred" },
             ]}
             listdata={historyList}
             renderCell={(heading: string, value: any, last: boolean) => {

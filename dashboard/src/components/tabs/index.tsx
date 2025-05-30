@@ -36,15 +36,15 @@ function TabsList({
 
 function TabsTrigger({
   className,
-  variant = "regular",
+  variant = "primary",
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger> & {
-  variant?: "outline" | "regular";
+  variant?: "primary" | "secondary";
 }) {
   const variants = {
-    outline:
-      "flex justify-center items-center h-10 px-4 data-[state=inactive]:text-[#949494] data-[state=active]:text-white data-[state=active]:border-border-blue data-[state=active]:bg-[#2B4761] data-[state=active]:shadow-none rounded-3xl cursor-pointer text-base font-semibold",
-    regular:
+    primary:
+      "flex justify-center items-center h-12 px-3 data-[state=inactive]:text-[#999] data-[state=active]:border-x-0 data-[state=active]:text-white border-b-3 rounded-none data-[state=active]:border-b-blue data-[state=inactive]:border-b-transaprent data-[state=active]:shadow-none cursor-pointer text-base font-semibold",
+    secondary:
       "h-10 px-4 data-[state=inactive]:text-[#999] data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:shadow-none data-[state=active]:text-shadow-secondary-tab cursor-pointer text-base font-medium",
   };
   return (

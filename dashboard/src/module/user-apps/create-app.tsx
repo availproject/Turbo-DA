@@ -15,11 +15,11 @@ import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { ChangeEvent, useCallback, useRef, useState } from "react";
-import { Text } from ".//text";
-import { useDialog } from "./dialog/provider";
-import PrimaryInput from "./input/primary";
-import AvatarList from "./lottie-comp/avatar-list";
-import { useAppToast } from "./toast";
+import { useDialog } from "../../components/dialog/provider";
+import PrimaryInput from "../../components/input/primary";
+import AvatarList from "../../components/lottie-comp/avatar-list";
+import { Text } from "../../components/text";
+import { useAppToast } from "../../components/toast";
 
 type CreateAppProps = {
   type?: "create" | "edit";
@@ -40,7 +40,7 @@ export default function CreateApp({
   const [uploadedAvatar, setUploadedAvatar] = useState<File>();
   const [previewUploadedAvatar, setPreviewUploadedAvatar] = useState<string>();
   const [selectedAvatar, setSelectedAvatar] = useState<string>(
-    appData?.app_logo ?? ""
+    appData?.app_logo ?? "avatar_1"
   );
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
@@ -155,8 +155,8 @@ export default function CreateApp({
         }
       }}
     >
-      <DialogContent className="min-w-[600px] h-[600px] p-0 shadow-primary border-border-grey bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl flex flex-col gap-y-0">
-        <div className="relative h-full flex flex-col">
+      <DialogContent className="min-w-[600px] h-[600px] p-0 border-none rounded-3xl">
+        <div className="shadow-primary bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden flex flex-col focus-within:outline-0 h-full w-full relative">
           <div className="bg-[url('/common-dialog-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
           <Close className="p-0 bg-transparent focus-visible:outline-none w-fit cursor-pointer absolute top-6 right-6">
             <X color="#FFF" size={24} strokeWidth={1} />
