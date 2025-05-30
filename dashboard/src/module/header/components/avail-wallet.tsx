@@ -2,9 +2,9 @@ import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
 import { chainList } from "@/module/purchase-credit/utils/constant";
 import { useConfig } from "@/providers/ConfigProvider";
+import { AvailWalletConnect, useAvailAccount } from "avail-wallet-sdk";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
-import { AvailWalletConnect, useAvailAccount } from "wallet-sdk-v2";
 
 const AvailWallet = () => {
   const { selected, selectedWallet, clearWalletState } = useAvailAccount();

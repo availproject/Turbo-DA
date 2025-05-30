@@ -6,11 +6,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { truncateAddress } from "@/lib/utils";
+import { useAvailAccount } from "avail-wallet-sdk";
 import { ChevronDown, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { useAvailAccount } from "wallet-sdk-v2";
 import AvailWallet from "./avail-wallet";
 import EVMWallet from "./evm-wallet";
 

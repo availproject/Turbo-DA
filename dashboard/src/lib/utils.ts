@@ -57,9 +57,9 @@ export const formatInBytes = (bytes: number) => bytes * 1024;
 export const convertBytes = (kb: number) => {
   if (kb >= 1024) {
     const mb = kb / 1024;
-    return `${mb.toFixed(2)} MB`;
+    return `${mb % 1 === 0 ? mb.toFixed(0) : mb.toFixed(2)} MB`;
   } else {
-    return `${kb.toFixed(2)} KB`;
+    return `${kb % 1 === 0 ? kb.toFixed(0) : kb.toFixed(2)} KB`;
   }
 };
 

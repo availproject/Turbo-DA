@@ -21,6 +21,11 @@ import { ISubmittableResult } from "@polkadot/types/types";
 import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
 import { readContract, writeContract } from "@wagmi/core";
 import { ApiPromise } from "avail-js-sdk";
+import {
+  AvailWalletConnect,
+  useAvailAccount,
+  useAvailWallet,
+} from "avail-wallet-sdk";
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
@@ -35,7 +40,6 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
-import { AvailWalletConnect, useApi, useAvailAccount } from "wallet-sdk-v2";
 
 export const abi: Abi = [
   {
@@ -113,6 +117,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [error, setError] = useState("");
   const account = useAccount();
   const { selected } = useAvailAccount();
+  const { api } = useAvailWallet();
   const { setOpen } = useDialog();
   const { error: errorToast } = useAppToast();
   const {
@@ -121,7 +126,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     setTransactionStatusList,
     setShowTransaction,
   } = useConfig();
-  const { api } = useApi();
   const balance = useWagmiBalance({
     address: account.address,
   });
@@ -304,12 +308,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  async function batchTransferAndRemark(
+  const batchTransferAndRemark = async (
     api: ApiPromise,
     account: WalletAccount,
     atomicAmount: string,
     remarkMessage: string
-  ) {
+  ) => {
     try {
       const injector = getWalletBySource(account.source);
       const options: Partial<LegacySignerOptions> = {
@@ -367,7 +371,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           : new Error("Failed to batch transfer and remark")
       );
     }
-  }
+  };
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
@@ -550,14 +554,19 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <AvailWalletConnect
                       connectedChildren={
                         <Button
-                          onClick={() =>
+                          onClick={() => {
+                            console.log({
+                              api,
+                              selected,
+                            });
+
                             batchTransferAndRemark(
                               api!,
                               selected!,
                               parseUnits(tokenAmount, 18).toString(),
                               "Buy Credits"
-                            )
-                          }
+                            );
+                          }}
                           variant={
                             !selectedToken ||
                             !selectedChain ||

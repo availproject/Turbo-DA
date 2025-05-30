@@ -4,10 +4,10 @@ import { DialogProvider } from "@/components/dialog/provider";
 import { config } from "@/config/walletConfig";
 import { ConfigProvider } from "@/providers/ConfigProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AvailWalletProvider } from "avail-wallet-sdk";
 import { ConnectKitProvider } from "connectkit";
 import { ReactNode } from "react";
 import { State, WagmiProvider } from "wagmi";
-import { AvailWalletProvider } from "wallet-sdk-v2";
 import "./globals.css";
 
 const queryClient = new QueryClient();
