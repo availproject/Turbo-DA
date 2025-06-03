@@ -19,7 +19,11 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{
+    collections::{Bound, HashMap},
+    str::FromStr,
+    sync::Arc,
+};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
@@ -76,9 +80,13 @@ pub fn generate_submission_id() -> Uuid {
 ///
 /// # Arguments
 /// * `key` - Token key to look up
-pub fn find_key_by_value(key: &String) -> Option<&String> {
-    if let Some(token) = TOKEN_MAP.get(key) {
-        Some(&token.token_address)
+pub fn find_key_by_value<'a>(chain: &'a u64, key: &'a String) -> Option<&'a String> {
+    if let Some(token) = TOKEN_MAP.get(chain) {
+        if let Some(token) = token.get(key) {
+            Some(&token.token_address)
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -278,22 +286,25 @@ pub struct Token {
 }
 
 lazy_static! {
-    pub static ref TOKEN_MAP: HashMap<String, Token> = {
+    pub static ref TOKEN_MAP: HashMap<u64, HashMap<String, Token>> = {
         let mut m = HashMap::new();
-        m.insert(
+        let mut chain_map = HashMap::new();
+        chain_map.insert(
             "ethereum".to_string(),
             Token {
                 token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44".to_string(),
                 token_decimals: 18,
             },
         );
-        m.insert(
+        chain_map.insert(
             "avail".to_string(),
             Token {
-                token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44".to_string(),
+                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
                 token_decimals: 18,
             },
         );
+        m.insert(11155111, chain_map.clone());
+        m.insert(84532, chain_map.clone());
         m
     };
 }
@@ -354,6 +365,7 @@ pub async fn calculate_avail_token_equivalent(
     coingecko_api_url: &str,
     coingecko_api_key: &str,
     token_amount: &BigDecimal,
+    chain: &u64,
     token_address: &str,
 ) -> Result<BigDecimal, String> {
     let http_client = Client::new();
@@ -366,8 +378,19 @@ pub async fn calculate_avail_token_equivalent(
 
     let token_symbol = TOKEN_MAP
         .iter()
-        .find(|(_, token)| token.token_address == token_address)
-        .map(|(key, _)| key.clone())
+        .find_map(|(chain_id, tokens)| {
+            if chain_id == chain {
+                tokens.iter().find_map(|(key, token)| {
+                    if token.token_address == token_address {
+                        Some(key.clone())
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        })
         .ok_or_else(|| String::from("Token address not found in token mapping"))?;
 
     let (token_usd_price, avail_usd_price) = get_prices(
@@ -392,10 +415,14 @@ pub async fn calculate_avail_token_equivalent(
 
     let token_avail_ratio = token_usd_price / avail_usd_price;
     let source_token_decimals = TOKEN_MAP
+        .get(chain)
+        .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
         .get(token_symbol.as_str())
         .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
         .token_decimals;
     let avail_token_decimals = TOKEN_MAP
+        .get(chain)
+        .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
         .get("avail")
         .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
         .token_decimals;
@@ -414,6 +441,7 @@ pub async fn get_amount_to_be_credited(
     coin_gecho_api_url: &String,
     coin_gecho_api_key: &String,
     avail_rpc_url: &String,
+    chain: &u64,
     address: &String,
     amount: &BigDecimal,
 ) -> Result<BigDecimal, String> {
@@ -421,6 +449,7 @@ pub async fn get_amount_to_be_credited(
         &coin_gecho_api_url,
         &coin_gecho_api_key,
         &amount,
+        &chain,
         &address,
     )
     .await

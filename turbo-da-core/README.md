@@ -834,7 +834,36 @@ curl -X GET "https://api.example.com/v1/user/estimate_credits_for_bytes" \
 }
 ```
 
-#### 23. GET /v1/user/token_map
+#### 23. GET /v1/user/estimate_credits_against_token
+
+Estimate the credits equivalent for a given token amount.
+
+- **Method**: `GET`
+- **Headers**:
+  - `Authorization: Bearer <token>`
+- **URL Parameters**:
+  - `amount` (required): The amount of the token to convert to credits
+  - `token_address` (required): The blockchain address of the token to convert from
+  - `chain_id` (required): The blockchain ID of the token to convert from
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.example.com/v1/user/estimate_credits_against_token?amount=100.00&token_address=0x123...&chain_id=1" \
+     -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Example Response:**
+
+```json
+{
+  "state": "SUCCESS",
+  "message": "Credit cost calculated successfully",
+  "data": "0.0123456789"
+}
+```
+
+#### 24. GET /v1/token_map
 
 Retrieve the list of supported tokens and their corresponding addresses.
 
@@ -845,7 +874,7 @@ Retrieve the list of supported tokens and their corresponding addresses.
 **Example Request:**
 
 ```bash
-curl -X GET "https://api.example.com/v1/user/token_map" \
+curl -X GET "https://api.example.com/v1/token_map" \
      -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -855,20 +884,33 @@ curl -X GET "https://api.example.com/v1/user/token_map" \
 {
   "state": "SUCCESS",
   "message": "Token map retrieved successfully",
+
   "data": {
-    "ethereum": {
-      "token_address": "0xc...",
-      "other_properties": "..."
+    "11155111": {
+      "ethereum": {
+        "token_address": "0xc...",
+        "other_properties": "..."
+      },
+      "avail": {
+        "token_address": "0xd...",
+        "other_properties": "..."
+      }
     },
-    "cardano": {
-      "token_address": "0xd...",
-      "other_properties": "..."
+    "84532": {
+      "ethereum": {
+        "token_address": "0xc...",
+        "other_properties": "..."
+      },
+      "avail": {
+        "token_address": "0xd...",
+        "other_properties": "..."
+      }
     }
   }
 }
 ```
 
-#### 24. GET /v1/user/get_fund_list
+#### 25. GET /v1/user/get_fund_list
 
 Retrieve a list of all fund transactions for a user.
 

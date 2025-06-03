@@ -120,11 +120,6 @@ async fn main() -> Result<(), std::io::Error> {
             .service(
                 web::scope("/v1")
                     .service(get_token_map)
-                    .wrap(ClerkMiddleware::new(
-                        MemoryCacheJwksProvider::new(clerk.clone()),
-                        None,
-                        true,
-                    ))
                     .service(
                         web::scope("/user")
                             .wrap_fn(|req, srv| {
@@ -146,6 +141,11 @@ async fn main() -> Result<(), std::io::Error> {
                                     Ok(res)
                                 }
                             })
+                            .wrap(ClerkMiddleware::new(
+                                MemoryCacheJwksProvider::new(clerk.clone()),
+                                None,
+                                true,
+                            ))
                             .service(get_user)
                             .service(get_all_expenditure)
                             .service(request_funds_status)

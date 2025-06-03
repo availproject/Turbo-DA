@@ -601,6 +601,7 @@ pub async fn estimate_credits_against_size(
 pub struct EstimateCreditsToken {
     pub amount: BigDecimal,
     pub token_address: String,
+    pub chain_id: u64,
 }
 
 /// Estimate the credits equivalent for a given token amount.
@@ -609,11 +610,12 @@ pub struct EstimateCreditsToken {
 /// This endpoint calculates how many credits can be obtained for a specified amount of a particular token.
 ///
 /// # Route
-/// `GET /v1/user/estimate_credits_against_token?amount={amount}&token_address={address}`
+/// `GET /v1/user/estimate_credits_against_token?amount={amount}&token_address={address}&chain_id={chain_id}`
 ///
 /// # Query Parameters
 /// * `amount` - The amount of the token to convert to credits.
 /// * `token_address` - The blockchain address of the token to convert from.
+/// * `chain_id` - The blockchain ID of the token to convert from.
 ///
 /// # Returns
 /// A JSON object containing the estimated credit equivalent for the specified token amount.
@@ -637,6 +639,7 @@ pub async fn estimate_credits_against_token(
         &config.coingecko_api_url,
         &config.coingecko_api_key,
         &config.avail_rpc_endpoint.first().unwrap(),
+        &query.0.chain_id,
         &query.0.token_address,
         &query.0.amount,
     )
@@ -666,14 +669,29 @@ pub async fn estimate_credits_against_token(
 ///   "state": "SUCCESS",
 ///   "message": "Token map retrieved successfully",
 ///   "data": {
-///     "ethereum": {
-///       "token_address": "0xc...",
-///       "other_properties": "..."
+///     "11155111": {
+///       "ethereum": {
+///         "token_address": "0xc...",
+///         "other_properties": "..."
+///       },
+///       "avail": {
+///         "token_address": "0xd...",
+///         "other_properties": "..."
+///       }
 ///     },
-///     "cardano": {
-///       "token_address": "0xd...",
-///       "other_properties": "..."
+///     "84532": {
+///       "ethereum": {
+///         "token_address": "0xc...",
+///         "other_properties": "..."
+///       },
+///       "avail": {
+///         "token_address": "0xd...",
+///         "other_properties": "..."
+///       }
 ///     }
+///   }
+///     }
+///   }
 ///   }
 /// }
 /// ```
