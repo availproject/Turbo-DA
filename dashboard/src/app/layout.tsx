@@ -11,7 +11,6 @@ import { dark } from "@clerk/themes";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import { ToastContainer } from "react-toastify";
-import { ppmori } from "./fonts";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -79,7 +78,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
       }}
     >
       <TooltipProvider>
-        <html lang="en" className={`${ppmori.className} antialiased av-scroll`}>
+        <html lang="en" className={`antialiased av-scroll`}>
           <body className="bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%]">
             <Providers token={token!}>
               <Header />
