@@ -21,8 +21,8 @@ contract TurboDAResolverTest is Test {
 
     uint256 public nonce;
 
-    bytes public constant USER_ID_1 = "USER1";
-    bytes public constant USER_ID_2 = "USER2";
+    bytes32 public constant ORDER_ID_1 = keccak256("ORDER1");
+    bytes32 public constant ORDER_ID_2 = keccak256("ORDER2");
 
     function _getPermitSignature(
         address owner,
@@ -30,13 +30,11 @@ contract TurboDAResolverTest is Test {
         uint256 value,
         uint256 deadline,
         uint256 privateKey
-    ) internal view returns (bytes memory) {
-        bytes32 domainSeparator = mockToken.DOMAIN_SEPARATOR();
-
+    ) internal view returns (uint8, bytes32, bytes32) {
         bytes32 permitHash = keccak256(
             abi.encodePacked(
                 "\x19\x01",
-                domainSeparator,
+                mockToken.DOMAIN_SEPARATOR(),
                 keccak256(
                     abi.encode(
                         keccak256(
@@ -52,8 +50,7 @@ contract TurboDAResolverTest is Test {
             )
         );
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, permitHash);
-        return abi.encodePacked(r, s, v);
+        return vm.sign(privateKey, permitHash);
     }
 
     function setUp() public {
@@ -64,7 +61,7 @@ contract TurboDAResolverTest is Test {
         vm.deal(user2, 10 ether);
 
         depositContract = new TurboDAResolver();
-        depositContract.initialize(user1);
+        depositContract.initialize(user1, 3 days);
 
         mockToken = new MockERC20(
             "MockToken",
@@ -73,7 +70,7 @@ contract TurboDAResolverTest is Test {
             1000000 ether
         );
         vm.startPrank(user1);
-        depositContract.addOperator(user1);
+        depositContract.grantRole(depositContract.OPERATOR_ROLE(), user1);
         depositContract.configureTokenValidity(address(mockToken), true);
         vm.stopPrank();
     }
@@ -82,20 +79,20 @@ contract TurboDAResolverTest is Test {
         uint256 depositAmount = 1 ether;
 
         vm.prank(user1);
-        depositContract.deposit{value: depositAmount}(USER_ID_1);
-
-        uint256 userDeposit = depositContract.userDeposits(
-            USER_ID_1,
-            address(0),
-            user1
+        uint256 balanceBefore = address(depositContract).balance;
+        depositContract.deposit{value: depositAmount}(ORDER_ID_1);
+        uint256 balanceAfter = address(depositContract).balance;
+        assertEq(
+            balanceAfter - balanceBefore,
+            depositAmount,
+            "Deposit amount should match"
         );
-        assertEq(userDeposit, depositAmount, "Deposit amount should match");
     }
 
     function testRevertOnZeroEthDeposit() public {
         vm.prank(user1);
         vm.expectRevert(TurboDAResolver.InvalidAmount.selector);
-        depositContract.deposit{value: 0}(USER_ID_1);
+        depositContract.deposit{value: 0}(ORDER_ID_1);
     }
 
     function testSuccessfulERC20Deposit() public {
@@ -106,25 +103,25 @@ contract TurboDAResolverTest is Test {
         vm.prank(user1);
         mockToken.approve(address(depositContract), depositAmount);
 
+        uint256 balanceBefore = mockToken.balanceOf(address(depositContract));
         vm.prank(user1);
         depositContract.depositERC20(
-            USER_ID_1,
+            ORDER_ID_1,
             depositAmount,
             address(mockToken)
         );
-
-        uint256 userDeposit = depositContract.userDeposits(
-            USER_ID_1,
-            address(mockToken),
-            user1
+        uint256 balanceAfter = mockToken.balanceOf(address(depositContract));
+        assertEq(
+            balanceAfter - balanceBefore,
+            depositAmount,
+            "Deposit amount should match"
         );
-        assertEq(userDeposit, depositAmount, "Deposit amount should match");
     }
 
     function testRevertOnZeroERC20Deposit() public {
         vm.prank(user1);
         vm.expectRevert(TurboDAResolver.InvalidAmount.selector);
-        depositContract.depositERC20(USER_ID_1, 0, address(mockToken));
+        depositContract.depositERC20(ORDER_ID_1, 0, address(mockToken));
     }
 
     function testRevertOnUnauthorizedTokenDeposit() public {
@@ -144,7 +141,7 @@ contract TurboDAResolverTest is Test {
         vm.prank(user1);
         vm.expectRevert(TurboDAResolver.InvalidTokenAddress.selector);
         depositContract.depositERC20(
-            USER_ID_1,
+            ORDER_ID_1,
             depositAmount,
             address(unauthorizedToken)
         );
@@ -168,7 +165,7 @@ contract TurboDAResolverTest is Test {
             )
         );
         depositContract.depositERC20(
-            USER_ID_1,
+            ORDER_ID_1,
             depositAmount,
             address(mockToken)
         );
@@ -181,33 +178,30 @@ contract TurboDAResolverTest is Test {
         mockToken.mint(user1, firstDepositAmount + secondDepositAmount);
 
         vm.startPrank(user1);
+        uint256 balanceBefore = mockToken.balanceOf(address(depositContract));
         mockToken.approve(
             address(depositContract),
             firstDepositAmount + secondDepositAmount
         );
 
         depositContract.depositERC20(
-            USER_ID_1,
+            ORDER_ID_1,
             firstDepositAmount,
             address(mockToken)
         );
 
         depositContract.depositERC20(
-            USER_ID_1,
+            ORDER_ID_1,
             secondDepositAmount,
             address(mockToken)
         );
         vm.stopPrank();
 
-        uint256 userDeposit = depositContract.userDeposits(
-            USER_ID_1,
-            address(mockToken),
-            user1
-        );
+        uint256 balanceAfter = mockToken.balanceOf(address(depositContract));
         assertEq(
-            userDeposit,
+            balanceAfter - balanceBefore,
             firstDepositAmount + secondDepositAmount,
-            "Total deposit should accumulate"
+            "Total deposit amount should match"
         );
     }
 
@@ -219,7 +213,7 @@ contract TurboDAResolverTest is Test {
         mockToken.mint(user1, depositAmount);
 
         // Generate permit signature
-        bytes memory signature = _getPermitSignature(
+        (uint8 v, bytes32 r, bytes32 s) = _getPermitSignature(
             user1,
             address(depositContract),
             depositAmount,
@@ -227,41 +221,26 @@ contract TurboDAResolverTest is Test {
             user1PrivateKey
         );
 
+        uint256 balanceBefore = mockToken.balanceOf(address(depositContract));
+
         // Perform permit deposit
         vm.prank(user1);
         depositContract.depositERC20WithPermit(
-            USER_ID_1,
+            ORDER_ID_1,
             depositAmount,
             deadline,
             address(mockToken),
-            signature
+            v,
+            r,
+            s
         );
 
         // Check deposit was recorded correctly
-        uint256 userDeposit = depositContract.userDeposits(
-            USER_ID_1,
-            address(mockToken),
-            user1
-        );
-        assertEq(userDeposit, depositAmount, "Deposit amount should match");
-    }
-
-    // Test permit deposit with invalid signature length
-    function testRevertOnInvalidSignatureLength() public {
-        uint256 depositAmount = 100 ether;
-        uint256 deadline = block.timestamp + 1 days;
-
-        // Create an invalid signature with incorrect length
-        bytes memory invalidSignature = new bytes(64);
-
-        vm.prank(user1);
-        vm.expectRevert(TurboDAResolver.InvalidSignature.selector);
-        depositContract.depositERC20WithPermit(
-            USER_ID_1,
+        uint256 balanceAfter = mockToken.balanceOf(address(depositContract));
+        assertEq(
+            balanceAfter - balanceBefore,
             depositAmount,
-            deadline,
-            address(mockToken),
-            invalidSignature
+            "Deposit amount should match"
         );
     }
 
@@ -271,28 +250,31 @@ contract TurboDAResolverTest is Test {
         uint256 secondDepositAmount = 75 ether;
         uint256 deadline = block.timestamp + 1 days;
 
-        mockToken.mint(user1, 1000000 ether);
+        mockToken.mint(user1, firstDepositAmount + secondDepositAmount);
 
         // First permit deposit
-        bytes memory firstSignature = _getPermitSignature(
+        (uint8 v, bytes32 r, bytes32 s) = _getPermitSignature(
             user1,
             address(depositContract),
             firstDepositAmount,
             deadline,
             user1PrivateKey
         );
+        uint256 balanceBefore = mockToken.balanceOf(address(depositContract));
 
         vm.prank(user1);
         depositContract.depositERC20WithPermit(
-            USER_ID_1,
+            ORDER_ID_1,
             firstDepositAmount,
             deadline,
             address(mockToken),
-            firstSignature
+            v,
+            r,
+            s
         );
 
         // Second permit deposit
-        bytes memory secondSignature = _getPermitSignature(
+        (v, r, s) = _getPermitSignature(
             user1,
             address(depositContract),
             secondDepositAmount,
@@ -302,43 +284,20 @@ contract TurboDAResolverTest is Test {
 
         vm.prank(user1);
         depositContract.depositERC20WithPermit(
-            USER_ID_1,
+            ORDER_ID_1,
             secondDepositAmount,
             deadline,
             address(mockToken),
-            secondSignature
+            v,
+            r,
+            s
         );
 
-        // Check total deposit
-        uint256 userDeposit = depositContract.userDeposits(
-            USER_ID_1,
-            address(mockToken),
-            user1
-        );
+        uint256 balanceAfter = mockToken.balanceOf(address(depositContract));
         assertEq(
-            userDeposit,
+            balanceAfter - balanceBefore,
             firstDepositAmount + secondDepositAmount,
-            "Total deposit should accumulate"
+            "Total deposit amount should match"
         );
-    }
-    // Helper function to create signature
-    function _createSignature(
-        bytes memory userID,
-        address tokenAddress,
-        uint256 amount,
-        address recipient
-    ) internal view returns (bytes memory) {
-        bytes memory message = abi.encodePacked(
-            userID,
-            tokenAddress,
-            amount,
-            recipient,
-            nonce
-        );
-
-        bytes32 messageHash = keccak256(message);
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(user1PrivateKey, messageHash);
-        return abi.encodePacked(r, s, v);
     }
 }

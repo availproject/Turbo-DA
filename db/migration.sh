@@ -43,9 +43,9 @@ if [ ! -f .env ]; then
     echo "DATABASE_URL=${DATABASE_URL}" >.env
 fi
 
-# Perform Diesel migrations
-echo "🔄 Running Diesel migrations..."
-diesel migration run --migration-dir ./migrations
+# # Perform Diesel migrations
+# echo "🔄 Running Diesel migrations..."
+# diesel migration run --migration-dir ./migrations
 
 # Add debug output for connection details
 echo -e "\n📊 Database Connection Details:"
@@ -77,6 +77,7 @@ validate_input() {
 # Prepare psql connection command with additional parameters
 PSQL_CMD="psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
 
+echo "PSQL_CMD: $PSQL_CMD"
 # Add password if provided
 if [[ -n "$DB_PASSWORD" ]]; then
     export PGPASSWORD="$DB_PASSWORD"

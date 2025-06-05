@@ -21,8 +21,8 @@ cron = { version = "0.8" }
 toml = {version ="0.8.19"}
 avail-rust = { workspace = true }
 db = {path = "../db" }
-turbo-da-core = {path= "../turbo-da-core"}
 reqwest = "0.12.9"
-data_submission = {path = "../data_submission"}
+avail-utils = {path = "../avail"}
 observability = { path = "../observability" }
+turbo-da-core = {path= "../turbo-da-core"}
 
