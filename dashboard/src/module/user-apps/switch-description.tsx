@@ -1,7 +1,11 @@
 import { InfoIcon } from "lucide-react";
-import { Text } from "./text";
-import { Switch } from "./ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Text } from "../../components/text";
+import { Switch } from "../../components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 
 type SwitchDescriptionProps = {
   id: string;

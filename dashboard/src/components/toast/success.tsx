@@ -10,7 +10,7 @@ type SuccessProps = {
 
 const Success = ({ label, description, className }: SuccessProps) => {
   return (
-    <div className={cn("flex gap-x-4 items-center pr-4", className)}>
+    <div className={cn("flex gap-x-4 items-center pr-4 w-fit", className)}>
       <div className="bg-white rounded-lg p-2">
         <Check
           color="#1FC16B"

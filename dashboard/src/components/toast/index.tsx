@@ -1,12 +1,20 @@
+import { TransactionStatus } from "@/providers/ConfigProvider";
 import { X } from "lucide-react";
 import { toast } from "react-toastify";
 import Failure from "./failure";
 import Success from "./success";
+import TransactionProgress from "./transaction-progress";
 
 type ToastProps = {
   label?: string;
   description?: string;
   className?: string;
+  transaction?: TransactionStatus;
+};
+
+type TransactionToastProps = {
+  className?: string;
+  transaction: TransactionStatus;
 };
 
 export const useAppToast = () => {
@@ -19,8 +27,8 @@ export const useAppToast = () => {
           className={className}
         />,
         {
+          containerId: "toast-container",
           theme: "colored",
-          className: "backdrop-blur-lg",
           progressClassName: "bg-[#78C47B]",
           closeButton: () => (
             <X
@@ -37,6 +45,7 @@ export const useAppToast = () => {
             justifyContent: "space-between",
             borderRadius: "8px",
             marginBottom: "0px",
+            backdropFilter: "blur(48px)",
           },
         }
       ),
@@ -50,6 +59,7 @@ export const useAppToast = () => {
         {
           theme: "colored",
           progressClassName: "bg-[#ff7360]",
+          containerId: "toast-container",
           closeButton: () => (
             <X
               color="#FFF"
@@ -66,7 +76,27 @@ export const useAppToast = () => {
             borderRadius: "8px",
             marginBottom: "0px",
           },
-          className: "backdrop-blur-lg",
+          className: "backdrop-blur-xl",
+        }
+      ),
+    transactionProgress: ({ transaction, className }: TransactionToastProps) =>
+      toast(
+        <TransactionProgress transaction={transaction} className={className} />,
+        {
+          theme: "colored",
+          closeButton: false,
+          containerId: "stacked-toast-container",
+          hideProgressBar: true,
+          style: {
+            backgroundColor: "#2B47613D",
+            width: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            borderRadius: "8px",
+            marginBottom: "0px",
+          },
+          autoClose: false,
+          className: "backdrop-blur-xl",
         }
       ),
   };

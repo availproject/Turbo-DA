@@ -43,12 +43,25 @@ export const formatInKB = (bytes: number) => {
   };
 };
 
-export const truncateToFixed = (num: number, decimals = 2) => {
+export const truncateToFixed = (num: number, decimals = 4) => {
   const factor = Math.pow(10, decimals);
   return (Math.floor(num * factor) / factor).toFixed(decimals);
 };
 
+export const truncateAddress = (address: string): string => {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+};
+
 export const formatInBytes = (bytes: number) => bytes * 1024;
+
+export const convertBytes = (kb: number) => {
+  if (kb >= 1024) {
+    const mb = kb / 1024;
+    return `${mb % 1 === 0 ? mb.toFixed(0) : mb.toFixed(2)} MB`;
+  } else {
+    return `${kb % 1 === 0 ? kb.toFixed(0) : kb.toFixed(2)} KB`;
+  }
+};
 
 export const formatDataBytes = (bytes: number) => {
   const formatBytes = formatInKB(bytes);

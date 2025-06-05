@@ -13,9 +13,8 @@ const useBalance = () => {
     setLoading(true);
     AuthenticationService.fetchUser({ token })
       .then((response) => {
-        setCreditBalance(
-          response?.data?.credit_balance ? +response?.data?.credit_balance : 0
-        );
+        const mainCreditBalance = +response?.data?.credit_balance || 0;
+        setCreditBalance(mainCreditBalance);
       })
       .catch((error) => {
         console.log(error);

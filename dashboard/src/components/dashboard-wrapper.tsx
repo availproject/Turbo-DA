@@ -32,11 +32,10 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
               Buy credits, post data at a guaranteed rate.
             </Text>
             <Tabs value={mainTabSelected} className="w-full gap-y-0 mt-3">
-              <TabsList className="bg-transparent p-0 h-auto pb-4">
+              <TabsList className="bg-transparent p-0 h-auto relative -bottom-px">
                 {mainTabs.map((tab) => (
                   <TabsTrigger
                     value={tab.value}
-                    variant="outline"
                     key={tab.value}
                     onClick={() => setMainTabSelected(tab.value)}
                   >

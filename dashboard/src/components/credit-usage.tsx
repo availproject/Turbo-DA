@@ -47,7 +47,7 @@ const month = [
   "Dec",
 ];
 
-const CreditUsage = ({ token }: { token?: string }) => {
+const CreditUsage = () => {
   const [filter, setFilter] = useState(month[0]);
 
   return (

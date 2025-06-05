@@ -20,6 +20,7 @@ interface IconSelectContainerProps {
   value?: string;
   onChange: (value: string) => void;
   className?: string;
+  defaultValue?: string;
 }
 
 const IconSelectContainer = ({
@@ -27,9 +28,10 @@ const IconSelectContainer = ({
   placeholder = "Select",
   value,
   onChange,
+  defaultValue,
 }: IconSelectContainerProps) => {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} defaultValue={defaultValue}>
       <SelectTrigger
         className={
           "h-12 border-border-blue rounded-lg w-full flex-1 cursor-pointer"
