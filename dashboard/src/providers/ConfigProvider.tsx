@@ -1,30 +1,35 @@
 "use client";
 import { template } from "@/lib/utils";
 import { useAuth } from "@clerk/nextjs";
+import { getTokenBalance } from "@/module/purchase-credit/utils";
+import { Chain } from "@/module/purchase-credit/utils/types";
+import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import React, {
   createContext,
   Dispatch,
   SetStateAction,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
 interface ConfigContextType {
   token?: string;
   fetchToken: () => void;
-  selectedChain: Chain;
-  setSelectedChain: Dispatch<SetStateAction<Chain>>;
+  selectedChain: ChainType;
+  setSelectedChain: Dispatch<SetStateAction<ChainType>>;
   setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;
   selectedToken?: Token;
   transactionStatusList: TransactionStatus[];
   setTransactionStatusList: Dispatch<SetStateAction<TransactionStatus[]>>;
   showTransaction?: TransactionStatus;
   setShowTransaction: Dispatch<SetStateAction<TransactionStatus | undefined>>;
+  availNativeBalance: string;
 }
 
 export const ConfigContext = createContext<ConfigContextType | undefined>(
-  undefined
+  undefined,
 );
 
 interface ConfigProviderProps {
@@ -32,7 +37,7 @@ interface ConfigProviderProps {
   accessToken?: string;
 }
 
-type Chain = {
+type ChainType = {
   name: string;
   icon: string;
 };
@@ -56,8 +61,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   accessToken,
 }) => {
   const { getToken } = useAuth();
+  const { selected } = useAvailAccount();
+  const { api } = useAvailWallet();
   const [token, setToken] = useState<string>(accessToken ?? "");
-  const [selectedChain, setSelectedChain] = useState<Chain>({
+  const [selectedChain, setSelectedChain] = useState<ChainType>({
     name: "Ethereum",
     icon: "/currency/eth.png",
   });
@@ -69,10 +76,28 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
     TransactionStatus[]
   >([]);
   const [showTransaction, setShowTransaction] = useState<TransactionStatus>();
+  const [availNativeBalance, setAvailNativeBalance] = useState<string>("0");
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchToken();
   }, []);
+
+  useEffect(() => {
+    if (selected?.address && api) {
+      fetchAvailBalance();
+
+      intervalRef.current = setInterval(() => {
+        fetchAvailBalance();
+      }, 20000);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [selected?.address, api?.isReady]);
 
   const fetchToken = async () => {
     await getToken({ template: template })
@@ -82,6 +107,23 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       .catch((err) => {
         console.error(err);
       });
+  };
+
+  const fetchAvailBalance = async () => {
+    if (!selected?.address || !api) return;
+
+    try {
+      console.log("avail balance", "fetching");
+      const balance = await getTokenBalance(
+        Chain.AVAIL,
+        selected.address as `0x${string}`,
+        api,
+      );
+      console.log(balance, "avail balance", selected.address);
+      setAvailNativeBalance(balance);
+    } catch (error) {
+      console.error("Failed to fetch Avail balance:", error);
+    }
   };
 
   return (
@@ -97,6 +139,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
         setTransactionStatusList,
         showTransaction,
         setShowTransaction,
+        availNativeBalance,
       }}
     >
       {children}

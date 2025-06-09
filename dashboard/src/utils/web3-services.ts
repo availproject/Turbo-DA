@@ -1,4 +1,4 @@
-import { Signer } from "@polkadot/types/types";
+import { Signer } from "@polkadot/api/types";
 import { base, baseSepolia, mainnet, sepolia } from "@wagmi/core/chains";
 
 type TransactionStatus = {

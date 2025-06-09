@@ -51,7 +51,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
         name: "ETH",
       },
     }),
-    []
+    [],
   );
 
   const displayValues = useCallback(
@@ -65,13 +65,13 @@ const CreditHistory = ({ token }: { token?: string }) => {
           return (
             <div className="flex items-center gap-x-2">
               <Image
-                src={chainList[value].logo}
-                alt={chainList[value].name}
+                src={chainList[value] ? chainList[value].logo : "/favicon.ico"}
+                alt={"helo"}
                 width={20}
                 height={20}
               />
               <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
-                {chainList[value].name}
+                hello
               </Text>
             </div>
           );
@@ -79,7 +79,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
           return value ?? "-";
       }
     },
-    [chainList]
+    [chainList],
   );
 
   return (

@@ -15,12 +15,8 @@ import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import CreditService from "@/services/credit";
-import { LegacySignerOptions } from "@/utils/web3-services";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { ISubmittableResult } from "@polkadot/types/types";
-import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
 import { readContract, writeContract } from "@wagmi/core";
-import { ApiPromise } from "avail-js-sdk";
 import {
   AvailWalletConnect,
   useAvailAccount,
@@ -29,7 +25,6 @@ import {
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
-import { err, ok } from "neverthrow";
 import {
   MouseEvent,
   useCallback,
@@ -38,71 +33,10 @@ import {
   useState,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Abi, parseUnits } from "viem";
+import { erc20Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
-
-export const abi: Abi = [
-  {
-    name: "approve",
-    type: "function",
-    stateMutability: "payable",
-    inputs: [
-      { internalType: "address", name: "spender", type: "address" },
-      { internalType: "uint256", name: "value", type: "uint256" },
-    ],
-    outputs: [],
-  },
-];
-
-export const depositAbi: Abi = [
-  {
-    type: "function",
-    name: "deposit",
-    inputs: [{ name: "orderId", type: "bytes32", internalType: "bytes32" }],
-    outputs: [],
-    stateMutability: "payable",
-  },
-  {
-    type: "function",
-    name: "depositERC20",
-    inputs: [
-      { name: "orderId", type: "bytes32", internalType: "bytes32" },
-      { name: "amount", type: "uint256", internalType: "uint256" },
-      { name: "tokenAddress", type: "address", internalType: "address" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "depositERC20WithPermit",
-    inputs: [
-      { name: "orderId", type: "bytes32", internalType: "bytes32" },
-      { name: "amount", type: "uint256", internalType: "uint256" },
-      { name: "deadline", type: "uint256", internalType: "uint256" },
-      {
-        name: "tokenAddress",
-        type: "address",
-        internalType: "address",
-      },
-      { name: "v", type: "uint8", internalType: "uint8" },
-      { name: "r", type: "bytes32", internalType: "bytes32" },
-      { name: "s", type: "bytes32", internalType: "bytes32" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-];
-
-const erc20Abi = [
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-];
+import { batchTransferAndRemark, postOrder } from "./utils";
+import { depositAbi } from "./utils/constant";
 
 const DESIRED_CHAIN = 11155111;
 
@@ -125,24 +59,16 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     selectedToken,
     setTransactionStatusList,
     setShowTransaction,
+    availNativeBalance,
   } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
   const { chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
-  console.log({
-    api,
-  });
 
   useEffect(() => {
     if (!account.address) return;
-    // setApi(api);
-    // transactionProgress({
-    //   transaction: {
-    //     id,
-    //   },
-    // });
     getERC20AvailBalance();
     showBalance({ token: account.address })
       .then((response) => {
@@ -159,15 +85,17 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (debouncedValue && !tokenAmountError) {
       calculateEstimateCredits({ amount: +debouncedValue });
     }
-  }, [debouncedValue, tokenAmountError]);
+  }, [debouncedValue, tokenAmountError, selectedChain, selectedToken]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     if (!selectedToken) {
       return;
     }
     const tokenAddress =
-      selectedToken &&
-      TOKEN_MAP[selectedToken?.name.toLowerCase()]?.token_address;
+      selectedChain.name === "AVAIL"
+        ? "0x0000000000000000000000000000000000000000"
+        : selectedToken &&
+          TOKEN_MAP[selectedToken?.name.toLowerCase()]?.token_address;
     setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
@@ -175,7 +103,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
-        }
+          //chain id is being hardcoded for mvp
+          chainId: selectedChain.name === "AVAIL" ? 0 : DESIRED_CHAIN,
+        },
       );
 
       setEstimateData(response?.data);
@@ -186,35 +116,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  const postOrder = async () => {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_credit_request`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chain: account.chainId,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      setLoading(false);
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    return await response.json();
-  };
-
   const getERC20AvailBalance = useCallback(async () => {
     await readContract(config, {
       address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44" as `0x${string}`,
       abi: erc20Abi,
       functionName: "balanceOf",
-      args: [account.address],
+      args: [account.address!],
       chainId: activeNetworkId,
     })
       .then((balance) => {
@@ -226,12 +133,21 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       });
   }, [account, activeNetworkId]);
 
-  const handleBuyCredits = async () => {
+  const handleBuyCredits = async ({ isAvail }: { isAvail: boolean }) => {
     if (!tokenAmount) return;
     try {
       setLoading(true);
       setError("");
-      const orderResponse = await postOrder();
+
+      const tokenAddress =
+        selectedToken &&
+        TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
+
+      console.log(tokenAddress, "token addy");
+      const orderResponse = await postOrder({
+        token: token!,
+        chainId: activeNetworkId,
+      });
 
       if (!orderResponse?.data) {
         setLoading(false);
@@ -239,13 +155,35 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         return;
       }
 
-      const tokenAddress =
-        selectedToken &&
-        TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
+      if (isAvail) {
+        const txn = await batchTransferAndRemark(
+          api!,
+          selected!,
+          parseUnits(tokenAmount, 18).toString(),
+          "Buy Credits",
+        );
+
+        if (txn.isOk()) {
+          const transaction: TransactionStatus = {
+            id: uuidv4(),
+            status: "finality",
+            orderId: orderResponse.data.id as number,
+            tokenAddress: tokenAddress! as `0x${string}`,
+            tokenAmount: +tokenAmount,
+            txnHash: txn.value.txhash,
+          };
+          setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
+          setShowTransaction(transaction);
+          setOpen("credit-transaction");
+          setTokenAmount("");
+          setLoading(false);
+          return;
+        }
+      }
 
       await writeContract(config, {
         address: tokenAddress as `0x${string}`,
-        abi,
+        abi: erc20Abi,
         functionName: "approve",
         args: [
           process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
@@ -308,71 +246,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  const batchTransferAndRemark = async (
-    api: ApiPromise,
-    account: WalletAccount,
-    atomicAmount: string,
-    remarkMessage: string
-  ) => {
-    try {
-      const injector = getWalletBySource(account.source);
-      const options: Partial<LegacySignerOptions> = {
-        signer: injector?.signer,
-        app_id: 0,
-      };
-
-      const transfer = api.tx.balances.transferKeepAlive(
-        selected?.address as `0x${string}`,
-        atomicAmount
-      );
-      const remark = api.tx.system.remark(remarkMessage);
-
-      //using batchall, so in case of the transfer not being successful, remark will not be executed.
-      const batchCall = api.tx.utility.batchAll([transfer, remark]);
-      const txResult = await new Promise<ISubmittableResult>((resolve) => {
-        batchCall.signAndSend(
-          selected?.address as `0x${string}`,
-          // @ts-expect-error
-          options,
-          (result: ISubmittableResult) => {
-            console.log(`Tx status: ${result.status}`);
-            if (result.isInBlock || result.isError) {
-              resolve(result);
-            }
-          }
-        );
-      });
-
-      const error = txResult.dispatchError;
-
-      if (txResult.isError) {
-        return err(new Error(`Transaction failed with error: ${error}`));
-      } else if (error !== undefined) {
-        if (error.isModule) {
-          const decoded = api.registry.findMetaError(error.asModule);
-          const { docs, name, section } = decoded;
-          return err(new Error(`${section}.${name}: ${docs.join(" ")}`));
-        } else {
-          return err(new Error(error.toString()));
-        }
-      }
-
-      return ok({
-        status: "success",
-        blockhash: txResult.status.asInBlock?.toString() || "",
-        txHash: txResult.txHash.toString(),
-        txIndex: txResult.txIndex,
-      });
-    } catch (error) {
-      console.error("Error during batch transfer and remark:", error);
-      return err(
-        error instanceof Error
-          ? error
-          : new Error("Failed to batch transfer and remark")
-      );
-    }
-  };
-
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
     e.stopPropagation();
@@ -426,7 +299,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           setTokenAmountError("Enter valid amount");
                           return;
                         }
-                        if (Number(balance.data?.formatted) < +value) {
+                        const currentBalance =
+                          selectedChain?.name === "Avail"
+                            ? Number(availNativeBalance)
+                            : Number(balance.data?.formatted);
+
+                        if (currentBalance < +value) {
                           setTokenAmountError(`Insufficent Balance`);
                           setEstimateData(undefined);
                         } else {
@@ -434,7 +312,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         }
                       }}
                     />
-                    {typeof balance.data?.formatted !== "undefined" && (
+                    {(typeof balance.data?.formatted !== "undefined" ||
+                      selectedChain?.name === "Avail") && (
                       <div className="flex items-center gap-x-2">
                         <Wallet size={24} color="#B3B3B3" strokeWidth={2} />
                         <Text
@@ -445,7 +324,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         >
                           Balance:{" "}
                           <Text as="span" size={"sm"} weight={"semibold"}>
-                            {Number(balance.data?.formatted).toFixed(4)}
+                            {selectedChain?.name === "Avail"
+                              ? Number(availNativeBalance).toFixed(4)
+                              : Number(balance.data?.formatted).toFixed(4)}
                           </Text>
                         </Text>
                       </div>
@@ -514,7 +395,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                         return (
                           <Button
-                            onClick={handleBuyCredits}
+                            onClick={() => {
+                              handleBuyCredits({
+                                isAvail: false,
+                              });
+                            }}
                             variant={
                               !selectedToken ||
                               !selectedChain ||
@@ -555,17 +440,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       connectedChildren={
                         <Button
                           onClick={() => {
-                            console.log({
-                              api,
-                              selected,
+                            handleBuyCredits({
+                              isAvail: true,
                             });
-
-                            batchTransferAndRemark(
-                              api!,
-                              selected!,
-                              parseUnits(tokenAmount, 18).toString(),
-                              "Buy Credits"
-                            );
                           }}
                           variant={
                             !selectedToken ||
