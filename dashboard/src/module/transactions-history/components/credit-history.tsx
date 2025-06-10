@@ -3,7 +3,7 @@ import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
-import { SignedIn, SignInButton } from "@clerk/clerk-react";
+import { SignedIn, SignInButton } from "@clerk/nextjs";
 import { SignedOut } from "@clerk/nextjs";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";

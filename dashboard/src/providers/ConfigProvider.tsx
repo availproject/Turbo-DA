@@ -3,6 +3,7 @@ import { template } from "@/lib/utils";
 import { useAuth } from "@clerk/nextjs";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
 import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
+import { supportedTokensAndChains } from "@/lib/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import React, {
   createContext,
@@ -66,13 +67,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   const { api } = useAvailWallet();
   const [token, setToken] = useState<string>(accessToken ?? "");
   const [selectedChain, setSelectedChain] = useState<ChainType>({
-    name: "Ethereum",
-    icon: "/currency/eth.png",
-    id: 11155111,
+    name: supportedTokensAndChains.ethereum.name,
+    icon: supportedTokensAndChains.ethereum.icon,
+    id: supportedTokensAndChains.ethereum.id,
   });
   const [selectedToken, setSelectedToken] = useState<Token | undefined>({
-    name: "ETH",
-    icon: "/currency/eth.png",
+    name: supportedTokensAndChains.ethereum.tokens[0].name,
+    icon: supportedTokensAndChains.ethereum.tokens[0].icon,
   });
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]

@@ -1,51 +1,11 @@
 import { Abi } from "viem";
+import { supportedTokensAndChains } from "@/lib/types";
 
-export const chainList = {
-  ethereum: {
-    name: "Ethereum",
-    icon: "/currency/eth.png",
-    id: 11155111, // Sepolia testnet
-    tokens: [
-      {
-        name: "ETH",
-        icon: "/currency/eth.png",
-      },
-      {
-        name: "MTK",
-        icon: "/currency/mtk.png",
-      },
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-      },
-    ],
-  },
-  base: {
-    name: "Base",
-    icon: "/currency/eth.png", // Using ETH icon as placeholder
-    id: 84532, // Base Sepolia testnet
-    tokens: [
-      {
-        name: "ETH",
-        icon: "/currency/eth.png",
-      },
-    ],
-  },
-};
+// Export the unified structure
+export const { ethereum, base, avail } = supportedTokensAndChains;
 
-export const availChain = {
-  avail: {
-    name: "Avail",
-    icon: "/avail-icon.svg",
-    id: 0, // Special ID for Avail (non-EVM)
-    tokens: [
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-      },
-    ],
-  },
-};
+export const chainList = { ethereum, base };
+export const availChain = { avail };
 
 export const abi: Abi = [
   {

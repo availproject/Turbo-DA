@@ -4,7 +4,7 @@ import { useDialog } from "@/components/dialog/provider";
 import { useAppToast } from "@/components/toast";
 import { config } from "@/config/walletConfig";
 import { useSwitchChain } from "wagmi";
-import { TOKEN_MAP } from "@/lib/types";
+import { TOKEN_MAP, supportedTokensAndChains } from "@/lib/types";
 import { numberToBytes32 } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 
@@ -25,6 +25,13 @@ import { depositAbi } from "../utils/constant";
 import { ClickHandler } from "../utils/types";
 
 // Remove hardcoded chain - now using dynamic chain from user selection
+
+// Helper function to get token info from supportedTokensAndChains
+const getTokenInfo = (chainName: string, tokenName: string) => {
+  const chainKey = chainName.toLowerCase();
+  const chain = supportedTokensAndChains[chainKey];
+  return chain?.tokens.find((token) => token.name === tokenName);
+};
 
 interface BuyButtonProps {
   tokenAmount: string;
@@ -66,7 +73,6 @@ const BuyButton = ({
       setLoading(true);
       onBuyStart?.();
 
-      // Handle chain switching for EVM chains (not Avail)
       if (!isAvail && selectedChain.id !== 0) {
         try {
           if (account.chainId !== selectedChain.id) {
@@ -74,7 +80,7 @@ const BuyButton = ({
           }
         } catch (error) {
           errorToast?.({
-            label: `Please switch to ${selectedChain.name} network manually in your wallet`
+            label: `Please switch to ${selectedChain.name} network manually in your wallet`,
           });
           setLoading(false);
           onBuyError?.("Chain switch failed");
@@ -82,10 +88,12 @@ const BuyButton = ({
         }
       }
 
-      // Get token address based on token selection from TOKEN_MAP
-      const tokenAddress = selectedToken 
-        ? TOKEN_MAP[selectedToken.name?.toLowerCase()]?.token_address
-        : undefined;
+      // Get token address based on token selection from supportedTokensAndChains
+      const tokenInfo =
+        selectedToken && selectedChain
+          ? getTokenInfo(selectedChain.name, selectedToken.name)
+          : undefined;
+      const tokenAddress = tokenInfo?.address;
 
       const orderResponse = await postOrder({
         token: token!,
@@ -146,10 +154,7 @@ const BuyButton = ({
               tokenAmount: +tokenAmount,
               txnHash,
             };
-            setTransactionStatusList((prev) => [
-              ...(prev ?? []),
-              transaction,
-            ]);
+            setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
             setOpen("credit-transaction");
             onTokenAmountClear?.();
@@ -179,6 +184,7 @@ const BuyButton = ({
           chainId: selectedChain.id,
         })
           .then(async () => {
+            console.log(tokenAddress?.toLowerCase(), "wow");
             await writeContract(config, {
               address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
               abi: depositAbi,
@@ -186,7 +192,7 @@ const BuyButton = ({
               args: [
                 numberToBytes32(+orderResponse?.data?.id),
                 parseUnits(tokenAmount, 18),
-                tokenAddress,
+                tokenAddress?.toLowerCase(),
               ],
               chainId: selectedChain.id,
             })
@@ -271,7 +277,10 @@ const BuyButton = ({
     );
   }
 
-  if ((selectedChain?.name === "Ethereum" || selectedChain?.name === "Base") && selectedToken) {
+  if (
+    (selectedChain?.name === "Ethereum" || selectedChain?.name === "Base") &&
+    selectedToken
+  ) {
     return (
       <ConnectKitButton.Custom>
         {(props) => {
