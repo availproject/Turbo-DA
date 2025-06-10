@@ -19,7 +19,7 @@ import { erc20Abi } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import BuySection from "./components/buy-section";
 
-const DESIRED_CHAIN = 11155111;
+// Removed hardcoded DESIRED_CHAIN - now using dynamic chain from user selection
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { getERC20AvailBalance, showBalance } = useWallet();
@@ -34,22 +34,39 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { selectedChain, selectedToken, availNativeBalance } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
+    chainId: selectedChain?.id !== 0 ? selectedChain?.id : undefined,
+    token: selectedToken && TOKEN_MAP[selectedToken.name?.toLowerCase()]?.token_address === "0x0000000000000000000000000000000000000000"
+      ? undefined // Native token (zero address)
+      : selectedToken && TOKEN_MAP[selectedToken.name?.toLowerCase()]?.token_address as `0x${string}`,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
 
   useEffect(() => {
-    if (!account.address) return;
-    getERC20AvailBalance(account.address);
-    showBalance({ token: account.address })
-      .then((response) => {
-        console.log({
-          response,
-        });
+    if (!account.address || !selectedChain || !selectedToken) return;
+    
+    // Only fetch ERC20 balance for non-Avail chains and non-native tokens
+    if (selectedChain.name !== "Avail") {
+      const tokenAddress = TOKEN_MAP[selectedToken.name?.toLowerCase()]?.token_address;
+      const isNativeToken = tokenAddress === "0x0000000000000000000000000000000000000000";
+      
+      if (!isNativeToken) {
+        getERC20AvailBalance(account.address, tokenAddress as `0x${string}`, selectedChain.id);
+      }
+        
+      showBalance({ 
+        token: isNativeToken ? undefined : tokenAddress as `0x${string}`, 
+        chainId: selectedChain.id 
       })
-      .catch((error) => {
-        console.log(error);
-      });
-  }, [account]);
+        .then((response) => {
+          console.log({
+            response,
+          });
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    }
+  }, [account.address, selectedChain, selectedToken, getERC20AvailBalance, showBalance]);
 
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
@@ -61,11 +78,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (!selectedToken) {
       return;
     }
-    const tokenAddress =
-      selectedChain.name === "AVAIL"
-        ? "0x0000000000000000000000000000000000000000"
-        : selectedToken &&
-          TOKEN_MAP[selectedToken?.name.toLowerCase()]?.token_address;
+    let tokenAddress: string;
+    if (selectedChain.name === "AVAIL") {
+      tokenAddress = "0x0000000000000000000000000000000000000000";
+    } else if (selectedToken) {
+      tokenAddress = TOKEN_MAP[selectedToken.name.toLowerCase()]?.token_address;
+    } else {
+      return;
+    }
     setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
@@ -73,8 +93,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
-          //chain id is being hardcoded for mvp
-          chainId: selectedChain.name === "AVAIL" ? 0 : DESIRED_CHAIN,
+          chainId: selectedChain.id,
         },
       );
 

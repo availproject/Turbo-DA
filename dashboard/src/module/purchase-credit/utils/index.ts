@@ -122,6 +122,7 @@ export async function getTokenBalance(
   address: `0x${string}`,
   api?: ApiPromise,
   tokenAddress?: string,
+  chainId?: number,
 ) {
   if (!validAddress(address, chain))
     throw new Error("Invalid Recipient on base");
@@ -144,7 +145,6 @@ export async function getTokenBalance(
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address],
-    //todo: fix hardcode, once the basic flow is tested out and we move multichain
-    chainId: 11155111,
+    chainId: chainId || 11155111, // Use provided chainId or fallback to Sepolia
   }).then((balance) => parseAmount(balance.toString(), 18));
 }

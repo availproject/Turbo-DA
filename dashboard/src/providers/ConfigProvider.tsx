@@ -40,6 +40,7 @@ interface ConfigProviderProps {
 type ChainType = {
   name: string;
   icon: string;
+  id: number;
 };
 
 type Token = {
@@ -67,6 +68,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   const [selectedChain, setSelectedChain] = useState<ChainType>({
     name: "Ethereum",
     icon: "/currency/eth.png",
+    id: 11155111,
   });
   const [selectedToken, setSelectedToken] = useState<Token | undefined>({
     name: "ETH",

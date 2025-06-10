@@ -3,7 +3,7 @@ import Button from "@/components/button";
 import { useDialog } from "@/components/dialog/provider";
 import { useAppToast } from "@/components/toast";
 import { config } from "@/config/walletConfig";
-import { useDesiredChain } from "@/hooks/useDesiredChain";
+import { useSwitchChain } from "wagmi";
 import { TOKEN_MAP } from "@/lib/types";
 import { numberToBytes32 } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
@@ -24,7 +24,7 @@ import { batchTransferAndRemark, postOrder } from "../utils";
 import { depositAbi } from "../utils/constant";
 import { ClickHandler } from "../utils/types";
 
-const DESIRED_CHAIN = 11155111;
+// Remove hardcoded chain - now using dynamic chain from user selection
 
 interface BuyButtonProps {
   tokenAmount: string;
@@ -57,7 +57,7 @@ const BuyButton = ({
     setTransactionStatusList,
     setShowTransaction,
   } = useConfig();
-  const { chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
+  const { switchChainAsync } = useSwitchChain();
 
   const handleBuyCredits = async ({ isAvail }: { isAvail: boolean }) => {
     if (!tokenAmount) return;
@@ -66,13 +66,30 @@ const BuyButton = ({
       setLoading(true);
       onBuyStart?.();
 
-      const tokenAddress =
-        selectedToken &&
-        TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
+      // Handle chain switching for EVM chains (not Avail)
+      if (!isAvail && selectedChain.id !== 0) {
+        try {
+          if (account.chainId !== selectedChain.id) {
+            await switchChainAsync({ chainId: selectedChain.id });
+          }
+        } catch (error) {
+          errorToast?.({
+            label: `Please switch to ${selectedChain.name} network manually in your wallet`
+          });
+          setLoading(false);
+          onBuyError?.("Chain switch failed");
+          return;
+        }
+      }
+
+      // Get token address based on token selection from TOKEN_MAP
+      const tokenAddress = selectedToken 
+        ? TOKEN_MAP[selectedToken.name?.toLowerCase()]?.token_address
+        : undefined;
 
       const orderResponse = await postOrder({
         token: token!,
-        chainId: account.chainId || DESIRED_CHAIN,
+        chainId: selectedChain.id,
       });
 
       if (!orderResponse?.data) {
@@ -109,68 +126,111 @@ const BuyButton = ({
         }
       }
 
-      await writeContract(config, {
-        address: tokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [
-          process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
-          parseUnits(tokenAmount, 18),
-        ],
-        chainId: account.chainId || DESIRED_CHAIN,
-      })
-        .then(async () => {
-          await writeContract(config, {
-            address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
-            abi: depositAbi,
-            functionName: "depositERC20",
-            args: [
-              numberToBytes32(+orderResponse?.data?.id),
-              parseUnits(tokenAmount, 18),
-              tokenAddress,
-            ],
-            chainId: account.chainId || DESIRED_CHAIN,
-          })
-            .then(async (txnHash: `0x${string}`) => {
-              const transaction: TransactionStatus = {
-                id: uuidv4(),
-                status: "finality",
-                orderId: orderResponse.data.id as number,
-                tokenAddress: tokenAddress! as `0x${string}`,
-                tokenAmount: +tokenAmount,
-                txnHash,
-              };
-              setTransactionStatusList((prev) => [
-                ...(prev ?? []),
-                transaction,
-              ]);
-              setShowTransaction(transaction);
-              setOpen("credit-transaction");
-              onTokenAmountClear?.();
-              setLoading(false);
-              onBuyComplete?.();
-            })
-            .catch((err) => {
-              const message = err.message.split(".")[0];
-              if (message === "User rejected the request") {
-                errorToast?.({ label: "You rejected the request" });
-              } else {
-                errorToast?.({ label: "Transaction failed" });
-              }
-              setLoading(false);
-              onBuyError?.(message);
-            });
+      // Handle transactions based on token type - check for zero address (native ETH)
+      if (tokenAddress === "0x0000000000000000000000000000000000000000") {
+        // For native ETH, directly call deposit with value
+        await writeContract(config, {
+          address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+          abi: depositAbi,
+          functionName: "deposit",
+          args: [numberToBytes32(+orderResponse?.data?.id)],
+          chainId: selectedChain.id,
+          value: parseUnits(tokenAmount, 18),
         })
-        .catch((err) => {
-          const message = err.message.split(".")[0];
-          if (message === "User rejected the request") {
-            errorToast?.({ label: "You rejected the request" });
-          } else {
-            errorToast?.({ label: message });
-          }
-          setLoading(false);
-          onBuyError?.(message);
-        });
+          .then(async (txnHash: `0x${string}`) => {
+            const transaction: TransactionStatus = {
+              id: uuidv4(),
+              status: "finality",
+              orderId: orderResponse.data.id as number,
+              tokenAddress: tokenAddress! as `0x${string}`,
+              tokenAmount: +tokenAmount,
+              txnHash,
+            };
+            setTransactionStatusList((prev) => [
+              ...(prev ?? []),
+              transaction,
+            ]);
+            setShowTransaction(transaction);
+            setOpen("credit-transaction");
+            onTokenAmountClear?.();
+            setLoading(false);
+            onBuyComplete?.();
+          })
+          .catch((err) => {
+            const message = err.message.split(".")[0];
+            if (message === "User rejected the request") {
+              errorToast?.({ label: "You rejected the request" });
+            } else {
+              errorToast?.({ label: "Transaction failed" });
+            }
+            setLoading(false);
+            onBuyError?.(message);
+          });
+      } else {
+        // For ERC20 tokens, first approve then deposit
+        await writeContract(config, {
+          address: tokenAddress as `0x${string}`,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [
+            process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+            parseUnits(tokenAmount, 18),
+          ],
+          chainId: selectedChain.id,
+        })
+          .then(async () => {
+            await writeContract(config, {
+              address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+              abi: depositAbi,
+              functionName: "depositERC20",
+              args: [
+                numberToBytes32(+orderResponse?.data?.id),
+                parseUnits(tokenAmount, 18),
+                tokenAddress,
+              ],
+              chainId: selectedChain.id,
+            })
+              .then(async (txnHash: `0x${string}`) => {
+                const transaction: TransactionStatus = {
+                  id: uuidv4(),
+                  status: "finality",
+                  orderId: orderResponse.data.id as number,
+                  tokenAddress: tokenAddress! as `0x${string}`,
+                  tokenAmount: +tokenAmount,
+                  txnHash,
+                };
+                setTransactionStatusList((prev) => [
+                  ...(prev ?? []),
+                  transaction,
+                ]);
+                setShowTransaction(transaction);
+                setOpen("credit-transaction");
+                onTokenAmountClear?.();
+                setLoading(false);
+                onBuyComplete?.();
+              })
+              .catch((err) => {
+                const message = err.message.split(".")[0];
+                if (message === "User rejected the request") {
+                  errorToast?.({ label: "You rejected the request" });
+                } else {
+                  errorToast?.({ label: "Transaction failed" });
+                }
+                setLoading(false);
+                onBuyError?.(message);
+              });
+          })
+          .catch((err) => {
+            const message = err.message.split(".")[0];
+            if (message === "User rejected the request") {
+              errorToast?.({ label: "You rejected the request" });
+            } else {
+              errorToast?.({ label: message });
+            }
+            setLoading(false);
+            onBuyError?.(message);
+          });
+      }
     } catch (error) {
       console.log(error);
       setLoading(false);
@@ -211,7 +271,7 @@ const BuyButton = ({
     );
   }
 
-  if (selectedChain?.name === "Ethereum" && selectedToken) {
+  if ((selectedChain?.name === "Ethereum" || selectedChain?.name === "Base") && selectedToken) {
     return (
       <ConnectKitButton.Custom>
         {(props) => {
@@ -220,12 +280,6 @@ const BuyButton = ({
               <Button onClick={(e) => handleClick(e, props.show)}>
                 Connect EVM Wallet
               </Button>
-            );
-          }
-
-          if (!props.chain || props.chain?.id !== DESIRED_CHAIN) {
-            return (
-              <Button onClick={() => chainChangerAsync()}>Wrong Network</Button>
             );
           }
 

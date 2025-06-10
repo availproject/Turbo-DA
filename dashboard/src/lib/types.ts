@@ -31,13 +31,18 @@ export const TOKEN_MAP: TokenMap = {
     token_decimals: 18,
     token_ticker: "AVAIL",
   },
-  ethereum: {
-    token_address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
+  eth: {
+    token_address: "0x0000000000000000000000000000000000000000", // Native ETH
     token_decimals: 18,
     token_ticker: "ETH",
   },
-  eth: {
-    token_address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
+  mtk: {
+    token_address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44", // MockToken contract
+    token_decimals: 18,
+    token_ticker: "MTK",
+  },
+  base_eth: {
+    token_address: "0x0000000000000000000000000000000000000000", // Native ETH on Base
     token_decimals: 18,
     token_ticker: "ETH",
   },
@@ -46,4 +51,5 @@ export const TOKEN_MAP: TokenMap = {
 export enum SupportedChains {
   Mainnet = 1,
   Sepolia = 11155111,
+  BaseSepolia = 84532,
 }
