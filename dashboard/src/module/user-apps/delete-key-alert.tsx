@@ -10,6 +10,7 @@ import { useDialog } from "../../components/dialog/provider";
 import { Text } from "../../components/text";
 import { useAppToast } from "../../components/toast";
 import { Dialog, DialogContent } from "../../components/ui/dialog";
+import { ClickHandler } from "../purchase-credit/utils/types";
 
 const DeleteKeyAlert = ({
   id,
@@ -18,7 +19,7 @@ const DeleteKeyAlert = ({
 }: {
   id: string;
   identifier: string;
-  clearAlertCallback: () => void;
+  clearAlertCallback: ClickHandler;
 }) => {
   const { open, setOpen } = useDialog();
   const { token } = useConfig();

@@ -146,5 +146,5 @@ export async function getTokenBalance(
     args: [address],
     //todo: fix hardcode, once the basic flow is tested out and we move multichain
     chainId: 11155111,
-  }).then((balance) => parseAmount(balance as string, 18));
+  }).then((balance) => parseAmount(balance.toString(), 18));
 }

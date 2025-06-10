@@ -2,7 +2,7 @@
 import { template } from "@/lib/utils";
 import { useAuth } from "@clerk/nextjs";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
-import { Chain } from "@/module/purchase-credit/utils/types";
+import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import React, {
   createContext,
@@ -16,7 +16,7 @@ import React, {
 
 interface ConfigContextType {
   token?: string;
-  fetchToken: () => void;
+  fetchToken: ClickHandler;
   selectedChain: ChainType;
   setSelectedChain: Dispatch<SetStateAction<ChainType>>;
   setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;

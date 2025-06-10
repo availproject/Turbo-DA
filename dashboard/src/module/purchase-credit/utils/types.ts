@@ -5,3 +5,5 @@ export enum Chain {
   BASE = "BASE",
   SOPHON = "SOPHON",
 }
+
+export type ClickHandler = () => void;
