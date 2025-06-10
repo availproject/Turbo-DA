@@ -3,10 +3,10 @@ import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
-import { SignedIn, SignInButton } from "@clerk/nextjs";
-import { SignedOut } from "@clerk/nextjs";
+import { SignInButton, useAuth } from "@clerk/nextjs";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { supportedTokensAndChains } from "@/lib/types";
 
 import Button from "@/components/button";
 import DynamicTable from "@/components/data-table";
@@ -18,6 +18,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
   const [historyList, setHistoryList] = useState<CreditRequest[]>();
   const [loading, setLoading] = useState(true);
   const { setMainTabSelected } = useOverview();
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     fetchHistory();
@@ -28,10 +29,11 @@ const CreditHistory = ({ token }: { token?: string }) => {
       const response = await HistoryService.getCreditHistory({
         token: token!,
       });
-      // const processedHistory = response?.data?.filter(
-      //   (credit: any) => credit?.request_status === "Processed"
-      // );
-      setHistoryList(response?.data ?? []);
+      // Sort by latest transactions first
+      const sortedData = (response?.data ?? []).sort((a: CreditRequest, b: CreditRequest) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setHistoryList(sortedData);
     } catch (error) {
       console.log(error);
       setHistoryList([]);
@@ -40,19 +42,25 @@ const CreditHistory = ({ token }: { token?: string }) => {
     }
   };
 
-  const chainList: Record<string, { logo: string; name: string }> = useMemo(
-    () => ({
-      "11155111": {
-        logo: "/currency/eth.png",
-        name: "ETH",
-      },
-      "1": {
-        logo: "/currency/eth.png",
-        name: "ETH",
-      },
-    }),
-    [],
-  );
+  // Helper function to get chain info from supportedTokensAndChains
+  const getChainInfo = useCallback((chainId: number) => {
+    // Find the chain by ID in supportedTokensAndChains
+    for (const [chainKey, chainData] of Object.entries(supportedTokensAndChains)) {
+      if (chainData.id === chainId) {
+        return {
+          logo: chainData.icon,
+          name: chainData.name,
+          tokens: chainData.tokens
+        };
+      }
+    }
+    // Fallback for unknown chains
+    return {
+      logo: "/favicon.ico",
+      name: "Unknown",
+      tokens: []
+    };
+  }, []);
 
   const displayValues = useCallback(
     (heading: string, value: any) => {
@@ -62,16 +70,17 @@ const CreditHistory = ({ token }: { token?: string }) => {
         case "amount_credit":
           return value ? formatDataBytes(value) : "-";
         case "chain_id":
+          const chainInfo = getChainInfo(value);
           return (
             <div className="flex items-center gap-x-2">
               <Image
-                src={chainList[value] ? chainList[value].logo : "/favicon.ico"}
-                alt={"helo"}
+                src={chainInfo.logo}
+                alt={chainInfo.name}
                 width={20}
                 height={20}
               />
               <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
-                hello
+                {chainInfo.name}
               </Text>
             </div>
           );
@@ -79,7 +88,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
           return value ?? "-";
       }
     },
-    [chainList],
+    [getChainInfo],
   );
 
   return (
@@ -90,12 +99,11 @@ const CreditHistory = ({ token }: { token?: string }) => {
           message="Your Credit History Would Be Shown Here"
           cta={
             <>
-              <SignedOut>
+              {!isSignedIn ? (
                 <SignInButton mode="modal" component="div">
                   <Button className="w-[195px]">Sign In</Button>
                 </SignInButton>
-              </SignedOut>
-              <SignedIn>
+              ) : (
                 <Button
                   className="w-[195px]"
                   onClick={() => {
@@ -104,17 +112,17 @@ const CreditHistory = ({ token }: { token?: string }) => {
                 >
                   Buy Credits
                 </Button>
-              </SignedIn>
+              )}
             </>
           }
         />
       ) : null}
       {loading ? (
         <div className="flex flex-col gap-y-4 mt-4">
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
         </div>
       ) : historyList?.length ? (
         <DynamicTable
@@ -127,11 +135,13 @@ const CreditHistory = ({ token }: { token?: string }) => {
           ]}
           listdata={historyList}
           renderCell={(heading: string, value: any, last: boolean) => (
-            <div className={cn("flex w-[150px]", last && "justify-end")}>
+            <div className={cn("flex", last ? "w-[180px] justify-end" : "w-[150px]")}>
               <Text
                 weight={"bold"}
                 size={"base"}
-                className={cn("py-3 px-4", !last && "text-right")}
+                className={cn("py-3 px-4 break-words", !last && "text-right", 
+                  heading === "amount_credit" && "whitespace-nowrap overflow-hidden text-ellipsis"
+                )}
                 variant={heading === "request_type" ? "green" : "white"}
                 as={heading === "chain_id" ? "div" : "p"}
               >

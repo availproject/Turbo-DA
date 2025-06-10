@@ -3,9 +3,10 @@ import CreditsTransactionProgress from "@/components/credits-transaction-progres
 import Input from "@/components/input";
 import { Text } from "@/components/text";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/useDebounce";
 import useWallet from "@/hooks/useWallet";
-import { TOKEN_MAP, supportedTokensAndChains } from "@/lib/types";
+import { supportedTokensAndChains } from "@/lib/types";
 import { formatDataBytes } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { useConfig } from "@/providers/ConfigProvider";
@@ -240,17 +241,23 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   >
                     You Receive (Credits)
                   </Text>
-                  <Input
-                    className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
-                    placeholder="00"
-                    id="creditsAmount"
-                    name="creditsAmount"
-                    defaultValue={
-                      estimateData && !estimateDataLoading
-                        ? formatDataBytes(+estimateData)
-                        : ""
-                    }
-                  />
+                  {estimateDataLoading ? (
+                    <div className="h-10 mt-2">
+                      <Skeleton className="h-10 w-32" />
+                    </div>
+                  ) : (
+                    <Input
+                      className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
+                      placeholder="00"
+                      id="creditsAmount"
+                      name="creditsAmount"
+                      defaultValue={
+                        estimateData && !estimateDataLoading
+                          ? formatDataBytes(+estimateData)
+                          : ""
+                      }
+                    />
+                  )}
                 </div>
               </div>
 
