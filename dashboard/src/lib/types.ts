@@ -67,7 +67,7 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
   },
   base: {
     name: "Base",
-    icon: "/currency/eth.png", // Using ETH icon as placeholder
+    icon: "/currency/base.png",
     id: 84532, // Base Sepolia testnet
     tokens: [
       {

@@ -51,7 +51,7 @@ const SelectChainToken = () => {
               </div>
               <div className="flex gap-y-2 flex-col my-6 px-3">
                 {Object.values(supportedTokensAndChains)
-                  .filter(chain => chain.name !== "Avail")
+                  .filter((chain) => chain.name !== "Avail")
                   .map((chain) => {
                     return (
                       <Button
@@ -144,7 +144,9 @@ const SelectChainToken = () => {
               </div>
               <div className="flex flex-col gap-y-3 mt-2">
                 {selectedChain &&
-                  supportedTokensAndChains[selectedChain.name.toLowerCase()]?.tokens.map((token) => (
+                  supportedTokensAndChains[
+                    selectedChain.name.toLowerCase()
+                  ]?.tokens.map((token) => (
                     <Button
                       variant={"outline"}
                       key={`token-${token.name}`}
@@ -169,9 +171,6 @@ const SelectChainToken = () => {
                         />
                         <Text weight={"semibold"}>{token.name}</Text>
                       </div>
-                      <Text className="text-[#999]" weight={"semibold"}>
-                        00.00
-                      </Text>
                     </Button>
                   ))}
               </div>
