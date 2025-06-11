@@ -3,10 +3,10 @@ import Button from "@/components/button";
 import { useDialog } from "@/components/dialog/provider";
 import { useAppToast } from "@/components/toast";
 import { config } from "@/config/walletConfig";
-import { useSwitchChain } from "wagmi";
-import { TOKEN_MAP, supportedTokensAndChains } from "@/lib/types";
+import { supportedTokensAndChains } from "@/lib/types";
 import { numberToBytes32 } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
+import { useSwitchChain } from "wagmi";
 
 import { writeContract } from "@wagmi/core";
 import {
@@ -112,7 +112,7 @@ const BuyButton = ({
           api!,
           selected!,
           parseUnits(tokenAmount, 18).toString(),
-          "Buy Credits",
+          "Buy Credits"
         );
 
         if (txn.isOk()) {
@@ -345,7 +345,7 @@ const BuyButton = ({
           </Button>
         }
       >
-        <Button>Connect Wallet</Button>
+        <Button>Connect Avail Wallet</Button>
       </AvailWalletConnect>
     );
   }

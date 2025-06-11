@@ -73,10 +73,10 @@ const DeleteKeyAlert = ({
             <div className="flex flex-col gap-y-2 text-center">
               <DialogTitle>
                 <>
-                  <Text weight={"bold"} size={"4xl"}>
+                  <Text weight={"bold"} size={"2xl"}>
                     Are you sure you want to delete your key?
                   </Text>
-                  <Text weight={"bold"} size={"4xl"} className="mt-1">
+                  <Text weight={"bold"} size={"2xl"} className="mt-1">
                     ....{identifier}
                   </Text>
                 </>
