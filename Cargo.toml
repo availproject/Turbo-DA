@@ -18,7 +18,7 @@ anyhow = "1.0.97"
 hex = "0.4"
 dotenv = "0.15"
 sha3 = "0.10.8"
-redis = { version = "0.28.2", features = ["r2d2", "tls-rustls"]}
+redis = { version = "0.28.2", features = ["r2d2"]}
 bcrypt = "0.15.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

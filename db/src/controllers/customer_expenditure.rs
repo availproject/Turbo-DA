@@ -338,13 +338,12 @@ pub async fn handle_reset_retry_count(
 pub async fn handle_get_wallet_usage(
     connection: &mut AsyncPgConnection,
     user: &String,
-    app: &Uuid,
+
     start_date: chrono::NaiveDateTime,
     end_date: chrono::NaiveDateTime,
 ) -> Result<Vec<CustomerExpenditureGet>, Error> {
     customer_expenditures
         .filter(user_id.eq(user))
-        .filter(app_id.eq(app))
         .filter(created_at.ge(start_date))
         .filter(created_at.le(end_date))
         .select(CustomerExpenditureGet::as_select())
@@ -355,6 +354,7 @@ pub async fn handle_get_wallet_usage(
 // todo : for migration only, remove this function after migration
 pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(), String> {
     let list = customer_expenditures
+        .filter(wallet.is_null())
         .select(CustomerExpenditureGet::as_select())
         .load::<CustomerExpenditureGet>(connection)
         .await
@@ -362,7 +362,7 @@ pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(
 
     println!("list: {:?}", list.len());
 
-    for item in list.iter() {
+    for (index, item) in list.iter().enumerate() {
         if item.converted_fees.is_some() {
             let mut wallet_store = vec![0u8; 32];
 
@@ -383,7 +383,7 @@ pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(
                 .await
                 .map_err(|e| e.to_string());
 
-            println!("submission id: {:?}", item.id);
+            println!("submission id: {:?} index {:?}", item.id, index);
         }
     }
     Ok(())
