@@ -366,14 +366,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Text>
         </div>
       ) : null}
-      {!+creditBalance && !+app?.credit_balance ? (
-        <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
-          <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
-          <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-            App Inactive — Please Assign Some Or Use Main Balance
-          </Text>
-        </div>
-      ) : null}
       <div
         className={cn(
           "absolute transition-all duration-500 bg-[#13334F] w-full left-0 p-4 flex gap-y-1 flex-col border-t border-border-blue",
