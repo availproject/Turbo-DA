@@ -192,12 +192,19 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       apiKeys?.[app.id]?.length && setOpen("view-key" + app.id);
                     }}
                     className={cn(
-                      "flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue",
-                      apiKeys?.[app.id]?.length && "cursor-pointer"
+                      "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
+                      apiKeys?.[app.id]?.length
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed"
                     )}
                   >
                     <Eye
-                      className="text-[#B3B3B3] group-hover:text-white"
+                      className={cn(
+                        "text-[#B3B3B3]",
+                        apiKeys?.[app.id]?.length
+                          ? "group-hover:text-white"
+                          : "opacity-40"
+                      )}
                       strokeWidth={2}
                       size={24}
                     />
@@ -223,19 +230,27 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       creditBalance &&
                       setOpen("assign-credits" + app.id)
                     }
-                    className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                    className={cn(
+                      "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
+                      !useMainBalance && +creditBalance
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed"
+                    )}
                   >
                     <ScrollText
-                      className="text-[#B3B3B3] group-hover:text-white"
+                      className={cn(
+                        "text-[#B3B3B3]",
+                        !useMainBalance && +creditBalance
+                          ? "group-hover:text-white"
+                          : "opacity-40"
+                      )}
                       strokeWidth={2}
                       size={24}
                     />
                     <Text
                       weight={"semibold"}
                       className={cn(
-                        !useMainBalance && +creditBalance
-                          ? "cursor-pointer"
-                          : "opacity-30"
+                        !useMainBalance && +creditBalance ? "" : "opacity-30"
                       )}
                     >
                       Assign Credits
@@ -247,10 +262,20 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       !useMainBalance &&
                       setOpen("reclaim-credits" + app.id)
                     }
-                    className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                    className={cn(
+                      "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
+                      +app.credit_balance && !useMainBalance
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed"
+                    )}
                   >
                     <ScrollText
-                      className="text-[#B3B3B3] group-hover:text-white"
+                      className={cn(
+                        "text-[#B3B3B3]",
+                        +app.credit_balance && !useMainBalance
+                          ? "group-hover:text-white"
+                          : "opacity-40"
+                      )}
                       strokeWidth={2}
                       size={24}
                     />
@@ -258,7 +283,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       weight={"semibold"}
                       className={cn(
                         +app.credit_balance && !useMainBalance
-                          ? "cursor-pointer"
+                          ? ""
                           : "opacity-30"
                       )}
                     >
@@ -363,14 +388,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
           <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
             Credits Null — Please BUY Some TO POST data
-          </Text>
-        </div>
-      ) : null}
-      {!+creditBalance && !+app?.credit_balance ? (
-        <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
-          <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
-          <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-            App Inactive — Please Assign Some Or Use Main Balance
           </Text>
         </div>
       ) : null}

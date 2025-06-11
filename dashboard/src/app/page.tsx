@@ -15,13 +15,13 @@ const CreditHistory = dynamic(
   () => import("@/module/transactions-history/components/credit-history"),
   {
     loading: () => <div>Loading....</div>,
-  }
+  },
 );
 const DataPostingHistory = dynamic(
   () => import("@/module/transactions-history/components/data-posting-history"),
   {
     loading: () => <div>Loading....</div>,
-  }
+  },
 );
 
 const BuyCreditsCard = dynamic(() => import("@/module/purchase-credit"));

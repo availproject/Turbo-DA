@@ -21,19 +21,19 @@ const SelectTokenButton = () => {
               {selectedChain && (
                 <Image
                   src={selectedChain.icon}
-                  width={40}
-                  height={40}
+                  width={24}
+                  height={24}
                   alt={selectedChain.name}
+                  className="absolute bottom-0 -right-2 border border-border-blue rounded-full"
                 />
               )}
 
               {selectedToken && (
                 <Image
                   src={selectedToken.icon}
-                  width={24}
-                  height={24}
-                  alt="eth"
-                  className="absolute bottom-0 -right-2 border border-border-blue rounded-full"
+                  width={40}
+                  height={40}
+                  alt={selectedToken.name}
                 />
               )}
             </div>
