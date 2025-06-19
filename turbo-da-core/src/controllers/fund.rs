@@ -358,6 +358,11 @@ pub async fn fund_user(
     }
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+struct RequestFundsStatusParams {
+    pub id: i32,
+}
+
 /// Retrieve the status and details of a user's fund request.
 ///
 /// # Description
@@ -390,6 +395,7 @@ pub async fn fund_user(
 
 #[get("/request_fund_status")]
 pub async fn request_funds_status(
+    query: web::Query<RequestFundsStatusParams>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
 ) -> impl Responder {
@@ -407,7 +413,7 @@ pub async fn request_funds_status(
         Err(response) => return response,
     };
 
-    let tx = get_fund_status(user, &mut connection).await;
+    let tx = get_fund_status(user, query.0.id, &mut connection).await;
     match tx {
         Ok(tx) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Fund request status retrieved successfully", "data": tx})),
         Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e})),

@@ -8,9 +8,11 @@ use uuid::Uuid;
 
 pub async fn get_fund_status(
     user: String,
+    fund_id: i32,
     connection: &mut AsyncPgConnection,
 ) -> Result<Vec<CreditRequestInfo>, String> {
     credit_requests
+        .filter(id.eq(fund_id))
         .filter(user_id.eq(user))
         .select(CreditRequestInfo::as_select())
         .load(&mut *connection)
