@@ -7,7 +7,6 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::Auth;
-use data_submission::encipher::EncipherEncryptionService;
 use config::AppConfig;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
@@ -30,6 +29,7 @@ mod redis;
 mod routes;
 mod utils;
 mod workload_scheduler;
+mod encipher;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -66,7 +66,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let port = app_config.port;
 
-    let encipher_encryption_service = EncipherEncryptionService::new(
+    let encipher_encryption_service = encipher::EncipherEncryptionService::new(
         app_config.encipher_encryption_service_url.clone(),
         app_config.encipher_encryption_service_version.clone(),
     );

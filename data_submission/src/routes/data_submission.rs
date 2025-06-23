@@ -6,13 +6,12 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use data_submission::encipher::EncipherEncryptionService;
+use crate::encipher::EncipherEncryptionService;
 use db::models::customer_expenditure::CreateCustomerExpenditure;
 use db::{
     controllers::{
         customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
     },
-    models::customer_expenditure::CreateCustomerExpenditure,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
@@ -217,6 +216,7 @@ pub struct SubmitDataEncrypted {
 /// * `injected_dependency` - Database connection pool
 /// * `config` - Application configuration
 /// * `http_request` - HTTP request containing user authentication
+/// * `encipher_encryption_service` - Encipher encryption service
 ///
 /// # Returns
 /// * JSON response with submission ID on success
@@ -233,20 +233,30 @@ pub async fn submit_data_encrypted(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let user = match retrieve_user_id(http_request) {
+    let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "App Id not retrieved" }))
+        }
     };
 
+    let user_id = match retrieve_user_id(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "User Id not retrieved" }))
+        }
+    };
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
-            return HttpResponse::InternalServerError().body(e);
+            return HttpResponse::InternalServerError().json(json!({ "error": e }));
         }
     };
 
@@ -258,8 +268,7 @@ pub async fn submit_data_encrypted(
     {
         Ok(encrypted_data) => encrypted_data,
         Err(e) => {
-            error!("Failed to encrypt data: {}", e);
-            return HttpResponse::InternalServerError().body(e.to_string());
+            return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
         }
     };
 
@@ -268,13 +277,14 @@ pub async fn submit_data_encrypted(
         thread_id: map_user_id_to_thread(&config),
         raw_payload: encrypted_data.clone().into(),
         submission_id,
-        user_id: user.clone(),
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(encrypted_data.len()),
-        user_id: user,
+        user_id: user_id,
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(encrypted_data),
@@ -284,7 +294,7 @@ pub async fn submit_data_encrypted(
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                error(&format!("couldn't connect to db with error "));
                 return;
             }
         };
