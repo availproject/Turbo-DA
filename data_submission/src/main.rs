@@ -1,4 +1,4 @@
-use crate::redis::Redis;
+use crate::{redis::Redis, routes::data_submission::submit_data_encrypted};
 use actix_cors::Cors;
 use actix_extensible_rate_limit::{
     backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
@@ -10,6 +10,7 @@ use actix_web::{
     App, HttpServer,
 };
 use auth::Auth;
+use data_submission::encipher::EncipherEncryptionService;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
@@ -69,6 +70,13 @@ async fn main() -> Result<(), std::io::Error> {
 
     let port = app_config.port;
 
+    let encipher_encryption_service = EncipherEncryptionService::new(
+        app_config.encipher_encryption_service_url.clone(),
+        app_config.encipher_encryption_service_version.clone(),
+    );
+
+    let shared_encipher_encryption_service = web::Data::new(encipher_encryption_service);
+
     let shared_config = web::Data::new(app_config);
 
     tokio::spawn(async move {
@@ -104,10 +112,12 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
+                    .app_data(shared_encipher_encryption_service.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
-                    .service(get_submission_info),
+                    .service(get_submission_info)
+                    .service(submit_data_encrypted),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?

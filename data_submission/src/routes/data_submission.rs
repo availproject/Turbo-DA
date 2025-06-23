@@ -6,6 +6,7 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
+use data_submission::encipher::EncipherEncryptionService;
 use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use log::error;
@@ -175,6 +176,100 @@ pub async fn submit_raw_data(
     });
 
     let _ = sender.send(consumer_response);
+
+    HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
+}
+
+/// Request payload for submitting string data
+#[derive(Deserialize, Serialize, Clone)]
+pub struct SubmitDataEncrypted {
+    pub data: String,
+}
+
+/// Handles submission of string data encrypted
+///
+/// # Arguments
+/// * `request_payload` - JSON payload containing the data string
+/// * `sender` - Channel sender for broadcasting responses
+/// * `injected_dependency` - Database connection pool
+/// * `config` - Application configuration
+/// * `http_request` - HTTP request containing user authentication
+///
+/// # Returns
+/// * JSON response with submission ID on success
+/// * Error response if user validation or database operations fail
+#[post("/submit_data_encrypted")]
+pub async fn submit_data_encrypted(
+    request_payload: web::Json<SubmitDataEncrypted>,
+    sender: web::Data<Sender<Response>>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
+    http_request: HttpRequest,
+    encipher_encryption_service: web::Data<EncipherEncryptionService>,
+) -> impl Responder {
+    if request_payload.data.len() == 0 {
+        return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
+    }
+    let user = match retrieve_user_id(http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+        Ok(app) => app,
+        Err(e) => {
+            return HttpResponse::InternalServerError().body(e);
+        }
+    };
+
+    drop(connection);
+
+    let encrypted_data = match encipher_encryption_service
+        .encrypt(request_payload.data.as_bytes().to_vec())
+        .await
+    {
+        Ok(encrypted_data) => encrypted_data,
+        Err(e) => {
+            error!("Failed to encrypt data: {}", e);
+            return HttpResponse::InternalServerError().body(e.to_string());
+        }
+    };
+
+    let submission_id = generate_submission_id();
+    let response = Response {
+        thread_id: map_user_id_to_thread(&config),
+        raw_payload: encrypted_data.clone().into(),
+        submission_id,
+        user_id: user.clone(),
+        app_id: avail_app_id,
+    };
+
+    let expenditure_entry = CreateCustomerExpenditure {
+        amount_data: format_size(encrypted_data.len()),
+        user_id: user,
+        id: submission_id,
+        error: None,
+        payload: Some(encrypted_data),
+    };
+
+    tokio::spawn(async move {
+        let mut connection = match get_connection(&injected_dependency).await {
+            Ok(conn) => conn,
+            Err(_) => {
+                error!("couldn't connect to db with error ");
+                return;
+            }
+        };
+
+        create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
+    });
+
+    let _ = sender.send(response);
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
 }
