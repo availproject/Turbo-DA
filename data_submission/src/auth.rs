@@ -1,7 +1,9 @@
 use crate::redis::Redis;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    error as actix_error, Error,
+    error as actix_error,
+    http::header::HeaderMap,
+    Error,
 };
 use db::{
     models::api::ApiKey,
@@ -10,9 +12,12 @@ use db::{
 use diesel::prelude::*;
 use diesel::QueryDsl;
 use futures_util::future::LocalBoxFuture;
-use log::{debug, error, info};
 use sha3::{Digest, Keccak256};
-use std::future::{ready, Ready};
+use std::{
+    fmt::Display,
+    future::{ready, Ready},
+};
+use turbo_da_core::logger::{debug, error, info, warn};
 
 pub struct Auth {
     redis: Redis,
@@ -78,31 +83,27 @@ where
         let mut hasher = Keccak256::new();
         hasher.update(x_api_key.as_bytes());
         let api_key_hash = hex::encode(hasher.finalize());
-        let headers = req.headers_mut();
+        let mut headers = req.headers_mut();
         // 1. Check if there is any entry in redis for the api key => don't make a call to db
         let redis_search = self.redis.get(api_key_hash.as_str());
 
         match redis_search {
             Ok(value) => {
-                if let (Ok(user_id_key), Ok(user_id_value)) = (
-                    "user_id".parse::<actix_web::http::header::HeaderName>(),
-                    value.parse::<actix_web::http::header::HeaderValue>(),
-                ) {
-                    headers.insert(user_id_key, user_id_value);
-                } else {
-                    log::warn!("Failed to parse user_id or its value");
-                    return Box::pin(async move {
-                        Err(actix_error::ErrorInternalServerError(
-                            "Failed to process user_id",
-                        ))
-                    });
+                let user = value.split(":").next().unwrap();
+                let account = value.split(":").nth(1).unwrap();
+
+                if let Err(e) = insert_headers(&mut headers, "user_id", &user) {
+                    return e;
+                }
+                if let Err(e) = insert_headers(&mut headers, "app_id", &account) {
+                    return e;
                 }
             }
             Err(_) => {
                 let mut conn = match PgConnection::establish(&self.database_url) {
                     Ok(conn) => conn,
                     Err(e) => {
-                        error!("Failed to connect to database: {}", e);
+                        error(&format!("Failed to connect to database: {}", e));
                         return Box::pin(async move {
                             Err(actix_error::ErrorInternalServerError(
                                 "Internal error. Contact admin",
@@ -110,8 +111,9 @@ where
                         });
                     }
                 };
+
                 // 2. If there is no entry in redis, make a call to db and update redis
-                let api_key_info: Result<ApiKey, diesel::result::Error> = api_keys
+                let api_key_info = api_keys
                     .filter(api_keys::api_key.eq(api_key_hash.as_str()))
                     .select(ApiKey::as_select())
                     .first::<ApiKey>(&mut conn);
@@ -124,32 +126,31 @@ where
                             ))
                         });
                     }
-                    Ok(entry) => {
-                        if let (Ok(user_id_key), Ok(user_id_value)) = (
-                            "user_id".parse::<actix_web::http::header::HeaderName>(),
-                            entry
-                                .user_id
-                                .to_string()
-                                .parse::<actix_web::http::header::HeaderValue>(),
-                        ) {
-                            headers.insert(user_id_key, user_id_value);
-                        } else {
-                            log::warn!("Failed to parse user_id or its value");
-                            return Box::pin(async move {
-                                Err(actix_error::ErrorInternalServerError(
-                                    "Failed to process user_id",
-                                ))
-                            });
+                    Ok(key) => {
+                        if let Err(e) = insert_headers(&mut headers, "user_id", &key.user_id) {
+                            return e;
                         }
-                        match self
-                            .redis
-                            .set(api_key_hash.as_str(), entry.user_id.to_string().as_str())
-                        {
+                        if let Err(e) = insert_headers(&mut headers, "app_id", &key.app_id) {
+                            return e;
+                        }
+
+                        println!(
+                            "Setting API key in redis for user {}:{}",
+                            key.user_id, key.app_id
+                        );
+                        match self.redis.set(
+                            api_key_hash.as_str(),
+                            format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())
+                                .as_str(),
+                        ) {
                             Ok(_) => {
-                                info!("API key set in redis for user {}", entry.user_id);
+                                info(&format!(
+                                    "API key set in redis for user {}:{}",
+                                    key.user_id, key.app_id
+                                ));
                             }
                             Err(e) => {
-                                error!("Failed to set API key in redis: {}", e);
+                                error(&format!("Failed to set API key in redis: {}", e));
                             }
                         }
                     }
@@ -162,8 +163,30 @@ where
         Box::pin(async move {
             let res = fut.await?;
 
-            debug!("API key {} is valid", api_key_hash);
+            debug(&format!("API key {} is valid", api_key_hash));
             Ok(res)
         })
+    }
+}
+
+fn insert_headers<B, T: Display>(
+    headers: &mut HeaderMap,
+    key: &str,
+    value: &T,
+) -> Result<(), LocalBoxFuture<'static, Result<ServiceResponse<B>, Error>>> {
+    if let (Ok(parsed_key), Ok(parsed_value)) = (
+        key.parse::<actix_web::http::header::HeaderName>(),
+        value
+            .to_string()
+            .parse::<actix_web::http::header::HeaderValue>(),
+    ) {
+        headers.insert(parsed_key, parsed_value);
+        Ok(())
+    } else {
+        let error_message = format!("Failed to parse {} or its value", key);
+        warn(&error_message);
+        Err(Box::pin(async move {
+            Err(actix_error::ErrorInternalServerError(error_message))
+        }))
     }
 }

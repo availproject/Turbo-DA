@@ -1,3 +1,5 @@
+/// Logging utilities
+use crate::logger::{error, info};
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
@@ -9,19 +11,17 @@ use actix_web::{
     web::{self},
     HttpRequest, HttpResponse, Responder,
 };
+use bigdecimal::BigDecimal;
 /// Database models and schema definitions
 use db::{
-    models::{
-        api::{ApiKey, ApiKeyCreate},
-        user_model::{User, UserCreate},
+    controllers::{
+        apps::{create_account, delete_account_by_id},
+        users::user_exists,
     },
-    schema::{api_keys::dsl::*, users::dsl::*},
+    models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
 };
 /// Database and async connection handling
-use diesel::{prelude::*, result::Error};
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-/// Logging utilities
-use log::{error, info};
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 /// Redis caching functionality
 use redis::Commands;
 /// Serialization/deserialization
@@ -38,75 +38,208 @@ use validator::Validate;
 #[derive(Deserialize, Serialize)]
 struct GetAllUsersParams {
     limit: Option<i64>,
+    user_id: Option<String>,
 }
 
 /// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
     pub name: Option<String>,
-    pub app_id: i32,
+}
+
+/// Request payload for user registration
+#[derive(Deserialize, Serialize, Validate)]
+pub(crate) struct RegisterAccount {
+    pub avail_app_id: Option<i32>,
+    pub fallback_enabled: bool,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
+}
+
+/// Request payload for user registration
+#[derive(Deserialize, Serialize, Validate)]
+pub(crate) struct EditAccount {
+    pub app_id: Uuid,
+    pub avail_app_id: Option<i32>,
+    pub fallback_enabled: Option<bool>,
+    pub app_name: Option<String>,
+    pub app_description: Option<String>,
+    pub app_logo: Option<String>,
 }
 
 /// Request payload for updating a user's app ID
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct UpdateAppID {
-    pub app_id: i32,
+    /// The available app ID to be assigned
+    pub avail_app_id: i32,
+    /// The UUID of the app to update
+    pub app_id: Uuid,
 }
 
-/// Retrieves a list of all users with optional limit
+/// Retrieves a list of all users with optional filtering
 ///
-/// # Arguments
-/// * `payload` - Query parameters containing optional limit
-/// * `config` - Application configuration
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Returns a paginated list of users in the system, with optional filtering by user ID and limit parameters.
+///
+/// # Route
+/// `GET /v1/user/get_all_users`
+///
+/// # Query Parameters
+/// * `limit` - Optional parameter to limit the number of users returned (default: no limit)
+/// * `user_id` - Optional parameter to filter users by specific user ID
 ///
 /// # Returns
-/// JSON response containing list of users or error
+/// JSON response containing a list of users or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Users retrieved successfully",
+///   "data": [
+///     {
+///       "id": "user1@example.com",
+///       "name": "User One",
+///       "credit_balance": "100.00",
+///       "credit_used": "25.50",
+///       "allocated_credit_balance": "200.00"
+///     },
+///     {
+///       "id": "user2@example.com",
+///       "name": "User Two",
+///       "credit_balance": "50.00",
+///       "credit_used": "10.25",
+///       "allocated_credit_balance": "100.00"
+///     }
+///   ]
+/// }
+/// ```
 #[get("/get_all_users")]
 pub async fn get_all_users(
     payload: web::Query<GetAllUsersParams>,
-    config: web::Data<AppConfig>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    let limit = payload.into_inner().limit;
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let final_limit = match limit {
-        Some(l) => l,
-        None => config.total_users_query_limit,
-    };
-    let results = users
-        .limit(final_limit)
-        .select(User::as_select())
-        .load(&mut *connection)
-        .await
-        .expect("Error loading users");
+    let results =
+        db::controllers::users::get_all_users(&mut connection, &payload.user_id, &payload.limit)
+            .await;
 
-    HttpResponse::Ok().json(json!({"results":results}))
+    HttpResponse::Ok().json(json!({
+        "state": "SUCCESS",
+        "message": "Users retrieved successfully",
+        "data": results,
+    }))
 }
 
-/// Retrieves details for the authenticated user.
+/// Query parameters for retrieving apps with optional limit
+#[derive(Deserialize, Serialize)]
+struct GetAllAppsParams {
+    limit: Option<i64>,
+    user_id: Option<String>,
+    app_id: Option<Uuid>,
+}
+/// Retrieves all apps in the system (admin only)
+///
+/// # Description
+/// Gets a list of all applications in the system. This endpoint is restricted to admin users only.
+///
+/// # Route
+/// `GET /v1/admin/get_all_apps`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication (requires admin privileges)
+///
+/// # Query Parameters
+/// * `limit` (optional): Maximum number of apps to return
+/// * `user_id` (optional): Filter apps by user ID
+/// * `app_id` (optional): Filter apps by app ID
+///
+/// # Returns
+/// JSON response containing the list of apps or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Apps retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "app_id": 1001,
+///       "app_name": "My App",
+///       "app_description": "App description",
+///       "app_logo": "logo_url",
+///       "credit_balance": "25.00",
+///       "credit_used": "5.50",
+///       "fallback_credit_used": "0.00",
+///       "fallback_enabled": true,
+///       "metadata_path": "path/to/metadata",
+///       "created_at": "2024-01-01T12:00:00Z",
+///       "updated_at": "2024-01-01T12:00:00Z"
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_all_apps")]
+pub async fn get_all_apps(
+    payload: web::Query<GetAllAppsParams>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let apps =
+        db::controllers::apps::get_all_apps(&mut connection, &payload.user_id, &payload.app_id)
+            .await;
+
+    match apps {
+        Ok(apps) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Apps retrieved successfully",
+            "data": apps,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+/// Retrieves details for the authenticated user
 ///
 /// # Description
 /// Gets user details based on the email address from the authentication token.
 ///
 /// # Route
-/// `GET v1/user/get_user`
+/// `GET /v1/user/get_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Returns
-/// An `HttpResponse` containing the user's details or an appropriate error message.
+/// JSON response containing user details or an appropriate error message
 ///
 /// # Example Response
 /// ```json
 /// {
-///   "id": "1",
-///   "name": "John Doe",
-///   "email": "john@example.com",
-///   "app_id": 1001,
-///   "assigned_wallet": "0x123..."
+///   "state": "SUCCESS",
+///   "message": "User retrieved successfully",
+///   "data": {
+///     "id": "user@example.com",
+///     "name": "John Doe",
+///     "credit_balance": "50.00",
+///     "credit_used": "10.25",
+///     "allocated_credit_balance": "100.00"
+///   }
 /// }
 /// ```
 
@@ -117,7 +250,12 @@ pub async fn get_user(
 ) -> impl Responder {
     let user_email = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Email not retrieved",
+            }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -125,31 +263,52 @@ pub async fn get_user(
         Err(response) => return response,
     };
 
-    handle_getuser_query(&mut connection, user_email).await
+    let user = db::controllers::users::get_user(&mut connection, &user_email).await;
+    match user {
+        Ok(user) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "User retrieved successfully",
+            "data": user,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
 }
 
-/// Registers a new user in the system.
+/// Registers a new user in the system
 ///
 /// # Description
-/// Creates a new user account with the provided name and app_id. The email address is extracted from
+/// Creates a new user account with the provided name. The email address is extracted from
 /// the authentication token.
 ///
 /// # Route
-/// `POST v1/users/register_new_user`
+/// `POST /v1/user/register_new_user`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
 /// {
-///   "name": "John Doe",
-///   "app_id": 1001
+///   "name": "John Doe"
 /// }
 /// ```
 ///
 /// # Returns
-/// - 200 OK with success message if registration succeeds
-/// - 409 Conflict if user already exists
-/// - 400 Bad Request if validation fails
-/// - 500 Internal Server Error if user info cannot be retrieved
+/// * 200 OK with success message if registration succeeds
+/// * 409 Conflict if user already exists
+/// * 400 Bad Request if validation fails
+/// * 500 Internal Server Error if user info cannot be retrieved
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Success: John Doe"
+/// }
+/// ```
 
 #[post("/register_new_user")]
 pub async fn register_new_user(
@@ -158,7 +317,10 @@ pub async fn register_new_user(
     http_request: HttpRequest,
 ) -> impl Responder {
     if let Err(errors) = payload.validate() {
-        return HttpResponse::BadRequest().json(errors);
+        return HttpResponse::BadRequest().json(json!({
+            "state": "ERROR",
+            "error": errors,
+        }));
     }
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -168,50 +330,526 @@ pub async fn register_new_user(
 
     let mut user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Email not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Email not retrieved",
+            }))
+        }
     };
 
     if user_exists(&mut connection, user.as_mut_str())
         .await
         .is_ok_and(|exists| exists)
     {
-        return HttpResponse::Conflict().body("User already exists");
+        return HttpResponse::Conflict().json(json!({
+            "state": "ERROR",
+            "error": "User already exists",
+        }));
     }
-    let username = match &payload.name {
-        Some(val) => val.clone(),
-        None => user.split('@').next().unwrap_or("").to_string(),
-    };
 
     let username = match payload.name.clone() {
         Some(val) => val,
         None => user.split("@").next().unwrap().to_string(),
     };
 
-    let tx = diesel::insert_into(users)
-        .values(UserCreate {
+    let tx = db::controllers::users::register_new_user(
+        &mut connection,
+        UserCreate {
             id: user,
             name: username.clone(),
-            app_id: payload.app_id,
-        })
-        .execute(&mut *connection)
-        .await;
+        },
+    )
+    .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "message": format!("Success: {}", username) })),
-        Err(e) => HttpResponse::NotAcceptable().json(json!({ "error": format!("Error: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": format!("Success: {}", username),
+        })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({
+            "state": "ERROR",
+            "error": format!("Error: {}", e)
+        })),
+    }
+}
+/// Generate an app account for a user
+///
+/// # Description
+/// Creates a new account with fallback settings and optional app details. The user ID is extracted from
+/// the authentication token.
+///
+/// # Route
+/// `POST /v1/user/generate_app_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "avail_app_id": 1001,
+///   "fallback_enabled": true,
+///   "app_name": "My Application",
+///   "app_description": "Description of my application",
+///   "app_logo": "https://example.com/logo.png"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK with account details if creation succeeds
+/// * 400 Bad Request if validation fails
+/// * 406 Not Acceptable if account creation fails
+/// * 500 Internal Server Error if user info cannot be retrieved
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Account created successfully",
+///   "data": {
+///     "id": "uuid-string",
+///     "user_id": "user@example.com",
+///     "app_id": 1001,
+///     "credit_balance": "0",
+///     "credit_used": "0",
+///     "fallback_enabled": true,
+///     "app_name": "My Application",
+///     "app_description": "Description of my application",
+///     "app_logo": "https://example.com/logo.png"
+///   }
+/// }
+/// ```
+
+#[post("/generate_app_account")]
+pub async fn generate_app_account(
+    payload: web::Json<RegisterAccount>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    if let Err(errors) = payload.validate() {
+        return HttpResponse::BadRequest().json(json!({
+            "state": "ERROR",
+            "error": errors,
+        }));
+    }
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let app_id = Uuid::new_v4();
+    let avail_app_id = payload.avail_app_id.unwrap_or(0);
+    let account = AppsCreate {
+        id: app_id,
+        user_id: user,
+        app_id: avail_app_id,
+        credit_balance: BigDecimal::from(0),
+        credit_used: BigDecimal::from(0),
+        fallback_enabled: payload.fallback_enabled,
+        app_name: payload.app_name.clone(),
+        app_description: payload.app_description.clone(),
+        app_logo: payload.app_logo.clone(),
+    };
+
+    let tx = create_account(&mut connection, &account).await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Account created successfully",
+            "data": account
+        })),
+        Err(e) => HttpResponse::NotAcceptable().json(json!({
+            "state": "ERROR",
+            "error": format!("Error: {}", e)
+        })),
+    }
+}
+/// Updates an existing app account with new information
+///
+/// # Description
+/// Allows a user to update the details of an existing application account, including app name,
+/// description, logo, and other settings.
+///
+/// # Route
+/// `PUT /v1/user/edit_app_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": "uuid-string",
+///   "avail_app_id": 1001,
+///   "fallback_enabled": true,
+///   "app_name": "Updated App Name",
+///   "app_description": "Updated app description",
+///   "app_logo": "https://example.com/logo.png"
+/// }
+/// ```
+///
+/// # Returns
+/// JSON response indicating success or failure of the update operation
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "App account updated successfully"
+/// }
+/// ```
+#[put("/edit_app_account")]
+pub async fn edit_app_account(
+    payload: web::Json<EditAccount>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let app_result =
+        db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id).await;
+    if app_result.is_err() {
+        return HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": app_result.err().unwrap().to_string(),
+        }));
+    }
+    let mut account = app_result.unwrap();
+
+    account.app_name = payload.app_name.clone();
+    account.app_description = payload.app_description.clone();
+    account.app_logo = payload.app_logo.clone();
+
+    if let Some(fallback_enabled) = payload.fallback_enabled {
+        if fallback_enabled != account.fallback_enabled {
+            account.fallback_enabled = fallback_enabled;
+        }
+    }
+
+    let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "App account updated successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+/// Retrieves all apps for the authenticated user
+///
+/// # Description
+/// Gets a list of all applications associated with the authenticated user.
+///
+/// # Route
+/// `GET /v1/user/get_apps`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Returns
+/// JSON response containing the list of apps or an appropriate error message
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Apps retrieved successfully",
+///   "data": [
+///     {
+///       "id": "uuid-string",
+///       "user_id": "user@example.com",
+///       "app_id": 1001,
+///       "credit_balance": "25.00",
+///       "credit_used": "5.50",
+///       "fallback_enabled": true
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_apps")]
+pub async fn get_apps(
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let apps = db::controllers::apps::get_apps(&mut connection, &user).await;
+
+    match apps {
+        Ok(apps) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Apps retrieved successfully",
+            "data": apps,
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
-/// Generates a new API key for the authenticated user
+#[derive(Deserialize, Serialize, Validate)]
+pub struct DeleteAccount {
+    pub app_id: Uuid,
+}
+
+/// Delete an account for the authenticated user
 ///
-/// # Arguments
-/// * `http_request` - The HTTP request containing user authentication
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Deletes the specified account associated with the authenticated user.
+///
+/// # Route
+/// `DELETE /v1/user/delete_account`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": "uuid-string"
+/// }
+/// ```
 ///
 /// # Returns
-/// JSON response containing the new API key or error message
+/// * 200 OK with success message if deletion succeeds
+/// * 404 Not Found if account doesn't exist
+/// * 500 Internal Server Error if deletion fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Account successfully deleted"
+/// }
+/// ```
+
+#[delete("/delete_account")]
+pub async fn delete_account(
+    payload: web::Json<DeleteAccount>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    // Delete the account
+    let tx = delete_account_by_id(&mut connection, user.clone(), payload.app_id).await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Account successfully deleted",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": format!("Error deleting account: {}", e),
+        })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct AllocateCreditBalance {
+    pub amount: BigDecimal,
+    pub app_id: Uuid,
+}
+
+/// Allocate credit balance to a user account
+///
+/// # Description
+/// Allocates the specified amount of credits to the user's account.
+///
+/// # Route
+/// `POST /v1/user/allocate_credit_balance`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "amount": "100.00",
+///   "app_id": "uuid-string"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK with success message if allocation succeeds
+/// * 500 Internal Server Error if allocation fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Credit balance allocated successfully"
+/// }
+/// ```
+
+#[post("/allocate_credit_balance")]
+pub async fn allocate_credit(
+    payload: web::Json<AllocateCreditBalance>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let tx = db::controllers::misc::allocate_credit_balance(
+        &mut connection,
+        &payload.app_id,
+        &user,
+        &payload.amount,
+    )
+    .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Credit balance allocated successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct ReclaimCredits {
+    pub app_id: Uuid,
+    pub amount: BigDecimal,
+}
+
+#[post("/reclaim_credits")]
+pub async fn reclaim_credits(
+    payload: web::Json<ReclaimCredits>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let tx = db::controllers::misc::reclaim_credits(
+        &mut connection,
+        &payload.app_id,
+        &user,
+        &payload.amount,
+    )
+    .await;
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Credits reclaimed successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct GenerateApiKey {
+    pub app_id: Uuid,
+}
+
+/// Generate a new API key for the authenticated user
+///
+/// # Description
+/// Creates a new API key associated with the specified account.
+///
+/// # Route
+/// `POST /v1/user/generate_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": "uuid-string"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK with the new API key if generation succeeds
+/// * 500 Internal Server Error if generation fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "API key created successfully",
+///   "data": {
+///     "api_key": "abcdef1234567890"
+///   }
+/// }
+/// ```
+
 #[post("/generate_api_key")]
 async fn generate_api_key(
+    payload: web::Json<GenerateApiKey>,
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
@@ -230,37 +868,77 @@ async fn generate_api_key(
     let mut hasher = Keccak256::new();
     hasher.update(key.as_bytes());
     let hashed_password = hasher.finalize();
-    let tx = diesel::insert_into(api_keys)
-        .values(ApiKeyCreate {
+    let tx = db::controllers::api_keys::create_api_key(
+        &mut connection,
+        &ApiKeyCreate {
             api_key: hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
-        })
-        .execute(&mut *connection)
-        .await;
+            app_id: payload.app_id,
+        },
+    )
+    .await;
 
     match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({ "api_key": key })),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "API key created successfully",
+            "data": {
+                "api_key": key
+            }
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
-/// Retrieves all API keys for the authenticated user
+/// Retrieve all API keys for the authenticated user
 ///
-/// # Arguments
-/// * `http_request` - The HTTP request containing user authentication
-/// * `injected_dependency` - Database connection pool
+/// # Description
+/// Returns a list of all API keys associated with the authenticated user.
+///
+/// # Route
+/// `GET /v1/user/get_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Returns
-/// JSON response containing list of API keys or error message
-#[get("/get_api_key")]
-pub async fn get_api_key(
+/// * 200 OK with a list of API keys if retrieval succeeds
+/// * 500 Internal Server Error if retrieval fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "API key retrieved successfully",
+///   "data": [
+///     {
+///       "api_key": "***********abc12",
+///       "identifier": "abc12",
+///       "created_at": "2023-01-01T12:00:00Z",
+///       "user_id": "user-id-string",
+///       "app_id": "uuid-string"
+///     }
+///   ]
+/// }
+/// ```
+
+#[get("/get_api_keys")]
+pub async fn get_api_keys(
     http_request: HttpRequest,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -268,15 +946,18 @@ pub async fn get_api_key(
         Err(response) => return response,
     };
 
-    let query = api_keys
-        .filter(user_id.eq(user))
-        .select(ApiKey::as_select())
-        .load(&mut *connection)
-        .await;
+    let query = db::controllers::api_keys::get_api_keys(&mut connection, &user).await;
 
     match query {
-        Ok(key) => HttpResponse::Ok().json(key),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(key) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "API key retrieved successfully",
+            "data": key
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
 }
 
@@ -286,13 +967,16 @@ pub struct DeleteApiKey {
     pub identifier: String,
 }
 
-/// Deletes an API key for the authenticated user.
+/// Delete an API key for the authenticated user
 ///
 /// # Description
 /// Removes the specified API key from both the database and Redis cache.
 ///
 /// # Route
-/// `DELETE v1/users/delete_api_key`
+/// `DELETE /v1/user/delete_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
@@ -302,9 +986,20 @@ pub struct DeleteApiKey {
 /// ```
 ///
 /// # Returns
-/// - 200 OK with deleted key identifier
-/// - 404 Not Found if key doesn't exist
-/// - 500 Internal Server Error if deletion fails
+/// * 200 OK with success message and deleted key identifier if deletion succeeds
+/// * 404 Not Found if key doesn't exist
+/// * 500 Internal Server Error if deletion fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "API key deleted successfully",
+///   "data": {
+///     "api_key": "abc12"
+///   }
+/// }
+/// ```
 
 #[delete("/delete_api_key")]
 async fn delete_api_key(
@@ -323,13 +1018,9 @@ async fn delete_api_key(
         Err(response) => return response,
     };
 
-    let query = diesel::delete(
-        api_keys
-            .filter(user_id.eq(user))
-            .filter(identifier.eq(&payload.identifier)),
-    )
-    .load::<ApiKey>(&mut *connection)
-    .await;
+    let query =
+        db::controllers::api_keys::delete_api_key(&mut connection, &user, &payload.identifier)
+            .await;
 
     match query {
         Ok(row) => {
@@ -340,36 +1031,55 @@ async fn delete_api_key(
             match redis::Client::open(config.redis_url.clone().as_str()) {
                 Ok(mut client) => {
                     let _result: Result<(), redis::RedisError> = client.del(hashed_key);
-                    info!("Deleted API key from Redis: {}", hashed_key);
+                    info(&format!("Deleted API key from Redis: {}", hashed_key));
                 }
                 Err(e) => {
-                    error!("Error connecting to Redis: {}", e);
+                    error(&format!("Error connecting to Redis: {}", e));
                 }
             }
-            return HttpResponse::Ok().json(json!({ "api_key": payload.identifier }));
+            return HttpResponse::Ok().json(json!({
+                "state": "SUCCESS",
+                "message": "API key deleted successfully",
+                "data": {
+                    "api_key": payload.identifier
+                }
+            }));
         }
         Err(e) => return HttpResponse::InternalServerError().body(e.to_string()),
     };
 }
 
-/// Updates the app_id for the authenticated user.
+/// Update the app_id for a user account
 ///
 /// # Description
-/// Changes the app_id associated with the user's account.
+/// Changes the app_id associated with the specified account.
 ///
 /// # Route
-/// `PUT v1/users/update_app_id`
+/// `PUT /v1/user/update_app_id`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
 ///
 /// # Request Body
 /// ```json
 /// {
-///   "app_id": 1002
+///   "avail_app_id": 1002,
+///   "app_id": "uuid-string"
 /// }
 /// ```
 ///
 /// # Returns
-/// - 200 OK with success message
-/// - 500 Internal Server Error if update fails
+/// * 200 OK with success message if update succeeds
+/// * 500 Internal Server Error if update fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "App ID updated successfully",
+///   "error": null
+/// }
+/// ```
 
 #[put("/update_app_id")]
 async fn update_app_id(
@@ -384,57 +1094,31 @@ async fn update_app_id(
 
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
     };
 
-    let query = diesel::update(users)
-        .filter(id.eq(user))
-        .set(app_id.eq(payload.app_id))
-        .execute(&mut *connection)
-        .await;
+    let query = db::controllers::apps::update_app_id(
+        &mut connection,
+        &payload.app_id,
+        &user,
+        payload.avail_app_id,
+    )
+    .await;
 
     match query {
-        Ok(result) => HttpResponse::Ok().json(format!("Success: {}", result)),
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "App ID updated successfully",
+            "error": null
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
     }
-}
-
-/// Helper function to retrieve user details by email.
-///
-/// # Arguments
-/// * `connection` - Database connection
-/// * `mail` - Email address to look up
-///
-/// # Returns
-/// HttpResponse containing user details or appropriate error
-
-async fn handle_getuser_query(connection: &mut AsyncPgConnection, mail: String) -> HttpResponse {
-    match users
-        .filter(id.eq(mail))
-        .select(User::as_select())
-        .first::<User>(connection)
-        .await
-    {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(Error::NotFound) => HttpResponse::NotFound().body("User not found"),
-        Err(_) => HttpResponse::InternalServerError().body("Database error"),
-    }
-}
-
-/// Checks if a user exists by email address.
-///
-/// # Arguments
-/// * `connection` - Database connection
-/// * `user_email` - Email address to check
-///
-/// # Returns
-/// Result containing boolean indicating if user exists
-
-pub async fn user_exists(
-    connection: &mut AsyncPgConnection,
-    user_email: &str,
-) -> Result<bool, Error> {
-    diesel::select(diesel::dsl::exists(users.filter(id.eq(user_email))))
-        .get_result(connection)
-        .await
 }
