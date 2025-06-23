@@ -1,4 +1,8 @@
-use crate::{redis::Redis, routes::data_submission::submit_data_encrypted};
+use crate::{
+    encipher::avail_client::AvailDaClient,
+    redis::Redis,
+    routes::{data_retrieval::decrypt_data, data_submission::submit_data_encrypted},
+};
 use actix_cors::Cors;
 
 use actix_web::{
@@ -25,11 +29,11 @@ use workload_scheduler::consumer::Consumer;
 
 mod auth;
 mod config;
+mod encipher;
 mod redis;
 mod routes;
 mod utils;
 mod workload_scheduler;
-mod encipher;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -73,6 +77,11 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_encipher_encryption_service = web::Data::new(encipher_encryption_service);
 
+    // Taking the first Avail DA client rpc url for now
+    // TODO : need to change it to optmial approach to choose the best RPC endpoint
+    let avail_da_client = AvailDaClient::new(app_config.avail_rpc_endpoint[0].clone()).await;
+    let shared_avail_da_client = web::Data::new(avail_da_client);
+
     let shared_config = web::Data::new(app_config);
 
     tokio::spawn(async move {
@@ -98,11 +107,13 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
                     .app_data(shared_encipher_encryption_service.clone())
+                    .app_data(shared_avail_da_client.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
                     .service(get_submission_info)
-                    .service(submit_data_encrypted),
+                    .service(submit_data_encrypted)
+                    .service(decrypt_data),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?

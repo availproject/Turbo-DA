@@ -15,3 +15,15 @@ pub struct EncryptResponse {
     pub address: Address,
     pub ephemeral_pub_key: Vec<u8>,
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DecryptRequest {
+    pub app_id: u32,
+    pub ciphertext: Vec<u8>,
+    pub ephemeral_pub_key: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DecryptResponse {
+    pub plaintext: Vec<u8>,
+}

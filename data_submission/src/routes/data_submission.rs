@@ -1,4 +1,6 @@
 use crate::config::AppConfig;
+use crate::encipher::types::EncryptRequest;
+use crate::encipher::EncipherEncryptionService;
 use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
 use actix_web::{
@@ -6,13 +8,10 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use crate::encipher::EncipherEncryptionService;
-use db::models::customer_expenditure::CreateCustomerExpenditure;
-use db::{
-    controllers::{
-        customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
-    },
+use db::controllers::{
+    customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
 };
+use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -263,7 +262,10 @@ pub async fn submit_data_encrypted(
     drop(connection);
 
     let encrypted_data = match encipher_encryption_service
-        .encrypt(request_payload.data.as_bytes().to_vec())
+        .encrypt(EncryptRequest {
+            app_id: avail_app_id as u32,
+            plaintext: request_payload.data.as_bytes().to_vec(),
+        })
         .await
     {
         Ok(encrypted_data) => encrypted_data,
