@@ -1,7 +1,7 @@
 name: Development Release
 on:
   workflow_dispatch:
-    branches: [develop]
+    branches: [develop, develop-enigma]
     inputs:
       version:
         description: 'Version tag (follow semantic versioning: v1.2.3 or v0.1.0-alpha.1)'
