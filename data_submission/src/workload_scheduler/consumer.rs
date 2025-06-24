@@ -302,9 +302,6 @@ impl<'a> ProcessSubmitResponse<'a> {
                 (BigDecimal::from(0), tx_params.amount_data_billed.clone())
             };
 
-        println!("billed_from_fallback: {}", billed_from_fallback);
-        println!("billed_from_credit: {}", billed_from_credit);
-
         // Convert BigDecimal values to u64 and create wallet store
         let fallback_u64 = billed_from_fallback
             .round(0)
@@ -320,14 +317,6 @@ impl<'a> ProcessSubmitResponse<'a> {
         let mut wallet_store = vec![0u8; 32];
         wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
         wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
-
-        let retrieve_original_fallback =
-            i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
-        let retrieve_original_credit =
-            i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
-
-        println!("retrieve_original_fallback: {}", retrieve_original_fallback);
-        println!("retrieve_original_credit: {}", retrieve_original_credit);
 
         update_customer_expenditure(
             result,

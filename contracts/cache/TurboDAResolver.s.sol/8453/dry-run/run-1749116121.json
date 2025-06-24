@@ -1,0 +1,10 @@
+{
+  "transactions": [
+    {
+      "rpc": "https://base.llamarpc.com"
+    },
+    {
+      "rpc": "https://base.llamarpc.com"
+    }
+  ]
+}

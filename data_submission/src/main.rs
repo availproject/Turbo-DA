@@ -1,6 +1,7 @@
-use crate::redis::Redis;
+use crate::{rate_limiter::ApiKeyExtractor, redis::Redis};
 use actix_cors::Cors;
 
+use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     middleware::Logger,
     web::{self},
@@ -25,6 +26,7 @@ use workload_scheduler::consumer::Consumer;
 
 mod auth;
 mod config;
+mod rate_limiter;
 mod redis;
 mod routes;
 mod utils;
@@ -73,6 +75,12 @@ async fn main() -> Result<(), std::io::Error> {
 
     HttpServer::new(move || {
         let shared_producer_send = web::Data::new(sender.clone());
+        let governor_conf = GovernorConfigBuilder::default()
+            .key_extractor(ApiKeyExtractor)
+            .requests_per_minute(1)
+            .burst_size(1)
+            .finish()
+            .unwrap();
 
         App::new()
             .wrap(Cors::permissive())
@@ -80,6 +88,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(health_check)
             .service(
                 web::scope("/v1")
+                    .wrap(Governor::new(&governor_conf))
                     .wrap(Auth::new(
                         Redis::new(shared_config.redis_url.as_str()),
                         shared_config.database_url.clone(),

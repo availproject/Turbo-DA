@@ -21,11 +21,16 @@ toml.workspace = true
 diesel.workspace = true
 rand.workspace = true
 sha3.workspace = true
+chrono.workspace = true
 actix-extensible-rate-limit.workspace = true
 futures-util = "0.3.30"
+ratelimit = "0.10.0"
+async-rate-limiter = { version = "1", features = ["rt-tokio"] }
 r2d2 = "*"
 r2d2_redis = "*"
 redis.workspace = true
+actix-governor = "0.8"
+governor = "0.8.0"
 db = { path = "../db" }
 turbo-da-core = {path = "../turbo-da-core"}
 observability = { path = "../observability" }

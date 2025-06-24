@@ -134,10 +134,6 @@ where
                             return e;
                         }
 
-                        println!(
-                            "Setting API key in redis for user {}:{}",
-                            key.user_id, key.app_id
-                        );
                         match self.redis.set(
                             api_key_hash.as_str(),
                             format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())
