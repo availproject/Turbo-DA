@@ -32,6 +32,4 @@ observability = { path = "../observability" }
 avail-utils = {path = "../avail"}
 tracing-subscriber = { workspace = true, features = ["json"] }
 tracing = { workspace = true }
-reqwest = "0.12.9"
-serde_bytes = "0.11.0"
-alloy-primitives = { version = "1.1.2", features = ["serde"] }
+enigma = { path = "../enigma" }

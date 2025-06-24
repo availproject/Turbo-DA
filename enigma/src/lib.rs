@@ -1,26 +1,24 @@
-use crate::encipher::types::{DecryptRequest, EncryptRequest};
 use reqwest::Client;
-use types::{DecryptResponse, EncryptResponse};
+use types::{DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse};
 
-pub mod avail_client;
 pub mod types;
 
-/// Encipher encryption service
+/// Enigma encryption service
 ///
 /// # Arguments
-/// * `service_url` - The URL of the Encipher service
-/// * `service_version` - The version of the Encipher service
-pub struct EncipherEncryptionService {
+/// * `service_url` - The URL of the Enigma service
+/// * `service_version` - The version of the Enigma service
+pub struct EnigmaEncryptionService {
     pub(crate) service_url: String,
     pub(crate) service_version: String,
 }
 
-/// Encipher encryption service implementation
+/// Enigma encryption service implementation
 ///
 /// # Arguments
-/// * `service_url` - The URL of the Encipher service
-/// * `service_version` - The version of the Encipher service
-impl EncipherEncryptionService {
+/// * `service_url` - The URL of the Enigma service
+/// * `service_version` - The version of the Enigma service
+impl EnigmaEncryptionService {
     pub fn new(service_url: String, service_version: String) -> Self {
         Self {
             service_url,
@@ -28,7 +26,7 @@ impl EncipherEncryptionService {
         }
     }
 
-    /// Encrypts the payload using the Encipher service
+    /// Encrypts the payload using the Enigma service
     ///
     /// # Arguments
     /// * `payload` - EncryptRequest struct containing app_id and plaintext
@@ -49,7 +47,7 @@ impl EncipherEncryptionService {
         Ok(self.format_encrypt_response_to_data_submission(response))
     }
 
-    /// Decrypts the payload using the Encipher service
+    /// Decrypts the payload using the Enigma service
     ///
     /// # Arguments
     /// * `payload` - DecryptRequest struct containing app_id, ciphertext, and ephemeral_pub_key

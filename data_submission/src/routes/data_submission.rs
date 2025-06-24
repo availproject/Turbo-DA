@@ -1,6 +1,4 @@
 use crate::config::AppConfig;
-use crate::encipher::types::EncryptRequest;
-use crate::encipher::EncipherEncryptionService;
 use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
 use actix_web::{
@@ -13,6 +11,8 @@ use db::controllers::{
 };
 use db::models::customer_expenditure::CreateCustomerExpenditure;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::types::EncryptRequest;
+use enigma::EnigmaEncryptionService;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
@@ -227,7 +227,7 @@ pub async fn submit_data_encrypted(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
-    encipher_encryption_service: web::Data<EncipherEncryptionService>,
+    enigma_encryption_service: web::Data<EnigmaEncryptionService>,
 ) -> impl Responder {
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
@@ -261,10 +261,13 @@ pub async fn submit_data_encrypted(
 
     drop(connection);
 
-    let encrypted_data = match encipher_encryption_service
+    let submission_id = generate_submission_id();
+
+    let encrypted_data = match enigma_encryption_service
         .encrypt(EncryptRequest {
             app_id: avail_app_id as u32,
             plaintext: request_payload.data.as_bytes().to_vec(),
+            turbo_da_app_id: submission_id.clone(),
         })
         .await
     {
@@ -274,7 +277,6 @@ pub async fn submit_data_encrypted(
         }
     };
 
-    let submission_id = generate_submission_id();
     let response = Response {
         thread_id: map_user_id_to_thread(&config),
         raw_payload: encrypted_data.clone().into(),

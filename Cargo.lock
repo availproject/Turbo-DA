@@ -4113,7 +4113,6 @@ dependencies = [
  "actix-cors",
  "actix-extensible-rate-limit",
  "actix-web",
- "alloy-primitives 1.2.1",
  "avail-rust",
  "avail-utils",
  "bigdecimal",
@@ -4121,6 +4120,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "dotenv",
+ "enigma",
  "env_logger 0.10.2",
  "futures",
  "futures-util",
@@ -4130,9 +4130,7 @@ dependencies = [
  "r2d2_redis",
  "rand 0.8.5",
  "redis 0.28.2",
- "reqwest",
  "serde",
- "serde_bytes",
  "serde_json",
  "sha3",
  "tokio",
@@ -4746,6 +4744,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "enigma"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives 1.2.1",
+ "reqwest",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]

@@ -1,11 +1,13 @@
 use alloy_primitives::{Address, Signature};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EncryptRequest {
     pub app_id: u32,
     #[serde(with = "serde_bytes")]
     pub plaintext: Vec<u8>,
+    pub turbo_da_app_id: Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

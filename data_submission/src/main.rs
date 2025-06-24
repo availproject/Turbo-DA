@@ -1,5 +1,4 @@
 use crate::{
-    encipher::avail_client::AvailDaClient,
     redis::Redis,
     routes::{data_retrieval::decrypt_data, data_submission::submit_data_encrypted},
 };
@@ -29,7 +28,6 @@ use workload_scheduler::consumer::Consumer;
 
 mod auth;
 mod config;
-mod encipher;
 mod redis;
 mod routes;
 mod utils;
@@ -70,17 +68,12 @@ async fn main() -> Result<(), std::io::Error> {
 
     let port = app_config.port;
 
-    let encipher_encryption_service = encipher::EncipherEncryptionService::new(
+    let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
         app_config.encipher_encryption_service_url.clone(),
         app_config.encipher_encryption_service_version.clone(),
     );
 
-    let shared_encipher_encryption_service = web::Data::new(encipher_encryption_service);
-
-    // Taking the first Avail DA client rpc url for now
-    // TODO : need to change it to optmial approach to choose the best RPC endpoint
-    let avail_da_client = AvailDaClient::new(app_config.avail_rpc_endpoint[0].clone()).await;
-    let shared_avail_da_client = web::Data::new(avail_da_client);
+    let shared_enigma_encryption_service = web::Data::new(enigma_encryption_service);
 
     let shared_config = web::Data::new(app_config);
 
@@ -106,8 +99,7 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
-                    .app_data(shared_encipher_encryption_service.clone())
-                    .app_data(shared_avail_da_client.clone())
+                    .app_data(shared_enigma_encryption_service.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
