@@ -69,8 +69,8 @@ async fn main() -> Result<(), std::io::Error> {
     let port = app_config.port;
 
     let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
-        app_config.encipher_encryption_service_url.clone(),
-        app_config.encipher_encryption_service_version.clone(),
+        app_config.enigma_encryption_service_url.clone(),
+        app_config.enigma_encryption_service_version.clone(),
     );
 
     let shared_enigma_encryption_service = web::Data::new(enigma_encryption_service);

@@ -227,6 +227,7 @@ pub async fn decrypt_data(
     let decrypted_data = match enigma_encryption_service
         .decrypt(DecryptRequest {
             app_id: app_id as u32,
+            turbo_da_app_id: submission.app_id,
             ciphertext: ciphertext,
             ephemeral_pub_key: ephemeral_pub_key,
         })

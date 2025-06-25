@@ -21,6 +21,7 @@ pub struct EncryptResponse {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DecryptRequest {
     pub app_id: u32,
+    pub turbo_da_app_id: Uuid,
     pub ciphertext: Vec<u8>,
     pub ephemeral_pub_key: Vec<u8>,
 }
