@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub number_of_threads: i32,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
+    pub enigma_encryption_service_url: String,
+    pub enigma_encryption_service_version: String,
     pub private_keys: Vec<String>,
     pub broadcast_channel_size: usize,
     pub payload_size: usize,
@@ -32,6 +34,8 @@ impl Default for AppConfig {
             number_of_threads: 3,
             max_pool_size: 10,
             avail_rpc_endpoint: vec![],
+            enigma_encryption_service_url: String::new(),
+            enigma_encryption_service_version: String::new(),
             broadcast_channel_size: 100000,
             private_keys: vec![],
             payload_size: 1024 * 1024, // in bytes
@@ -225,6 +229,11 @@ impl AppConfig {
             index += 1;
         }
 
+        let enigma_encryption_service_url = env::var("ENIGMA_ENCRYPTION_SERVICE_URL")?;
+        // default to v1 if not set
+        let enigma_encryption_service_version =
+            env::var("ENIGMA_ENCRYPTION_SERVICE_VERSION").unwrap_or(String::from("v1"));
+
         Ok(AppConfig {
             port,
             database_url,
@@ -232,6 +241,8 @@ impl AppConfig {
             number_of_threads,
             max_pool_size,
             avail_rpc_endpoint,
+            enigma_encryption_service_url,
+            enigma_encryption_service_version,
             private_keys,
             broadcast_channel_size,
             payload_size,

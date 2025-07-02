@@ -1,4 +1,7 @@
-use crate::redis::Redis;
+use crate::{
+    redis::Redis,
+    routes::{data_retrieval::decrypt_data, data_submission::submit_data_encrypted},
+};
 use actix_cors::Cors;
 
 use actix_web::{
@@ -65,6 +68,13 @@ async fn main() -> Result<(), std::io::Error> {
 
     let port = app_config.port;
 
+    let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
+        app_config.enigma_encryption_service_url.clone(),
+        app_config.enigma_encryption_service_version.clone(),
+    );
+
+    let shared_enigma_encryption_service = web::Data::new(enigma_encryption_service);
+
     let shared_config = web::Data::new(app_config);
 
     tokio::spawn(async move {
@@ -89,10 +99,13 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
+                    .app_data(shared_enigma_encryption_service.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
-                    .service(get_submission_info),
+                    .service(get_submission_info)
+                    .service(submit_data_encrypted)
+                    .service(decrypt_data),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?
