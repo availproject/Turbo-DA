@@ -215,7 +215,7 @@ pub struct SubmitDataEncrypted {
 /// * `injected_dependency` - Database connection pool
 /// * `config` - Application configuration
 /// * `http_request` - HTTP request containing user authentication
-/// * `encipher_encryption_service` - Encipher encryption service
+/// * `enigma_encryption_service` - Enigma encryption service
 ///
 /// # Returns
 /// * JSON response with submission ID on success

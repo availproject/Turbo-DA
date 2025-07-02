@@ -159,7 +159,7 @@ struct DecryptDataRequest {
 /// # Arguments
 /// * `request_payload` - Query parameters containing submission ID
 /// * `injected_dependency` - Database connection pool
-/// * `encipher_encryption_service` - Encipher encryption service
+/// * `enigma_encryption_service` - Enigma encryption service
 ///
 /// # Returns
 /// * `HttpResponse` - JSON response containing submission details or error

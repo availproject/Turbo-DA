@@ -229,10 +229,10 @@ impl AppConfig {
             index += 1;
         }
 
-        let enigma_encryption_service_url = env::var("ENCIPHER_ENCRYPTION_SERVICE_URL")?;
+        let enigma_encryption_service_url = env::var("ENIGMA_ENCRYPTION_SERVICE_URL")?;
         // default to v1 if not set
         let enigma_encryption_service_version =
-            env::var("ENCIPHER_ENCRYPTION_SERVICE_VERSION").unwrap_or(String::from("v1"));
+            env::var("ENIGMA_ENCRYPTION_SERVICE_VERSION").unwrap_or(String::from("v1"));
 
         Ok(AppConfig {
             port,
