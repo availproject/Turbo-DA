@@ -1,7 +1,17 @@
-use avail_rust::hex::ToHex;
+use ark_poly_commit::{
+    Evaluations, LabeledPolynomial, Polynomial, PolynomialCommitment, QuerySet,
+    marlin_pc::MarlinKZG10,
+};
+
+use avail_core::{AppExtrinsic, BlockLengthColumns};
+use kate::{
+    M1NoPrecomp, Seed,
+    couscous::multiproof_params,
+    gridgen::core::{AsBytes, EvaluationGrid},
+};
+
 /// Core logic of generating extrinsic and submitting to Avail DA.
 use avail_rust::prelude::*;
-use avail_rust::transactions::SystemEvents::ExtrinsicFailed;
 use hex;
 
 #[derive(Debug)]
@@ -16,13 +26,13 @@ pub struct TransactionInfo {
 }
 
 pub struct SubmitDataAvail<'a> {
-    pub client: &'a SDK,
+    pub client: &'a Client,
     pub account: &'a Keypair,
     pub app_id: i32,
 }
 
 impl<'a> SubmitDataAvail<'a> {
-    pub fn new(client: &'a SDK, account: &'a Keypair, app_id: i32) -> Self {
+    pub fn new(client: &'a Client, account: &'a Keypair, app_id: i32) -> Self {
         SubmitDataAvail {
             client,
             account,
@@ -30,13 +40,26 @@ impl<'a> SubmitDataAvail<'a> {
         }
     }
     pub async fn submit_data(&self, data: &[u8]) -> Result<TransactionInfo, String> {
-        let options = Options::new().app_id(self.app_id as u32);
-        let tx = self.client.tx.data_availability.submit_data(data.to_vec());
+        let options = Options::new(Some(self.app_id as u32));
+
+        let commitments = hex::decode("b6907dd56f7ed12c09167e75c41ace9891d166c2af12648ef024d1fcd28c2b16abd66b86030f40ca007684ed164fa929").expect("we know its valid hex");
+
+        let tx = self
+            .client
+            .tx()
+            .data_availability()
+            .submit_data_with_commitments(data.to_vec(), commitments);
 
         let res = tx
-            .execute_and_watch_finalization(&self.account, options)
+            .sign_and_submit(&self.account, options)
             .await
             .map_err(|e| e.to_string())?;
+
+        let receipt = match res.receipt(true).await.map_err(|e| e.to_string())? {
+            Some(receipt) => receipt,
+            None => return Err("Transaction failed".to_string()),
+        };
+
         let fee = tx
             .payment_query_fee_details(&self.account, Some(options))
             .await

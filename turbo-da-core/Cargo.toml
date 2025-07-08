@@ -32,7 +32,7 @@ validator = { version = "0.16", features = ["derive"] }
 num-bigint = "0.4"
 jsonwebtoken = "9"
 chrono = { version = "0.4", features=["serde"] }
-thiserror = "1.0"
+thiserror = {workspace = true } 
 lazy_static = "1.4"
 bcrypt = { workspace = true }
 sha3 = {workspace = true}
@@ -44,7 +44,7 @@ worker = "0.3.3"
 redis = {workspace = true}
 rayon = "1.10.0"
 hex = { workspace = true }
-reqwest = { version = "0.12.9", features = ["blocking", "json"] }
+reqwest = { workspace = true }
 cron = { version = "0.8", optional = true }
 toml = { workspace = true }
 confy = {version = "0.3.1"}
