@@ -8,3 +8,5 @@ avail-rust.workspace = true
 hex.workspace = true
 avail-core = {  git = "https://github.com/availproject/avail-core", rev = "08364e189f355e20cdc8e8b8997d13a6913c1a89" }
 kate = { git = "https://github.com/availproject/avail-core", rev = "08364e189f355e20cdc8e8b8997d13a6913c1a89" }
+codec = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive", "bit-vec"] }
+thiserror-no-std = "2.0.2"

@@ -25,7 +25,7 @@ serde_json = "1.0"
 log = "0.4.22"
 rand = "0.8.5"
 env_logger = "0.10"
-avail-rust = { package="avail-rust-client", git="https://github.com/availproject/avail-rust", rev="17ea9e85c48845e13bf07eec1e2a450f729ef215"}
+avail-rust = { package="avail-rust-client", git="https://github.com/availproject/avail-rust", rev="284806ed852530ad82410629055015d2ecf8ebb0"}
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
 diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
