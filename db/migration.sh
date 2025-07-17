@@ -43,9 +43,9 @@ if [ ! -f .env ]; then
     echo "DATABASE_URL=${DATABASE_URL}" >.env
 fi
 
-# # Perform Diesel migrations
-# echo "🔄 Running Diesel migrations..."
-# diesel migration run --migration-dir ./migrations
+# Perform Diesel migrations
+echo "🔄 Running Diesel migrations..."
+diesel migration run --migration-dir ./migrations
 
 # Add debug output for connection details
 echo -e "\n📊 Database Connection Details:"

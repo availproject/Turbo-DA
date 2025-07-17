@@ -175,6 +175,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
+          chainId: activeNetworkId,
         }
       );
 
@@ -244,7 +245,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
 
       await writeContract(config, {
-        address: tokenAddress as `0x${string}`,
+        address: tokenAddress?.toLowerCase() as `0x${string}`,
         abi,
         functionName: "approve",
         args: [
