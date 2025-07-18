@@ -1,8 +1,12 @@
 name: Development Release
 on:
   workflow_dispatch:
-    branches: [develop]
     inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'develop'
+        type: string
       version:
         description: 'Version tag (follow semantic versioning: v1.2.3 or v0.1.0-alpha.1)'
         required: true
@@ -18,6 +22,11 @@ on:
         required: false
         default: ''
         type: string
+      network:
+        description: 'Network to deploy to'
+        required: false
+        default: 'hex'
+        type: string
 jobs:
   build-and-push:
     name: Build and Push Docker Images
@@ -26,14 +35,13 @@ jobs:
     strategy:
       matrix:
         service: [funds_monitor, fallback_monitor, turbo-da-core, data_submission]
-        network: [hex]
         stage: [development]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: ${{ github.event.inputs.branch }} 
       
       - name: Check if service should be built
         id: should_build
@@ -70,7 +78,7 @@ jobs:
         run: |
           DOCKERHUB_ORG="availj"
           DOCKERHUB_REPO="turboda"
-          NETWORK="${{ matrix.network }}"
+          NETWORK="${{ github.event.inputs.network }}"
           STAGE="${{ matrix.stage }}"
           IMAGE_TAG="${{ github.event.inputs.version }}"
           
