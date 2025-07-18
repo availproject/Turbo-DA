@@ -18,6 +18,11 @@ on:
         required: false
         default: ''
         type: string
+      network:
+        description: 'Network to deploy to'
+        required: false
+        default: 'hex'
+        type: string
 jobs:
   build-and-push:
     name: Build and Push Docker Images
@@ -26,7 +31,6 @@ jobs:
     strategy:
       matrix:
         service: [funds_monitor, fallback_monitor, turbo-da-core, data_submission]
-        network: [hex]
         stage: [development]
     
     steps:
@@ -70,7 +74,7 @@ jobs:
         run: |
           DOCKERHUB_ORG="availj"
           DOCKERHUB_REPO="turboda"
-          NETWORK="${{ matrix.network }}"
+          NETWORK="${{ github.event.inputs.network }}"
           STAGE="${{ matrix.stage }}"
           IMAGE_TAG="${{ github.event.inputs.version }}"
           
