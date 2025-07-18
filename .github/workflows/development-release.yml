@@ -1,8 +1,12 @@
 name: Development Release
 on:
   workflow_dispatch:
-    branches: [develop]
     inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'develop'
+        type: string
       version:
         description: 'Version tag (follow semantic versioning: v1.2.3 or v0.1.0-alpha.1)'
         required: true
@@ -37,7 +41,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: ${{ github.event.inputs.branch }} 
       
       - name: Check if service should be built
         id: should_build
