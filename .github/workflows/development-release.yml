@@ -1,6 +1,7 @@
 name: Development Release
 on:
   workflow_dispatch:
+    branches: [develop]
     inputs:
       version:
         description: 'Version tag (follow semantic versioning: v1.2.3 or v0.1.0-alpha.1)'
@@ -17,7 +18,11 @@ on:
         required: false
         default: ''
         type: string
-
+      network:
+        description: 'Network to deploy to'
+        required: false
+        default: 'hex'
+        type: string
 jobs:
   build-and-push:
     name: Build and Push Docker Images
@@ -26,12 +31,13 @@ jobs:
     strategy:
       matrix:
         service: [funds_monitor, fallback_monitor, turbo-da-core, data_submission]
-        network: [hex]
         stage: [development]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: develop
       
       - name: Check if service should be built
         id: should_build
@@ -68,7 +74,7 @@ jobs:
         run: |
           DOCKERHUB_ORG="availj"
           DOCKERHUB_REPO="turboda"
-          NETWORK="${{ matrix.network }}"
+          NETWORK="${{ github.event.inputs.network }}"
           STAGE="${{ matrix.stage }}"
           IMAGE_TAG="${{ github.event.inputs.version }}"
           
@@ -87,8 +93,6 @@ jobs:
           target: ${{ matrix.service }}
           push: true
           tags: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}
-          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-buildcache
-          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-buildcache,mode=max
           build-args: |
             NETWORK=${{ steps.meta.outputs.network }}
             STAGE=${{ steps.meta.outputs.stage }}
