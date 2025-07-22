@@ -116,7 +116,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const account = useAccount();
-  const { selected } = useAvailAccount();
+  const { selected, selectedWallet } = useAvailAccount();
   const { api } = useAvailWallet();
   const { setOpen } = useDialog();
   const { error: errorToast } = useAppToast();
@@ -165,9 +165,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (!selectedToken) {
       return;
     }
-    const tokenAddress =
-      selectedToken &&
-      TOKEN_MAP[selectedToken?.name.toLowerCase()]?.token_address;
+    const tokenKey = selectedToken?.name?.toLowerCase();
+    const tokenAddress = tokenKey ? TOKEN_MAP[tokenKey]?.token_address : undefined;
+    
+    if (!tokenAddress) {
+      console.error(`Token address not found for ${selectedToken?.name}`);
+      return;
+    }
+    
     setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
@@ -240,23 +245,35 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         return;
       }
 
-      const tokenAddress =
-        selectedToken &&
-        TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
+      const tokenKey = selectedToken?.name?.toLowerCase();
+      const tokenAddress = tokenKey ? TOKEN_MAP[tokenKey]?.token_address : undefined;
+      
+      if (!tokenAddress) {
+        setError(`Token address not found for ${selectedToken?.name}`);
+        setLoading(false);
+        return;
+      }
+
+      const contractAddress = process.env.NEXT_PUBLIC_ADDRESS;
+      if (!contractAddress) {
+        setError("Contract address not configured");
+        setLoading(false);
+        return;
+      }
 
       await writeContract(config, {
-        address: tokenAddress?.toLowerCase() as `0x${string}`,
+        address: tokenAddress.toLowerCase() as `0x${string}`,
         abi,
         functionName: "approve",
         args: [
-          process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+          contractAddress as `0x${string}`,
           parseUnits(tokenAmount, 18),
         ],
         chainId: activeNetworkId,
       })
         .then(async () => {
           await writeContract(config, {
-            address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+            address: contractAddress as `0x${string}`,
             abi: depositAbi,
             functionName: "depositERC20",
             args: [
@@ -316,11 +333,41 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     remarkMessage: string
   ) => {
     try {
-      const injector = getWalletBySource(account.source);
-      const options: Partial<LegacySignerOptions> = {
-        signer: injector?.signer,
-        app_id: 0,
-      };
+      // Get the proper signer from the wallet
+      const walletSource = account.source;
+      console.log("Getting signer for wallet source:", walletSource);
+      
+      if (!walletSource) {
+        return err(new Error("No wallet source available"));
+      }
+
+      // Enable the extension and get the injector
+      const { web3Enable, web3FromSource } = await import('@polkadot/extension-dapp');
+      
+      // Enable web3 extensions
+      const extensions = await web3Enable('Turbo DA Dashboard');
+      console.log("Available extensions:", extensions.length);
+      
+      if (extensions.length === 0) {
+        return err(new Error("No wallet extensions found. Please install a Polkadot wallet extension."));
+      }
+      
+      // Get the injector for this specific wallet
+      const injector = await web3FromSource(walletSource);
+      
+      if (!injector?.signer) {
+        return err(new Error(`No signer found for ${walletSource} wallet. Please make sure the wallet extension is installed and connected.`));
+      }
+
+      console.log("Signer found:", injector.signer);
+      console.log("Signer methods:", {
+        hasSignPayload: typeof injector.signer.signPayload === 'function',
+        hasSignRaw: typeof injector.signer.signRaw === 'function'
+      });
+
+      // Set the signer on the API instance
+      // @ts-ignore - Type incompatibility between polkadot/extension-dapp and avail-js-sdk signer types
+      api.setSigner(injector.signer);
 
       const transfer = api.tx.balances.transferKeepAlive(
         selected?.address as `0x${string}`,
@@ -330,18 +377,27 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
       //using batchall, so in case of the transfer not being successful, remark will not be executed.
       const batchCall = api.tx.utility.batchAll([transfer, remark]);
-      const txResult = await new Promise<ISubmittableResult>((resolve) => {
+      
+      console.log("About to submit transaction...");
+      
+      const txResult = await new Promise<ISubmittableResult>((resolve, reject) => {
         batchCall.signAndSend(
           selected?.address as `0x${string}`,
-          // @ts-expect-error
-          options,
+          // @ts-ignore - Type incompatibility between polkadot versions in different packages
           (result: ISubmittableResult) => {
             console.log(`Tx status: ${result.status}`);
-            if (result.isInBlock || result.isError) {
+            if (result.isInBlock) {
+              console.log("Transaction included in block");
+              resolve(result);
+            } else if (result.isError) {
+              console.log("Transaction error");
               resolve(result);
             }
           }
-        );
+        ).catch((error) => {
+          console.error("Transaction submission failed:", error);
+          reject(error);
+        });
       });
 
       const error = txResult.dispatchError;
@@ -555,20 +611,60 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <AvailWalletConnect
                       connectedChildren={
                         <Button
-                          onClick={() => {
+                          onClick={async () => {
+                            console.log("Buy Now button clicked - Avail chain");
+                            console.log("Initial validation:", { 
+                              hasApi: !!api, 
+                              hasSelected: !!selected, 
+                              hasSelectedWallet: !!selectedWallet,
+                              tokenAmount,
+                              selectedToken: selectedToken?.name,
+                              selectedChain: selectedChain?.name
+                            });
+
+                            if (!api || !selected) {
+                              console.error("API or selected account not available", { api, selected });
+                              errorToast?.({ label: "Wallet not connected properly" });
+                              return;
+                            }
+
+                            setLoading(true);
+                            setError("");
+
                             console.log({
                               api,
                               selected,
+                              selectedWallet,
+                              tokenAmount,
+                              selectedToken,
+                              selectedChain,
                             });
 
-                            batchTransferAndRemark(
-                              api!,
-                              selected!,
-                              parseUnits(tokenAmount, 18).toString(),
-                              "Buy Credits"
-                            );
+                            try {
+                              const result = await batchTransferAndRemark(
+                                api,
+                                selected,
+                                parseUnits(tokenAmount, 18).toString(),
+                                "Buy Credits"
+                              );
+
+                              if (result.isErr()) {
+                                throw new Error(result.error.message);
+                              }
+
+                              console.log("Transaction successful:", result.value);
+                              setTokenAmount("");
+                            } catch (error) {
+                              console.error("Transaction failed:", error);
+                              const message = error instanceof Error ? error.message : "Transaction failed";
+                              errorToast?.({ label: message });
+                              setError(message);
+                            } finally {
+                              setLoading(false);
+                            }
                           }}
                           variant={
+                            loading ||
                             !selectedToken ||
                             !selectedChain ||
                             !tokenAmount ||
