@@ -17,7 +17,7 @@ use diesel_async::{
 };
 use observability::{init_meter, init_tracer};
 use routes::{
-    data_retrieval::{get_pre_image, get_submission_info},
+    data_retrieval::{get_decrypt_request_data, get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
     health::health_check,
 };
@@ -105,7 +105,8 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(get_pre_image)
                     .service(get_submission_info)
                     .service(submit_data_encrypted)
-                    .service(decrypt_data),
+                    .service(decrypt_data)
+                    .service(get_decrypt_request_data),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?

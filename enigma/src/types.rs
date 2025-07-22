@@ -26,7 +26,34 @@ pub struct DecryptRequest {
     pub ephemeral_pub_key: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RequestStatus {
+    Pending,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DecryptResponse {
-    pub plaintext: Vec<u8>,
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetDecryptRequestStatusRequest {
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetDecryptRequestStatusResponse {
+    pub request: DecryptRequestData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecryptRequestData {
+    pub app_id: String,
+    pub ciphertext_array: Vec<Vec<u8>>,
+    pub ephemeral_pub_key_array: Vec<Vec<u8>>,
+    pub decrypted_array: Option<Vec<Vec<u8>>>,
+    pub job_id: uuid::Uuid,
+    pub status: RequestStatus,
 }

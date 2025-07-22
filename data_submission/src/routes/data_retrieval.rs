@@ -8,7 +8,10 @@ use db::controllers::{
 };
 use diesel::result::Error;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use enigma::{types::DecryptRequest, EnigmaEncryptionService};
+use enigma::{
+    types::{DecryptRequest, GetDecryptRequestStatusRequest},
+    EnigmaEncryptionService,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
@@ -238,7 +241,25 @@ pub async fn decrypt_data(
             return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
         }
     };
-    HttpResponse::Ok().json(json!({ "data": decrypted_data }))
+    HttpResponse::Ok().json(json!({ "decrypted_data_job_id": decrypted_data }))
+}
+
+#[get("/get_decrypt_request_data")]
+pub async fn get_decrypt_request_data(
+    request_payload: web::Query<GetDecryptRequestStatusRequest>,
+    enigma_encryption_service: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    let job_id = request_payload.job_id;
+    let request_data = match enigma_encryption_service
+        .get_decrypt_request_data(job_id)
+        .await
+    {
+        Ok(request_data) => request_data,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
+        }
+    };
+    HttpResponse::Ok().json(json!({ "request_data": request_data }))
 }
 
 /// Retrieves the ephemeral public key and the ciphertext from the submission.
