@@ -115,6 +115,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [availBalance, setAvailBalance] = useState<string>("0");
+  const [availERC20Balance, setAvailERC20Balance] = useState<string>("0");
   const account = useAccount();
   const { selected, selectedWallet } = useAvailAccount();
   const { api } = useAvailWallet();
@@ -154,6 +156,84 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         console.log(error);
       });
   }, [account]);
+
+  // Fetch Avail balance when selected account changes
+  useEffect(() => {
+    if (api && selected?.address && selectedChain?.name === "Avail") {
+      fetchAvailBalance();
+    }
+  }, [api, selected?.address, selectedChain?.name]);
+
+  // Fetch AVAIL ERC20 balance on Ethereum
+  useEffect(() => {
+    if (account.address && account.isConnected) {
+      fetchAvailERC20Balance();
+    }
+  }, [account.address, account.isConnected]);
+
+  const fetchAvailERC20Balance = async () => {
+    if (!account.address) return;
+    
+    try {
+      const availTokenAddress = TOKEN_MAP.avail?.token_address;
+      if (!availTokenAddress) return;
+
+      const erc20Abi = [
+        {
+          type: "function",
+          name: "balanceOf",
+          stateMutability: "view",
+          inputs: [{ name: "account", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }],
+        },
+      ] as const;
+
+      const balance = await readContract(config, {
+        address: availTokenAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [account.address],
+        chainId: account.chainId,
+      });
+
+      // Convert from wei to AVAIL (18 decimals)
+      const balanceBN = new BigNumber(balance.toString());
+      const divisor = new BigNumber(10).pow(18);
+      const balanceInAvail = balanceBN.div(divisor).toFixed(4);
+      
+      setAvailERC20Balance(balanceInAvail);
+    } catch (error) {
+      console.error("Error fetching AVAIL ERC20 balance:", error);
+      setAvailERC20Balance("0");
+    }
+  };
+
+  const fetchAvailBalance = async () => {
+    if (!api || !selected?.address) return;
+    
+    try {
+      const balance = await api.query.system.account(selected.address);
+      // @ts-ignore - Balance type compatibility between different Polkadot versions
+      const freeBalance = balance.data.free.toString();
+      
+      // Avail uses 18 decimals
+      const decimals = 18;
+      const divisor = BigInt(10 ** decimals);
+      const freeBalanceBigInt = BigInt(freeBalance);
+      const wholePart = freeBalanceBigInt / divisor;
+      const remainder = freeBalanceBigInt % divisor;
+      
+      // Convert remainder to decimal with proper precision
+      const fractionalPart = remainder.toString().padStart(decimals, '0');
+      const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
+      const balanceNumber = parseFloat(balanceStr);
+      
+      setAvailBalance(balanceNumber.toFixed(4));
+    } catch (error) {
+      console.error("Error fetching Avail balance:", error);
+      setAvailBalance("0");
+    }
+  };
 
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
@@ -482,30 +562,62 @@ address: tokenAddress.toLowerCase() as `0x${string}`,
                           setTokenAmountError("Enter valid amount");
                           return;
                         }
-                        if (Number(balance.data?.formatted) < +value) {
-                          setTokenAmountError(`Insufficent Balance`);
+                        const getCurrentBalance = () => {
+                          if (selectedChain?.name === "Avail") {
+                            return Number(availBalance);
+                          } else if (selectedChain?.name === "Ethereum") {
+                            if (selectedToken?.name === "ETH") {
+                              return Number(balance.data?.formatted || 0);
+                            } else if (selectedToken?.name === "AVAIL") {
+                              return Number(availERC20Balance);
+                            }
+                          }
+                          return 0;
+                        };
+                        
+                        const currentBalance = getCurrentBalance();
+                        
+                        if (currentBalance < +value) {
+                          setTokenAmountError(`Insufficient Balance`);
                           setEstimateData(undefined);
                         } else {
                           setTokenAmountError("");
                         }
                       }}
                     />
-                    {typeof balance.data?.formatted !== "undefined" && (
-                      <div className="flex items-center gap-x-2">
-                        <Wallet size={24} color="#B3B3B3" strokeWidth={2} />
-                        <Text
-                          size={"sm"}
-                          weight={"medium"}
-                          variant="secondary-grey"
-                          as="div"
-                        >
-                          Balance:{" "}
-                          <Text as="span" size={"sm"} weight={"semibold"}>
-                            {Number(balance.data?.formatted).toFixed(4)}
+                    {(() => {
+                      const getDisplayBalance = () => {
+                        if (selectedChain?.name === "Avail") {
+                          return availBalance;
+                        } else if (selectedChain?.name === "Ethereum") {
+                          if (selectedToken?.name === "ETH") {
+                            return balance.data?.formatted ? Number(balance.data.formatted).toFixed(4) : "0.0000";
+                          } else if (selectedToken?.name === "AVAIL") {
+                            return availERC20Balance;
+                          }
+                        }
+                        return "0.0000";
+                      };
+                      
+                      const displayBalance = getDisplayBalance();
+                      
+                      return displayBalance !== "0.0000" && (
+                        <div className="flex items-center gap-x-2">
+                          <Wallet size={24} color="#B3B3B3" strokeWidth={2} />
+                          <Text
+                            size={"sm"}
+                            weight={"medium"}
+                            variant="secondary-grey"
+                            as="div"
+                          >
+                            Balance:{" "}
+                            <Text as="span" size={"sm"} weight={"semibold"}>
+                              {displayBalance}
+                            </Text>
                           </Text>
-                        </Text>
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <SelectTokenButton />
                 </div>
