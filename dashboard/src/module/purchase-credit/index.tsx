@@ -777,11 +777,19 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             });
 
                             try {
+                              const orderResponse = await postOrder();
+                              
+                              if (!orderResponse?.data) {
+                                setLoading(false);
+                                setError(orderResponse.message);
+                                return;
+                              }
+
                               const result = await batchTransferAndRemark(
                                 api,
                                 selected,
                                 parseUnits(tokenAmount, 18).toString(),
-                                "Buy Credits"
+                                numberToBytes32(+orderResponse?.data?.id)
                               );
 
                               if (result.isErr()) {
