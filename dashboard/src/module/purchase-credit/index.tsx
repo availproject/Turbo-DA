@@ -115,8 +115,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [availBalance, setAvailBalance] = useState<string>("0");
+  const [availERC20Balance, setAvailERC20Balance] = useState<string>("0");
   const account = useAccount();
-  const { selected } = useAvailAccount();
+  const { selected, selectedWallet } = useAvailAccount();
   const { api } = useAvailWallet();
   const { setOpen } = useDialog();
   const { error: errorToast } = useAppToast();
@@ -155,6 +157,84 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       });
   }, [account]);
 
+  // Fetch Avail balance when selected account changes
+  useEffect(() => {
+    if (api && selected?.address && selectedChain?.name === "Avail") {
+      fetchAvailBalance();
+    }
+  }, [api, selected?.address, selectedChain?.name]);
+
+  // Fetch AVAIL ERC20 balance on Ethereum
+  useEffect(() => {
+    if (account.address && account.isConnected) {
+      fetchAvailERC20Balance();
+    }
+  }, [account.address, account.isConnected]);
+
+  const fetchAvailERC20Balance = async () => {
+    if (!account.address) return;
+    
+    try {
+      const availTokenAddress = TOKEN_MAP.avail?.token_address;
+      if (!availTokenAddress) return;
+
+      const erc20Abi = [
+        {
+          type: "function",
+          name: "balanceOf",
+          stateMutability: "view",
+          inputs: [{ name: "account", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }],
+        },
+      ] as const;
+
+      const balance = await readContract(config, {
+        address: availTokenAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [account.address],
+        chainId: account.chainId,
+      });
+
+      // Convert from wei to AVAIL (18 decimals)
+      const balanceBN = new BigNumber(balance.toString());
+      const divisor = new BigNumber(10).pow(18);
+      const balanceInAvail = balanceBN.div(divisor).toFixed(4);
+      
+      setAvailERC20Balance(balanceInAvail);
+    } catch (error) {
+      console.error("Error fetching AVAIL ERC20 balance:", error);
+      setAvailERC20Balance("0");
+    }
+  };
+
+  const fetchAvailBalance = async () => {
+    if (!api || !selected?.address) return;
+    
+    try {
+      const balance = await api.query.system.account(selected.address);
+      // @ts-ignore - Balance type compatibility between different Polkadot versions
+      const freeBalance = balance.data.free.toString();
+      
+      // Avail uses 18 decimals
+      const decimals = 18;
+      const divisor = BigInt(10 ** decimals);
+      const freeBalanceBigInt = BigInt(freeBalance);
+      const wholePart = freeBalanceBigInt / divisor;
+      const remainder = freeBalanceBigInt % divisor;
+      
+      // Convert remainder to decimal with proper precision
+      const fractionalPart = remainder.toString().padStart(decimals, '0');
+      const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
+      const balanceNumber = parseFloat(balanceStr);
+      
+      setAvailBalance(balanceNumber.toFixed(4));
+    } catch (error) {
+      console.error("Error fetching Avail balance:", error);
+      setAvailBalance("0");
+    }
+  };
+
   useEffect(() => {
     if (debouncedValue && !tokenAmountError) {
       calculateEstimateCredits({ amount: +debouncedValue });
@@ -165,9 +245,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (!selectedToken) {
       return;
     }
-    const tokenAddress =
-      selectedToken &&
-      TOKEN_MAP[selectedToken?.name.toLowerCase()]?.token_address;
+    const tokenKey = selectedToken?.name?.toLowerCase();
+    const tokenAddress = tokenKey ? TOKEN_MAP[tokenKey]?.token_address : undefined;
+    
+    if (!tokenAddress) {
+      console.error(`Token address not found for ${selectedToken?.name}`);
+      return;
+    }
+    
     setEstimateDataLoading(true);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
@@ -239,23 +324,35 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         return;
       }
 
-      const tokenAddress =
-        selectedToken &&
-        TOKEN_MAP[selectedToken?.name?.toLowerCase()].token_address;
+      const tokenKey = selectedToken?.name?.toLowerCase();
+      const tokenAddress = tokenKey ? TOKEN_MAP[tokenKey]?.token_address : undefined;
+      
+      if (!tokenAddress) {
+        setError(`Token address not found for ${selectedToken?.name}`);
+        setLoading(false);
+        return;
+      }
+
+      const contractAddress = process.env.NEXT_PUBLIC_ADDRESS;
+      if (!contractAddress) {
+        setError("Contract address not configured");
+        setLoading(false);
+        return;
+      }
 
       await writeContract(config, {
-        address: tokenAddress as `0x${string}`,
+address: tokenAddress.toLowerCase() as `0x${string}`,
         abi,
         functionName: "approve",
         args: [
-          process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+          contractAddress as `0x${string}`,
           parseUnits(tokenAmount, 18),
         ],
         chainId: activeNetworkId,
       })
         .then(async () => {
           await writeContract(config, {
-            address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
+            address: contractAddress as `0x${string}`,
             abi: depositAbi,
             functionName: "depositERC20",
             args: [
@@ -315,11 +412,41 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     remarkMessage: string
   ) => {
     try {
-      const injector = getWalletBySource(account.source);
-      const options: Partial<LegacySignerOptions> = {
-        signer: injector?.signer,
-        app_id: 0,
-      };
+      // Get the proper signer from the wallet
+      const walletSource = account.source;
+      console.log("Getting signer for wallet source:", walletSource);
+      
+      if (!walletSource) {
+        return err(new Error("No wallet source available"));
+      }
+
+      // Enable the extension and get the injector
+      const { web3Enable, web3FromSource } = await import('@polkadot/extension-dapp');
+      
+      // Enable web3 extensions
+      const extensions = await web3Enable('Turbo DA Dashboard');
+      console.log("Available extensions:", extensions.length);
+      
+      if (extensions.length === 0) {
+        return err(new Error("No wallet extensions found. Please install a Polkadot wallet extension."));
+      }
+      
+      // Get the injector for this specific wallet
+      const injector = await web3FromSource(walletSource);
+      
+      if (!injector?.signer) {
+        return err(new Error(`No signer found for ${walletSource} wallet. Please make sure the wallet extension is installed and connected.`));
+      }
+
+      console.log("Signer found:", injector.signer);
+      console.log("Signer methods:", {
+        hasSignPayload: typeof injector.signer.signPayload === 'function',
+        hasSignRaw: typeof injector.signer.signRaw === 'function'
+      });
+
+      // Set the signer on the API instance
+      // @ts-ignore - Type incompatibility between polkadot/extension-dapp and avail-js-sdk signer types
+      api.setSigner(injector.signer);
 
       const transfer = api.tx.balances.transferKeepAlive(
         selected?.address as `0x${string}`,
@@ -329,18 +456,27 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
       //using batchall, so in case of the transfer not being successful, remark will not be executed.
       const batchCall = api.tx.utility.batchAll([transfer, remark]);
-      const txResult = await new Promise<ISubmittableResult>((resolve) => {
+      
+      console.log("About to submit transaction...");
+      
+      const txResult = await new Promise<ISubmittableResult>((resolve, reject) => {
         batchCall.signAndSend(
           selected?.address as `0x${string}`,
-          // @ts-expect-error
-          options,
+          // @ts-ignore - Type incompatibility between polkadot versions in different packages
           (result: ISubmittableResult) => {
             console.log(`Tx status: ${result.status}`);
-            if (result.isInBlock || result.isError) {
+            if (result.isInBlock) {
+              console.log("Transaction included in block");
+              resolve(result);
+            } else if (result.isError) {
+              console.log("Transaction error");
               resolve(result);
             }
           }
-        );
+        ).catch((error) => {
+          console.error("Transaction submission failed:", error);
+          reject(error);
+        });
       });
 
       const error = txResult.dispatchError;
@@ -426,30 +562,62 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           setTokenAmountError("Enter valid amount");
                           return;
                         }
-                        if (Number(balance.data?.formatted) < +value) {
-                          setTokenAmountError(`Insufficent Balance`);
+                        const getCurrentBalance = () => {
+                          if (selectedChain?.name === "Avail") {
+                            return Number(availBalance);
+                          } else if (selectedChain?.name === "Ethereum") {
+                            if (selectedToken?.name === "ETH") {
+                              return Number(balance.data?.formatted || 0);
+                            } else if (selectedToken?.name === "AVAIL") {
+                              return Number(availERC20Balance);
+                            }
+                          }
+                          return 0;
+                        };
+                        
+                        const currentBalance = getCurrentBalance();
+                        
+                        if (currentBalance < +value) {
+                          setTokenAmountError(`Insufficient Balance`);
                           setEstimateData(undefined);
                         } else {
                           setTokenAmountError("");
                         }
                       }}
                     />
-                    {typeof balance.data?.formatted !== "undefined" && (
-                      <div className="flex items-center gap-x-2">
-                        <Wallet size={24} color="#B3B3B3" strokeWidth={2} />
-                        <Text
-                          size={"sm"}
-                          weight={"medium"}
-                          variant="secondary-grey"
-                          as="div"
-                        >
-                          Balance:{" "}
-                          <Text as="span" size={"sm"} weight={"semibold"}>
-                            {Number(balance.data?.formatted).toFixed(4)}
+                    {(() => {
+                      const getDisplayBalance = () => {
+                        if (selectedChain?.name === "Avail") {
+                          return availBalance;
+                        } else if (selectedChain?.name === "Ethereum") {
+                          if (selectedToken?.name === "ETH") {
+                            return balance.data?.formatted ? Number(balance.data.formatted).toFixed(4) : "0.0000";
+                          } else if (selectedToken?.name === "AVAIL") {
+                            return availERC20Balance;
+                          }
+                        }
+                        return "0.0000";
+                      };
+                      
+                      const displayBalance = getDisplayBalance();
+                      
+                      return displayBalance !== "0.0000" && (
+                        <div className="flex items-center gap-x-2">
+                          <Wallet size={24} color="#B3B3B3" strokeWidth={2} />
+                          <Text
+                            size={"sm"}
+                            weight={"medium"}
+                            variant="secondary-grey"
+                            as="div"
+                          >
+                            Balance:{" "}
+                            <Text as="span" size={"sm"} weight={"semibold"}>
+                              {displayBalance}
+                            </Text>
                           </Text>
-                        </Text>
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <SelectTokenButton />
                 </div>
@@ -554,20 +722,60 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <AvailWalletConnect
                       connectedChildren={
                         <Button
-                          onClick={() => {
+                          onClick={async () => {
+                            console.log("Buy Now button clicked - Avail chain");
+                            console.log("Initial validation:", { 
+                              hasApi: !!api, 
+                              hasSelected: !!selected, 
+                              hasSelectedWallet: !!selectedWallet,
+                              tokenAmount,
+                              selectedToken: selectedToken?.name,
+                              selectedChain: selectedChain?.name
+                            });
+
+                            if (!api || !selected) {
+                              console.error("API or selected account not available", { api, selected });
+                              errorToast?.({ label: "Wallet not connected properly" });
+                              return;
+                            }
+
+                            setLoading(true);
+                            setError("");
+
                             console.log({
                               api,
                               selected,
+                              selectedWallet,
+                              tokenAmount,
+                              selectedToken,
+                              selectedChain,
                             });
 
-                            batchTransferAndRemark(
-                              api!,
-                              selected!,
-                              parseUnits(tokenAmount, 18).toString(),
-                              "Buy Credits"
-                            );
+                            try {
+                              const result = await batchTransferAndRemark(
+                                api,
+                                selected,
+                                parseUnits(tokenAmount, 18).toString(),
+                                "Buy Credits"
+                              );
+
+                              if (result.isErr()) {
+                                throw new Error(result.error.message);
+                              }
+
+                              console.log("Transaction successful:", result.value);
+                              setTokenAmount("");
+                            } catch (error) {
+                              console.error("Transaction failed:", error);
+                              const message = error instanceof Error ? error.message : "Transaction failed";
+                              errorToast?.({ label: message });
+                              setError(message);
+                            } finally {
+                              setLoading(false);
+                            }
                           }}
                           variant={
+                            loading ||
                             !selectedToken ||
                             !selectedChain ||
                             !tokenAmount ||
