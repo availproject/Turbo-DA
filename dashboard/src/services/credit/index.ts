@@ -16,7 +16,7 @@ class CreditService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      },
+      }
     );
 
     if (!response.ok) {
@@ -41,7 +41,7 @@ class CreditService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      },
+      }
     );
 
     if (!response.ok) {
@@ -55,21 +55,23 @@ class CreditService {
     token,
     amount,
     tokenAddress,
+    chain_id,
   }: {
     token: string;
     amount: number;
     tokenAddress: string;
+    chain_id: number;
   }) {
     const atomicAmount: string = parseUnits(amount.toString(), 18).toString();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}&chain_id=${chain_id}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      },
+      }
     );
 
     if (!response.ok) {
@@ -97,7 +99,7 @@ class CreditService {
         body: JSON.stringify({
           chain,
         }),
-      },
+      }
     );
 
     if (!response.ok) {
