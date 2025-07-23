@@ -455,7 +455,7 @@ pub async fn purchase_cost(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -503,7 +503,7 @@ pub async fn estimate_credits(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -544,7 +544,7 @@ pub async fn estimate_credits_for_bytes(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -592,7 +592,7 @@ pub async fn estimate_credits_against_size(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = alice();
 
     let convertor = Convertor::new(&sdk, &account);
 

@@ -1,12 +1,26 @@
-use avail_rust::{Filter, H256, SDK, block::Block, subxt::Error};
+use avail_rust::{
+    avail::data_availability::tx::SubmitData,
+    avail_rust_core::rpc::system::fetch_extrinsics_v1_types::EncodeSelector, prelude::*,
+};
+use codec::Decode;
+pub async fn retrieve_data(
+    client: Client,
+    block_number: u32,
+    tx_index: u32,
+) -> Result<Vec<u8>, String> {
+    let tx = client
+        .block_client()
+        .block_transaction(
+            block_number.into(),
+            tx_index.into(),
+            None,
+            Some(EncodeSelector::Call),
+        )
+        .await
+        .map_err(|e| e.to_string())?
+        .expect("Must be there");
+    let encoded_call = hex::decode(tx.encoded.expect("Must be there")).expect("");
+    let sd = SubmitData::decode(&mut &encoded_call[2..]).expect("Should work");
 
-pub async fn retrieve_data(client: SDK, block_hash: H256, tx_index: u32) -> Result<Vec<u8>, Error> {
-    let block = match Block::new(&client.client, block_hash).await {
-        Ok(block) => block,
-        Err(e) => return Err(Error::from(e.to_string())),
-    };
-
-    let da_submission = block.data_submissions(Filter::new().tx_index(tx_index));
-
-    Ok(da_submission[0].data.clone())
+    Ok(sd.data)
 }
