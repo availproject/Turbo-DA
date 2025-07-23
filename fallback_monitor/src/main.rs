@@ -10,7 +10,7 @@ use tokio::{
     self,
     time::{self, sleep, Duration},
 };
-use turbo_da_core::utils::create_keypair;
+
 use turbo_da_core::{
     logger::{error, info},
     utils::generate_keygen_list,
