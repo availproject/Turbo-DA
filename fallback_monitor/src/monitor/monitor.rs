@@ -1,4 +1,4 @@
-use avail_rust::{Client, Keypair};
+use avail_rust::{Keypair, SDK};
 use avail_utils::submit_data::SubmitDataAvail;
 use bigdecimal::BigDecimal;
 /// This file contains logic to monitor the failing transactions.
@@ -37,7 +37,7 @@ use turbo_da_core::utils::{format_size, Convertor};
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
     connection: &String,
-    client: &Client,
+    client: &SDK,
     account: &Vec<Keypair>,
     retry_count: i32,
     limit: i64,
@@ -81,7 +81,7 @@ pub async fn monitor_failed_transactions(
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
     connection: &String,
-    client: &Client,
+    client: &SDK,
     account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,

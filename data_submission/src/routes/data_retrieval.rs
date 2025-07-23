@@ -87,13 +87,14 @@ pub async fn get_pre_image(
                     .body("Customer Expenditure found but tx isn't finalised yet.");
             }
             let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+            let b_hash = match hex_string_to_fixed_bytes(sub.block_hash.unwrap().as_str()) {
+                Ok(hash) => hash,
+                Err(e) => {
+                    return HttpResponse::NotImplemented().json(json!({ "error": e }));
+                }
+            };
 
-            match retrieve_data(
-                sdk,
-                sub.block_number.unwrap() as u32,
-                sub.extrinsic_index.unwrap() as u32,
-            )
-            .await
+            match retrieve_data(sdk, H256::from(b_hash), sub.extrinsic_index.unwrap() as u32).await
             {
                 Ok(pre_image) => HttpResponse::Ok().body(pre_image),
                 Err(e) => HttpResponse::InternalServerError()
