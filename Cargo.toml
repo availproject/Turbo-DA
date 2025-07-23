@@ -25,7 +25,7 @@ serde_json = "1.0"
 log = "0.4.22"
 rand = "0.8.5"
 env_logger = "0.10"
-avail-rust = { package="avail-rust-client", git="https://github.com/availproject/avail-rust", rev="284806ed852530ad82410629055015d2ecf8ebb0"}
+avail-rust = { git = "https://github.com/availproject/avail-rust", tag = "v0.1.2" }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
 diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
@@ -35,9 +35,8 @@ actix-extensible-rate-limit = {version = "0.4.0", features=["redis"]}
 diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
 toml = {version ="0.8.19"}
 password-hash = {version = "0.5.0"}
-thiserror = "2.0.12"
+thiserror = "1.0.61"
 tracing = "0.1.40"
-reqwest = { version = "0.12.15", features=["blocking", "json"]}
 tracing-subscriber = "0.3.18"
 console-subscriber = "0.4.0"
 tracing-appender = "0.2.2"

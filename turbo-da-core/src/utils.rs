@@ -6,7 +6,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{prelude::alice, Client as SDK, Keypair, Options};
+use avail_rust::{account, Keypair, Options, SDK};
 
 use crate::logger::{debug_json, error, info};
 use bigdecimal::BigDecimal;
@@ -247,9 +247,13 @@ impl<'a> Convertor<'a> {
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        let tx = self.sdk.tx().data_availability().submit_data(data);
+        let tx = self.sdk.tx.data_availability.submit_data(data);
 
-        let query_info = match tx.estimate_call_fees(None).await {
+        let options = Options::new();
+        let query_info = match tx
+            .payment_query_fee_details(self.account, Some(options))
+            .await
+        {
             Ok(info) => info,
             Err(e) => {
                 error(&format!("Failed to get payment query info: {:?}", e));
@@ -455,7 +459,7 @@ pub async fn get_amount_to_be_credited(
         .await
         .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
 
-    let account = alice();
+    let account = account::alice();
     let converter = Convertor::new(&client, &account);
     let price_per_kb = converter
         .get_gas_price_for_data(converter.one_kb.clone())

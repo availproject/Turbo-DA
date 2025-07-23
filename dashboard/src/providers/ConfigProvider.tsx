@@ -58,12 +58,12 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   const { getToken } = useAuth();
   const [token, setToken] = useState<string>(accessToken ?? "");
   const [selectedChain, setSelectedChain] = useState<Chain>({
-    name: "Avail",
-    icon: "/avail-icon.svg",
+    name: "Ethereum",
+    icon: "/currency/eth.png",
   });
   const [selectedToken, setSelectedToken] = useState<Token | undefined>({
-    name: "AVAIL",
-    icon: "/avail-icon.svg",
+    name: "ETH",
+    icon: "/currency/eth.png",
   });
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
