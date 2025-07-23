@@ -20,6 +20,7 @@ pub struct Config {
     pub(crate) coin_gecho_api_url: String,
     pub(crate) coin_gecho_api_key: String,
     pub(crate) avail_rpc_url: String,
+    pub(crate) avail_deposit_address: String,
 }
 
 impl Default for Config {
@@ -43,6 +44,7 @@ impl Default for Config {
             coin_gecho_api_url: String::new(),
             coin_gecho_api_key: String::new(),
             avail_rpc_url: String::new(),
+            avail_deposit_address: String::new(),
         }
     }
 }
@@ -118,6 +120,14 @@ impl Config {
             e
         })?;
 
+        let avail_deposit_address = env::var("AVAIL_DEPOSIT_ADDRESS").map_err(|e| {
+            error(&format!(
+                "Failed to get AVAIL_DEPOSIT_ADDRESS environment variable: {:?}",
+                e
+            ));
+            e
+        })?;
+
         let mut network = HashMap::new();
 
         // Collect all environment variables
@@ -172,6 +182,7 @@ impl Config {
             coin_gecho_api_url,
             coin_gecho_api_key,
             avail_rpc_url,
+            avail_deposit_address,
         })
     }
 }

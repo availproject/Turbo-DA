@@ -19,11 +19,7 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{
-    collections::{Bound, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
@@ -376,7 +372,7 @@ pub async fn calculate_avail_token_equivalent(
         "level": "debug"
     }));
 
-    let mut equivalent_amount = BigDecimal::from(0);
+    let equivalent_amount;
     if token_address == "0x0000000000000000000000000000000000000000".to_string() {
         let token_symbol = "avail".to_string();
         let (token_usd_price, avail_usd_price) = get_prices(

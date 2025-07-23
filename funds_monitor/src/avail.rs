@@ -3,12 +3,11 @@ use avail::runtime_types::frame_system::pallet::Call::remark as Remark;
 use avail::runtime_types::pallet_balances::pallet::Call::transfer_keep_alive as TransferKeepAlive;
 use avail::utility::calls::types::BatchAll;
 use avail_rust::prelude::*;
-use avail_rust::{avail, block, error::ClientError, subxt, Block, Filter, SDK};
+use avail_rust::{avail, error::ClientError, Block, Filter, SDK};
 use diesel::PgConnection;
-use serde_json::json;
 use std::sync::Arc;
 use subxt::utils::MultiAddress;
-use turbo_da_core::logger::{debug, debug_json, error, info};
+use turbo_da_core::logger::{debug, error, info};
 
 use crate::config::Config;
 use crate::query_finalised_block_number;
@@ -28,7 +27,7 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
 
     let mut connection = utils.establish_connection()?;
 
-    let _ = sync_database(&mut connection, &sdk, &utils).await;
+    let _ = sync_database(&mut connection, &sdk, &utils, &cfg.avail_deposit_address).await;
 
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
@@ -42,7 +41,7 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
                     }
                 };
                 info(&format!("block: {}", block.block.number()));
-                let _ = process_block(block, &utils).await;
+                let _ = process_block(block, &utils, &cfg.avail_deposit_address).await;
             }
             Err(e) => {
                 error(&format!("Error fetching block: {}", e));
@@ -57,6 +56,7 @@ async fn sync_database(
     connection: &mut PgConnection,
     client: &SDK,
     utils: &Utils,
+    avail_deposit_address: &String,
 ) -> Result<(), ClientError> {
     let finalised_block_number = query_finalised_block_number(0, connection);
     let block = Block::new(
@@ -64,11 +64,15 @@ async fn sync_database(
         new_h256_from_hex(&finalised_block_number.block_hash)?,
     )
     .await?;
-    process_block(block, utils).await?;
+    process_block(block, utils, avail_deposit_address).await?;
     Ok(())
 }
 
-async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
+async fn process_block(
+    block: Block,
+    utils: &Utils,
+    avail_deposit_address: &String,
+) -> Result<(), ClientError> {
     debug(&format!("Filtering batch calls from block"));
 
     let all_batch_calls = block.transactions_static::<BatchAll>(Filter::new());
@@ -119,6 +123,14 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
             continue;
         };
 
+        if acc.to_string() != avail_deposit_address.to_string() {
+            error(&format!(
+                "Destination is not the deposit address, skipping: {}",
+                acc.to_string()
+            ));
+            continue;
+        }
+
         let ascii_remark = hex::encode(remark.clone());
         info(&format!(
             "Found matching batch call, tx_hash: {}, account: {}, number: {}, hash: {}, ascii_remark: {}",
@@ -133,7 +145,7 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
             .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
         let receipt = Deposit {
-            token_address: "0x0000000000000000000000000000000000000000".to_string(), // todo: fix
+            token_address: "0x0000000000000000000000000000000000000000".to_string(),
             amount: value.to_string(),
             _from: account,
         };

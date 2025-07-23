@@ -377,7 +377,7 @@ pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(
                     .to_be_bytes(),
             );
 
-            let i = diesel::update(customer_expenditures.filter(id.eq(item.id)))
+            let _ = diesel::update(customer_expenditures.filter(id.eq(item.id)))
                 .set(wallet.eq(wallet_store))
                 .execute(connection)
                 .await
