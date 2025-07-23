@@ -24,7 +24,7 @@ export function Providers({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <AvailWalletProvider>
+        <AvailWalletProvider rpcUrl="wss://rpc-hex-devnet.avail.tools/ws">
           <ConnectKitProvider
             theme="midnight"
             options={{ overlayBlur: 2, embedGoogleFonts: true }}
