@@ -274,7 +274,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  const postOrder = async () => {
+  const postOrder = async (chain_id_override?: number) => {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_credit_request`,
       {
@@ -284,7 +284,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          chain: account.chainId,
+          chain: chain_id_override ?? account.chainId,
         }),
       }
     );
@@ -459,9 +459,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       // Set the signer on the API instance
       // @ts-ignore - Type incompatibility between polkadot/extension-dapp and avail-js-sdk signer types
       api.setSigner(injector.signer);
-
+      console.log(
+        "signer address",
+        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string
+      );
       const transfer = api.tx.balances.transferKeepAlive(
-        process.env.NEXT_AVAIL_PUBLIC_ADDRESS as string,
+        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string,
         atomicAmount
       );
       const remark = api.tx.system.remark(remarkMessage);
@@ -777,8 +780,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             });
 
                             try {
-                              const orderResponse = await postOrder();
-                              
+                              const orderResponse = await postOrder(0);
+
                               if (!orderResponse?.data) {
                                 setLoading(false);
                                 setError(orderResponse.message);
@@ -800,6 +803,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 "Transaction successful:",
                                 result.value
                               );
+
+                              // postInclusionDetails({
+                              //   orderId: +orderResponse?.data?.id,
+                              //   txnHash: result.value.txHash,
+                              // });
                               setTokenAmount("");
                             } catch (error) {
                               console.error("Transaction failed:", error);

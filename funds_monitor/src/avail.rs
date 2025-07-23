@@ -1,5 +1,5 @@
 use avail::runtime_types::da_runtime::RuntimeCall;
-use avail::runtime_types::frame_system::pallet::Call::remark_with_event as RemarkWithEvent;
+use avail::runtime_types::frame_system::pallet::Call::remark as Remark;
 use avail::runtime_types::pallet_balances::pallet::Call::transfer_keep_alive as TransferKeepAlive;
 use avail::utility::calls::types::BatchAll;
 use avail_rust::prelude::*;
@@ -34,8 +34,15 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
     while let Some(avail_block) = stream.next().await {
         match avail_block {
             Ok(avail_block) => {
-                let block: Block = Block::from_block(avail_block).await?;
-                process_block(block, &utils).await?;
+                let block: Block = match Block::from_block(avail_block).await {
+                    Ok(block) => block,
+                    Err(e) => {
+                        error(&format!("Error fetching block: {}", e));
+                        continue;
+                    }
+                };
+                info(&format!("block: {}", block.block.number()));
+                let _ = process_block(block, &utils).await;
             }
             Err(e) => {
                 error(&format!("Error fetching block: {}", e));
@@ -73,6 +80,10 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
         let account = hex::encode(batch_all.account_id().unwrap().0);
         let tx_hash = batch_all.tx_hash().to_string();
         let calls = batch_all.value.calls;
+        info(&format!(
+            "Found matching batch call, tx_hash: {}, account: {}, number: {}, hash: {}",
+            tx_hash, account, number, hash
+        ));
         // We know that our batch calls needs to have exactly 2 transactions.
         if calls.len() != 2 {
             info(&format!(
@@ -98,7 +109,7 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
             continue;
         };
 
-        let RemarkWithEvent { remark } = system_call else {
+        let Remark { remark } = system_call else {
             info(&format!("System call is not RemarkWithEvent, skipping"));
             continue;
         };
@@ -108,15 +119,11 @@ async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
             continue;
         };
 
-        let acc_string = std::format!("{}", acc);
-        let ascii_remark = block::to_ascii(remark.clone()).unwrap();
-        debug_json(json!({
-            "message": "Found matching batch call",
-            "destination": acc_string,
-            "value": value,
-            "remark": ascii_remark,
-            "level": "debug"
-        }));
+        let ascii_remark = hex::encode(remark.clone());
+        info(&format!(
+            "Found matching batch call, tx_hash: {}, account: {}, number: {}, hash: {}, ascii_remark: {}",
+            tx_hash, account, number, hash, ascii_remark
+        ));
 
         let mut connection = utils.establish_connection()?;
 
