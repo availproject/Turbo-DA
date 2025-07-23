@@ -461,7 +461,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       api.setSigner(injector.signer);
 
       const transfer = api.tx.balances.transferKeepAlive(
-        selected?.address as `0x${string}`,
+        process.env.NEXT_PUBLIC_ADDRESS as string,
         atomicAmount
       );
       const remark = api.tx.system.remark(remarkMessage);
