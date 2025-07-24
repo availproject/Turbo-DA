@@ -28,12 +28,12 @@ const SelectChainToken = () => {
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
-  
+
   // Wallet connections
   const account = useAccount();
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
-  
+
   // Balance states
   const [availBalance, setAvailBalance] = useState<string>("0.0000");
   const [availERC20Balance, setAvailERC20Balance] = useState<string>("0.0000");
@@ -55,22 +55,22 @@ const SelectChainToken = () => {
 
   const fetchAvailBalance = async () => {
     if (!api || !selected?.address) return;
-    
+
     try {
       const balance = await api.query.system.account(selected.address);
       // @ts-ignore - Balance type compatibility
       const freeBalance = balance.data.free.toString();
-      
+
       const decimals = 18;
       const divisor = BigInt(10 ** decimals);
       const freeBalanceBigInt = BigInt(freeBalance);
       const wholePart = freeBalanceBigInt / divisor;
       const remainder = freeBalanceBigInt % divisor;
-      
-      const fractionalPart = remainder.toString().padStart(decimals, '0');
+
+      const fractionalPart = remainder.toString().padStart(decimals, "0");
       const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
       const balanceNumber = parseFloat(balanceStr);
-      
+
       setAvailBalance(balanceNumber.toFixed(4));
     } catch (error) {
       console.error("Error fetching Avail balance:", error);
@@ -80,7 +80,7 @@ const SelectChainToken = () => {
 
   const fetchAvailERC20Balance = async () => {
     if (!account.address) return;
-    
+
     try {
       const availTokenAddress = TOKEN_MAP.avail?.token_address;
       if (!availTokenAddress) return;
@@ -107,7 +107,7 @@ const SelectChainToken = () => {
       const balanceBN = new BigNumber(balance.toString());
       const divisor = new BigNumber(10).pow(18);
       const balanceInAvail = balanceBN.div(divisor).toFixed(4);
-      
+
       setAvailERC20Balance(balanceInAvail);
     } catch (error) {
       console.error("Error fetching AVAIL ERC20 balance:", error);
@@ -122,7 +122,9 @@ const SelectChainToken = () => {
     } else if (chainName.toLowerCase() === "ethereum") {
       if (tokenName.toLowerCase() === "eth") {
         // ETH token on Ethereum - use ETH balance
-        return ethBalance.data?.formatted ? Number(ethBalance.data.formatted).toFixed(4) : "0.0000";
+        return ethBalance.data?.formatted
+          ? Number(ethBalance.data.formatted).toFixed(4)
+          : "0.0000";
       } else if (tokenName.toLowerCase() === "avail") {
         // AVAIL token on Ethereum - use ERC20 balance
         return availERC20Balance;
