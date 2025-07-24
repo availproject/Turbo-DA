@@ -108,6 +108,13 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
+  
+  // Helper function to check if value is effectively zero
+  const isZeroValue = (value: string): boolean => {
+    if (!value || value.trim() === '') return true;
+    const numValue = parseFloat(value);
+    return numValue === 0 || isNaN(numValue);
+  };
   const [tokenAmount, setTokenAmount] = useState("");
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
@@ -315,7 +322,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   }, [account, activeNetworkId]);
 
   const handleBuyCredits = async () => {
-    if (!tokenAmount) return;
+    if (!tokenAmount || isZeroValue(tokenAmount)) return;
     try {
       setLoading(true);
       setError("");
@@ -710,7 +717,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedToken ||
                               !selectedChain ||
                               !tokenAmount ||
-                              tokenAmount === "0" ||
+                              isZeroValue(tokenAmount) ||
                               tokenAmountError !== ""
                                 ? "disabled"
                                 : "primary"
@@ -720,7 +727,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedToken ||
                               !selectedChain ||
                               !tokenAmount ||
-                              tokenAmount === "0" ||
+                              isZeroValue(tokenAmount) ||
                               tokenAmountError !== ""
                             }
                           >
@@ -826,7 +833,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedToken ||
                             !selectedChain ||
                             !tokenAmount ||
-                            tokenAmount === "0" ||
+                            isZeroValue(tokenAmount) ||
                             tokenAmountError !== ""
                               ? "disabled"
                               : "primary"
@@ -836,7 +843,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedToken ||
                             !selectedChain ||
                             !tokenAmount ||
-                            tokenAmount === "0" ||
+                            isZeroValue(tokenAmount) ||
                             tokenAmountError !== ""
                           }
                         >
