@@ -34,38 +34,42 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
             </Text>
             <Tabs value={mainTabSelected} className="w-full gap-y-0 mt-3">
               <div className="flex justify-between">
-              <TabsList className="bg-transparent p-0 h-auto relative -bottom-px">
-                {mainTabs.map((tab) => (
-                  <TabsTrigger
-                    value={tab.value}
-                    key={tab.value}
-                    onClick={() => setMainTabSelected(tab.value)}
-                  >
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-             <div
-  className="w-[464px] px-[8px] py-[12px] border border-[#4C4C4C] rounded-t-[8px] flex items-center"
-  style={{
-    background: "var(--Gradient-Secondary-Base, linear-gradient(90deg, var(--Color-bg-gradients-surface-secondary-leftshade, #0D2335) 0%, var(--Color-bg-gradients-surface-secondary-rightshade, #141B29) 100%))",
-  }}
->
-
-  <p className="text-[#CCC] font-semibold leading-[18px] text-sm">API Endpoint: <span className="text-[#3CA3FC] text-base">https://infinity.turbo-api.availproject.org/ </span>
-  
-  </p>
-  <Copy 
-    className="ml-[6px] cursor-pointer hover:opacity-80"
-    size={20}
-    color="#B3B3B3"
-    strokeWidth={2}
-    onClick={() => {
-      navigator.clipboard.writeText('https://infinity.turbo-api.availproject.org/');
-    }}
-  />
-</div>
-
+                <TabsList className="bg-transparent p-0 h-auto relative -bottom-px">
+                  {mainTabs.map((tab) => (
+                    <TabsTrigger
+                      value={tab.value}
+                      key={tab.value}
+                      onClick={() => setMainTabSelected(tab.value)}
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                <div
+                  className="w-[464px] px-[8px] py-[12px] border border-[#4C4C4C] rounded-t-[8px] flex items-center"
+                  style={{
+                    background:
+                      "var(--Gradient-Secondary-Base, linear-gradient(90deg, var(--Color-bg-gradients-surface-secondary-leftshade, #0D2335) 0%, var(--Color-bg-gradients-surface-secondary-rightshade, #141B29) 100%))",
+                  }}
+                >
+                  <p className="text-[#CCC] font-semibold leading-[18px] text-sm">
+                    API Endpoint:{" "}
+                    <span className="text-[#3CA3FC] text-base">
+                      https://infinity.turbo-api.availproject.org/ 
+                    </span>
+                  </p>
+                  <Copy
+                    className="ml-[6px] cursor-pointer hover:opacity-80"
+                    size={20}
+                    color="#FFFFFF"
+                    strokeWidth={1}
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        "https://infinity.turbo-api.availproject.org/"
+                      );
+                    }}
+                  />
+                </div>
               </div>
               {children}
             </Tabs>
