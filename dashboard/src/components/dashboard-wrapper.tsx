@@ -1,13 +1,14 @@
 "use client";
 import { APP_TABS } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
-import { memo, ReactNode } from "react";
+import { memo, ReactNode, useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger } from "./tabs";
 import { Text } from "./text";
-import { Copy } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 
 const DashboardWrapper = ({ children }: { children: ReactNode }) => {
   const { setMainTabSelected, mainTabSelected } = useOverview();
+  const [isCopied, setIsCopied] = useState(false);
   const mainTabs = [
     {
       value: APP_TABS.OVERVIEW,
@@ -58,17 +59,35 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
                       https://infinity.turbo-api.availproject.org/ 
                     </span>
                   </p>
-                  <Copy
-                    className="ml-[6px] cursor-pointer hover:opacity-80"
-                    size={20}
-                    color="#FFFFFF"
-                    strokeWidth={1}
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        "https://infinity.turbo-api.availproject.org/"
-                      );
-                    }}
-                  />
+                  <div className="ml-[6px] cursor-pointer relative">
+                    <Copy
+                      className={`absolute transition-opacity duration-100 hover:opacity-80 ${
+                        isCopied
+                          ? "opacity-0 pointer-events-none"
+                          : "opacity-100"
+                      }`}
+                      size={20}
+                      color="#FFFFFF"
+                      strokeWidth={1}
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          "https://infinity.turbo-api.availproject.org/"
+                        );
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                    />
+                    <Check
+                      className={`transition-opacity duration-100 ${
+                        isCopied
+                          ? "opacity-100"
+                          : "opacity-0 pointer-events-none"
+                      }`}
+                      size={20}
+                      color="#22C55E"
+                      strokeWidth={1}
+                    />
+                  </div>
                 </div>
               </div>
               {children}
