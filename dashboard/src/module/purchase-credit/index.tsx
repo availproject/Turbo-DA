@@ -666,6 +666,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     placeholder="00"
                     id="creditsAmount"
                     name="creditsAmount"
+                    tabIndex={-1}
+                    readOnly
                     defaultValue={
                       estimateData && !estimateDataLoading
                         ? formatDataBytes(+estimateData)
