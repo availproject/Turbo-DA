@@ -62,16 +62,20 @@ const CreditHistory = ({ token }: { token?: string }) => {
         case "amount_credit":
           return value ? formatDataBytes(value) : "-";
         case "chain_id":
+          const chainInfo = chainList[value];
+          if (!chainInfo) {
+            return <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>Unknown Chain</Text>;
+          }
           return (
             <div className="flex items-center gap-x-2">
               <Image
-                src={chainList[value].logo}
-                alt={chainList[value].name}
+                src={chainInfo.logo}
+                alt={chainInfo.name}
                 width={20}
                 height={20}
               />
               <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
-                {chainList[value].name}
+                {chainInfo.name}
               </Text>
             </div>
           );
