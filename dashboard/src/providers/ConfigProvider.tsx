@@ -49,6 +49,7 @@ export type TransactionStatus = {
   orderId: number;
   tokenAmount: number;
   tokenAddress: `0x${string}`;
+  creditAmount?: number;
 };
 
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({

@@ -1,6 +1,6 @@
 "use client";
 import { config } from "@/config/walletConfig";
-import { APP_TABS, cn } from "@/lib/utils";
+import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
@@ -29,10 +29,10 @@ const CreditsTransactionProgress = () => {
     setShowTransaction,
   } = useConfig();
   const account = useAccount();
-  
+
   // State to control initial animation
   const [shouldAnimate, setShouldAnimate] = useState(false);
-  
+
   // Start animation after dialog opens
   useEffect(() => {
     if (showTransaction?.status === "initialised") {
@@ -84,10 +84,13 @@ const CreditsTransactionProgress = () => {
     txnHash: `0x${string}`;
   }) => {
     if (!showTransaction) return;
-    
+
     // After 3 seconds, update to "Almost Done" status
     setTimeout(() => {
-      const almostDoneTransaction = { ...showTransaction, status: "almost_done" as const };
+      const almostDoneTransaction = {
+        ...showTransaction,
+        status: "almost_done" as const,
+      };
       setTransactionStatusList((prev) =>
         prev.map((transaction: TransactionStatus) =>
           transaction.id === showTransaction?.id
@@ -97,7 +100,7 @@ const CreditsTransactionProgress = () => {
       );
       setShowTransaction(almostDoneTransaction);
     }, 3000);
-    
+
     try {
       const transactionReceipt = await waitForTransactionReceipt(config, {
         hash: txnHash,
@@ -202,7 +205,9 @@ const CreditsTransactionProgress = () => {
                         size={"2xl"}
                         variant={"green"}
                       >
-                        1000 KB{" "}
+                        {showTransaction?.creditAmount
+                          ? formatDataBytes(showTransaction.creditAmount)
+                          : ""}
                       </Text>
                       Credited Successfully
                     </Text>
@@ -226,41 +231,50 @@ const CreditsTransactionProgress = () => {
                           <div
                             className={cn(
                               "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
-                              (showTransaction?.status === "initialised" && shouldAnimate) && "w-full",
-                              (showTransaction?.status === "finality" || 
-                               showTransaction?.status === "almost_done") && "w-full"
+                              showTransaction?.status === "initialised" &&
+                                shouldAnimate &&
+                                "w-full",
+                              (showTransaction?.status === "finality" ||
+                                showTransaction?.status === "almost_done") &&
+                                "w-full"
                             )}
                           ></div>
                         </div>
-                        
+
                         {/* Second Progress Bar - Finalization In Progress */}
                         <div
                           className={cn(
                             "rounded-full w-[84px] h-2 overflow-hidden transition-colors duration-500",
-                            (showTransaction?.status === "finality" || 
-                             showTransaction?.status === "almost_done") ? "bg-white" : "bg-[#999]"
+                            showTransaction?.status === "finality" ||
+                              showTransaction?.status === "almost_done"
+                              ? "bg-white"
+                              : "bg-[#999]"
                           )}
                         >
                           <div
                             className={cn(
                               "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
-                              (showTransaction?.status === "finality" || 
-                               showTransaction?.status === "almost_done") && "w-full"
+                              (showTransaction?.status === "finality" ||
+                                showTransaction?.status === "almost_done") &&
+                                "w-full"
                             )}
                           ></div>
                         </div>
-                        
+
                         {/* Third Progress Bar - Almost Done */}
                         <div
                           className={cn(
                             "rounded-full w-[84px] h-2 overflow-hidden transition-colors duration-500",
-                            showTransaction?.status === "almost_done" ? "bg-white" : "bg-[#999]"
+                            showTransaction?.status === "almost_done"
+                              ? "bg-white"
+                              : "bg-[#999]"
                           )}
                         >
                           <div
                             className={cn(
                               "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
-                              showTransaction?.status === "almost_done" && "w-full"
+                              showTransaction?.status === "almost_done" &&
+                                "w-full"
                             )}
                           ></div>
                         </div>
@@ -281,7 +295,9 @@ const CreditsTransactionProgress = () => {
                     size={"2xl"}
                     variant={"green"}
                   >
-                    1000 KB{" "}
+                    {showTransaction?.creditAmount
+                      ? formatDataBytes(showTransaction.creditAmount)
+                      : "1000 KB"}{" "}
                   </Text>
                   Credited Successfully
                 </Text>
@@ -304,9 +320,9 @@ const CreditsTransactionProgress = () => {
                   variant={"secondary-grey"}
                   className="relative self-stretch text-center"
                 >
-                  {(showTransaction?.status === "initialised" || 
-                    showTransaction?.status === "finality" || 
-                    showTransaction?.status === "almost_done") && 
+                  {(showTransaction?.status === "initialised" ||
+                    showTransaction?.status === "finality" ||
+                    showTransaction?.status === "almost_done") &&
                     "Processing transaction on Avail chain"}
                 </Text>
               )}

@@ -379,6 +379,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 tokenAddress: tokenAddress! as `0x${string}`,
                 tokenAmount: +tokenAmount,
                 txnHash,
+                creditAmount: estimateData ? +estimateData : undefined,
               };
               setTransactionStatusList((prev) => [
                 ...(prev ?? []),
