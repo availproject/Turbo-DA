@@ -374,7 +374,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
             .then(async (txnHash: `0x${string}`) => {
               const transaction: TransactionStatus = {
                 id: uuidv4(),
-                status: "finality",
+                status: "initialised", // Start with initialised status
                 orderId: orderResponse.data.id as number,
                 tokenAddress: tokenAddress! as `0x${string}`,
                 tokenAmount: +tokenAmount,
@@ -386,6 +386,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               ]);
               setShowTransaction(transaction);
               setOpen("credit-transaction");
+              
+              // After 2 seconds, move to finality status
+              setTimeout(() => {
+                const updatedTransaction = { ...transaction, status: "finality" as const };
+                setTransactionStatusList((prev) =>
+                  prev.map((t) => (t.id === transaction.id ? updatedTransaction : t))
+                );
+                setShowTransaction(updatedTransaction);
+              }, 2000);
               setTokenAmount("");
               setLoading(false);
             })
