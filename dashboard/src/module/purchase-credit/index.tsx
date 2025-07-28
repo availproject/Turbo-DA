@@ -108,10 +108,10 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
-  
+
   // Helper function to check if value is effectively zero
   const isZeroValue = (value: string): boolean => {
-    if (!value || value.trim() === '') return true;
+    if (!value || value.trim() === "") return true;
     const numValue = parseFloat(value);
     return numValue === 0 || isNaN(numValue);
   };
@@ -387,12 +387,17 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               ]);
               setShowTransaction(transaction);
               setOpen("credit-transaction");
-              
+
               // After 2 seconds, move to finality status
               setTimeout(() => {
-                const updatedTransaction = { ...transaction, status: "finality" as const };
+                const updatedTransaction = {
+                  ...transaction,
+                  status: "finality" as const,
+                };
                 setTransactionStatusList((prev) =>
-                  prev.map((t) => (t.id === transaction.id ? updatedTransaction : t))
+                  prev.map((t) =>
+                    t.id === transaction.id ? updatedTransaction : t
+                  )
                 );
                 setShowTransaction(updatedTransaction);
               }, 2000);

@@ -22,47 +22,47 @@ function DiscountEligibility({ token }: { token?: string }) {
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
   const debouncedValue = useDebounce(deferredQuery, 500);
-  const [credits, setCredits] = useState();
+  const [credits, setCredits] = useState<number>();
+  const [loading, setLoading] = useState(false);
   const { open, setOpen } = useDialog();
 
   useEffect(() => {
     if (!token) return;
     if (!debouncedValue) {
+      setCredits(undefined);
       return;
     }
 
+    setLoading(true);
     CreditService.creditEstimates({
       token,
-      data: +formatInKB(debouncedValue) || 0,
+      data: debouncedValue * 1024,
     })
       .then((response) => {
         setCredits(response?.data);
       })
       .catch((error) => {
         console.log(error);
+        setCredits(undefined);
+      })
+      .finally(() => {
+        setLoading(false);
       });
-  }, [debouncedValue]);
+  }, [debouncedValue, token]);
 
   const batchSizeData = useMemo(() => {
     if (!debouncedValue) {
       return {
         size: "100 KB",
-        credits: "50",
-      };
-    }
-
-    if (debouncedValue >= 100) {
-      return {
-        size: `${convertBytes(debouncedValue)}`,
-        credits: debouncedValue / 2,
+        credits: "73387.97",
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: debouncedValue,
+      credits: credits ? Number(credits).toFixed(2) : loading ? "..." : "0.00",
     };
-  }, [debouncedValue, credits]);
+  }, [debouncedValue, credits, loading]);
 
   return (
     <Dialog
@@ -126,8 +126,8 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} credits. The higher the batch size,
-                    the lower would be your credit consumption.
+                    {batchSizeData.credits} The higher the batch size, the lower
+                    would be your credit consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">
