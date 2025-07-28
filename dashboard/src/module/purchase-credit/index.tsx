@@ -10,6 +10,7 @@ import { config } from "@/config/walletConfig";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
+import useBalance from "@/hooks/useBalance";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
@@ -108,6 +109,7 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
+  const { updateCreditBalance } = useBalance();
 
   // Helper function to check if value is effectively zero
   const isZeroValue = (value: string): boolean => {
@@ -403,6 +405,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               }, 2000);
               setTokenAmount("");
               setLoading(false);
+              
+              // Refresh credit balance after successful transaction initiation
+              updateCreditBalance();
             })
             .catch((err) => {
               const message = err.message.split(".")[0];
@@ -833,6 +838,9 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               //   txnHash: result.value.txHash,
                               // });
                               setTokenAmount("");
+                              
+                              // Refresh credit balance after successful transaction
+                              updateCreditBalance();
                             } catch (error) {
                               console.error("Transaction failed:", error);
                               const message =

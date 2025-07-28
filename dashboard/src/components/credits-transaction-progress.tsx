@@ -3,6 +3,7 @@ import { config } from "@/config/walletConfig";
 import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
+import useBalance from "@/hooks/useBalance";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import Image from "next/image";
 import { Close } from "@radix-ui/react-dialog";
@@ -22,6 +23,7 @@ const CreditsTransactionProgress = () => {
   const { open, setOpen } = useDialog();
   const { transactionProgress, error } = useAppToast();
   const { setMainTabSelected } = useOverview();
+  const { updateCreditBalance } = useBalance();
   const {
     token,
     setTransactionStatusList,
@@ -123,6 +125,9 @@ const CreditsTransactionProgress = () => {
               )
             );
             setShowTransaction({ ...showTransaction, status: "completed" });
+            
+            // Refresh credit balance after successful transaction
+            updateCreditBalance();
           })
           .catch((error) => {
             console.log(error);
