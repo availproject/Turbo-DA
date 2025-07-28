@@ -24,47 +24,59 @@ function DiscountEligibility({ token }: { token?: string }) {
   const debouncedValue = useDebounce(deferredQuery, 500);
   const [credits, setCredits] = useState<number>();
   const [loading, setLoading] = useState(false);
-  const [graphData, setGraphData] = useState<Array<{x: number, y: number}>>([]);
+  const [graphData, setGraphData] = useState<Array<{ x: number; y: number }>>(
+    []
+  );
   const { open, setOpen } = useDialog();
 
   // Fetch real data points from API for graph
   useEffect(() => {
     if (!token) return;
-    
+
     const fetchGraphDataPoints = async () => {
-      const batchSizes = [10, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 10000];
+      const batchSizes = [
+        10, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000,
+        3000, 4000, 5000, 6000, 7000, 8000, 10000,
+      ];
       const dataPoints = [];
-      
+
       console.log("🔥 Fetching real graph data points...");
-      
+
       for (const batchSize of batchSizes) {
         try {
           const response = await CreditService.creditEstimates({
             token,
             data: batchSize * 1024, // Convert KB to bytes
           });
-          
+
           const credits = response?.data;
           if (credits) {
             const creditValue = Number(credits) / 1024; // Convert back to credits
-            dataPoints.push({ 
-              batchSize, 
+            dataPoints.push({
+              batchSize,
               credits: creditValue,
-              costRatio: creditValue / batchSize // Cost per KB
+              costRatio: creditValue / batchSize, // Cost per KB
             });
           }
         } catch (error) {
-          console.log(`Error fetching data for batch size ${batchSize}:`, error);
+          console.log(
+            `Error fetching data for batch size ${batchSize}:`,
+            error
+          );
         }
       }
-      
+
       console.log("📊 REAL GRAPH DATA POINTS:", dataPoints);
       console.log("📋 Copy this data for hardcoding:");
-      dataPoints.forEach(point => {
-        console.log(`{ batchSize: ${point.batchSize}, cost: ${point.costRatio.toFixed(4)} },`);
+      dataPoints.forEach((point) => {
+        console.log(
+          `{ batchSize: ${point.batchSize}, cost: ${point.costRatio.toFixed(
+            4
+          )} },`
+        );
       });
     };
-    
+
     fetchGraphDataPoints();
   }, [token]);
 
@@ -76,7 +88,7 @@ function DiscountEligibility({ token }: { token?: string }) {
       { batchSize: 10, cost: 0.9653 },
       { batchSize: 25, cost: 0.9126 },
       { batchSize: 50, cost: 0.8365 },
-      { batchSize: 75, cost: 0.7720 },
+      { batchSize: 75, cost: 0.772 },
       { batchSize: 100, cost: 0.7168 },
       { batchSize: 150, cost: 0.6271 },
       { batchSize: 200, cost: 0.5573 },
@@ -87,19 +99,19 @@ function DiscountEligibility({ token }: { token?: string }) {
       { batchSize: 1000, cost: 0.2005 },
       // API returns very small values for larger sizes, likely an issue
       // So we'll extend the curve logically
-      { batchSize: 1500, cost: 0.1800 },
-      { batchSize: 2000, cost: 0.1700 },
-      { batchSize: 3000, cost: 0.1600 },
-      { batchSize: 4000, cost: 0.1550 },
-      { batchSize: 5000, cost: 0.1500 },
-      { batchSize: 10000, cost: 0.1400 },
+      { batchSize: 1500, cost: 0.18 },
+      { batchSize: 2000, cost: 0.17 },
+      { batchSize: 3000, cost: 0.16 },
+      { batchSize: 4000, cost: 0.155 },
+      { batchSize: 5000, cost: 0.15 },
+      { batchSize: 10000, cost: 0.14 },
     ];
 
     // Convert to SVG coordinates (normalize to 0-455 width, 0-190 height)
     const maxBatchSize = 10000;
     const maxCost = 1.0;
-    
-    return dataPoints.map(point => ({
+
+    return dataPoints.map((point) => ({
       x: (point.batchSize / maxBatchSize) * 455,
       y: 190 - (point.cost / maxCost) * 190, // Invert Y axis (SVG coordinate system)
     }));
@@ -108,21 +120,21 @@ function DiscountEligibility({ token }: { token?: string }) {
   // Generate SVG path from data points
   const generateSVGPath = useMemo(() => {
     if (generateGraphData.length === 0) return "";
-    
+
     let path = `M ${generateGraphData[0].x} ${generateGraphData[0].y}`;
-    
+
     // Create smooth curve using quadratic bezier curves
     for (let i = 1; i < generateGraphData.length; i++) {
       const current = generateGraphData[i];
       const previous = generateGraphData[i - 1];
-      
+
       // Control point for smooth curve (midpoint with slight adjustment)
       const controlX = (previous.x + current.x) / 2;
       const controlY = (previous.y + current.y) / 2;
-      
+
       path += ` Q ${controlX} ${controlY} ${current.x} ${current.y}`;
     }
-    
+
     return path;
   }, [generateGraphData]);
 
@@ -153,14 +165,18 @@ function DiscountEligibility({ token }: { token?: string }) {
   const batchSizeData = useMemo(() => {
     if (!debouncedValue) {
       return {
-        size: "100 KB", 
+        size: "100 KB",
         credits: (73387.97 / 1024).toFixed(2),
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: credits ? (Number(credits) / 1024).toFixed(2) : loading ? "..." : "0.00",
+      credits: credits
+        ? (Number(credits) / 1024).toFixed(2)
+        : loading
+        ? "..."
+        : "0.00",
     };
   }, [debouncedValue, credits, loading]);
 
@@ -226,8 +242,8 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} The higher the batch size, the lower
-                    would be your credit consumption.
+                    {batchSizeData.credits} credits. The higher the batch size,
+                    the lower would be your credit consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">
@@ -266,7 +282,11 @@ function DiscountEligibility({ token }: { token?: string }) {
                         {debouncedValue && credits && (
                           <circle
                             cx={(Math.min(debouncedValue, 10000) / 10000) * 455}
-                            cy={190 - ((Number(credits) / 1024 / debouncedValue) / 1.0) * 190} // Real position based on API response
+                            cy={
+                              190 -
+                              (Number(credits) / 1024 / debouncedValue / 1.0) *
+                                190
+                            } // Real position based on API response
                             r="4"
                             fill="#3CA3FC"
                             stroke="#fff"
