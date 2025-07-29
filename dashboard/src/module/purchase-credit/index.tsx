@@ -438,7 +438,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     api: ApiPromise,
     account: WalletAccount,
     atomicAmount: string,
-    remarkMessage: string
+    remarkMessage: string,
+    onTransactionReady?: (txHash: string) => void
   ) => {
     try {
       // Get the proper signer from the wallet
@@ -509,6 +510,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               // @ts-ignore - Type incompatibility between polkadot versions in different packages
               (result: ISubmittableResult) => {
                 console.log(`Tx status: ${result.status}`);
+                
+                // Trigger callback when transaction is ready (user accepted and transaction is processing)
+                if (result.status.toString() === "Ready" && onTransactionReady) {
+                  onTransactionReady(result.txHash?.toString() || "");
+                }
+                
                 if (result.isInBlock) {
                   console.log("Transaction included in block");
                   resolve(result);
@@ -817,11 +824,56 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 return;
                               }
 
+                              // Create transaction ID for tracking
+                              const transactionId = uuidv4();
+                              let transaction: TransactionStatus;
+
+                              // Start the transaction processing with callback for when it's ready
                               const result = await batchTransferAndRemark(
                                 api,
                                 selected,
                                 parseUnits(tokenAmount, 18).toString(),
-                                numberToBytes32(+orderResponse?.data?.id)
+                                numberToBytes32(+orderResponse?.data?.id),
+                                (txHash: string) => {
+                                  // This callback triggers when "Tx status: Ready" appears
+                                  console.log("Transaction is ready, showing dialog...");
+                                  
+                                  transaction = {
+                                    id: transactionId,
+                                    status: "initialised",
+                                    orderId: orderResponse.data.id as number,
+                                    tokenAddress: TOKEN_MAP.avail
+                                      .token_address as `0x${string}`,
+                                    tokenAmount: +tokenAmount,
+                                    txnHash: txHash as `0x${string}`,
+                                    creditAmount: estimateData
+                                      ? +estimateData
+                                      : undefined,
+                                  };
+
+                                  // Show dialog and let CreditsTransactionProgress handle natural progression
+                                  setTransactionStatusList((prev) => [
+                                    ...(prev ?? []),
+                                    transaction,
+                                  ]);
+                                  setShowTransaction(transaction);
+                                  setOpen("credit-transaction");
+
+                                  // Add the missing transition: initialised → finality (like Ethereum flow)
+                                  setTimeout(() => {
+                                    const finalityTransaction = {
+                                      ...transaction,
+                                      status: "finality" as const,
+                                    };
+                                    setTransactionStatusList((prev) =>
+                                      prev.map((t) =>
+                                        t.id === transactionId ? finalityTransaction : t
+                                      )
+                                    );
+                                    setShowTransaction(finalityTransaction);
+                                    // Now CreditsTransactionProgress will handle finality → almost_done
+                                  }, 2000); // Same timing as Ethereum flow
+                                }
                               );
 
                               if (result.isErr()) {
@@ -833,45 +885,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 result.value
                               );
 
-                              // Create transaction status object for Avail (like Ethereum flow)
-                              const transaction: TransactionStatus = {
-                                id: uuidv4(),
-                                status: "initialised",
-                                orderId: orderResponse.data.id as number,
-                                tokenAddress: TOKEN_MAP.avail
-                                  .token_address as `0x${string}`,
-                                tokenAmount: +tokenAmount,
-                                txnHash: result.value.txHash as `0x${string}`,
-                                creditAmount: estimateData
-                                  ? +estimateData
-                                  : undefined,
-                              };
-
-                              // Add to transaction list and show progress modal
-                              setTransactionStatusList((prev) => [
-                                ...(prev ?? []),
-                                transaction,
-                              ]);
-                              setShowTransaction(transaction);
-                              setOpen("credit-transaction");
-
-                              // For Avail: Since transaction is already confirmed on-chain,
-                              // move directly to finality status after a short delay
-                              setTimeout(() => {
-                                const finalityTransaction = {
-                                  ...transaction,
-                                  status: "finality" as const,
-                                };
-                                setTransactionStatusList((prev) =>
-                                  prev.map((t) =>
-                                    t.id === transaction.id
-                                      ? finalityTransaction
-                                      : t
-                                  )
-                                );
-                                setShowTransaction(finalityTransaction);
-
-                                // For Avail: Call inclusion details API since transaction is confirmed
+                              // Transaction completed successfully - but don't show success immediately
+                              // Let the 3 steps complete first, then show success
+                              if (transaction) {
+                                // Wait for the natural 3-step progression to complete (takes ~5 seconds total)
+                                // Step 1: initialised (0-2s)
+                                // Step 2: finality (2-3s) 
+                                // Step 3: almost_done (3s+)
+                                // Then we can show completed
+                                
                                 setTimeout(async () => {
                                   try {
                                     const response = await fetch(
@@ -897,14 +919,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                                     await response.json();
 
-                                    // Mark as completed
+                                    // Now mark as completed after 3 steps are done
                                     const completedTransaction = {
-                                      ...finalityTransaction,
+                                      ...transaction,
+                                      txnHash: result.value.txHash as `0x${string}`,
                                       status: "completed" as const,
                                     };
                                     setTransactionStatusList((prev) =>
                                       prev.map((t) =>
-                                        t.id === transaction.id
+                                        t.id === transactionId
                                           ? completedTransaction
                                           : t
                                       )
@@ -917,20 +940,21 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                     );
                                     // Still mark as completed since blockchain transaction succeeded
                                     const completedTransaction = {
-                                      ...finalityTransaction,
+                                      ...transaction,
+                                      txnHash: result.value.txHash as `0x${string}`,
                                       status: "completed" as const,
                                     };
                                     setTransactionStatusList((prev) =>
                                       prev.map((t) =>
-                                        t.id === transaction.id
+                                        t.id === transactionId
                                           ? completedTransaction
                                           : t
                                       )
                                     );
                                     setShowTransaction(completedTransaction);
                                   }
-                                }, 2000); // Wait 2 seconds before calling inclusion API
-                              }, 1000); // Wait 1 second before moving to finality
+                                }, 5000); // Wait 5 seconds for 3 steps to complete naturally
+                              }
 
                               setTokenAmount("");
                               setLoading(false);
