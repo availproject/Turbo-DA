@@ -82,7 +82,7 @@ async fn process_block(
         let number = block.block.number();
         let hash = block.block.hash().to_string();
         let account = hex::encode(batch_all.account_id().unwrap().0);
-        let tx_hash = batch_all.tx_hash().to_string();
+        let tx_hash = hex::encode(batch_all.tx_hash().as_bytes());
         let calls = batch_all.value.calls;
         info(&format!(
             "Found matching batch call, tx_hash: {}, account: {}, number: {}, hash: {}",
