@@ -29,56 +29,6 @@ function DiscountEligibility({ token }: { token?: string }) {
   );
   const { open, setOpen } = useDialog();
 
-  // Fetch real data points from API for graph
-  useEffect(() => {
-    if (!token) return;
-
-    const fetchGraphDataPoints = async () => {
-      const batchSizes = [
-        10, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000,
-        3000, 4000, 5000, 6000, 7000, 8000, 10000,
-      ];
-      const dataPoints = [];
-
-      console.log("🔥 Fetching real graph data points...");
-
-      for (const batchSize of batchSizes) {
-        try {
-          const response = await CreditService.creditEstimates({
-            token,
-            data: batchSize * 1024, // Convert KB to bytes
-          });
-
-          const credits = response?.data;
-          if (credits) {
-            const creditValue = Number(credits) / 1024; // Convert back to credits
-            dataPoints.push({
-              batchSize,
-              credits: creditValue,
-              costRatio: creditValue / batchSize, // Cost per KB
-            });
-          }
-        } catch (error) {
-          console.log(
-            `Error fetching data for batch size ${batchSize}:`,
-            error
-          );
-        }
-      }
-
-      console.log("📊 REAL GRAPH DATA POINTS:", dataPoints);
-      console.log("📋 Copy this data for hardcoding:");
-      dataPoints.forEach((point) => {
-        console.log(
-          `{ batchSize: ${point.batchSize}, cost: ${point.costRatio.toFixed(
-            4
-          )} },`
-        );
-      });
-    };
-
-    fetchGraphDataPoints();
-  }, [token]);
 
   // Generate graph data points using hardcoded formula
   // Since the formula doesn't change often, we'll use predetermined points
