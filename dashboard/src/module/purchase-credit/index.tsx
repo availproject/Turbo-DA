@@ -510,12 +510,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               // @ts-ignore - Type incompatibility between polkadot versions in different packages
               (result: ISubmittableResult) => {
                 console.log(`Tx status: ${result.status}`);
-                
+
                 // Trigger callback when transaction is ready (user accepted and transaction is processing)
-                if (result.status.toString() === "Ready" && onTransactionReady) {
+                if (
+                  result.status.toString() === "Ready" &&
+                  onTransactionReady
+                ) {
                   onTransactionReady(result.txHash?.toString() || "");
                 }
-                
+
                 if (result.isInBlock) {
                   console.log("Transaction included in block");
                   resolve(result);
@@ -826,7 +829,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                               // Create transaction ID for tracking
                               const transactionId = uuidv4();
-                              let transaction: TransactionStatus;
+                              let transaction: TransactionStatus | undefined;
 
                               // Start the transaction processing with callback for when it's ready
                               const result = await batchTransferAndRemark(
@@ -836,9 +839,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 numberToBytes32(+orderResponse?.data?.id),
                                 (txHash: string) => {
                                   // This callback triggers when "Tx status: Ready" appears
-                                  console.log("Transaction is ready, showing dialog...");
-                                  
-                                  transaction = {
+                                  console.log(
+                                    "Transaction is ready, showing dialog..."
+                                  );
+
+                                  const newTransaction: TransactionStatus = {
                                     id: transactionId,
                                     status: "initialised",
                                     orderId: orderResponse.data.id as number,
@@ -851,23 +856,28 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       : undefined,
                                   };
 
+                                  transaction = newTransaction;
+
                                   // Show dialog and let CreditsTransactionProgress handle natural progression
                                   setTransactionStatusList((prev) => [
                                     ...(prev ?? []),
-                                    transaction,
+                                    newTransaction,
                                   ]);
-                                  setShowTransaction(transaction);
+                                  setShowTransaction(newTransaction);
                                   setOpen("credit-transaction");
 
                                   // Add the missing transition: initialised → finality (like Ethereum flow)
                                   setTimeout(() => {
-                                    const finalityTransaction = {
-                                      ...transaction,
-                                      status: "finality" as const,
-                                    };
+                                    const finalityTransaction: TransactionStatus =
+                                      {
+                                        ...newTransaction,
+                                        status: "finality" as const,
+                                      };
                                     setTransactionStatusList((prev) =>
                                       prev.map((t) =>
-                                        t.id === transactionId ? finalityTransaction : t
+                                        t.id === transactionId
+                                          ? finalityTransaction
+                                          : t
                                       )
                                     );
                                     setShowTransaction(finalityTransaction);
@@ -885,15 +895,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 result.value
                               );
 
-                              // Transaction completed successfully - but don't show success immediately
-                              // Let the 3 steps complete first, then show success
                               if (transaction) {
-                                // Wait for the natural 3-step progression to complete (takes ~5 seconds total)
-                                // Step 1: initialised (0-2s)
-                                // Step 2: finality (2-3s) 
-                                // Step 3: almost_done (3s+)
-                                // Then we can show completed
-                                
                                 setTimeout(async () => {
                                   try {
                                     const response = await fetch(
@@ -920,11 +922,17 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                     await response.json();
 
                                     // Now mark as completed after 3 steps are done
-                                    const completedTransaction = {
-                                      ...transaction,
-                                      txnHash: result.value.txHash as `0x${string}`,
-                                      status: "completed" as const,
-                                    };
+                                    const completedTransaction: TransactionStatus =
+                                      {
+                                        id: transaction!.id,
+                                        orderId: transaction!.orderId,
+                                        tokenAmount: transaction!.tokenAmount,
+                                        tokenAddress: transaction!.tokenAddress,
+                                        creditAmount: transaction!.creditAmount,
+                                        txnHash: result.value
+                                          .txHash as `0x${string}`,
+                                        status: "completed" as const,
+                                      };
                                     setTransactionStatusList((prev) =>
                                       prev.map((t) =>
                                         t.id === transactionId
@@ -939,11 +947,17 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       error
                                     );
                                     // Still mark as completed since blockchain transaction succeeded
-                                    const completedTransaction = {
-                                      ...transaction,
-                                      txnHash: result.value.txHash as `0x${string}`,
-                                      status: "completed" as const,
-                                    };
+                                    const completedTransaction: TransactionStatus =
+                                      {
+                                        id: transaction!.id,
+                                        orderId: transaction!.orderId,
+                                        tokenAmount: transaction!.tokenAmount,
+                                        tokenAddress: transaction!.tokenAddress,
+                                        creditAmount: transaction!.creditAmount,
+                                        txnHash: result.value
+                                          .txHash as `0x${string}`,
+                                        status: "completed" as const,
+                                      };
                                     setTransactionStatusList((prev) =>
                                       prev.map((t) =>
                                         t.id === transactionId
