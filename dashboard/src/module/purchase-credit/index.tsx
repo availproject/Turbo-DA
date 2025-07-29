@@ -405,7 +405,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               }, 2000);
               setTokenAmount("");
               setLoading(false);
-              
+
               // Refresh credit balance after successful transaction initiation
               updateCreditBalance();
             })
@@ -833,12 +833,108 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 result.value
                               );
 
-                              // postInclusionDetails({
-                              //   orderId: +orderResponse?.data?.id,
-                              //   txnHash: result.value.txHash,
-                              // });
+                              // Create transaction status object for Avail (like Ethereum flow)
+                              const transaction: TransactionStatus = {
+                                id: uuidv4(),
+                                status: "initialised",
+                                orderId: orderResponse.data.id as number,
+                                tokenAddress: TOKEN_MAP.avail
+                                  .token_address as `0x${string}`,
+                                tokenAmount: +tokenAmount,
+                                txnHash: result.value.txHash as `0x${string}`,
+                                creditAmount: estimateData
+                                  ? +estimateData
+                                  : undefined,
+                              };
+
+                              // Add to transaction list and show progress modal
+                              setTransactionStatusList((prev) => [
+                                ...(prev ?? []),
+                                transaction,
+                              ]);
+                              setShowTransaction(transaction);
+                              setOpen("credit-transaction");
+
+                              // For Avail: Since transaction is already confirmed on-chain,
+                              // move directly to finality status after a short delay
+                              setTimeout(() => {
+                                const finalityTransaction = {
+                                  ...transaction,
+                                  status: "finality" as const,
+                                };
+                                setTransactionStatusList((prev) =>
+                                  prev.map((t) =>
+                                    t.id === transaction.id
+                                      ? finalityTransaction
+                                      : t
+                                  )
+                                );
+                                setShowTransaction(finalityTransaction);
+
+                                // For Avail: Call inclusion details API since transaction is confirmed
+                                setTimeout(async () => {
+                                  try {
+                                    const response = await fetch(
+                                      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
+                                      {
+                                        method: "POST",
+                                        headers: {
+                                          Authorization: `Bearer ${token}`,
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          order_id: +orderResponse?.data?.id,
+                                          tx_hash: result.value.txHash,
+                                        }),
+                                      }
+                                    );
+
+                                    if (!response.ok) {
+                                      throw new Error(
+                                        `HTTP error! Status: ${response.status}`
+                                      );
+                                    }
+
+                                    await response.json();
+
+                                    // Mark as completed
+                                    const completedTransaction = {
+                                      ...finalityTransaction,
+                                      status: "completed" as const,
+                                    };
+                                    setTransactionStatusList((prev) =>
+                                      prev.map((t) =>
+                                        t.id === transaction.id
+                                          ? completedTransaction
+                                          : t
+                                      )
+                                    );
+                                    setShowTransaction(completedTransaction);
+                                  } catch (error) {
+                                    console.error(
+                                      "Failed to post inclusion details:",
+                                      error
+                                    );
+                                    // Still mark as completed since blockchain transaction succeeded
+                                    const completedTransaction = {
+                                      ...finalityTransaction,
+                                      status: "completed" as const,
+                                    };
+                                    setTransactionStatusList((prev) =>
+                                      prev.map((t) =>
+                                        t.id === transaction.id
+                                          ? completedTransaction
+                                          : t
+                                      )
+                                    );
+                                    setShowTransaction(completedTransaction);
+                                  }
+                                }, 2000); // Wait 2 seconds before calling inclusion API
+                              }, 1000); // Wait 1 second before moving to finality
+
                               setTokenAmount("");
-                              
+                              setLoading(false);
+
                               // Refresh credit balance after successful transaction
                               updateCreditBalance();
                             } catch (error) {
