@@ -271,7 +271,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
-          chain_id: account.chainId ?? 1,
+          chain_id: account.chainId ?? DESIRED_CHAIN,
         }
       );
 
