@@ -3,7 +3,10 @@ import { config } from "@/config/walletConfig";
 import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import useBalance, { dispatchTransactionCompleted } from "@/hooks/useBalance";
+import useBalance, {
+  dispatchTransactionCompleted,
+  dispatchCreditBalanceUpdated,
+} from "@/hooks/useBalance";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import Image from "next/image";
 import { Close } from "@radix-ui/react-dialog";
@@ -23,7 +26,7 @@ const CreditsTransactionProgress = () => {
   const { open, setOpen } = useDialog();
   const { transactionProgress, error } = useAppToast();
   const { setMainTabSelected } = useOverview();
-  const { updateAllBalances } = useBalance();
+  const { updateAllBalances, pollCreditBalanceUpdate } = useBalance();
   const {
     token,
     setTransactionStatusList,
@@ -34,6 +37,7 @@ const CreditsTransactionProgress = () => {
 
   // State to control initial animation
   const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [isPollingCreditBalance, setIsPollingCreditBalance] = useState(false);
 
   // Start animation after dialog opens
   useEffect(() => {
@@ -129,8 +133,31 @@ const CreditsTransactionProgress = () => {
             // Dispatch transaction completed event to update all balances
             dispatchTransactionCompleted();
 
-            // Refresh credit balance after successful transaction
+            // Refresh token balances immediately
             updateAllBalances();
+
+            // Start polling for credit balance update if we have credit amount
+            if (showTransaction?.creditAmount) {
+              console.log(
+                `Starting credit balance polling for ${showTransaction.creditAmount} credits...`
+              );
+              setIsPollingCreditBalance(true);
+              pollCreditBalanceUpdate(showTransaction.creditAmount).then(
+                (success) => {
+                  setIsPollingCreditBalance(false);
+                  if (success) {
+                    console.log(
+                      "Credit balance polling completed successfully"
+                    );
+                    // Dispatch events after successful polling
+                    dispatchTransactionCompleted();
+                    dispatchCreditBalanceUpdated();
+                  } else {
+                    console.log("Credit balance polling timed out or failed");
+                  }
+                }
+              );
+            }
 
             // Force a small delay to ensure all components have updated
             setTimeout(() => {
@@ -206,24 +233,45 @@ const CreditsTransactionProgress = () => {
               {showTransaction?.tokenAmount ? (
                 <>
                   {showTransaction?.status === "completed" ? (
-                    <Text
-                      weight={"semibold"}
-                      size={"2xl"}
-                      as="div"
-                      className="relative self-stretch text-center"
-                    >
+                    <>
                       <Text
-                        as="span"
                         weight={"semibold"}
                         size={"2xl"}
-                        variant={"green"}
+                        as="div"
+                        className="relative self-stretch text-center"
                       >
-                        {showTransaction?.creditAmount
-                          ? formatDataBytes(showTransaction.creditAmount)
-                          : ""}
+                        <Text
+                          as="span"
+                          weight={"semibold"}
+                          size={"2xl"}
+                          variant={"green"}
+                        >
+                          {showTransaction?.creditAmount
+                            ? formatDataBytes(showTransaction.creditAmount)
+                            : ""}
+                        </Text>
+                        Credited Successfully
                       </Text>
-                      Credited Successfully
-                    </Text>
+                      <div className="flex flex-col items-center gap-y-2">
+                        <Text
+                          weight={"medium"}
+                          size={"sm"}
+                          variant={"secondary-grey"}
+                          className="text-center"
+                        >
+                          {isPollingCreditBalance
+                            ? "Waiting for backend to update credit balance..."
+                            : "Credit balance updated successfully!"}
+                        </Text>
+                        {isPollingCreditBalance && (
+                          <LoaderCircle
+                            className="animate-spin"
+                            color="#B3B3B3"
+                            size={20}
+                          />
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <>
                       <Text

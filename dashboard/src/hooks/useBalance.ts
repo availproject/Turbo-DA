@@ -10,10 +10,16 @@ import BigNumber from "bignumber.js";
 
 // Custom event for transaction completion
 const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
+const CREDIT_BALANCE_UPDATED_EVENT = "creditBalanceUpdated";
 
 // Dispatch transaction completed event
 export const dispatchTransactionCompleted = () => {
   window.dispatchEvent(new CustomEvent(TRANSACTION_COMPLETED_EVENT));
+};
+
+// Dispatch credit balance updated event
+export const dispatchCreditBalanceUpdated = () => {
+  window.dispatchEvent(new CustomEvent(CREDIT_BALANCE_UPDATED_EVENT));
 };
 
 const useBalance = () => {
@@ -36,6 +42,81 @@ const useBalance = () => {
       setLoading(false);
     }
   }, [token, setCreditBalance]);
+
+  // Poll for credit balance updates after transaction completion
+  const pollCreditBalanceUpdate = useCallback(
+    async (expectedIncrease: number, maxAttempts: number = 30) => {
+      if (!token) return;
+
+      console.log(
+        `Starting credit balance polling. Expected increase: ${expectedIncrease}`
+      );
+
+      let attempts = 0;
+      const startTime = Date.now();
+      const maxWaitTime = 60000; // 60 seconds max wait time
+
+      const poll = async (): Promise<boolean> => {
+        attempts++;
+
+        try {
+          const response = await AuthenticationService.fetchUser({ token });
+          const currentBalance = +response?.data?.credit_balance || 0;
+          const previousBalance = creditBalance;
+          const actualIncrease = currentBalance - previousBalance;
+
+          console.log(
+            `Poll attempt ${attempts}: Previous: ${previousBalance}, Current: ${currentBalance}, Increase: ${actualIncrease}, Expected: ${expectedIncrease}`
+          );
+
+          // Check if balance has increased by the expected amount
+          if (actualIncrease >= expectedIncrease) {
+            console.log(
+              `Credit balance updated successfully! New balance: ${currentBalance}`
+            );
+            setCreditBalance(currentBalance);
+            // Dispatch event to hide the warning message
+            dispatchCreditBalanceUpdated();
+            return true;
+          }
+
+          // Check if we've exceeded max attempts or time
+          if (attempts >= maxAttempts || Date.now() - startTime > maxWaitTime) {
+            console.log(`Polling timeout. Final balance: ${currentBalance}`);
+            setCreditBalance(currentBalance);
+            return false;
+          }
+
+          // Exponential backoff: 2s, 4s, 8s, 16s, then 20s intervals
+          const delay = Math.min(
+            2000 * Math.pow(2, Math.min(attempts - 1, 3)),
+            20000
+          );
+
+          console.log(`Balance not updated yet. Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+
+          return poll();
+        } catch (error) {
+          console.error(
+            `Error polling credit balance (attempt ${attempts}):`,
+            error
+          );
+
+          if (attempts >= maxAttempts || Date.now() - startTime > maxWaitTime) {
+            return false;
+          }
+
+          // Retry after 5 seconds on error
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          return poll();
+        }
+      };
+
+      return poll();
+    },
+    [token, creditBalance, setCreditBalance]
+  );
 
   // Function to refresh AVAIL ERC20 balance on Ethereum
   const refreshAvailERC20Balance = useCallback(async () => {
@@ -128,6 +209,7 @@ const useBalance = () => {
     refreshAvailERC20Balance,
     refreshETHBalance,
     updateAllBalances,
+    pollCreditBalanceUpdate,
     refreshCounter,
     creditBalance: +creditBalance,
   };

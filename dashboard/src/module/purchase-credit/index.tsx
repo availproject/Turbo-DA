@@ -10,7 +10,10 @@ import { config } from "@/config/walletConfig";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
-import useBalance, { dispatchTransactionCompleted } from "@/hooks/useBalance";
+import useBalance, {
+  dispatchTransactionCompleted,
+  dispatchCreditBalanceUpdated,
+} from "@/hooks/useBalance";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
@@ -117,7 +120,8 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
-  const { updateAllBalances, refreshCounter } = useBalance();
+  const { updateAllBalances, refreshCounter, pollCreditBalanceUpdate } =
+    useBalance();
 
   // Helper function to check if value is effectively zero
   const isZeroValue = (value: string): boolean => {
@@ -516,8 +520,27 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               // Dispatch transaction completed event to update all balances
               dispatchTransactionCompleted();
 
-              // Refresh credit balance after successful transaction initiation
+              // Refresh token balances immediately
               updateAllBalancesComprehensive();
+
+              // Start polling for credit balance update
+              if (estimateData) {
+                console.log(
+                  `Starting credit balance polling for ${estimateData} credits...`
+                );
+                pollCreditBalanceUpdate(estimateData).then((success) => {
+                  if (success) {
+                    console.log(
+                      "Credit balance polling completed successfully"
+                    );
+                    // Dispatch events after successful polling
+                    dispatchTransactionCompleted();
+                    dispatchCreditBalanceUpdated();
+                  } else {
+                    console.log("Credit balance polling timed out or failed");
+                  }
+                });
+              }
             })
             .catch((err) => {
               const message = err.message.split(".")[0];
@@ -1117,8 +1140,31 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               // Dispatch transaction completed event to update all balances
                               dispatchTransactionCompleted();
 
-                              // Refresh credit balance after successful transaction
+                              // Refresh token balances immediately
                               updateAllBalancesComprehensive();
+
+                              // Start polling for credit balance update
+                              if (estimateData) {
+                                console.log(
+                                  `Starting credit balance polling for ${estimateData} credits...`
+                                );
+                                pollCreditBalanceUpdate(estimateData).then(
+                                  (success) => {
+                                    if (success) {
+                                      console.log(
+                                        "Credit balance polling completed successfully"
+                                      );
+                                      // Dispatch events after successful polling
+                                      dispatchTransactionCompleted();
+                                      dispatchCreditBalanceUpdated();
+                                    } else {
+                                      console.log(
+                                        "Credit balance polling timed out or failed"
+                                      );
+                                    }
+                                  }
+                                );
+                              }
                             } catch (error) {
                               console.error("Transaction failed:", error);
                               const message =
