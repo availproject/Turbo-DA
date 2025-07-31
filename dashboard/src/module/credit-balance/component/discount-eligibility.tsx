@@ -18,17 +18,11 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
-// Animated loading dots component
-const LoadingDots = () => (
-  <span className="inline-block">
-    <span className="animate-pulse">.</span>
-    <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>
-      .
-    </span>
-    <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>
-      .
-    </span>
-  </span>
+// Circle loader component
+const CircleLoader = () => (
+  <div className="inline-flex items-center justify-center">
+    <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  </div>
 );
 
 function DiscountEligibility({ token }: { token?: string }) {
@@ -203,7 +197,7 @@ function DiscountEligibility({ token }: { token?: string }) {
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
                     {batchSizeData.isLoading ? (
-                      <LoadingDots />
+                      <CircleLoader />
                     ) : (
                       batchSizeData.credits
                     )}{" "}

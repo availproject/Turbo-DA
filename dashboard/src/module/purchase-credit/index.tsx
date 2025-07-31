@@ -41,18 +41,13 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
+import Image from "next/image";
 
-// Animated loading dots component
-const LoadingDots = () => (
-  <span className="inline-block">
-    <span className="animate-pulse">.</span>
-    <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>
-      .
-    </span>
-    <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>
-      .
-    </span>
-  </span>
+// Circle loader component
+const CircleLoader = () => (
+  <div className="inline-flex items-center justify-center">
+    <div className="w-10 h-10 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  </div>
 );
 
 export const abi: Abi = [
@@ -750,10 +745,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       }
                     />
                     {estimateDataLoading && (
-                      <div className="absolute inset-0 flex items-center justify-start pl-0 pointer-events-none">
-                        <span className="text-[32px] font-semibold text-white">
-                          <LoadingDots />
-                        </span>
+                      <div className="absolute inset-0 flex items-center justify-start pl-0 pt-5 pointer-events-none">
+                        <CircleLoader />
                       </div>
                     )}
                   </div>
@@ -769,7 +762,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   )}
                   {/* Warning message for insufficient balance or zero amount */}
                   {tokenAmount && (
-                    <>
+                    <div className="w-full">
                       {isZeroValue(tokenAmount) && (
                         <Text variant={"error"} size={"sm"} weight={"medium"}>
                           Please enter a valid amount greater than 0
@@ -781,7 +774,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             Insufficient balance. Please enter a smaller amount
                           </Text>
                         )}
-                    </>
+                    </div>
                   )}
                   {(!selectedChain || !selectedToken) && (
                     <Button
