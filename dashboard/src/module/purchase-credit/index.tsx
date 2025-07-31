@@ -21,10 +21,13 @@ import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import CreditService from "@/services/credit";
 import { LegacySignerOptions } from "@/utils/web3-services";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { ISubmittableResult } from "@polkadot/types/types";
-import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
+import {
+  getWalletBySource,
+  getWallets,
+  WalletAccount,
+} from "@talismn/connect-wallets";
 import { readContract, writeContract } from "@wagmi/core";
-import { ApiPromise } from "avail-js-sdk";
+import { ApiPromise, SubmittableResult } from "avail-js-sdk";
 import {
   AvailWalletConnect,
   useAvailAccount,
@@ -33,7 +36,7 @@ import {
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
-import { err, ok } from "neverthrow";
+import { Result, err, ok } from "neverthrow";
 import {
   MouseEvent,
   useCallback,
@@ -309,7 +312,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (debouncedValue && selectedToken && effectiveChainId) {
       console.log(
         "Calling calculateEstimateCredits with effectiveChainId:",
-        effectiveChainId
+        effectiveChainId,
       );
       calculateEstimateCredits({ amount: +debouncedValue });
     } else {
@@ -331,7 +334,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (tokenAmount && selectedToken && effectiveChainId && !tokenAmountError) {
       console.log(
         "Direct API call triggered for Arc browser compatibility with effectiveChainId:",
-        effectiveChainId
+        effectiveChainId,
       );
       const timeoutId = setTimeout(() => {
         calculateEstimateCredits({ amount: +tokenAmount });
@@ -383,7 +386,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
           chain_id: effectiveChainId,
-        }
+        },
       );
 
       console.log("API response:", response);
@@ -407,7 +410,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         body: JSON.stringify({
           chain: chain_id_override ?? account.chainId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -510,8 +513,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 };
                 setTransactionStatusList((prev) =>
                   prev.map((t) =>
-                    t.id === transaction.id ? updatedTransaction : t
-                  )
+                    t.id === transaction.id ? updatedTransaction : t,
+                  ),
                 );
                 setShowTransaction(updatedTransaction);
               }, 2000);
@@ -527,12 +530,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               // Start polling for credit balance update
               if (estimateData) {
                 console.log(
-                  `Starting credit balance polling for ${estimateData} credits...`
+                  `Starting credit balance polling for ${estimateData} credits...`,
                 );
                 pollCreditBalanceUpdate(estimateData).then((success) => {
                   if (success) {
                     console.log(
-                      "Credit balance polling completed successfully"
+                      "Credit balance polling completed successfully",
                     );
                     // Dispatch events after successful polling
                     dispatchTransactionCompleted();
@@ -565,137 +568,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     } catch (error) {
       console.log(error);
       setLoading(false);
-    }
-  };
-
-  const batchTransferAndRemark = async (
-    api: ApiPromise,
-    account: WalletAccount,
-    atomicAmount: string,
-    remarkMessage: string,
-    onTransactionReady?: (txHash: string) => void
-  ) => {
-    try {
-      // Get the proper signer from the wallet
-      const walletSource = account.source;
-      console.log("Getting signer for wallet source:", walletSource);
-
-      if (!walletSource) {
-        return err(new Error("No wallet source available"));
-      }
-
-      // Enable the extension and get the injector
-      const { web3Enable, web3FromSource } = await import(
-        "@polkadot/extension-dapp"
-      );
-
-      // Enable web3 extensions
-      const extensions = await web3Enable("Turbo DA Dashboard");
-      console.log("Available extensions:", extensions.length);
-
-      if (extensions.length === 0) {
-        return err(
-          new Error(
-            "No wallet extensions found. Please install a Polkadot wallet extension."
-          )
-        );
-      }
-
-      // Get the injector for this specific wallet
-      const injector = await web3FromSource(walletSource);
-
-      if (!injector?.signer) {
-        return err(
-          new Error(
-            `No signer found for ${walletSource} wallet. Please make sure the wallet extension is installed and connected.`
-          )
-        );
-      }
-
-      console.log("Signer found:", injector.signer);
-      console.log("Signer methods:", {
-        hasSignPayload: typeof injector.signer.signPayload === "function",
-        hasSignRaw: typeof injector.signer.signRaw === "function",
-      });
-
-      // Set the signer on the API instance
-      // @ts-ignore - Type incompatibility between polkadot/extension-dapp and avail-js-sdk signer types
-      api.setSigner(injector.signer);
-      console.log(
-        "signer address",
-        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string
-      );
-      const transfer = api.tx.balances.transferKeepAlive(
-        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string,
-        atomicAmount
-      );
-      const remark = api.tx.system.remark(remarkMessage);
-
-      //using batchall, so in case of the transfer not being successful, remark will not be executed.
-      const batchCall = api.tx.utility.batchAll([transfer, remark]);
-
-      console.log("About to submit transaction...");
-
-      const txResult = await new Promise<ISubmittableResult>(
-        (resolve, reject) => {
-          batchCall
-            .signAndSend(
-              selected?.address as `0x${string}`,
-              // @ts-ignore - Type incompatibility between polkadot versions in different packages
-              (result: ISubmittableResult) => {
-                console.log(`Tx status: ${result.status}`);
-
-                // Trigger callback when transaction is ready (user accepted and transaction is processing)
-                if (
-                  result.status.toString() === "Ready" &&
-                  onTransactionReady
-                ) {
-                  onTransactionReady(result.txHash?.toString() || "");
-                }
-
-                if (result.isInBlock) {
-                  console.log("Transaction included in block");
-                  resolve(result);
-                } else if (result.isError) {
-                  console.log("Transaction error");
-                  resolve(result);
-                }
-              }
-            )
-            .catch((error) => {
-              console.error("Transaction submission failed:", error);
-              reject(error);
-            });
-        }
-      );
-
-      const error = txResult.dispatchError;
-
-      if (txResult.isError) {
-        return err(new Error(`Transaction failed with error: ${error}`));
-      } else if (error !== undefined) {
-        if (error.isModule) {
-          const decoded = api.registry.findMetaError(error.asModule);
-          const { docs, name, section } = decoded;
-          return err(new Error(`${section}.${name}: ${docs.join(" ")}`));
-        } else {
-          return err(new Error(error.toString()));
-        }
-      }
-
-      return ok({
-        status: "success",
-        blockhash: txResult.status.asInBlock?.toString() || "",
-        txHash: txResult.txHash.toString(),
-        txIndex: txResult.txIndex,
-      });
-    } catch (error) {
-      console.error("Error during batch transfer and remark:", error);
-      return err(
-        error instanceof Error
-          ? error
-          : new Error("Failed to batch transfer and remark")
-      );
     }
   };
 
@@ -736,7 +608,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
         if (currentBalance < numValue) {
           setTokenAmountError(
-            "Insufficient balance. Please enter a smaller amount"
+            "Insufficient balance. Please enter a smaller amount",
           );
         } else {
           setTokenAmountError("");
@@ -754,8 +626,84 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       availBalance,
       balance.data?.formatted,
       availERC20Balance,
-    ]
+    ],
   );
+
+  async function batchTransferAndRemark(
+    api: ApiPromise,
+    account: WalletAccount,
+    atomicAmount: string,
+    remarkMessage: string,
+    onTransactionReady?: (txHash: string) => void,
+  ): Promise<Result<any, Error>> {
+    try {
+      const wallets = getWallets();
+      const matchedWallet = wallets.find((wallet) => {
+        return wallet.title === wallet?.title;
+      });
+
+      await matchedWallet!.enable("turbo-da");
+      const injector = getWalletBySource(account.source);
+
+      const options: Partial<LegacySignerOptions> = {
+        signer: injector?.signer as {},
+        app_id: 0,
+      };
+
+      const transfer = api.tx.balances.transferKeepAlive(
+        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string,
+        atomicAmount,
+      );
+      const remark = api.tx.system.remark(remarkMessage);
+
+      //using batchall, so in case of the transfer not being successful, remark will not be executed.
+      const batchCall = api.tx.utility.batchAll([transfer, remark]);
+
+      const txResult = await new Promise<SubmittableResult>((resolve) => {
+        batchCall.signAndSend(
+          account.address,
+          options,
+          (result: SubmittableResult) => {
+            console.log(`Tx status: ${result.status}`);
+            if (result.status.toString() === "Ready" && onTransactionReady) {
+              onTransactionReady(result.txHash?.toString() || "");
+            }
+            if (result.isInBlock || result.isError) {
+              resolve(result);
+            }
+          },
+        );
+      });
+
+      const error = txResult.dispatchError;
+
+      if (txResult.isError) {
+        return err(new Error(`Transaction failed with error: ${error}`));
+      } else if (error !== undefined) {
+        if (error.isModule) {
+          const decoded = api.registry.findMetaError(error.asModule);
+          const { docs, name, section } = decoded;
+          return err(new Error(`${section}.${name}: ${docs.join(" ")}`));
+        } else {
+          return err(new Error(error.toString()));
+        }
+      }
+
+      return ok({
+        status: "success",
+        blockhash: txResult.status.asInBlock?.toString() || "",
+        txHash: txResult.txHash.toString(),
+        txIndex: txResult.txIndex,
+      });
+    } catch (error) {
+      console.error("Error during batch transfer and remark:", error);
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to batch transfer and remark"),
+      );
+    }
+  }
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
@@ -895,8 +843,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         estimateDataLoading
                           ? ""
                           : estimateData
-                          ? formatDataBytes(+estimateData)
-                          : ""
+                            ? formatDataBytes(+estimateData)
+                            : ""
                       }
                     />
                     {estimateDataLoading && (
@@ -1037,7 +985,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             if (!api || !selected) {
                               console.error(
                                 "API or selected account not available",
-                                { api, selected }
+                                { api, selected },
                               );
                               errorToast?.({
                                 label: "Wallet not connected properly",
@@ -1079,7 +1027,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 (txHash: string) => {
                                   // This callback triggers when "Tx status: Ready" appears
                                   console.log(
-                                    "Transaction is ready, showing dialog..."
+                                    "Transaction is ready, showing dialog...",
                                   );
 
                                   const newTransaction: TransactionStatus = {
@@ -1116,13 +1064,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? finalityTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(finalityTransaction);
                                     // Now CreditsTransactionProgress will handle finality → almost_done
                                   }, 2000); // Same timing as Ethereum flow
-                                }
+                                },
                               );
 
                               if (result.isErr()) {
@@ -1131,7 +1079,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                               console.log(
                                 "Transaction successful:",
-                                result.value
+                                result.value,
                               );
 
                               if (transaction) {
@@ -1149,12 +1097,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                           order_id: +orderResponse?.data?.id,
                                           tx_hash: result.value.txHash,
                                         }),
-                                      }
+                                      },
                                     );
 
                                     if (!response.ok) {
                                       throw new Error(
-                                        `HTTP error! Status: ${response.status}`
+                                        `HTTP error! Status: ${response.status}`,
                                       );
                                     }
 
@@ -1176,14 +1124,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? completedTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(completedTransaction);
                                   } catch (error) {
                                     console.error(
                                       "Failed to post inclusion details:",
-                                      error
+                                      error,
                                     );
                                     // Still mark as completed since blockchain transaction succeeded
                                     const completedTransaction: TransactionStatus =
@@ -1201,8 +1149,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? completedTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(completedTransaction);
                                   }
@@ -1221,23 +1169,23 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               // Start polling for credit balance update
                               if (estimateData) {
                                 console.log(
-                                  `Starting credit balance polling for ${estimateData} credits...`
+                                  `Starting credit balance polling for ${estimateData} credits...`,
                                 );
                                 pollCreditBalanceUpdate(estimateData).then(
                                   (success) => {
                                     if (success) {
                                       console.log(
-                                        "Credit balance polling completed successfully"
+                                        "Credit balance polling completed successfully",
                                       );
                                       // Dispatch events after successful polling
                                       dispatchTransactionCompleted();
                                       dispatchCreditBalanceUpdated();
                                     } else {
                                       console.log(
-                                        "Credit balance polling timed out or failed"
+                                        "Credit balance polling timed out or failed",
                                       );
                                     }
-                                  }
+                                  },
                                 );
                               }
                             } catch (error) {
