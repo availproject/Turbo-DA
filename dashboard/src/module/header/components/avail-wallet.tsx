@@ -9,7 +9,7 @@ import {
 } from "avail-wallet-sdk";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 // Custom event for transaction completion
 const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
@@ -19,6 +19,7 @@ const AvailWallet = () => {
   const { api } = useAvailWallet();
   const { selectedChain, setSelectedChain, setSelectedToken } = useConfig();
   const [availBalance, setAvailBalance] = useState<string>("0.0000");
+  const hasFixedEvents = useRef(false);
 
   // Fetch Avail balance when account changes
   useEffect(() => {
@@ -27,12 +28,39 @@ const AvailWallet = () => {
     }
   }, [api, selected?.address]);
 
+  // Auto-reload after successful wallet connection to fix event handling
+  useEffect(() => {
+    if (api && !hasFixedEvents.current) {
+      hasFixedEvents.current = true;
+      
+      const handleWalletConnected = () => {
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      };
+      
+      const checkForConnection = setInterval(() => {
+        const walletConnectedElement = document.querySelector('[data-state="connected"], .wallet-connected');
+        const hasConnection = document.body.innerText.includes('5DHWX1tk') || 
+                            document.body.innerText.includes('Talisman');
+        
+        if (hasConnection || walletConnectedElement) {
+          clearInterval(checkForConnection);
+          handleWalletConnected();
+        }
+      }, 500);
+      
+      setTimeout(() => {
+        clearInterval(checkForConnection);
+      }, 10000);
+      
+      return () => clearInterval(checkForConnection);
+    }
+  }, [api]);
+
   // Listen for transaction completion events to refresh balance
   useEffect(() => {
     const handleTransactionCompleted = () => {
-      console.log(
-        "Avail wallet: Transaction completed event received, refreshing balance..."
-      );
       if (api && selected?.address) {
         fetchAvailBalance();
       }
@@ -78,10 +106,6 @@ const AvailWallet = () => {
     }
   };
 
-  console.log({
-    selectedWallet,
-    selected,
-  });
 
   return (
     <div className="w-full">
