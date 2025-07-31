@@ -138,6 +138,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [error, setError] = useState("");
   const [availBalance, setAvailBalance] = useState<string>("0");
   const [availERC20Balance, setAvailERC20Balance] = useState<string>("0");
+  const [balanceChecking, setBalanceChecking] = useState(false);
   const account = useAccount();
   const { selected, selectedWallet } = useAvailAccount();
   const { api } = useAvailWallet();
@@ -698,11 +699,83 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
+  // Function to validate balance asynchronously
+  const validateBalance = useCallback(
+    async (value: string) => {
+      if (!value || value.trim() === "") {
+        setTokenAmountError("");
+        return;
+      }
+
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        setTokenAmountError("Enter valid amount");
+        return;
+      }
+
+      setBalanceChecking(true);
+
+      try {
+        // Wait a bit for balance updates to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const getCurrentBalance = () => {
+          if (selectedChain?.name === "Avail") {
+            return Number(availBalance);
+          } else if (selectedChain?.name === "Ethereum") {
+            if (selectedToken?.name === "ETH") {
+              return Number(balance.data?.formatted || 0);
+            } else if (selectedToken?.name === "AVAIL") {
+              return Number(availERC20Balance);
+            }
+          }
+          return 0;
+        };
+
+        const currentBalance = getCurrentBalance();
+
+        if (currentBalance < numValue) {
+          setTokenAmountError(
+            "Insufficient balance. Please enter a smaller amount"
+          );
+        } else {
+          setTokenAmountError("");
+        }
+      } catch (error) {
+        console.error("Error validating balance:", error);
+        setTokenAmountError("");
+      } finally {
+        setBalanceChecking(false);
+      }
+    },
+    [
+      selectedChain?.name,
+      selectedToken?.name,
+      availBalance,
+      balance.data?.formatted,
+      availERC20Balance,
+    ]
+  );
+
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
     e.stopPropagation();
     callback?.();
   };
+
+  // Re-validate balance when balance values change (e.g., when switching networks)
+  useEffect(() => {
+    if (tokenAmount && !balanceChecking) {
+      validateBalance(tokenAmount);
+    }
+  }, [
+    availBalance,
+    availERC20Balance,
+    balance.data?.formatted,
+    selectedChain?.name,
+    selectedToken?.name,
+    validateBalance,
+  ]);
 
   return (
     <div className="relative min-lg:w-[466px] h-[455px]">
@@ -753,28 +826,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                         if (validValue) {
                           setTokenAmount(value);
-
-                          // Check balance after setting token amount
-                          const getCurrentBalance = () => {
-                            if (selectedChain?.name === "Avail") {
-                              return Number(availBalance);
-                            } else if (selectedChain?.name === "Ethereum") {
-                              if (selectedToken?.name === "ETH") {
-                                return Number(balance.data?.formatted || 0);
-                              } else if (selectedToken?.name === "AVAIL") {
-                                return Number(availERC20Balance);
-                              }
-                            }
-                            return 0;
-                          };
-
-                          const currentBalance = getCurrentBalance();
-
-                          if (currentBalance < +value) {
-                            setTokenAmountError(`Insufficient Balance`);
-                          } else {
-                            setTokenAmountError("");
-                          }
+                          // Use async balance validation
+                          validateBalance(value);
                         } else {
                           setTokenAmountError("Enter valid amount");
                         }
@@ -870,8 +923,19 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           Please enter a valid amount greater than 0
                         </Text>
                       )}
+                      {!isZeroValue(tokenAmount) && balanceChecking && (
+                        <Text
+                          variant={"secondary-grey"}
+                          size={"sm"}
+                          weight={"medium"}
+                        >
+                          Checking balance...
+                        </Text>
+                      )}
                       {!isZeroValue(tokenAmount) &&
-                        tokenAmountError === "Insufficient Balance" && (
+                        !balanceChecking &&
+                        tokenAmountError ===
+                          "Insufficient balance. Please enter a smaller amount" && (
                           <Text variant={"error"} size={"sm"} weight={"medium"}>
                             Insufficient balance. Please enter a smaller amount
                           </Text>
@@ -914,7 +978,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedChain ||
                               !tokenAmount ||
                               isZeroValue(tokenAmount) ||
-                              tokenAmountError !== ""
+                              tokenAmountError !== "" ||
+                              balanceChecking
                                 ? "disabled"
                                 : "primary"
                             }
@@ -924,7 +989,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedChain ||
                               !tokenAmount ||
                               isZeroValue(tokenAmount) ||
-                              tokenAmountError !== ""
+                              tokenAmountError !== "" ||
+                              balanceChecking
                             }
                           >
                             {loading ? (
@@ -935,6 +1001,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                   size={24}
                                 />
                                 Waiting for confirmation
+                              </div>
+                            ) : balanceChecking ? (
+                              <div className="flex gap-x-1 justify-center">
+                                <LoaderCircle
+                                  className="animate-spin"
+                                  color="#fff"
+                                  size={24}
+                                />
+                                Checking balance...
                               </div>
                             ) : (
                               "Buy Now"
@@ -1183,7 +1258,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedChain ||
                             !tokenAmount ||
                             isZeroValue(tokenAmount) ||
-                            tokenAmountError !== ""
+                            tokenAmountError !== "" ||
+                            balanceChecking
                               ? "disabled"
                               : "primary"
                           }
@@ -1193,7 +1269,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedChain ||
                             !tokenAmount ||
                             isZeroValue(tokenAmount) ||
-                            tokenAmountError !== ""
+                            tokenAmountError !== "" ||
+                            balanceChecking
                           }
                         >
                           {loading ? (
@@ -1204,6 +1281,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 size={24}
                               />
                               Waiting for confirmation
+                            </div>
+                          ) : balanceChecking ? (
+                            <div className="flex gap-x-1 justify-center">
+                              <LoaderCircle
+                                className="animate-spin"
+                                color="#fff"
+                                size={24}
+                              />
+                              Checking balance...
                             </div>
                           ) : (
                             "Buy Now"
