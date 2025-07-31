@@ -42,6 +42,19 @@ import { v4 as uuidv4 } from "uuid";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 
+// Animated loading dots component
+const LoadingDots = () => (
+  <span className="inline-block">
+    <span className="animate-pulse">.</span>
+    <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>
+      .
+    </span>
+    <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>
+      .
+    </span>
+  </span>
+);
+
 export const abi: Abi = [
   {
     name: "approve",
@@ -245,13 +258,34 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   };
 
   useEffect(() => {
-    if (debouncedValue && !tokenAmountError) {
+    console.log("useEffect triggered with:", {
+      debouncedValue,
+      tokenAmountError,
+      selectedToken: selectedToken?.name,
+      accountChainId: account.chainId,
+    });
+
+    if (debouncedValue && selectedToken && account.chainId) {
+      console.log("Calling calculateEstimateCredits");
       calculateEstimateCredits({ amount: +debouncedValue });
+    } else {
+      console.log("Not calling calculateEstimateCredits because:", {
+        noDebouncedValue: !debouncedValue,
+        noSelectedToken: !selectedToken,
+        noAccountChainId: !account.chainId,
+      });
     }
-  }, [debouncedValue, tokenAmountError]);
+  }, [debouncedValue, selectedToken, account.chainId]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    console.log("calculateEstimateCredits called with:", {
+      amount,
+      selectedToken,
+      accountChainId: account.chainId,
+    });
+
     if (!selectedToken) {
+      console.log("No selectedToken, returning early");
       return;
     }
     const tokenKey = selectedToken?.name?.toLowerCase();
@@ -266,6 +300,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
     setEstimateDataLoading(true);
     try {
+      console.log("Making API call with:", {
+        token,
+        amount,
+        tokenAddress: tokenAddress.toLowerCase(),
+        chain_id: account.chainId ?? DESIRED_CHAIN,
+      });
+
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
           token: token!,
@@ -275,9 +316,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         }
       );
 
+      console.log("API response:", response);
       setEstimateData(response?.data);
     } catch (error) {
-      console.log(error);
+      console.log("API error:", error);
     } finally {
       setEstimateDataLoading(false);
     }
@@ -614,30 +656,30 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                         if (validValue) {
                           setTokenAmount(value);
+
+                          // Check balance after setting token amount
+                          const getCurrentBalance = () => {
+                            if (selectedChain?.name === "Avail") {
+                              return Number(availBalance);
+                            } else if (selectedChain?.name === "Ethereum") {
+                              if (selectedToken?.name === "ETH") {
+                                return Number(balance.data?.formatted || 0);
+                              } else if (selectedToken?.name === "AVAIL") {
+                                return Number(availERC20Balance);
+                              }
+                            }
+                            return 0;
+                          };
+
+                          const currentBalance = getCurrentBalance();
+
+                          if (currentBalance < +value) {
+                            setTokenAmountError(`Insufficient Balance`);
+                          } else {
+                            setTokenAmountError("");
+                          }
                         } else {
                           setTokenAmountError("Enter valid amount");
-                          return;
-                        }
-                        const getCurrentBalance = () => {
-                          if (selectedChain?.name === "Avail") {
-                            return Number(availBalance);
-                          } else if (selectedChain?.name === "Ethereum") {
-                            if (selectedToken?.name === "ETH") {
-                              return Number(balance.data?.formatted || 0);
-                            } else if (selectedToken?.name === "AVAIL") {
-                              return Number(availERC20Balance);
-                            }
-                          }
-                          return 0;
-                        };
-
-                        const currentBalance = getCurrentBalance();
-
-                        if (currentBalance < +value) {
-                          setTokenAmountError(`Insufficient Balance`);
-                          setEstimateData(undefined);
-                        } else {
-                          setTokenAmountError("");
                         }
                       }}
                     />
@@ -691,19 +733,30 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   >
                     You Receive (Credits)
                   </Text>
-                  <Input
-                    className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
-                    placeholder="00"
-                    id="creditsAmount"
-                    name="creditsAmount"
-                    tabIndex={-1}
-                    readOnly
-                    defaultValue={
-                      estimateData && !estimateDataLoading
-                        ? formatDataBytes(+estimateData)
-                        : ""
-                    }
-                  />
+                  <div className="relative">
+                    <Input
+                      className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
+                      placeholder={estimateDataLoading ? "" : "00"}
+                      id="creditsAmount"
+                      name="creditsAmount"
+                      tabIndex={-1}
+                      readOnly
+                      value={
+                        estimateDataLoading
+                          ? ""
+                          : estimateData
+                          ? formatDataBytes(+estimateData)
+                          : ""
+                      }
+                    />
+                    {estimateDataLoading && (
+                      <div className="absolute inset-0 flex items-center justify-start pl-0 pointer-events-none">
+                        <span className="text-[32px] font-semibold text-white">
+                          <LoadingDots />
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -713,6 +766,22 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <Text variant={"error"} size={"sm"} weight={"medium"}>
                       {error}
                     </Text>
+                  )}
+                  {/* Warning message for insufficient balance or zero amount */}
+                  {tokenAmount && (
+                    <>
+                      {isZeroValue(tokenAmount) && (
+                        <Text variant={"error"} size={"sm"} weight={"medium"}>
+                          Please enter a valid amount greater than 0
+                        </Text>
+                      )}
+                      {!isZeroValue(tokenAmount) &&
+                        tokenAmountError === "Insufficient Balance" && (
+                          <Text variant={"error"} size={"sm"} weight={"medium"}>
+                            Insufficient balance. Please enter a smaller amount
+                          </Text>
+                        )}
+                    </>
                   )}
                   {(!selectedChain || !selectedToken) && (
                     <Button

@@ -18,6 +18,19 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
+// Animated loading dots component
+const LoadingDots = () => (
+  <span className="inline-block">
+    <span className="animate-pulse">.</span>
+    <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>
+      .
+    </span>
+    <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>
+      .
+    </span>
+  </span>
+);
+
 function DiscountEligibility({ token }: { token?: string }) {
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
@@ -28,7 +41,6 @@ function DiscountEligibility({ token }: { token?: string }) {
     []
   );
   const { open, setOpen } = useDialog();
-
 
   // Generate graph data points using hardcoded formula
   // Since the formula doesn't change often, we'll use predetermined points
@@ -117,16 +129,14 @@ function DiscountEligibility({ token }: { token?: string }) {
       return {
         size: "100 KB",
         credits: (73387.97 / 1024).toFixed(2),
+        isLoading: false,
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: credits
-        ? (Number(credits) / 1024).toFixed(2)
-        : loading
-        ? "..."
-        : "0.00",
+      credits: credits ? (Number(credits) / 1024).toFixed(2) : " - ",
+      isLoading: loading,
     };
   }, [debouncedValue, credits, loading]);
 
@@ -192,8 +202,13 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} credits. The higher the batch size,
-                    the lower would be your credit consumption.
+                    {batchSizeData.isLoading ? (
+                      <LoadingDots />
+                    ) : (
+                      batchSizeData.credits
+                    )}{" "}
+                    credits. The higher the batch size, the lower would be your
+                    credit consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">
