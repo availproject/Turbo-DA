@@ -7,6 +7,10 @@ import { ConnectKitButton } from "connectkit";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
+import { useEffect } from "react";
+
+// Custom event for transaction completion
+const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
 
 const EVMWallet = () => {
   const account = useAccount();
@@ -15,6 +19,28 @@ const EVMWallet = () => {
   const result = useBalance({
     address: account.address,
   });
+
+  // Listen for transaction completion events to refresh balance
+  useEffect(() => {
+    const handleTransactionCompleted = () => {
+      console.log(
+        "EVM wallet: Transaction completed event received, balance will refresh automatically"
+      );
+      // The useBalance hook will automatically refresh when the component re-renders
+    };
+
+    window.addEventListener(
+      TRANSACTION_COMPLETED_EVENT,
+      handleTransactionCompleted
+    );
+
+    return () => {
+      window.removeEventListener(
+        TRANSACTION_COMPLETED_EVENT,
+        handleTransactionCompleted
+      );
+    };
+  }, []);
 
   console.log({
     account,

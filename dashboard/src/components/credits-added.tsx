@@ -14,12 +14,12 @@ type CreditsAddedProps = {
 };
 export default function CreditsAdded({ credits }: CreditsAddedProps) {
   const { open, setOpen } = useDialog();
-  const { updateCreditBalance } = useBalance();
+  const { updateAllBalances, refreshCounter } = useBalance();
 
   useEffect(() => {
     const updateBalnceCallback = setTimeout(() => {
       if (open) {
-        updateCreditBalance();
+        updateAllBalances();
       }
     }, 5000);
     return () => {

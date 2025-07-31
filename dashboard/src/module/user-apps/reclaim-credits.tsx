@@ -29,7 +29,7 @@ const ReclaimCredits = ({
   const { token } = useConfig();
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const { updateCreditBalance } = useBalance();
+  const { updateAllBalances } = useBalance();
   const { success } = useAppToast();
   const { updateAppList } = useApp();
 
@@ -42,7 +42,7 @@ const ReclaimCredits = ({
         appId: appData.id,
       });
       if (response?.state === "SUCCESS") {
-        updateCreditBalance();
+        updateAllBalances();
         updateAppList();
         setOpen("");
         success({

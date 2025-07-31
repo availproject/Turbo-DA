@@ -17,6 +17,9 @@ import BigNumber from "bignumber.js";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+
+// Custom event for transaction completion
+const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
 import { readContract } from "wagmi/actions";
 import { useAccount, useBalance } from "wagmi";
 import { availChain, chainList } from "../utils/constant";
@@ -52,6 +55,33 @@ const SelectChainToken = () => {
       fetchAvailERC20Balance();
     }
   }, [account.address, account.isConnected]);
+
+  // Listen for transaction completion events to refresh balances
+  useEffect(() => {
+    const handleTransactionCompleted = () => {
+      console.log(
+        "Select chain token: Transaction completed event received, refreshing balances..."
+      );
+      if (api && selected?.address) {
+        fetchAvailBalance();
+      }
+      if (account.address && account.isConnected) {
+        fetchAvailERC20Balance();
+      }
+    };
+
+    window.addEventListener(
+      TRANSACTION_COMPLETED_EVENT,
+      handleTransactionCompleted
+    );
+
+    return () => {
+      window.removeEventListener(
+        TRANSACTION_COMPLETED_EVENT,
+        handleTransactionCompleted
+      );
+    };
+  }, [api, selected?.address, account.address, account.isConnected]);
 
   const fetchAvailBalance = async () => {
     if (!api || !selected?.address) return;

@@ -10,7 +10,7 @@ import { config } from "@/config/walletConfig";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
-import useBalance from "@/hooks/useBalance";
+import useBalance, { dispatchTransactionCompleted } from "@/hooks/useBalance";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
@@ -46,7 +46,7 @@ import Image from "next/image";
 // Circle loader component
 const CircleLoader = () => (
   <div className="inline-flex items-center justify-center">
-    <div className="w-10 h-10 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
   </div>
 );
 
@@ -117,7 +117,7 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
-  const { updateCreditBalance } = useBalance();
+  const { updateAllBalances, refreshCounter } = useBalance();
 
   // Helper function to check if value is effectively zero
   const isZeroValue = (value: string): boolean => {
@@ -147,9 +147,45 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
+    chainId: account.chainId,
   });
-  const debouncedValue = useDebounce(deferredTokenValue, 500);
+  const debouncedValue = useDebounce(deferredTokenValue, 800); // Increased from 500ms to 800ms
   const { chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
+
+  // Force balance refresh when refreshCounter changes
+  useEffect(() => {
+    if (refreshCounter > 0) {
+      console.log("Refresh counter changed, updating balances...");
+      // This will trigger the balance hooks to refresh
+      fetchAvailERC20Balance();
+      if (api && selected?.address && selectedChain?.name === "Avail") {
+        fetchAvailBalance();
+      }
+    }
+  }, [refreshCounter]);
+
+  // Enhanced balance update function
+  const updateAllBalancesComprehensive = useCallback(async () => {
+    console.log("Comprehensive balance update triggered...");
+
+    // Update credit balance
+    await updateAllBalances();
+
+    // Force refresh of local balance states
+    if (account.address && account.isConnected) {
+      fetchAvailERC20Balance();
+    }
+    if (api && selected?.address && selectedChain?.name === "Avail") {
+      fetchAvailBalance();
+    }
+  }, [
+    updateAllBalances,
+    account.address,
+    account.isConnected,
+    api,
+    selected?.address,
+    selectedChain?.name,
+  ]);
   console.log({
     api,
   });
@@ -179,14 +215,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (api && selected?.address && selectedChain?.name === "Avail") {
       fetchAvailBalance();
     }
-  }, [api, selected?.address, selectedChain?.name]);
+  }, [api, selected?.address, selectedChain?.name, refreshCounter]);
 
   // Fetch AVAIL ERC20 balance on Ethereum
   useEffect(() => {
     if (account.address && account.isConnected) {
       fetchAvailERC20Balance();
     }
-  }, [account.address, account.isConnected]);
+  }, [account.address, account.isConnected, refreshCounter]);
 
   const fetchAvailERC20Balance = async () => {
     if (!account.address) return;
@@ -258,25 +294,54 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       tokenAmountError,
       selectedToken: selectedToken?.name,
       accountChainId: account.chainId,
+      deferredTokenValue,
+      tokenAmount,
     });
 
-    if (debouncedValue && selectedToken && account.chainId) {
-      console.log("Calling calculateEstimateCredits");
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
+    if (debouncedValue && selectedToken && effectiveChainId) {
+      console.log(
+        "Calling calculateEstimateCredits with effectiveChainId:",
+        effectiveChainId
+      );
       calculateEstimateCredits({ amount: +debouncedValue });
     } else {
       console.log("Not calling calculateEstimateCredits because:", {
         noDebouncedValue: !debouncedValue,
         noSelectedToken: !selectedToken,
-        noAccountChainId: !account.chainId,
+        noEffectiveChainId: !effectiveChainId,
+        originalChainId: account.chainId,
+        fallbackChainId: DESIRED_CHAIN,
       });
     }
   }, [debouncedValue, selectedToken, account.chainId]);
+
+  // Alternative approach for Arc browser - direct API call on tokenAmount change
+  useEffect(() => {
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
+    if (tokenAmount && selectedToken && effectiveChainId && !tokenAmountError) {
+      console.log(
+        "Direct API call triggered for Arc browser compatibility with effectiveChainId:",
+        effectiveChainId
+      );
+      const timeoutId = setTimeout(() => {
+        calculateEstimateCredits({ amount: +tokenAmount });
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [tokenAmount, selectedToken, account.chainId, tokenAmountError]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     console.log("calculateEstimateCredits called with:", {
       amount,
       selectedToken,
       accountChainId: account.chainId,
+      effectiveChainId: account.chainId ?? DESIRED_CHAIN,
     });
 
     if (!selectedToken) {
@@ -293,13 +358,18 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       return;
     }
 
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
     setEstimateDataLoading(true);
     try {
       console.log("Making API call with:", {
         token,
         amount,
         tokenAddress: tokenAddress.toLowerCase(),
-        chain_id: account.chainId ?? DESIRED_CHAIN,
+        chain_id: effectiveChainId,
+        originalChainId: account.chainId,
+        fallbackChainId: DESIRED_CHAIN,
       });
 
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
@@ -307,7 +377,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
-          chain_id: account.chainId ?? DESIRED_CHAIN,
+          chain_id: effectiveChainId,
         }
       );
 
@@ -443,8 +513,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
               setTokenAmount("");
               setLoading(false);
 
+              // Dispatch transaction completed event to update all balances
+              dispatchTransactionCompleted();
+
               // Refresh credit balance after successful transaction initiation
-              updateCreditBalance();
+              updateAllBalancesComprehensive();
             })
             .catch((err) => {
               const message = err.message.split(".")[0];
@@ -641,6 +714,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       value={tokenAmount}
                       onChange={(e) => {
                         const value = e.target.value;
+                        console.log("Input onChange triggered:", {
+                          value,
+                          browser: navigator.userAgent,
+                          timestamp: new Date().toISOString(),
+                        });
+
                         if (value === "") {
                           setTokenAmount("");
                           setEstimateData(undefined);
@@ -745,7 +824,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       }
                     />
                     {estimateDataLoading && (
-                      <div className="absolute inset-0 flex items-center justify-start pl-0 pt-5 pointer-events-none">
+                      <div className="absolute inset-0 flex items-center justify-start pl-0 pt-3 pointer-events-none w-1/2">
                         <CircleLoader />
                       </div>
                     )}
@@ -1035,8 +1114,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               setTokenAmount("");
                               setLoading(false);
 
+                              // Dispatch transaction completed event to update all balances
+                              dispatchTransactionCompleted();
+
                               // Refresh credit balance after successful transaction
-                              updateCreditBalance();
+                              updateAllBalancesComprehensive();
                             } catch (error) {
                               console.error("Transaction failed:", error);
                               const message =

@@ -30,7 +30,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
   const { creditBalance } = useOverview();
   const [amount, setAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const { updateCreditBalance } = useBalance();
+  const { updateAllBalances } = useBalance();
   const { updateAppList } = useApp();
   const { success } = useAppToast();
 
@@ -48,7 +48,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
           label: "Credits Assigned Successfully!",
           description: `${amount} credits successfully assigned from main credit balance`,
         });
-        updateCreditBalance();
+        updateAllBalances();
         updateAppList();
         setOpen("");
       }

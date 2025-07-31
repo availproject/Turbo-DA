@@ -11,6 +11,9 @@ import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+// Custom event for transaction completion
+const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
+
 const AvailWallet = () => {
   const { selected, selectedWallet, clearWalletState } = useAvailAccount();
   const { api } = useAvailWallet();
@@ -22,6 +25,30 @@ const AvailWallet = () => {
     if (api && selected?.address) {
       fetchAvailBalance();
     }
+  }, [api, selected?.address]);
+
+  // Listen for transaction completion events to refresh balance
+  useEffect(() => {
+    const handleTransactionCompleted = () => {
+      console.log(
+        "Avail wallet: Transaction completed event received, refreshing balance..."
+      );
+      if (api && selected?.address) {
+        fetchAvailBalance();
+      }
+    };
+
+    window.addEventListener(
+      TRANSACTION_COMPLETED_EVENT,
+      handleTransactionCompleted
+    );
+
+    return () => {
+      window.removeEventListener(
+        TRANSACTION_COMPLETED_EVENT,
+        handleTransactionCompleted
+      );
+    };
   }, [api, selected?.address]);
 
   const fetchAvailBalance = async () => {
