@@ -34,6 +34,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showBalanceError, setShowBalanceError] = useState(false);
   const account = useAccount();
   const { selectedChain, selectedToken, availNativeBalance } = useConfig();
   const balance = useWagmiBalance({
@@ -93,10 +94,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   ]);
 
   useEffect(() => {
-    if (debouncedValue && !tokenAmountError) {
+    if (debouncedValue && +debouncedValue > 0) {
       calculateEstimateCredits({ amount: +debouncedValue });
     }
-  }, [debouncedValue, tokenAmountError, selectedChain, selectedToken]);
+  }, [debouncedValue, selectedChain, selectedToken]);
+
+  // Reset balance error when chain or token changes
+  useEffect(() => {
+    setShowBalanceError(false);
+  }, [selectedChain, selectedToken]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     if (!selectedToken) {
@@ -186,12 +192,20 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           setTokenAmount("");
                           setEstimateData(undefined);
                           setTokenAmountError("");
+                          setShowBalanceError(false);
                           return;
                         }
                         const validValue = /^\d+(\.\d*)?$/.test(value);
 
                         if (validValue) {
                           setTokenAmount(value);
+                          if (+value === 0) {
+                            setTokenAmountError(
+                              "Please enter a valid amount greater than 0"
+                            );
+                            setShowBalanceError(false);
+                            return;
+                          }
                         } else {
                           setTokenAmountError("Enter valid amount");
                           return;
@@ -203,9 +217,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                         if (currentBalance < +value) {
                           setTokenAmountError(`Insufficent Balance`);
-                          setEstimateData(undefined);
+                          setShowBalanceError(true);
                         } else {
                           setTokenAmountError("");
+                          setShowBalanceError(false);
                         }
                       }}
                     />
@@ -271,6 +286,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 onBuyError={handleBuyError}
                 onTokenAmountClear={handleTokenAmountClear}
                 token={token}
+                showBalanceError={showBalanceError}
               />
             </CardContent>
           </div>

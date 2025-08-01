@@ -14,6 +14,7 @@ interface BuySectionProps {
   onBuyError?: (error: string) => void;
   onTokenAmountClear?: ClickHandler;
   token?: string;
+  showBalanceError?: boolean;
 }
 
 const BuySection = ({
@@ -25,6 +26,7 @@ const BuySection = ({
   onBuyError,
   onTokenAmountClear,
   token,
+  showBalanceError,
 }: BuySectionProps) => {
   const { isSignedIn } = useAuth();
 
@@ -35,6 +37,16 @@ const BuySection = ({
           {!!error && (
             <Text variant={"error"} size={"sm"} weight={"medium"}>
               {error}
+            </Text>
+          )}
+          {tokenAmountError && (
+            <Text variant={"error"} size={"sm"} weight={"medium"}>
+              {tokenAmountError}
+            </Text>
+          )}
+          {showBalanceError && !tokenAmountError && (
+            <Text variant={"error"} size={"sm"} weight={"medium"}>
+              Insufficient balance. Please enter a smaller amount
             </Text>
           )}
           <BuyButton
