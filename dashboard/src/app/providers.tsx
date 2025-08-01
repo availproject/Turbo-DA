@@ -2,6 +2,7 @@
 
 import { DialogProvider } from "@/components/dialog/provider";
 import { config } from "@/config/walletConfig";
+import { appConfig } from "@/config/default";
 import { ConfigProvider } from "@/providers/ConfigProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AvailWalletProvider } from "avail-wallet-sdk";
@@ -24,7 +25,7 @@ export function Providers({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <AvailWalletProvider rpcUrl="wss://hex-rpc.avail.tools/ws">
+        <AvailWalletProvider rpcUrl={appConfig.rpcUrl}>
           <ConnectKitProvider
             theme="midnight"
             options={{ overlayBlur: 2, embedGoogleFonts: true }}

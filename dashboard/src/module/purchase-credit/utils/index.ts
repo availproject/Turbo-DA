@@ -31,7 +31,7 @@ export const postOrder = async ({
       body: JSON.stringify({
         chain: chainId,
       }),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -45,7 +45,7 @@ export async function batchTransferAndRemark(
   api: ApiPromise,
   account: WalletAccount,
   atomicAmount: string,
-  remarkMessage: string,
+  remarkMessage: string
 ): Promise<Result<any, Error>> {
   try {
     const wallets = getWallets();
@@ -76,7 +76,7 @@ export async function batchTransferAndRemark(
           if (result.isInBlock || result.isError) {
             resolve(result);
           }
-        },
+        }
       );
     });
 
@@ -105,7 +105,7 @@ export async function batchTransferAndRemark(
     return err(
       error instanceof Error
         ? error
-        : new Error("Failed to batch transfer and remark"),
+        : new Error("Failed to batch transfer and remark")
     );
   }
 }
@@ -122,7 +122,7 @@ export async function getTokenBalance(
   address: `0x${string}`,
   api?: ApiPromise,
   tokenAddress?: string,
-  chainId?: number,
+  chainId?: number
 ) {
   if (!validAddress(address, chain))
     throw new Error("Invalid Recipient on base");
