@@ -46,7 +46,10 @@ export async function batchTransferAndRemark(
   api: ApiPromise,
   account: WalletAccount,
   atomicAmount: string,
-  remarkMessage: string
+  remarkMessage: string,
+  onInBlock?: (txHash: string) => void,
+  onFinalized?: (txHash: string) => void,
+  onBroadcast?: (txHash: string) => void
 ): Promise<Result<any, Error>> {
   try {
     const wallets = getWallets();
@@ -75,7 +78,28 @@ export async function batchTransferAndRemark(
         options,
         (result: SubmittableResult) => {
           console.log(`Tx status: ${result.status}`);
+
+          // Emit broadcast event when transaction is broadcast
+          if (result.status.isBroadcast) {
+            const txHash = result.txHash.toString();
+            console.log(`Transaction broadcast: ${txHash}`);
+            onBroadcast?.(txHash);
+          }
+
+          // Emit inblock event when transaction is in block
+          if (result.status.isInBlock) {
+            const txHash = result.txHash.toString();
+            console.log(`Transaction in block: ${txHash}`);
+            onInBlock?.(txHash);
+          }
+
           if (result.isFinalized || result.isError) {
+            // Emit finalized event when transaction is finalized
+            if (result.isFinalized) {
+              const txHash = result.txHash.toString();
+              console.log(`Transaction finalized: ${txHash}`);
+              onFinalized?.(txHash);
+            }
             resolve(result);
           }
         }

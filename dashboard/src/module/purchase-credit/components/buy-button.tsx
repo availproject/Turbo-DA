@@ -23,6 +23,8 @@ import { useAccount } from "wagmi";
 import { batchTransferAndRemark, postOrder } from "../utils";
 import { depositAbi } from "../utils/constant";
 import { ClickHandler } from "../utils/types";
+import CreditService from "@/services/credit";
+import { ErrorHandlingUtils } from "@/utils/errorHandling";
 
 // Remove hardcoded chain - now using dynamic chain from user selection
 
@@ -79,11 +81,14 @@ const BuyButton = ({
             await switchChainAsync({ chainId: selectedChain.id });
           }
         } catch (error) {
+          const errorMessage = ErrorHandlingUtils.getErrorMessage(error);
           errorToast?.({
-            label: `Please switch to ${selectedChain.name} network manually in your wallet`,
+            label:
+              errorMessage ||
+              `Please switch to ${selectedChain.name} network manually in your wallet`,
           });
           setLoading(false);
-          onBuyError?.("Chain switch failed");
+          onBuyError?.(errorMessage || "Chain switch failed");
           return;
         }
       }
@@ -108,28 +113,90 @@ const BuyButton = ({
       }
 
       if (isAvail) {
+        let currentTransaction: TransactionStatus | undefined;
+
         const txn = await batchTransferAndRemark(
           api!,
           selected!,
           parseUnits(tokenAmount, 18).toString(),
-          numberToBytes32(+orderResponse.data.id)
+          numberToBytes32(+orderResponse.data.id),
+          // InBlock callback
+          (txHash: string) => {
+            console.log("Transaction in block detected:", txHash);
+            // Update transaction status to inblock
+            if (currentTransaction) {
+              setTransactionStatusList((prev) =>
+                prev.map((t) =>
+                  t.id === currentTransaction!.id
+                    ? {
+                        ...t,
+                        status: "inblock",
+                        txnHash: txHash as `0x${string}`,
+                      }
+                    : t
+                )
+              );
+              setShowTransaction({
+                ...currentTransaction,
+                status: "inblock",
+                txnHash: txHash as `0x${string}`,
+              });
+            }
+          },
+          // Finalized callback
+          (txHash: string) => {
+            console.log("Transaction finalized detected:", txHash);
+            if (currentTransaction) {
+              setTransactionStatusList((prev) =>
+                prev.map((t) =>
+                  t.id === currentTransaction!.id
+                    ? {
+                        ...t,
+                        status: "finality",
+                        txnHash: txHash as `0x${string}`,
+                      }
+                    : t
+                )
+              );
+              setShowTransaction({
+                ...currentTransaction,
+                status: "finality",
+                txnHash: txHash as `0x${string}`,
+              });
+            }
+          },
+          // Broadcast callback
+          (txHash: string) => {
+            console.log("Transaction broadcast detected:", txHash);
+            // Create transaction and show dialog as soon as transaction is broadcast
+            currentTransaction = {
+              id: uuidv4(),
+              status: "broadcast",
+              orderId: orderResponse.data.id as number,
+              tokenAddress: tokenAddress! as `0x${string}`,
+              tokenAmount: +tokenAmount,
+              txnHash: txHash as `0x${string}`,
+            };
+            setTransactionStatusList((prev) => [
+              ...(prev ?? []),
+              currentTransaction!,
+            ]);
+            setShowTransaction(currentTransaction);
+            setOpen("credit-transaction");
+          }
         );
 
         if (txn.isOk()) {
-          const transaction: TransactionStatus = {
-            id: uuidv4(),
-            status: "finality",
-            orderId: orderResponse.data.id as number,
-            tokenAddress: tokenAddress! as `0x${string}`,
-            tokenAmount: +tokenAmount,
-            txnHash: txn.value.txHash,
-          };
-          setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
-          setShowTransaction(transaction);
-          setOpen("credit-transaction");
           onTokenAmountClear?.();
           setLoading(false);
           onBuyComplete?.();
+          return;
+        } else {
+          // Handle error
+          const errorMessage = ErrorHandlingUtils.getErrorMessage(txn.error);
+          errorToast?.({ label: errorMessage });
+          setLoading(false);
+          onBuyError?.(errorMessage);
           return;
         }
       }
@@ -144,9 +211,10 @@ const BuyButton = ({
           value: parseUnits(tokenAmount, 18),
         })
           .then(async (txnHash: `0x${string}`) => {
+            // Create transaction and show dialog only when transaction is sent
             const transaction: TransactionStatus = {
               id: uuidv4(),
-              status: "finality",
+              status: "inblock",
               orderId: orderResponse.data.id as number,
               tokenAddress: tokenAddress! as `0x${string}`,
               tokenAmount: +tokenAmount,
@@ -155,19 +223,26 @@ const BuyButton = ({
             setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
             setOpen("credit-transaction");
+
+            // Update to finality status when transaction is confirmed
+            setTransactionStatusList((prev) =>
+              prev.map((t) =>
+                t.id === transaction.id
+                  ? { ...t, status: "finality", txnHash }
+                  : t
+              )
+            );
+            setShowTransaction({ ...transaction, status: "finality", txnHash });
+
             onTokenAmountClear?.();
             setLoading(false);
             onBuyComplete?.();
           })
           .catch((err) => {
-            const message = err.message.split(".")[0];
-            if (message === "User rejected the request") {
-              errorToast?.({ label: "You rejected the request" });
-            } else {
-              errorToast?.({ label: "Transaction failed" });
-            }
+            const errorMessage = ErrorHandlingUtils.getErrorMessage(err);
+            errorToast?.({ label: errorMessage });
             setLoading(false);
-            onBuyError?.(message);
+            onBuyError?.(errorMessage);
           });
       } else {
         await writeContract(config, {
@@ -193,9 +268,10 @@ const BuyButton = ({
               chainId: selectedChain.id,
             })
               .then(async (txnHash: `0x${string}`) => {
+                // Create transaction and show dialog only when transaction is sent
                 const transaction: TransactionStatus = {
                   id: uuidv4(),
-                  status: "finality",
+                  status: "inblock",
                   orderId: orderResponse.data.id as number,
                   tokenAddress: tokenAddress! as `0x${string}`,
                   tokenAmount: +tokenAmount,
@@ -207,36 +283,45 @@ const BuyButton = ({
                 ]);
                 setShowTransaction(transaction);
                 setOpen("credit-transaction");
+
+                // Update to finality status when transaction is confirmed
+                setTransactionStatusList((prev) =>
+                  prev.map((t) =>
+                    t.id === transaction.id
+                      ? { ...t, status: "finality", txnHash }
+                      : t
+                  )
+                );
+                setShowTransaction({
+                  ...transaction,
+                  status: "finality",
+                  txnHash,
+                });
+
                 onTokenAmountClear?.();
                 setLoading(false);
                 onBuyComplete?.();
               })
               .catch((err) => {
-                const message = err.message.split(".")[0];
-                if (message === "User rejected the request") {
-                  errorToast?.({ label: "You rejected the request" });
-                } else {
-                  errorToast?.({ label: "Transaction failed" });
-                }
+                const errorMessage = ErrorHandlingUtils.getErrorMessage(err);
+                errorToast?.({ label: errorMessage });
                 setLoading(false);
-                onBuyError?.(message);
+                onBuyError?.(errorMessage);
               });
           })
           .catch((err) => {
-            const message = err.message.split(".")[0];
-            if (message === "User rejected the request") {
-              errorToast?.({ label: "You rejected the request" });
-            } else {
-              errorToast?.({ label: message });
-            }
+            const errorMessage = ErrorHandlingUtils.getErrorMessage(err);
+            errorToast?.({ label: errorMessage });
             setLoading(false);
-            onBuyError?.(message);
+            onBuyError?.(errorMessage);
           });
       }
     } catch (error) {
       console.log(error);
+      const errorMessage = ErrorHandlingUtils.getErrorMessage(error);
+      errorToast?.({ label: errorMessage });
       setLoading(false);
-      onBuyError?.(error instanceof Error ? error.message : "Unknown error");
+      onBuyError?.(errorMessage);
     }
   };
 

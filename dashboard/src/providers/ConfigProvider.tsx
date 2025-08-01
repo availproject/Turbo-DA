@@ -67,11 +67,12 @@ type Token = {
 
 export type TransactionStatus = {
   id: string;
-  status: "initialised" | "finality" | "completed";
+  status: "initialised" | "broadcast" | "inblock" | "finality" | "completed";
   txnHash?: `0x${string}`;
   orderId: number;
   tokenAmount: number;
   tokenAddress: `0x${string}`;
+  creditsAmount?: number;
 };
 
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({
