@@ -122,7 +122,7 @@ const BuyButton = ({
             orderId: orderResponse.data.id as number,
             tokenAddress: tokenAddress! as `0x${string}`,
             tokenAmount: +tokenAmount,
-            txnHash: txn.value.txhash,
+            txnHash: txn.value.txHash,
           };
           setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
           setShowTransaction(transaction);
@@ -134,9 +134,7 @@ const BuyButton = ({
         }
       }
 
-      // Handle transactions based on token type - check for zero address (native ETH)
       if (tokenAddress === "0x0000000000000000000000000000000000000000") {
-        // For native ETH, directly call deposit with value
         await writeContract(config, {
           address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
           abi: depositAbi,
@@ -172,7 +170,6 @@ const BuyButton = ({
             onBuyError?.(message);
           });
       } else {
-        // For ERC20 tokens, first approve then deposit
         await writeContract(config, {
           address: tokenAddress as `0x${string}`,
           abi: erc20Abi,
@@ -184,7 +181,6 @@ const BuyButton = ({
           chainId: selectedChain.id,
         })
           .then(async () => {
-            console.log(tokenAddress?.toLowerCase(), "wow");
             await writeContract(config, {
               address: process.env.NEXT_PUBLIC_ADDRESS as `0x${string}`,
               abi: depositAbi,

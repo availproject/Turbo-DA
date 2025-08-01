@@ -30,8 +30,12 @@ const CreditsTransactionProgress = () => {
   const account = useAccount();
 
   useEffect(() => {
-    if (showTransaction?.id && showTransaction.status === "finality") {
-      finalityTransaction({ txnHash: showTransaction.txnHash! });
+    if (
+      showTransaction?.id &&
+      showTransaction.status === "finality" &&
+      showTransaction.txnHash
+    ) {
+      finalityTransaction({ txnHash: showTransaction.txnHash });
       return;
     }
   }, [showTransaction?.id, showTransaction?.status, showTransaction?.txnHash]);
@@ -43,6 +47,10 @@ const CreditsTransactionProgress = () => {
     orderId: number;
     txnHash: string;
   }) => {
+    if (!token) {
+      throw new Error("No authentication token available");
+    }
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
       {
@@ -59,7 +67,8 @@ const CreditsTransactionProgress = () => {
     );
 
     if (!response.ok) {
-      throw undefined;
+      const errorText = await response.text();
+      throw new Error(`API call failed: ${response.status} - ${errorText}`);
     }
 
     return await response.json();
@@ -70,13 +79,13 @@ const CreditsTransactionProgress = () => {
   }: {
     txnHash: `0x${string}`;
   }) => {
-    if (!showTransaction) return;
+    if (!showTransaction || !txnHash) {
+      return;
+    }
     try {
-      const transactionReceipt = await waitForTransactionReceipt(config, {
-        hash: txnHash,
-      });
+      const isAvailTransaction = txnHash.length !== 66;
 
-      if (transactionReceipt.status === "success") {
+      if (isAvailTransaction) {
         await postInclusionDetails({
           orderId: showTransaction?.orderId,
           txnHash: txnHash,
@@ -95,17 +104,50 @@ const CreditsTransactionProgress = () => {
             setShowTransaction({ ...showTransaction, status: "completed" });
           })
           .catch((error) => {
-            console.log(error);
-            error?.({ label: "Transaction failed" });
+            console.log("AVAIL transaction error:", error);
+            const errorMessage =
+              error instanceof Error ? error.message : "Transaction failed";
+            error?.({ label: errorMessage });
             setOpen("");
           });
       } else {
-        error?.({ label: "Transaction failed" });
-        setOpen("");
+        const transactionReceipt = await waitForTransactionReceipt(config, {
+          hash: txnHash,
+        });
+
+        if (transactionReceipt.status === "success") {
+          await postInclusionDetails({
+            orderId: showTransaction?.orderId,
+            txnHash: txnHash,
+          })
+            .then(() => {
+              setTransactionStatusList((prev) =>
+                prev.map((transaction: TransactionStatus) =>
+                  transaction.id === showTransaction?.id
+                    ? {
+                        ...transaction,
+                        status: "completed",
+                      }
+                    : transaction
+                )
+              );
+              setShowTransaction({ ...showTransaction, status: "completed" });
+            })
+            .catch((error) => {
+              console.log(error);
+              error?.({ label: "Transaction failed" });
+              setOpen("");
+            });
+        } else {
+          error?.({ label: "Transaction failed" });
+          setOpen("");
+        }
       }
     } catch (err) {
-      console.log(err);
-      error?.({ label: "Transaction failed" });
+      console.log("Finality transaction error:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Transaction failed";
+      error?.({ label: errorMessage });
       setOpen("");
     }
   };

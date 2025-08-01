@@ -85,11 +85,10 @@ const TransactionProgress = ({
     if (!displayTransaction) return;
     try {
       setInProcess(true);
-      const transactionReceipt = await waitForTransactionReceipt(config, {
-        hash: txnHash,
-      });
 
-      if (transactionReceipt.status === "success") {
+      const isAvailTransaction = txnHash.length !== 66;
+
+      if (isAvailTransaction) {
         await postInclusionDetails({
           orderId: displayTransaction?.orderId,
           txnHash: txnHash,
@@ -118,8 +117,42 @@ const TransactionProgress = ({
             setError("Transaction failed");
           });
       } else {
-        setStatus("failed");
-        setError("Transaction failed");
+        const transactionReceipt = await waitForTransactionReceipt(config, {
+          hash: txnHash,
+        });
+
+        if (transactionReceipt.status === "success") {
+          await postInclusionDetails({
+            orderId: displayTransaction?.orderId,
+            txnHash: txnHash,
+          })
+            .then(() => {
+              setStatus("success");
+              setInProcess(false);
+              setTransactionStatusList((prev) =>
+                prev.map((transaction: TransactionStatus) =>
+                  transaction.id === displayTransaction?.id
+                    ? {
+                        ...transaction,
+                        status: "completed",
+                      }
+                    : transaction
+                )
+              );
+              setDisplayTransaction({
+                ...displayTransaction,
+                status: "completed",
+              });
+            })
+            .catch((error) => {
+              console.log(error);
+              setStatus("failed");
+              setError("Transaction failed");
+            });
+        } else {
+          setStatus("failed");
+          setError("Transaction failed");
+        }
       }
     } catch (err) {
       console.log(err);

@@ -1,3 +1,4 @@
+import { appConfig } from "@/config/default";
 import { LegacySignerOptions } from "@/utils/web3-services";
 import {
   getWalletBySource,
@@ -61,10 +62,11 @@ export async function batchTransferAndRemark(
       app_id: 0,
     };
 
-    const transfer = api.tx.balances.transferKeepAlive("0x", atomicAmount);
+    const transfer = api.tx.balances.transferKeepAlive(
+      appConfig.contracts.avail.liquidityBridgeAddress,
+      atomicAmount
+    );
     const remark = api.tx.system.remark(remarkMessage);
-
-    //using batchall, so in case of the transfer not being successful, remark will not be executed.
     const batchCall = api.tx.utility.batchAll([transfer, remark]);
 
     const txResult = await new Promise<SubmittableResult>((resolve) => {
@@ -73,7 +75,7 @@ export async function batchTransferAndRemark(
         options,
         (result: SubmittableResult) => {
           console.log(`Tx status: ${result.status}`);
-          if (result.isInBlock || result.isError) {
+          if (result.isFinalized || result.isError) {
             resolve(result);
           }
         }
@@ -96,7 +98,10 @@ export async function batchTransferAndRemark(
 
     return ok({
       status: "success",
-      blockhash: txResult.status.asInBlock?.toString() || "",
+      blockhash:
+        txResult.status.asFinalized?.toString() ||
+        txResult.status.asInBlock?.toString() ||
+        "",
       txHash: txResult.txHash.toString(),
       txIndex: txResult.txIndex,
     });
