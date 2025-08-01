@@ -66,7 +66,7 @@ export async function batchTransferAndRemark(
     };
 
     const transfer = api.tx.balances.transferKeepAlive(
-      appConfig.contracts.avail.liquidityBridgeAddress,
+      process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
       atomicAmount
     );
     const remark = api.tx.system.remark(remarkMessage);

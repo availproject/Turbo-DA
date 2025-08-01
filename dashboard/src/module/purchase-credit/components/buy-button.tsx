@@ -93,7 +93,6 @@ const BuyButton = ({
         }
       }
 
-      // Get token address based on token selection from supportedTokensAndChains
       const tokenInfo =
         selectedToken && selectedChain
           ? getTokenInfo(selectedChain.name, selectedToken.name)
