@@ -8,11 +8,9 @@ interface ProgressBarProps {
 }
 
 const stepOrder: TransactionStatus["status"][] = [
-  "initialised",
   ...TRANSACTION_CONSTANTS.STATUS_FLOW,
 ];
 
-/** Returns true if the transaction status is >= the given step */
 const isStepCompleted = (
   status: TransactionStatus["status"] | undefined,
   stepIndex: number
@@ -40,8 +38,7 @@ export const ProgressBar = ({ status, className }: ProgressBarProps) => {
         <div
           key={i}
           className={cn(
-            "rounded-full overflow-hidden",
-            `w-[${TRANSACTION_CONSTANTS.PROGRESS_BAR_WIDTH}px] h-[${TRANSACTION_CONSTANTS.PROGRESS_BAR_HEIGHT}px]`,
+            "rounded-full overflow-hidden w-[84px] h-2",
             getBarBackground(status, i)
           )}
         >

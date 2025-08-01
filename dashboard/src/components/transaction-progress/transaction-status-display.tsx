@@ -29,21 +29,6 @@ export const TransactionStatusDisplay = ({
     }
   };
 
-  const getDescriptionMessage = () => {
-    switch (status) {
-      case "broadcast":
-        return TRANSACTION_MESSAGES.DESCRIPTIONS.BROADCAST;
-      case "inblock":
-        return TRANSACTION_MESSAGES.DESCRIPTIONS.INBLOCK;
-      case "finality":
-        return TRANSACTION_MESSAGES.DESCRIPTIONS.FINALITY;
-      case "completed":
-        return TRANSACTION_MESSAGES.DESCRIPTIONS.COMPLETED;
-      default:
-        return "";
-    }
-  };
-
   if (tokenAmount) {
     return (
       <div className={className}>

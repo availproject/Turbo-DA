@@ -20,22 +20,26 @@ import {
   TRANSACTION_CONSTANTS,
   TRANSACTION_ACTIONS,
 } from "@/constants/transaction";
+import { useDialog } from "./dialog/provider";
 
 const CreditsTransactionProgress = () => {
   const { setMainTabSelected } = useOverview();
   const account = useAccount();
+  const { open, setOpen } = useDialog();
   const { showTransaction, minimizeTransaction } = useTransactionProgress();
 
   const status = showTransaction?.status;
 
   return (
     <Dialog
-      open={!!showTransaction}
-      onOpenChange={(value) => !value && minimizeTransaction()}
+      open={open === "credit-transaction"}
+      onOpenChange={(value) => {
+        if (!value) {
+          minimizeTransaction();
+        }
+      }}
     >
-      <DialogContent
-        className={`min-w-[${TRANSACTION_CONSTANTS.DIALOG_MIN_WIDTH}px] h-[${TRANSACTION_CONSTANTS.DIALOG_HEIGHT}px] p-0 border-none rounded-3xl`}
-      >
+      <DialogContent className="min-w-[600px] h-[400px] p-0 border-none rounded-3xl">
         <div className="shadow-primary bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl overflow-hidden flex flex-col focus-within:outline-0 h-full w-full relative">
           <div className="bg-[url('/credits-added-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
           <Card className="relative w-full h-full bg-[#192a3d] rounded-2xl overflow-hidden border border-transparent">
@@ -52,9 +56,7 @@ const CreditsTransactionProgress = () => {
               </Close>
             )}
 
-            <CardContent
-              className={`flex flex-col items-center justify-center h-full pt-0 w-[${TRANSACTION_CONSTANTS.CONTENT_WIDTH}px] mx-auto gap-y-4`}
-            >
+            <CardContent className="flex flex-col items-center justify-center h-full pt-0 w-[444px] mx-auto gap-y-4">
               <DialogTitle>
                 {status === "completed" ? (
                   <DotLottieReact
