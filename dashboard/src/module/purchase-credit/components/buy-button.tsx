@@ -112,7 +112,7 @@ const BuyButton = ({
           api!,
           selected!,
           parseUnits(tokenAmount, 18).toString(),
-          "Buy Credits"
+          numberToBytes32(+orderResponse?.data?.id),
         );
 
         if (txn.isOk()) {

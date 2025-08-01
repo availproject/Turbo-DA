@@ -61,7 +61,10 @@ export async function batchTransferAndRemark(
       app_id: 0,
     };
 
-    const transfer = api.tx.balances.transferKeepAlive("0x", atomicAmount);
+    const transfer = api.tx.balances.transferKeepAlive(
+      process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
+      atomicAmount,
+    );
     const remark = api.tx.system.remark(remarkMessage);
 
     //using batchall, so in case of the transfer not being successful, remark will not be executed.
