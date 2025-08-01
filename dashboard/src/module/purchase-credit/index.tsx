@@ -65,7 +65,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         getERC20AvailBalance(
           account.address,
           tokenInfo.address as `0x${string}`,
-          selectedChain.id,
+          selectedChain.id
         );
       }
 
@@ -120,7 +120,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
           chainId: selectedChain.id,
-        },
+        }
       );
 
       setEstimateData(response?.data);
@@ -256,6 +256,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           ? formatDataBytes(+estimateData)
                           : ""
                       }
+                      readOnly
                     />
                   )}
                 </div>
