@@ -15,6 +15,22 @@ import React, {
   useState,
 } from "react";
 
+const STORAGE_KEYS = {
+  SELECTED_CHAIN: "turbo-da-selected-chain",
+  SELECTED_TOKEN: "turbo-da-selected-token",
+} as const;
+
+const getDefaultChain = (): ChainType => ({
+  name: supportedTokensAndChains.ethereum.name,
+  icon: supportedTokensAndChains.ethereum.icon,
+  id: supportedTokensAndChains.ethereum.id,
+});
+
+const getDefaultToken = (): Token => ({
+  name: supportedTokensAndChains.ethereum.tokens[0].name,
+  icon: supportedTokensAndChains.ethereum.tokens[0].icon,
+});
+
 interface ConfigContextType {
   token?: string;
   fetchToken: ClickHandler;
@@ -30,7 +46,7 @@ interface ConfigContextType {
 }
 
 export const ConfigContext = createContext<ConfigContextType | undefined>(
-  undefined,
+  undefined
 );
 
 interface ConfigProviderProps {
@@ -66,24 +82,42 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
   const [token, setToken] = useState<string>(accessToken ?? "");
-  const [selectedChain, setSelectedChain] = useState<ChainType>({
-    name: supportedTokensAndChains.ethereum.name,
-    icon: supportedTokensAndChains.ethereum.icon,
-    id: supportedTokensAndChains.ethereum.id,
-  });
-  const [selectedToken, setSelectedToken] = useState<Token | undefined>({
-    name: supportedTokensAndChains.ethereum.tokens[0].name,
-    icon: supportedTokensAndChains.ethereum.tokens[0].icon,
-  });
+  const [selectedChain, setSelectedChain] =
+    useState<ChainType>(getDefaultChain);
+  const [selectedToken, setSelectedToken] = useState<Token | undefined>(
+    getDefaultToken
+  );
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
   >([]);
   const [showTransaction, setShowTransaction] = useState<TransactionStatus>();
   const [availNativeBalance, setAvailNativeBalance] = useState<string>("0");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     fetchToken();
+
+    if (typeof window !== "undefined") {
+      try {
+        const storedChain = localStorage.getItem(STORAGE_KEYS.SELECTED_CHAIN);
+        const storedToken = localStorage.getItem(STORAGE_KEYS.SELECTED_TOKEN);
+
+        if (storedChain) {
+          const parsedChain = JSON.parse(storedChain);
+          setSelectedChain(parsedChain);
+        }
+
+        if (storedToken) {
+          const parsedToken = JSON.parse(storedToken);
+          setSelectedToken(parsedToken);
+        }
+      } catch (error) {
+        console.warn("Failed to parse stored chain/token preferences:", error);
+      }
+
+      setIsHydrated(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -101,6 +135,32 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       }
     };
   }, [selected?.address, api?.isReady]);
+
+  useEffect(() => {
+    if (isHydrated) {
+      try {
+        localStorage.setItem(
+          STORAGE_KEYS.SELECTED_CHAIN,
+          JSON.stringify(selectedChain)
+        );
+      } catch (error) {
+        console.warn("Failed to save selected chain to localStorage:", error);
+      }
+    }
+  }, [selectedChain, isHydrated]);
+
+  useEffect(() => {
+    if (isHydrated && selectedToken) {
+      try {
+        localStorage.setItem(
+          STORAGE_KEYS.SELECTED_TOKEN,
+          JSON.stringify(selectedToken)
+        );
+      } catch (error) {
+        console.warn("Failed to save selected token to localStorage:", error);
+      }
+    }
+  }, [selectedToken, isHydrated]);
 
   const fetchToken = async () => {
     await getToken({ template: template })
@@ -120,7 +180,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       const balance = await getTokenBalance(
         Chain.AVAIL,
         selected.address as `0x${string}`,
-        api,
+        api
       );
       console.log(balance, "avail balance", selected.address);
       setAvailNativeBalance(balance);
