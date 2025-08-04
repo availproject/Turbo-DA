@@ -73,6 +73,7 @@ export type TransactionStatus = {
   tokenAmount: number;
   tokenAddress: `0x${string}`;
   creditsAmount?: number;
+  chainType: "avail" | "ethereum" | "base";
 };
 
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({

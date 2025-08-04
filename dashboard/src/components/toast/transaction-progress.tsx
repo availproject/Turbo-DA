@@ -59,6 +59,7 @@ const TransactionProgress = ({
         txnHash: displayTransaction.txnHash,
         orderId: displayTransaction.orderId,
         token,
+        chainType: displayTransaction.chainType,
       });
 
       if (result.success) {

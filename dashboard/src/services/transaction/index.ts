@@ -52,13 +52,15 @@ export class TransactionService {
     txnHash,
     orderId,
     token,
+    chainType,
   }: {
     txnHash: `0x${string}`;
     orderId: number;
     token: string;
+    chainType: "avail" | "ethereum" | "base";
   }): Promise<TransactionResult> {
     try {
-      const isAvailTransaction = txnHash.length !== 66;
+      const isAvailTransaction = chainType === "avail";
 
       if (isAvailTransaction) {
         // For Avail transactions, directly post inclusion details

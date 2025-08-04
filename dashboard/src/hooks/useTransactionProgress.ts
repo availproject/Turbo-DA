@@ -60,6 +60,7 @@ export const useTransactionProgress = (
         txnHash: showTransaction.txnHash,
         orderId: showTransaction.orderId,
         token,
+        chainType: showTransaction.chainType,
       });
 
       if (result.success) {

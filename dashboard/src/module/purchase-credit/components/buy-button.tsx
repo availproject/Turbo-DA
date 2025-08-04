@@ -175,6 +175,7 @@ const BuyButton = ({
               tokenAddress: tokenAddress! as `0x${string}`,
               tokenAmount: +tokenAmount,
               txnHash: txHash as `0x${string}`,
+              chainType: "avail",
             };
             setTransactionStatusList((prev) => [
               ...(prev ?? []),
@@ -218,6 +219,7 @@ const BuyButton = ({
               tokenAddress: tokenAddress! as `0x${string}`,
               tokenAmount: +tokenAmount,
               txnHash,
+              chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
             };
             setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
@@ -275,6 +277,7 @@ const BuyButton = ({
                   tokenAddress: tokenAddress! as `0x${string}`,
                   tokenAmount: +tokenAmount,
                   txnHash,
+                  chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
                 };
                 setTransactionStatusList((prev) => [
                   ...(prev ?? []),
