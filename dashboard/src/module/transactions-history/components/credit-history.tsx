@@ -5,13 +5,14 @@ import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supportedTokensAndChains } from "@/lib/types";
 
 import Button from "@/components/button";
 import DynamicTable from "@/components/data-table";
 import { Text } from "@/components/text";
 import { Skeleton } from "@/components/ui/skeleton";
+import Label from "@/components/label";
 import EmptyState from "./empty-state";
 
 const CreditHistory = ({ token }: { token?: string }) => {
@@ -29,10 +30,16 @@ const CreditHistory = ({ token }: { token?: string }) => {
       const response = await HistoryService.getCreditHistory({
         token: token!,
       });
-      // Sort by latest transactions first
-      const sortedData = (response?.data ?? []).sort((a: CreditRequest, b: CreditRequest) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      // Sort by latest transactions first and add token information
+      const sortedData = (response?.data ?? [])
+        .sort(
+          (a: CreditRequest, b: CreditRequest) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+        .map((item: CreditRequest) => ({
+          ...item,
+          token: item.chain_id, // Use chain_id to determine token
+        }));
       setHistoryList(sortedData);
     } catch (error) {
       console.log(error);
@@ -45,12 +52,14 @@ const CreditHistory = ({ token }: { token?: string }) => {
   // Helper function to get chain info from supportedTokensAndChains
   const getChainInfo = useCallback((chainId: number) => {
     // Find the chain by ID in supportedTokensAndChains
-    for (const [chainKey, chainData] of Object.entries(supportedTokensAndChains)) {
+    for (const [chainKey, chainData] of Object.entries(
+      supportedTokensAndChains
+    )) {
       if (chainData.id === chainId) {
         return {
           logo: chainData.icon,
           name: chainData.name,
-          tokens: chainData.tokens
+          tokens: chainData.tokens,
         };
       }
     }
@@ -58,7 +67,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
     return {
       logo: "/favicon.ico",
       name: "Unknown",
-      tokens: []
+      tokens: [],
     };
   }, []);
 
@@ -84,11 +93,53 @@ const CreditHistory = ({ token }: { token?: string }) => {
               </Text>
             </div>
           );
+        case "token":
+          // Get the default token for the chain (first token in the chain's token list)
+          const chainInfoForToken = getChainInfo(value);
+          const defaultToken = chainInfoForToken.tokens[0];
+          if (defaultToken) {
+            return (
+              <div className="flex items-center gap-x-2">
+                <Image
+                  src={defaultToken.icon}
+                  alt={defaultToken.name}
+                  width={20}
+                  height={20}
+                />
+                <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
+                  {defaultToken.name}
+                </Text>
+              </div>
+            );
+          }
+          return "-";
+        case "request_status":
+          let labelStatus: "pending" | "complete" | "cancelled";
+          switch (value?.toUpperCase()) {
+            case "COMPLETED":
+            case "PROCESSED":
+              labelStatus = "complete";
+              break;
+            case "PENDING":
+              labelStatus = "cancelled";
+              break;
+            case "INCLUDED":
+              labelStatus = "pending";
+              break;
+            default:
+              return "-";
+          }
+          return <Label status={labelStatus} />;
+        case "tx_hash":
+          if (value && value.length > 10 && !value.includes("…")) {
+            return `${value.slice(0, 6)}…${value.slice(-4)}`;
+          }
+          return value ?? "-";
         default:
           return value ?? "-";
       }
     },
-    [getChainInfo],
+    [getChainInfo]
   );
 
   return (
@@ -128,22 +179,32 @@ const CreditHistory = ({ token }: { token?: string }) => {
         <DynamicTable
           headings={[
             { key: "created_at", label: "Purchasing Date" },
+            { key: "request_status", label: "Status" },
             { key: "request_type", label: "Type" },
-            { key: "chain_id", label: "Token Used" },
-            { key: "request_status", label: "Amount Paid" },
+            { key: "chain_id", label: "Chain" },
+            { key: "token", label: "Token" },
+            { key: "tx_hash", label: "Amount Paid" },
             { key: "amount_credit", label: "Credit Received" },
           ]}
           listdata={historyList}
           renderCell={(heading: string, value: any, last: boolean) => (
-            <div className={cn("flex", last ? "w-[180px] justify-end" : "w-[150px]")}>
+            <div
+              className={cn(
+                "flex",
+                last ? "w-[180px] justify-end" : "w-[150px]"
+              )}
+            >
               <Text
                 weight={"bold"}
                 size={"base"}
-                className={cn("py-3 px-4 break-words", !last && "text-right", 
-                  heading === "amount_credit" && "whitespace-nowrap overflow-hidden text-ellipsis"
+                className={cn(
+                  "py-3 px-4 break-words",
+                  !last && "text-right",
+                  heading === "amount_credit" &&
+                    "whitespace-nowrap overflow-hidden text-ellipsis"
                 )}
                 variant={heading === "request_type" ? "green" : "white"}
-                as={heading === "chain_id" ? "div" : "p"}
+                as={heading === "chain_id" || heading === "token" ? "div" : "p"}
               >
                 {displayValues(heading, value)}
               </Text>

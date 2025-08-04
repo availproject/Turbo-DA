@@ -23,7 +23,6 @@ import { useAccount } from "wagmi";
 import { batchTransferAndRemark, postOrder } from "../utils";
 import { depositAbi } from "../utils/constant";
 import { ClickHandler } from "../utils/types";
-import CreditService from "@/services/credit";
 import { ErrorHandlingUtils } from "@/utils/errorHandling";
 
 // Remove hardcoded chain - now using dynamic chain from user selection
@@ -219,7 +218,9 @@ const BuyButton = ({
               tokenAddress: tokenAddress! as `0x${string}`,
               tokenAmount: +tokenAmount,
               txnHash,
-              chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+              chainType: selectedChain.name.toLowerCase() as
+                | "ethereum"
+                | "base",
             };
             setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
@@ -277,7 +278,9 @@ const BuyButton = ({
                   tokenAddress: tokenAddress! as `0x${string}`,
                   tokenAmount: +tokenAmount,
                   txnHash,
-                  chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+                  chainType: selectedChain.name.toLowerCase() as
+                    | "ethereum"
+                    | "base",
                 };
                 setTransactionStatusList((prev) => [
                   ...(prev ?? []),
