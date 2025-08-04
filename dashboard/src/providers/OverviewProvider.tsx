@@ -30,6 +30,8 @@ interface OverviewContextType {
   setMainTabSelected: Dispatch<SetStateAction<APP_TABS>>;
   transactionProgress: TransactionProgress[];
   setTransactionProgress: Dispatch<SetStateAction<TransactionProgress[]>>;
+  isAwaitingCreditUpdate: boolean;
+  setIsAwaitingCreditUpdate: Dispatch<SetStateAction<boolean>>;
 }
 
 type TransactionProgress = {
@@ -66,6 +68,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [transactionProgress, setTransactionProgress] = useState<
     TransactionProgress[]
   >([]);
+  const [isAwaitingCreditUpdate, setIsAwaitingCreditUpdate] = useState(false);
   const tokenMap = useTokenMap();
   const { token } = useConfig();
 
@@ -114,6 +117,8 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         setMainTabSelected,
         transactionProgress,
         setTransactionProgress,
+        isAwaitingCreditUpdate,
+        setIsAwaitingCreditUpdate,
       }}
     >
       {children}

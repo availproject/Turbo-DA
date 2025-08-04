@@ -5,7 +5,7 @@ import { Text } from "@/components/text";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
-import { Wallet } from "lucide-react";
+import { AlertTriangle, Wallet } from "lucide-react";
 import DiscountEligibility from "./component/discount-eligibility";
 
 type CreditBalanceProps = {
@@ -14,7 +14,7 @@ type CreditBalanceProps = {
 
 const CreditBalance = ({ token }: CreditBalanceProps) => {
   const { setOpen } = useDialog();
-  const { creditBalance } = useOverview();
+  const { creditBalance, isAwaitingCreditUpdate } = useOverview();
 
   return (
     <>
@@ -69,6 +69,26 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
           </Card>
         </div>
       </div>
+      
+      {isAwaitingCreditUpdate && (
+        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+          <div className="flex items-center gap-x-2">
+            <AlertTriangle
+              size={16}
+              color="#F59E0B"
+              strokeWidth={2}
+            />
+            <Text
+              size={"sm"}
+              weight={"medium"}
+              className="text-yellow-500"
+            >
+              It takes around 40s to reflect your newly bought credits
+            </Text>
+          </div>
+        </div>
+      )}
+      
       <DiscountEligibility token={token} />
     </>
   );
