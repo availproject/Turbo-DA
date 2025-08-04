@@ -98,6 +98,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    console.log(
+      "NEXT_PUBLIC_AVAIL_ADDRESS",
+      process.env.NEXT_PUBLIC_AVAIL_ADDRESS
+    );
+
     fetchToken();
 
     if (typeof window !== "undefined") {
