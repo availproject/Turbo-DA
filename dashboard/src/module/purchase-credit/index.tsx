@@ -102,7 +102,35 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   // Reset balance error when chain or token changes
   useEffect(() => {
     setShowBalanceError(false);
+    setTokenAmountError("");
   }, [selectedChain, selectedToken]);
+
+  useEffect(() => {
+    if (tokenAmount && +tokenAmount > 0) {
+      const currentBalance =
+        selectedChain?.name === "Avail"
+          ? Number(availNativeBalance)
+          : Number(balance.data?.formatted);
+
+      if (currentBalance < +tokenAmount) {
+        setTokenAmountError(`Insufficent Balance`);
+        setShowBalanceError(true);
+      } else {
+        setTokenAmountError("");
+        setShowBalanceError(false);
+      }
+    } else if (!tokenAmount) {
+      // Clear errors when input is empty
+      setTokenAmountError("");
+      setShowBalanceError(false);
+    }
+  }, [
+    selectedChain,
+    selectedToken,
+    balance.data?.formatted,
+    availNativeBalance,
+    tokenAmount,
+  ]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
     if (!selectedToken) {
@@ -209,18 +237,6 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                         } else {
                           setTokenAmountError("Enter valid amount");
                           return;
-                        }
-                        const currentBalance =
-                          selectedChain?.name === "Avail"
-                            ? Number(availNativeBalance)
-                            : Number(balance.data?.formatted);
-
-                        if (currentBalance < +value) {
-                          setTokenAmountError(`Insufficent Balance`);
-                          setShowBalanceError(true);
-                        } else {
-                          setTokenAmountError("");
-                          setShowBalanceError(false);
                         }
                       }}
                     />
