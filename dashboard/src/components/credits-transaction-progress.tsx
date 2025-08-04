@@ -21,6 +21,7 @@ import {
   TRANSACTION_ACTIONS,
 } from "@/constants/transaction";
 import { useDialog } from "./dialog/provider";
+import { getExplorerUrl } from "@/utils/explorer";
 
 const CreditsTransactionProgress = () => {
   const { setMainTabSelected } = useOverview();
@@ -98,11 +99,10 @@ const CreditsTransactionProgress = () => {
               {status !== "broadcast" && (
                 <div className="flex gap-x-4 w-full justify-center">
                   <Link
-                    href={
-                      account.chain?.blockExplorers?.default.url +
-                      "/tx/" +
-                      showTransaction?.txnHash
-                    }
+                    href={getExplorerUrl(
+                      showTransaction,
+                      account.chain?.blockExplorers?.default.url
+                    )}
                     target="_blank"
                     className="w-full"
                   >

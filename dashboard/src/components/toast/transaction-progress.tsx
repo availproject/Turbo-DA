@@ -17,6 +17,7 @@ import { useDialog } from "../dialog/provider";
 import { Text } from "../text";
 import { TransactionService } from "@/services/transaction";
 import { TRANSACTION_ACTIONS } from "@/constants/transaction";
+import { getExplorerUrl } from "@/utils/explorer";
 
 type TransactionProgressProps = {
   transaction: TransactionStatus;
@@ -160,11 +161,10 @@ const TransactionProgress = ({
         {transaction.status !== "inblock" && (
           <div className="flex gap-x-4 w-full">
             <Link
-              href={
-                account.chain?.blockExplorers?.default.url +
-                "/tx/" +
-                transaction?.txnHash
-              }
+              href={getExplorerUrl(
+                transaction,
+                account.chain?.blockExplorers?.default.url
+              )}
               target="_blank"
               className="w-fit"
             >
