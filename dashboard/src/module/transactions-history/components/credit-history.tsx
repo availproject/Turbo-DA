@@ -204,7 +204,13 @@ const CreditHistory = ({ token }: { token?: string }) => {
                     "whitespace-nowrap overflow-hidden text-ellipsis"
                 )}
                 variant={heading === "request_type" ? "green" : "white"}
-                as={heading === "chain_id" || heading === "token" ? "div" : "p"}
+                as={
+                  heading === "chain_id" ||
+                  heading === "token" ||
+                  heading === "request_status"
+                    ? "div"
+                    : "p"
+                }
               >
                 {displayValues(heading, value)}
               </Text>
