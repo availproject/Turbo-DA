@@ -47,7 +47,7 @@ export async function batchTransferAndRemark(
   account: WalletAccount,
   atomicAmount: string,
   remarkMessage: string,
-  onInBlock?: (txHash: string) => void,
+  onInBlock?: (txHash: string, blockHash: string) => void,
   onFinalized?: (txHash: string) => void,
   onBroadcast?: (txHash: string) => void
 ): Promise<Result<any, Error>> {
@@ -88,9 +88,9 @@ export async function batchTransferAndRemark(
 
           // Emit inblock event when transaction is in block
           if (result.status.isInBlock) {
-            const txHash = result.txHash.toString();
-            console.log(`Transaction in block: ${txHash}`);
-            onInBlock?.(txHash);
+            const blockHash = result.status.asInBlock?.toString();
+            console.log(`Transaction in block detected: ${blockHash}`);
+            onInBlock?.(result.txHash.toString(), blockHash || "");
           }
 
           if (result.isFinalized || result.isError) {

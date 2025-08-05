@@ -119,8 +119,7 @@ const BuyButton = ({
           parseUnits(tokenAmount, 18).toString(),
           numberToBytes32(+orderResponse.data.id),
           // InBlock callback
-          (txHash: string) => {
-            console.log("Transaction in block detected:", txHash);
+          (txHash: string, blockHash: string) => {
             // Update transaction status to inblock
             if (currentTransaction) {
               setTransactionStatusList((prev) =>
@@ -130,6 +129,7 @@ const BuyButton = ({
                         ...t,
                         status: "inblock",
                         txnHash: txHash as `0x${string}`,
+                        blockhash: blockHash as `0x${string}`,
                       }
                     : t
                 )
@@ -138,6 +138,7 @@ const BuyButton = ({
                 ...currentTransaction,
                 status: "inblock",
                 txnHash: txHash as `0x${string}`,
+                blockhash: blockHash as `0x${string}`,
               });
             }
           },

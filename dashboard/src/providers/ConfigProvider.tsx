@@ -69,6 +69,7 @@ export type TransactionStatus = {
   id: string;
   status: "initialised" | "broadcast" | "inblock" | "finality" | "completed";
   txnHash?: `0x${string}`;
+  blockhash?: `0x${string}`;
   orderId: number;
   tokenAmount: number;
   tokenAddress: `0x${string}`;
