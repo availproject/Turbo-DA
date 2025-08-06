@@ -78,6 +78,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const { token } = useAuth();
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
+  
   const [selectedChain, setSelectedChain] =
     useState<ChainType>(getDefaultChain);
   const [selectedToken, setSelectedToken] = useState<Token | undefined>(
@@ -92,11 +93,6 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    console.log(
-      "NEXT_PUBLIC_AVAIL_ADDRESS",
-      process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
-    );
-
     if (typeof window !== "undefined") {
       try {
         const storedChain = localStorage.getItem(STORAGE_KEYS.SELECTED_CHAIN);
@@ -133,7 +129,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [selected?.address, api?.isReady]);
+  }, [selected?.address, api]);
 
   useEffect(() => {
     if (isHydrated) {
@@ -162,19 +158,20 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   }, [selectedToken, isHydrated]);
 
   const fetchAvailBalance = async () => {
-    if (!selected?.address || !api) return;
+    if (!selected?.address || !api) {
+      return;
+    }
 
     try {
-      console.log("avail balance", "fetching");
       const balance = await getTokenBalance(
         Chain.AVAIL,
         selected.address as `0x${string}`,
         api,
       );
-      console.log(balance, "avail balance", selected.address);
       setAvailNativeBalance(balance);
     } catch (error) {
       console.error("Failed to fetch Avail balance:", error);
+      setAvailNativeBalance("0");
     }
   };
 

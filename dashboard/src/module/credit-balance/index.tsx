@@ -24,7 +24,7 @@ const CreditBalance = () => {
     return (
       <div className="relative w-full h-[124px]">
         <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
-          <Card className="relative shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden">
+          <Card className="relative shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden h-[124px]">
             <CardContent className="p-4 z-1 relative flex items-center justify-center">
               <Text size={"sm"} variant={"secondary-grey"}>
                 Loading credit balance...
