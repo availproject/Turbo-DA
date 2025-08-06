@@ -13,7 +13,7 @@ import { useConfig } from "@/providers/ConfigProvider";
 import { useAuthState } from "@/providers/AuthProvider";
 import CreditService from "@/services/credit";
 import { Wallet } from "lucide-react";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import BuySection from "./components/buy-section";
 
@@ -38,6 +38,7 @@ const BuyCreditsCard = () => {
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
   const [estimateDataLoading, setEstimateDataLoading] = useState(false);
+  const requestIdRef = useRef(0);
   const deferredTokenValue = useDeferredValue(tokenAmount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -73,7 +74,7 @@ const BuyCreditsCard = () => {
         getERC20AvailBalance(
           account.address,
           tokenInfo.address as `0x${string}`,
-          selectedChain.id,
+          selectedChain.id
         );
       }
 
@@ -153,7 +154,9 @@ const BuyCreditsCard = () => {
     } else {
       return;
     }
+    const currentRequestId = ++requestIdRef.current;
     setEstimateDataLoading(true);
+    setEstimateData(undefined);
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
@@ -161,14 +164,18 @@ const BuyCreditsCard = () => {
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
           chainId: selectedChain.id,
-        },
+        }
       );
 
-      setEstimateData(response?.data);
+      if (currentRequestId === requestIdRef.current) {
+        setEstimateData(response?.data);
+      }
     } catch (error) {
       console.log(error);
     } finally {
-      setEstimateDataLoading(false);
+      if (currentRequestId === requestIdRef.current) {
+        setEstimateDataLoading(false);
+      }
     }
   };
 
@@ -253,7 +260,7 @@ const BuyCreditsCard = () => {
                           setTokenAmount(value);
                           if (+value === 0) {
                             setTokenAmountError(
-                              "Please enter a valid amount greater than 0",
+                              "Please enter a valid amount greater than 0"
                             );
                             setShowBalanceError(false);
                             return;
@@ -306,7 +313,7 @@ const BuyCreditsCard = () => {
                       placeholder="00"
                       id="creditsAmount"
                       name="creditsAmount"
-                      defaultValue={
+                      value={
                         estimateData && !estimateDataLoading
                           ? formatDataBytes(+estimateData)
                           : ""
