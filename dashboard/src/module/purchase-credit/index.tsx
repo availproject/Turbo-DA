@@ -203,10 +203,36 @@ const BuyCreditsCard = () => {
       <div className="relative min-lg:w-[466px] h-[455px]">
         <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
           <Card className="w-full border-none shadow-primary bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0 relative h-full">
-            <CardContent className="h-full flex items-center justify-center">
-              <Text size={"sm"} variant={"secondary-grey"}>
-                Loading...
-              </Text>
+            <div className="bg-[url('/purchase-credits-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+            <CardContent className="p-6 z-1 relative">
+              <div className="space-y-6">
+                <div className="flex items-center gap-x-2">
+                  <Skeleton className="w-8 h-8 rounded-lg" sheen={false} />
+                  <Skeleton className="w-32 h-6 rounded" />
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Skeleton className="w-24 h-4 rounded mb-2" />
+                    <Skeleton className="w-full h-12 rounded-lg" />
+                  </div>
+                  
+                  <div>
+                    <Skeleton className="w-32 h-4 rounded mb-2" />
+                    <Skeleton className="w-full h-12 rounded-lg" />
+                  </div>
+                  
+                  <div>
+                    <Skeleton className="w-40 h-4 rounded mb-2" />
+                    <Skeleton className="w-full h-12 rounded-lg" />
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <Skeleton className="w-32 h-4 rounded" />
+                  <Skeleton className="w-full h-12 rounded-lg" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -14,7 +14,18 @@ export class ErrorHandlingUtils {
     // Common wallet rejection errors
     if (
       errorMessage.includes("User rejected") ||
-      errorMessage.includes("user rejected")
+      errorMessage.includes("user rejected") ||
+      errorMessage.includes("User denied") ||
+      errorMessage.includes("user denied") ||
+      errorMessage.includes("User cancelled") ||
+      errorMessage.includes("user cancelled") ||
+      errorMessage.includes("Cancelled by user") ||
+      errorMessage.includes("cancelled by user") ||
+      errorMessage.includes("Transaction cancelled") ||
+      errorMessage.includes("transaction cancelled") ||
+      errorMessage.includes("rejected by user") ||
+      errorMessage.includes("denied by user") ||
+      errorMessage.includes("Transaction timeout - no response from wallet")
     ) {
       return {
         code: "USER_REJECTED",

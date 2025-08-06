@@ -72,7 +72,12 @@ export async function batchTransferAndRemark(
     const remark = api.tx.system.remark(remarkMessage);
     const batchCall = api.tx.utility.batchAll([transfer, remark]);
 
-    const txResult = await new Promise<SubmittableResult>((resolve) => {
+    const txResult = await new Promise<SubmittableResult>((resolve, reject) => {
+      // Add timeout to prevent infinite waiting
+      const timeout = setTimeout(() => {
+        reject(new Error("Transaction timeout - no response from wallet"));
+      }, 60000); // 60 seconds timeout
+
       batchCall.signAndSend(
         account.address,
         options as any,
@@ -94,6 +99,7 @@ export async function batchTransferAndRemark(
           }
 
           if (result.isFinalized || result.isError) {
+            clearTimeout(timeout);
             // Emit finalized event when transaction is finalized
             if (result.isFinalized) {
               const txHash = result.txHash.toString();
@@ -103,7 +109,10 @@ export async function batchTransferAndRemark(
             resolve(result);
           }
         },
-      );
+      ).catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
     });
 
     const error = txResult.dispatchError;
