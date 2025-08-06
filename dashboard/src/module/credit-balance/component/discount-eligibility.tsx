@@ -13,13 +13,15 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { turboDADocLink } from "@/lib/constant";
 import { convertBytes, formatInBytes, kbToCredits } from "@/lib/utils";
 import CreditService from "@/services/credit";
+import { useAuth } from "@/providers/AuthProvider";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-function DiscountEligibility({ token }: { token?: string }) {
+function DiscountEligibility() {
+  const { token } = useAuth();
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
   const debouncedValue = useDebounce(deferredQuery, 500);
@@ -96,7 +98,7 @@ function DiscountEligibility({ token }: { token?: string }) {
 
     const pathData = points
       .map((point, index) =>
-        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`
+        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`,
       )
       .join(" ");
 

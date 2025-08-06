@@ -1,13 +1,13 @@
+"use client";
 import DashboardWrapper from "@/components/dashboard-wrapper";
 import TurboOnWallet from "@/components/lottie-comp/turbo-on-wallet";
 import { TabsContent } from "@/components/tabs";
 import { Text } from "@/components/text";
 import { Card } from "@/components/ui/card";
 import { HISTORY_TYPES } from "@/lib/types";
-import { APP_TABS, template } from "@/lib/utils";
+import { APP_TABS } from "@/lib/utils";
 import HistoryWrapper from "@/module/transactions-history";
-import { SignedIn, SignedOut } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
+import { useAuthState } from "@/providers/AuthProvider";
 
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
@@ -28,9 +28,9 @@ const BuyCreditsCard = dynamic(() => import("@/module/purchase-credit"));
 const CreditBalance = dynamic(() => import("@/module/credit-balance"));
 const AppsCard = dynamic(() => import("@/module/user-apps"));
 
-export default async function Page() {
-  const { getToken } = await auth();
-  const token = (await getToken({ template })) ?? undefined;
+export default function Page() {
+  const { isLoggedOut } = useAuthState();
+
   return (
     <DashboardWrapper>
       <TabsContent
@@ -46,11 +46,9 @@ export default async function Page() {
         >
           <div className="flex gap-4">
             <div className="flex flex-col w-full gap-4">
-              <SignedIn>
-                <CreditBalance token={token} />
-                <AppsCard token={token} />
-              </SignedIn>
-              <SignedOut>
+              <CreditBalance />
+              <AppsCard />
+              {isLoggedOut && (
                 <div className="relative w-full h-[520px] rounded-2xl">
                   <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
                     <Card className="border-none shadow-primary rounded-2xl pt-0 gap-0 flex-1 flex justify-center items-center flex-col gap-y-2.5 bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] relative h-full pb-0 overflow-hidden">
@@ -62,13 +60,10 @@ export default async function Page() {
                     </Card>
                   </div>
                 </div>
-              </SignedOut>
+              )}
             </div>
             <div className="flex flex-col w-full min-lg:w-[721px] gap-4">
-              <BuyCreditsCard token={token} />
-              {/* <SignedIn>
-                <CreditUsage token={token} />
-              </SignedIn> */}
+              <BuyCreditsCard />
             </div>
           </div>
         </Suspense>
@@ -79,10 +74,10 @@ export default async function Page() {
       >
         <HistoryWrapper>
           <TabsContent value={HISTORY_TYPES.CREDIT}>
-            <CreditHistory token={token} />
+            <CreditHistory />
           </TabsContent>
           <TabsContent value={HISTORY_TYPES.PUBLISH}>
-            <DataPostingHistory token={token} />
+            <DataPostingHistory />
           </TabsContent>
         </HistoryWrapper>
       </TabsContent>

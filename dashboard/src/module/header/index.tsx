@@ -2,13 +2,16 @@
 import Button from "@/components/button";
 import { Text } from "@/components/text";
 import { turboDADocLink } from "@/lib/constant";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, UserButton } from "@clerk/nextjs";
+import { useAuthState } from "@/providers/AuthProvider";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import WalletsMenu from "./components/wallets-menu";
 
 function Header() {
+  const { isAuthenticated, isLoggedOut } = useAuthState();
+
   return (
     <header className="sticky top-0 z-2 w-full h-18 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-6 flex items-center justify-between">
       <div className="flex gap-x-3 items-center">
@@ -25,15 +28,17 @@ function Header() {
           </Text>
           <ArrowUpRight size={20} color="#FFFFFF" />
         </Link>
-        <SignedIn>
-          <WalletsMenu />
-          <UserButton />
-        </SignedIn>
-        <SignedOut>
+        {isAuthenticated && (
+          <>
+            <WalletsMenu />
+            <UserButton />
+          </>
+        )}
+        {isLoggedOut && (
           <SignInButton mode="modal" component="div">
             <Button className="w-[137px] h-10">Sign In</Button>
           </SignInButton>
-        </SignedOut>
+        )}
       </div>
     </header>
   );

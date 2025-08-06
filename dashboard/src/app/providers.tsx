@@ -16,11 +16,9 @@ const queryClient = new QueryClient();
 export function Providers({
   children,
   initialState,
-  token,
 }: {
   children: ReactNode;
   initialState?: State;
-  token?: string;
 }) {
   return (
     <WagmiProvider config={config} initialState={initialState}>
@@ -30,7 +28,7 @@ export function Providers({
             theme="midnight"
             options={{ overlayBlur: 2, embedGoogleFonts: true }}
           >
-            <ConfigProvider accessToken={token}>
+            <ConfigProvider>
               <DialogProvider>{children}</DialogProvider>
             </ConfigProvider>
           </ConnectKitProvider>

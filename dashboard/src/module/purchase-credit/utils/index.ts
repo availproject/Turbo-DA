@@ -32,7 +32,7 @@ export const postOrder = async ({
       body: JSON.stringify({
         chain: chainId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -49,7 +49,7 @@ export async function batchTransferAndRemark(
   remarkMessage: string,
   onInBlock?: (txHash: string, blockHash: string) => void,
   onFinalized?: (txHash: string) => void,
-  onBroadcast?: (txHash: string) => void
+  onBroadcast?: (txHash: string) => void,
 ): Promise<Result<any, Error>> {
   try {
     const wallets = getWallets();
@@ -67,7 +67,7 @@ export async function batchTransferAndRemark(
 
     const transfer = api.tx.balances.transferKeepAlive(
       process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
-      atomicAmount
+      atomicAmount,
     );
     const remark = api.tx.system.remark(remarkMessage);
     const batchCall = api.tx.utility.batchAll([transfer, remark]);
@@ -75,7 +75,7 @@ export async function batchTransferAndRemark(
     const txResult = await new Promise<SubmittableResult>((resolve) => {
       batchCall.signAndSend(
         account.address,
-        options,
+        options as any,
         (result: SubmittableResult) => {
           console.log(`Tx status: ${result.status}`);
 
@@ -102,7 +102,7 @@ export async function batchTransferAndRemark(
             }
             resolve(result);
           }
-        }
+        },
       );
     });
 
@@ -134,7 +134,7 @@ export async function batchTransferAndRemark(
     return err(
       error instanceof Error
         ? error
-        : new Error("Failed to batch transfer and remark")
+        : new Error("Failed to batch transfer and remark"),
     );
   }
 }
@@ -151,7 +151,7 @@ export async function getTokenBalance(
   address: `0x${string}`,
   api?: ApiPromise,
   tokenAddress?: string,
-  chainId?: number
+  chainId?: number,
 ) {
   if (!validAddress(address, chain))
     throw new Error("Invalid Recipient on base");

@@ -1,6 +1,6 @@
 "use client";
 import { Text } from "@/components/text";
-import { useAuth, SignInButton } from "@clerk/nextjs";
+import { SignInButton } from "@clerk/nextjs";
 import Button from "@/components/button";
 import BuyButton from "./buy-button";
 import { ClickHandler } from "../utils/types";
@@ -15,6 +15,8 @@ interface BuySectionProps {
   onTokenAmountClear?: ClickHandler;
   token?: string;
   showBalanceError?: boolean;
+  isAuthenticated?: boolean;
+  isLoggedOut?: boolean;
 }
 
 const BuySection = ({
@@ -27,12 +29,12 @@ const BuySection = ({
   onTokenAmountClear,
   token,
   showBalanceError,
+  isAuthenticated,
+  isLoggedOut,
 }: BuySectionProps) => {
-  const { isSignedIn } = useAuth();
-
   return (
     <div className="flex-1 flex flex-col gap-y-3 items-center p-4 justify-end">
-      {isSignedIn ? (
+      {isAuthenticated ? (
         <>
           {!!error && (
             <Text variant={"error"} size={"sm"} weight={"medium"}>
@@ -59,10 +61,12 @@ const BuySection = ({
             token={token}
           />
         </>
-      ) : (
+      ) : isLoggedOut ? (
         <SignInButton mode="modal" component="div">
           <Button>Sign In</Button>
         </SignInButton>
+      ) : (
+        <Button disabled>Loading...</Button>
       )}
     </div>
   );

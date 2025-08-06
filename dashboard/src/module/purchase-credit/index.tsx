@@ -10,6 +10,7 @@ import { supportedTokensAndChains } from "@/lib/types";
 import { formatDataBytes } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { useConfig } from "@/providers/ConfigProvider";
+import { useAuthState } from "@/providers/AuthProvider";
 import CreditService from "@/services/credit";
 import { Wallet } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
@@ -25,8 +26,14 @@ const getTokenInfo = (chainName: string, tokenName: string) => {
   return chain?.tokens.find((token) => token.name === tokenName);
 };
 
-const BuyCreditsCard = ({ token }: { token?: string }) => {
+const BuyCreditsCard = () => {
   const { getERC20AvailBalance, showBalance } = useWallet();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    isLoggedOut,
+    token,
+  } = useAuthState();
   const [tokenAmount, setTokenAmount] = useState("");
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
@@ -66,7 +73,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         getERC20AvailBalance(
           account.address,
           tokenInfo.address as `0x${string}`,
-          selectedChain.id
+          selectedChain.id,
         );
       }
 
@@ -133,7 +140,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   ]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
-    if (!selectedToken) {
+    if (!selectedToken || !token) {
       return;
     }
     let tokenAddress: string;
@@ -150,11 +157,11 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     try {
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
-          token: token!,
+          token,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
           chainId: selectedChain.id,
-        }
+        },
       );
 
       setEstimateData(response?.data);
@@ -182,6 +189,23 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const handleTokenAmountClear = () => {
     setTokenAmount("");
   };
+
+  // Show loading state while authentication is loading
+  if (authLoading) {
+    return (
+      <div className="relative min-lg:w-[466px] h-[455px]">
+        <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
+          <Card className="w-full border-none shadow-primary bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0 relative h-full">
+            <CardContent className="h-full flex items-center justify-center">
+              <Text size={"sm"} variant={"secondary-grey"}>
+                Loading...
+              </Text>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-lg:w-[466px] h-[455px]">
@@ -229,7 +253,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                           setTokenAmount(value);
                           if (+value === 0) {
                             setTokenAmountError(
-                              "Please enter a valid amount greater than 0"
+                              "Please enter a valid amount greater than 0",
                             );
                             setShowBalanceError(false);
                             return;
@@ -301,8 +325,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 onBuyComplete={handleBuyComplete}
                 onBuyError={handleBuyError}
                 onTokenAmountClear={handleTokenAmountClear}
-                token={token}
+                token={token || undefined}
                 showBalanceError={showBalanceError}
+                isAuthenticated={isAuthenticated}
+                isLoggedOut={isLoggedOut}
               />
             </CardContent>
           </div>

@@ -1,10 +1,9 @@
 "use client";
-import { template } from "@/lib/utils";
-import { useAuth } from "@clerk/nextjs";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
 import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
 import { supportedTokensAndChains } from "@/lib/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
+import { useAuth } from "./AuthProvider";
 import React, {
   createContext,
   Dispatch,
@@ -33,7 +32,6 @@ const getDefaultToken = (): Token => ({
 
 interface ConfigContextType {
   token?: string;
-  fetchToken: ClickHandler;
   selectedChain: ChainType;
   setSelectedChain: Dispatch<SetStateAction<ChainType>>;
   setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;
@@ -46,12 +44,11 @@ interface ConfigContextType {
 }
 
 export const ConfigContext = createContext<ConfigContextType | undefined>(
-  undefined
+  undefined,
 );
 
 interface ConfigProviderProps {
   children?: React.ReactNode;
-  accessToken?: string;
 }
 
 type ChainType = {
@@ -77,18 +74,14 @@ export type TransactionStatus = {
   chainType: "avail" | "ethereum" | "base";
 };
 
-export const ConfigProvider: React.FC<ConfigProviderProps> = ({
-  children,
-  accessToken,
-}) => {
-  const { getToken } = useAuth();
+export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
+  const { token } = useAuth();
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
-  const [token, setToken] = useState<string>(accessToken ?? "");
   const [selectedChain, setSelectedChain] =
     useState<ChainType>(getDefaultChain);
   const [selectedToken, setSelectedToken] = useState<Token | undefined>(
-    getDefaultToken
+    getDefaultToken,
   );
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
@@ -101,10 +94,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   useEffect(() => {
     console.log(
       "NEXT_PUBLIC_AVAIL_ADDRESS",
-      process.env.NEXT_PUBLIC_AVAIL_ADDRESS
+      process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
     );
-
-    fetchToken();
 
     if (typeof window !== "undefined") {
       try {
@@ -149,7 +140,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       try {
         localStorage.setItem(
           STORAGE_KEYS.SELECTED_CHAIN,
-          JSON.stringify(selectedChain)
+          JSON.stringify(selectedChain),
         );
       } catch (error) {
         console.warn("Failed to save selected chain to localStorage:", error);
@@ -162,23 +153,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       try {
         localStorage.setItem(
           STORAGE_KEYS.SELECTED_TOKEN,
-          JSON.stringify(selectedToken)
+          JSON.stringify(selectedToken),
         );
       } catch (error) {
         console.warn("Failed to save selected token to localStorage:", error);
       }
     }
   }, [selectedToken, isHydrated]);
-
-  const fetchToken = async () => {
-    await getToken({ template: template })
-      .then((res) => {
-        if (res) setToken(res);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  };
 
   const fetchAvailBalance = async () => {
     if (!selected?.address || !api) return;
@@ -188,7 +169,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
       const balance = await getTokenBalance(
         Chain.AVAIL,
         selected.address as `0x${string}`,
-        api
+        api,
       );
       console.log(balance, "avail balance", selected.address);
       setAvailNativeBalance(balance);
@@ -200,8 +181,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({
   return (
     <ConfigContext.Provider
       value={{
-        token,
-        fetchToken,
+        token: token || undefined,
         selectedChain,
         setSelectedChain,
         selectedToken,

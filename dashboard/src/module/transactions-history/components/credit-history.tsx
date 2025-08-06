@@ -3,7 +3,8 @@ import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { SignInButton } from "@clerk/nextjs";
+import { useAuthState } from "@/providers/AuthProvider";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { supportedTokensAndChains } from "@/lib/types";
@@ -15,26 +16,33 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Label from "@/components/label";
 import EmptyState from "./empty-state";
 
-const CreditHistory = ({ token }: { token?: string }) => {
+const CreditHistory = () => {
   const [historyList, setHistoryList] = useState<CreditRequest[]>();
   const [loading, setLoading] = useState(true);
   const { setMainTabSelected } = useOverview();
-  const { isSignedIn } = useAuth();
+  const { isAuthenticated, isLoggedOut, token } = useAuthState();
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    if (isAuthenticated && token) {
+      fetchHistory();
+    } else if (isLoggedOut) {
+      setHistoryList([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, token, isLoggedOut]);
 
   const fetchHistory = async () => {
+    if (!token) return;
+
     try {
       const response = await HistoryService.getCreditHistory({
-        token: token!,
+        token,
       });
       // Sort by latest transactions first and add token information
       const sortedData = (response?.data ?? [])
         .sort(
           (a: CreditRequest, b: CreditRequest) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
         .map((item: CreditRequest) => ({
           ...item,
@@ -53,7 +61,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
   const getChainInfo = useCallback((chainId: number) => {
     // Find the chain by ID in supportedTokensAndChains
     for (const [chainKey, chainData] of Object.entries(
-      supportedTokensAndChains
+      supportedTokensAndChains,
     )) {
       if (chainData.id === chainId) {
         return {
@@ -139,7 +147,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
           return value ?? "-";
       }
     },
-    [getChainInfo]
+    [getChainInfo],
   );
 
   return (
@@ -150,7 +158,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
           message="Your Credit History Would Be Shown Here"
           cta={
             <>
-              {!isSignedIn ? (
+              {!isAuthenticated ? (
                 <SignInButton mode="modal" component="div">
                   <Button className="w-[195px]">Sign In</Button>
                 </SignInButton>
@@ -191,7 +199,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
             <div
               className={cn(
                 "flex",
-                last ? "w-[180px] justify-end" : "w-[150px]"
+                last ? "w-[180px] justify-end" : "w-[150px]",
               )}
             >
               <Text
@@ -201,7 +209,7 @@ const CreditHistory = ({ token }: { token?: string }) => {
                   "py-3 px-4 break-words",
                   !last && "text-right",
                   heading === "amount_credit" &&
-                    "whitespace-nowrap overflow-hidden text-ellipsis"
+                    "whitespace-nowrap overflow-hidden text-ellipsis",
                 )}
                 variant={heading === "request_type" ? "green" : "white"}
                 as={
