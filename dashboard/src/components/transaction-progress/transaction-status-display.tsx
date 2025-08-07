@@ -29,23 +29,10 @@ export const TransactionStatusDisplay = ({
     }
   };
 
-  if (tokenAmount) {
-    return (
-      <div className={className}>
-        <Text weight="semibold" size="2xl" className="text-center">
-          {getStatusMessage()}
-        </Text>
-      </div>
-    );
-  }
-
   return (
     <div className={className}>
-      <Text weight="semibold" size="2xl" as="div" className="text-center">
-        <Text as="span" weight="semibold" size="2xl" variant="green">
-          1000 KB{" "}
-        </Text>
-        Credited Successfully
+      <Text weight="semibold" size="2xl" className="text-center">
+        {getStatusMessage()}
       </Text>
     </div>
   );

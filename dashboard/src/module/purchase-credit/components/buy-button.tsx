@@ -24,6 +24,7 @@ import { batchTransferAndRemark, postOrder } from "../utils";
 import { depositAbi } from "../utils/constant";
 import { ClickHandler } from "../utils/types";
 import { ErrorHandlingUtils } from "@/utils/errorHandling";
+import { TransactionService } from "@/services/transaction";
 
 // Remove hardcoded chain - now using dynamic chain from user selection
 
@@ -144,30 +145,60 @@ const BuyButton = ({
           },
           // Finalized callback
           (txHash: string) => {
-            console.log("Transaction finalized detected:", txHash);
             if (currentTransaction) {
-              setTransactionStatusList((prev) =>
-                prev.map((t) =>
+              setTransactionStatusList((prev) => {
+                const updated = prev.map((t) =>
                   t.id === currentTransaction!.id
                     ? {
                         ...t,
-                        status: "finality",
+                        status: "finality" as const,
                         txnHash: txHash as `0x${string}`,
                       }
                     : t
-                )
-              );
-              setShowTransaction({
-                ...currentTransaction,
-                status: "finality",
-                txnHash: txHash as `0x${string}`,
+                );
+                
+                
+                return updated;
               });
+              
+              const finalizedTransaction = {
+                ...currentTransaction,
+                status: "finality" as const,
+                txnHash: txHash as `0x${string}`,
+              };
+              
+              setShowTransaction(finalizedTransaction);
+              
+              const completionTimeoutId = setTimeout(() => {
+                const completedTransaction = { ...currentTransaction!, status: "completed" as const };
+                
+                setTransactionStatusList((prev) => {
+                  const updated = prev.map((t) =>
+                    t.id === currentTransaction!.id
+                      ? completedTransaction
+                      : t
+                  );
+                  return updated;
+                });
+                
+                setShowTransaction(completedTransaction);
+                
+                const cleanupTimeoutId = setTimeout(() => {
+                  setTransactionStatusList((prev) => 
+                    prev.filter(t => t.id !== currentTransaction!.id)
+                  );
+                  setShowTransaction(undefined);
+                  setOpen("");
+                }, 4000);
+                
+                return () => clearTimeout(cleanupTimeoutId);
+              }, 2000);
+              
+              return () => clearTimeout(completionTimeoutId);
             }
           },
           // Broadcast callback
           (txHash: string) => {
-            console.log("Transaction broadcast detected:", txHash);
-            // Create transaction and show dialog as soon as transaction is broadcast
             currentTransaction = {
               id: uuidv4(),
               status: "broadcast",
@@ -211,10 +242,9 @@ const BuyButton = ({
           value: parseUnits(tokenAmount, 18),
         })
           .then(async (txnHash: `0x${string}`) => {
-            // Create transaction and show dialog only when transaction is sent
             const transaction: TransactionStatus = {
               id: uuidv4(),
-              status: "inblock",
+              status: "broadcast", // Start with broadcast like Avail
               orderId: orderResponse.data.id as number,
               tokenAddress: tokenAddress! as `0x${string}`,
               tokenAmount: +tokenAmount,
@@ -223,19 +253,88 @@ const BuyButton = ({
                 | "ethereum"
                 | "base",
             };
+            
             setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
             setOpen("credit-transaction");
 
-            // Update to finality status when transaction is confirmed
-            setTransactionStatusList((prev) =>
-              prev.map((t) =>
-                t.id === transaction.id
-                  ? { ...t, status: "finality", txnHash }
-                  : t
-              )
-            );
-            setShowTransaction({ ...transaction, status: "finality", txnHash });
+            // Progress to inblock after a short delay
+            setTimeout(() => {
+              setTransactionStatusList((prev) => {
+                const updated = prev.map((t) =>
+                  t.id === transaction.id
+                    ? { ...t, status: "inblock" as const }
+                    : t
+                );
+                return updated;
+              });
+              
+              // Always update showTransaction for this specific transaction
+              setShowTransaction((prevShow) => {
+                if (prevShow && prevShow.id === transaction.id) {
+                  const updated = { ...prevShow, status: "inblock" as const };
+                  return updated;
+                }
+                return prevShow;
+              });
+            }, 1000);
+
+            // Call inclusion API for EVM transaction
+            TransactionService.handleTransactionFinality({
+              txnHash,
+              orderId: orderResponse.data.id as number,
+              token: token!,
+              chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+              onSuccess: () => {
+                // Update transaction to finality status to trigger 2-second UI timer
+                setTimeout(() => {
+                  setTransactionStatusList((prev) => {
+                    const updated = prev.map((t) =>
+                      t.id === transaction.id
+                        ? { ...t, status: "finality" as const }
+                        : t
+                    );
+                    return updated;
+                  });
+                  
+                  // Always update showTransaction for this specific transaction
+                  setShowTransaction((prevShow) => {
+                    if (prevShow && prevShow.id === transaction.id) {
+                      const updated = { ...prevShow, status: "finality" as const };
+                      return updated;
+                    }
+                    return prevShow;
+                  });
+                  
+                  setTimeout(() => {
+                    setTransactionStatusList((prev) => {
+                      const updated = prev.map((t) =>
+                        t.id === transaction.id
+                          ? { ...t, status: "completed" as const }
+                          : t
+                      );
+                      return updated;
+                    });
+                    
+                    setShowTransaction((prevShow) => {
+                      if (prevShow && prevShow.id === transaction.id) {
+                        const completedTx = { ...prevShow, status: "completed" as const };
+                        return completedTx;
+                      }
+                      return prevShow;
+                    });
+                    
+                    setTimeout(() => {
+                      setTransactionStatusList((prev) => 
+                        prev.filter(t => t.id !== transaction.id)
+                      );
+                      setShowTransaction(undefined);
+                      setOpen("");
+                    }, 4000);
+                  }, 2000);
+                }, 2000);
+              }
+            });
 
             onTokenAmountClear?.();
             setLoading(false);
@@ -271,10 +370,9 @@ const BuyButton = ({
               chainId: selectedChain.id,
             })
               .then(async (txnHash: `0x${string}`) => {
-                // Create transaction and show dialog only when transaction is sent
                 const transaction: TransactionStatus = {
                   id: uuidv4(),
-                  status: "inblock",
+                  status: "broadcast", // Start with broadcast like Avail
                   orderId: orderResponse.data.id as number,
                   tokenAddress: tokenAddress! as `0x${string}`,
                   tokenAmount: +tokenAmount,
@@ -283,6 +381,7 @@ const BuyButton = ({
                     | "ethereum"
                     | "base",
                 };
+                
                 setTransactionStatusList((prev) => [
                   ...(prev ?? []),
                   transaction,
@@ -290,18 +389,82 @@ const BuyButton = ({
                 setShowTransaction(transaction);
                 setOpen("credit-transaction");
 
-                // Update to finality status when transaction is confirmed
-                setTransactionStatusList((prev) =>
-                  prev.map((t) =>
-                    t.id === transaction.id
-                      ? { ...t, status: "finality", txnHash }
-                      : t
-                  )
-                );
-                setShowTransaction({
-                  ...transaction,
-                  status: "finality",
+                // Progress to inblock after a short delay
+                setTimeout(() => {
+                  setTransactionStatusList((prev) => {
+                    const updated = prev.map((t) =>
+                      t.id === transaction.id
+                        ? { ...t, status: "inblock" as const }
+                        : t
+                    );
+                    return updated;
+                  });
+                  
+                  // Always update showTransaction for this specific transaction
+                  setShowTransaction((prevShow) => {
+                    if (prevShow && prevShow.id === transaction.id) {
+                      const updated = { ...prevShow, status: "inblock" as const };
+                      return updated;
+                    }
+                    return prevShow;
+                  });
+                }, 1000);
+
+                // Call inclusion API for EVM ERC20 transaction
+                TransactionService.handleTransactionFinality({
                   txnHash,
+                  orderId: orderResponse.data.id as number,
+                  token: token!,
+                  chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+                  onSuccess: () => {
+                    // Update transaction to finality status to trigger 2-second UI timer
+                    setTimeout(() => {
+                      setTransactionStatusList((prev) => {
+                        const updated = prev.map((t) =>
+                          t.id === transaction.id
+                            ? { ...t, status: "finality" as const }
+                            : t
+                        );
+                        return updated;
+                      });
+                      
+                      // Always update showTransaction for this specific transaction
+                      setShowTransaction((prevShow) => {
+                        if (prevShow && prevShow.id === transaction.id) {
+                          const updated = { ...prevShow, status: "finality" as const };
+                          return updated;
+                        }
+                        return prevShow;
+                      });
+                      
+                      setTimeout(() => {
+                        setTransactionStatusList((prev) => {
+                          const updated = prev.map((t) =>
+                            t.id === transaction.id
+                              ? { ...t, status: "completed" as const }
+                              : t
+                          );
+                          return updated;
+                        });
+                        
+                        setShowTransaction((prevShow) => {
+                          if (prevShow && prevShow.id === transaction.id) {
+                            const completedTx = { ...prevShow, status: "completed" as const };
+                            return completedTx;
+                          }
+                          return prevShow;
+                        });
+                        
+                        setTimeout(() => {
+                          setTransactionStatusList((prev) => 
+                            prev.filter(t => t.id !== transaction.id)
+                          );
+                          setShowTransaction(undefined);
+                          setOpen("");
+                        }, 4000);
+                      }, 2000);
+                    }, 2000);
+                  }
                 });
 
                 onTokenAmountClear?.();
@@ -323,7 +486,6 @@ const BuyButton = ({
           });
       }
     } catch (error) {
-      console.log(error);
       const errorMessage = ErrorHandlingUtils.getErrorMessage(error);
       errorToast?.({ label: errorMessage });
       setLoading(false);

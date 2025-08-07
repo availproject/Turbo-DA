@@ -65,6 +65,7 @@ const CreditsTransactionProgress = () => {
                     autoplay
                     width={50}
                     height={50}
+                    className="mx-auto"
                   />
                 ) : (
                   <LoaderCircle

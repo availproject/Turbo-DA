@@ -16,6 +16,7 @@ import { Wallet } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import BuySection from "./components/buy-section";
+import { useTransactionProgress } from "@/hooks/useTransactionProgress";
 
 // Removed hardcoded DESIRED_CHAIN - now using dynamic chain from user selection
 
@@ -27,6 +28,9 @@ const getTokenInfo = (chainName: string, tokenName: string) => {
 };
 
 const BuyCreditsCard = () => {
+  // Initialize global transaction processing
+  useTransactionProgress();
+  
   const { getERC20AvailBalance, showBalance } = useWallet();
   const {
     isAuthenticated,
@@ -83,15 +87,9 @@ const BuyCreditsCard = () => {
           ? undefined
           : (tokenInfo?.address as `0x${string}`),
         chainId: selectedChain.id,
-      })
-        .then((response) => {
-          console.log({
-            response,
-          });
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+      }).catch(() => {
+        // Silent fail for balance display
+      });
     }
   }, [
     account.address,
@@ -171,7 +169,7 @@ const BuyCreditsCard = () => {
         setEstimateData(response?.data);
       }
     } catch (error) {
-      console.log(error);
+      // Silent fail for estimate calculation
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setEstimateDataLoading(false);

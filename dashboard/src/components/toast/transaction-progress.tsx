@@ -2,11 +2,8 @@ import { APP_TABS, cn } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
 import {
-  Check,
-  LoaderCircle,
-  Scaling,
+  Maximize2,
   SquareArrowOutUpRight,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -15,9 +12,9 @@ import { useAccount } from "wagmi";
 import Button from "../button";
 import { useDialog } from "../dialog/provider";
 import { Text } from "../text";
-import { TransactionService } from "@/services/transaction";
-import { TRANSACTION_ACTIONS } from "@/constants/transaction";
+import { TRANSACTION_ACTIONS, TRANSACTION_MESSAGES } from "@/constants/transaction";
 import { getExplorerUrl } from "@/utils/explorer";
+import { ProgressBar } from "../transaction-progress/progress-bar";
 
 type TransactionProgressProps = {
   transaction: TransactionStatus;
@@ -31,175 +28,131 @@ const TransactionProgress = ({
   const account = useAccount();
   const { setMainTabSelected } = useOverview();
   const { setOpen } = useDialog();
-  const [error, setError] = useState("");
-  const { setShowTransaction, token, setTransactionStatusList } = useConfig();
+  const { setShowTransaction, transactionStatusList } = useConfig();
   const [displayTransaction, setDisplayTransaction] = useState(transaction);
-  const [inProcess, setInProcess] = useState(false);
-  const [status, setStatus] = useState<"failed" | "success">();
 
+  // Sync displayTransaction with global transaction state
   useEffect(() => {
-    if (displayTransaction?.id && displayTransaction.status === "finality") {
-      handleFinalityTransaction();
-      return;
+    const updatedTransaction = transactionStatusList.find(t => t.id === transaction.id);
+    
+    if (updatedTransaction) {
+      setDisplayTransaction(updatedTransaction);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    displayTransaction?.id,
-    displayTransaction?.status,
-    displayTransaction?.txnHash,
-  ]);
+  }, [transactionStatusList, transaction.id, displayTransaction.status]);
 
-  const handleFinalityTransaction = async () => {
-    if (!displayTransaction?.txnHash || !displayTransaction?.orderId || !token)
-      return;
+  // Auto-close toast after 2 seconds when transaction is completed
+  useEffect(() => {
+    if (displayTransaction?.status === "completed") {
+      const timer = setTimeout(() => {
+        toast.dismiss();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [displayTransaction?.status]);
 
-    try {
-      setInProcess(true);
 
-      const result = await TransactionService.handleTransactionFinality({
-        txnHash: displayTransaction.txnHash,
-        orderId: displayTransaction.orderId,
-        token,
-        chainType: displayTransaction.chainType,
-      });
+  const handleExpandClick = () => {
+    setMainTabSelected(APP_TABS.OVERVIEW);
+    setOpen("credit-transaction");
+    setShowTransaction(displayTransaction);
+    toast.dismiss();
+  };
 
-      if (result.success) {
-        setStatus("success");
-        setInProcess(false);
-        updateTransactionStatus("completed");
-      } else {
-        setStatus("failed");
-        setError(result.error || "Transaction failed");
-      }
-    } catch (err) {
-      console.log(err);
-      setStatus("failed");
-      setError("Transaction failed");
-    } finally {
-      setInProcess(false);
+  const getStatusMessage = () => {
+    switch (displayTransaction.status) {
+      case "initialised":
+      case "broadcast":
+        return TRANSACTION_MESSAGES.STATUS.BROADCAST;
+      case "inblock":
+        return TRANSACTION_MESSAGES.STATUS.INBLOCK;
+      case "finality":
+        return TRANSACTION_MESSAGES.STATUS.FINALITY;
+      case "completed":
+        return TRANSACTION_MESSAGES.STATUS.COMPLETED;
+      default:
+        return "";
     }
   };
 
-  const updateTransactionStatus = (newStatus: TransactionStatus["status"]) => {
-    setTransactionStatusList((prev) =>
-      prev.map((transaction: TransactionStatus) =>
-        transaction.id === displayTransaction?.id
-          ? {
-              ...transaction,
-              status: newStatus,
-            }
-          : transaction
-      )
-    );
-    setDisplayTransaction({
-      ...displayTransaction,
-      status: newStatus,
-    });
+  const getDescriptionMessage = () => {
+    switch (displayTransaction.status) {
+      case "initialised":
+      case "broadcast":
+        return TRANSACTION_MESSAGES.DESCRIPTIONS.BROADCAST;
+      case "inblock":
+        return TRANSACTION_MESSAGES.DESCRIPTIONS.INBLOCK;
+      case "finality":
+        return TRANSACTION_MESSAGES.DESCRIPTIONS.FINALITY;
+      case "completed":
+        return TRANSACTION_MESSAGES.DESCRIPTIONS.COMPLETED;
+      default:
+        return "";
+    }
   };
 
   return (
     <div
       className={cn(
-        "flex gap-x-4 items-center px-4 py-3 h-[130px] flex-1 w-[530px]",
+        "flex flex-col gap-y-3 px-4 py-3 flex-1 w-[530px] min-h-[130px]",
         className
       )}
     >
-      {!inProcess && status === "success" && (
-        <div className="bg-white rounded-lg p-2">
-          <Check
-            color="#1FC16B"
-            size={24}
-            strokeWidth={3}
-            className="border-2 border-[#1FC16B] rounded-full p-0.5"
-          />
+      {/* Header with title and expand button */}
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <Text weight="semibold" size="lg">
+            {getStatusMessage()}
+          </Text>
         </div>
-      )}
-      {!inProcess && status === "failed" && (
-        <div className="bg-white rounded-lg p-2">
-          <X
-            color="#ff7360"
-            size={24}
-            strokeWidth={3}
-            className="border-2 border-[#ff7360] rounded-full p-0.5"
-          />
-        </div>
-      )}
-      {inProcess && !status && (
-        <LoaderCircle
-          className="animate-spin"
-          color="#FFFFFF"
-          size={48}
-          strokeWidth={2}
+        <Maximize2
+          color="#B3B3B3"
+          size={20}
+          className="cursor-pointer mt-1"
+          onClick={handleExpandClick}
         />
-      )}
-      <div className="flex flex-col gap-y-2 flex-1">
-        <Text weight={"semibold"}>
-          {transaction.status === "inblock" && "Credit Buying Initiated"}
-          {transaction.status === "finality" && "Almost Done"}
-          {transaction.status === "completed" && "Credited Successfully"}
-        </Text>
-        {transaction.status === "inblock" && (
-          <Text weight={"medium"} variant={"secondary-grey"}>
-            Processing transaction on Avail Chain
-          </Text>
-        )}
-        {transaction.status === "finality" && (
-          <Text weight={"medium"} variant={"secondary-grey"}>
-            Processing transaction on Avail Chain
-          </Text>
-        )}
-        {transaction.status === "completed" && (
-          <Text weight={"medium"} variant={"secondary-grey"}>
-            Transaction completed successfully
-          </Text>
-        )}
-        {error && (
-          <Text weight={"medium"} variant={"error"}>
-            {error}
-          </Text>
-        )}
-        {transaction.status !== "inblock" && (
-          <div className="flex gap-x-4 w-full">
-            <Link
-              href={getExplorerUrl(
-                transaction,
-                account.chain?.blockExplorers?.default.url
-              )}
-              target="_blank"
-              className="w-fit"
-            >
-              <Button
-                variant={"link"}
-                className="flex gap-x-1.5 items-center justify-center"
-              >
-                <Text weight={"semibold"} size={"sm"}>
-                  {TRANSACTION_ACTIONS.VIEW_EXPLORER}
-                </Text>
-                <SquareArrowOutUpRight color="#B3B3B3" size={20} />
-              </Button>
-            </Link>
-            <Button
-              variant={"link"}
-              onClick={() => setMainTabSelected(APP_TABS.HISTORY)}
-            >
-              <Text weight={"semibold"} size={"sm"}>
-                {TRANSACTION_ACTIONS.VIEW_HISTORY}
-              </Text>
-            </Button>
-          </div>
-        )}
       </div>
-      <Scaling
-        color="#B3B3B3"
-        size={24}
-        className="cursor-pointer self-start"
-        onClick={() => {
-          setMainTabSelected(APP_TABS.OVERVIEW);
-          setOpen("credit-transaction");
-          setShowTransaction(displayTransaction);
-          toast.dismiss();
-        }}
-      />
+
+      {/* Progress Bar */}
+      <ProgressBar status={displayTransaction.status} className="w-fit" />
+
+      {/* Description */}
+      <Text weight="medium" variant="secondary-grey" size="sm">
+        {getDescriptionMessage()}
+      </Text>
+
+
+      {/* Action buttons */}
+      {displayTransaction.status !== "broadcast" && (
+        <div className="flex gap-x-4 w-full">
+          <Link
+            href={getExplorerUrl(
+              displayTransaction,
+              account.chain?.blockExplorers?.default.url
+            )}
+            target="_blank"
+            className="w-fit"
+          >
+            <Button
+              variant="link"
+              className="flex gap-x-1.5 items-center justify-center p-0"
+            >
+              <Text weight="semibold" size="sm">
+                {TRANSACTION_ACTIONS.VIEW_EXPLORER}
+              </Text>
+              <SquareArrowOutUpRight color="#B3B3B3" size={16} />
+            </Button>
+          </Link>
+          <Button
+            variant="link"
+            className="p-0"
+            onClick={() => setMainTabSelected(APP_TABS.HISTORY)}
+          >
+            <Text weight="semibold" size="sm">
+              {TRANSACTION_ACTIONS.VIEW_HISTORY}
+            </Text>
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

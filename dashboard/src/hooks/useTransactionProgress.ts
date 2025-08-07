@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
-import { TransactionService } from "@/services/transaction";
 import { useAppToast } from "@/components/toast";
 import { useDialog } from "@/components/dialog/provider";
 import { useOverview } from "@/providers/OverviewProvider";
 import useBalance from "./useBalance";
+import { toast } from "react-toastify";
 
 export interface UseTransactionProgressOptions {
   onSuccess?: () => void;
@@ -19,8 +19,9 @@ export const useTransactionProgress = (
     setTransactionStatusList,
     showTransaction,
     setShowTransaction,
+    transactionStatusList,
   } = useConfig();
-  const { error: errorToast } = useAppToast();
+  const { error: errorToast, transactionProgress } = useAppToast();
   const { setOpen } = useDialog();
   const { creditBalance, setIsAwaitingCreditUpdate } = useOverview();
   const { updateCreditBalance } = useBalance();
@@ -30,96 +31,20 @@ export const useTransactionProgress = (
     initialBalance?: number;
   }>({});
 
-  // Handle finality transaction processing
-  useEffect(() => {
-    if (
-      showTransaction?.id &&
-      showTransaction.status === "finality" &&
-      showTransaction.txnHash &&
-      !isProcessing
-    ) {
-      handleFinalityTransaction();
-    }
-  }, [
-    showTransaction?.id,
-    showTransaction?.status,
-    showTransaction?.txnHash,
-    isProcessing,
-  ]);
-
-  // Auto-complete transaction after delay
-  useEffect(() => {
-    if (showTransaction?.status === "finality" && !isProcessing) {
-      const timer = setTimeout(() => {
-        completeTransaction();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [showTransaction?.status, showTransaction?.id, isProcessing]);
-
-  const handleFinalityTransaction = async () => {
-    if (!showTransaction?.txnHash || !showTransaction?.orderId || !token)
-      return;
-
-    setIsProcessing(true);
-
-    try {
-      const result = await TransactionService.handleTransactionFinality({
-        txnHash: showTransaction.txnHash,
-        orderId: showTransaction.orderId,
-        token,
-        chainType: showTransaction.chainType,
-      });
-
-      if (result.success) {
-        completeTransaction();
-        options?.onSuccess?.();
-      } else {
-        handleError(result.error || "Transaction failed");
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Transaction failed";
-      handleError(message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const completeTransaction = () => {
-    if (!showTransaction) return;
-
-    setTransactionStatusList((prev) =>
-      prev.map((transaction: TransactionStatus) =>
-        transaction.id === showTransaction.id
-          ? { ...transaction, status: "completed" }
-          : transaction
-      )
-    );
-    setShowTransaction({ ...showTransaction, status: "completed" });
-
-    // Start polling for credit balance updates
-    startCreditBalancePolling();
-  };
-
-  const startCreditBalancePolling = () => {
+  const startCreditBalancePolling = useCallback(() => {
     const initialBalance = creditBalance;
     pollingRef.current.initialBalance = initialBalance;
     setIsAwaitingCreditUpdate(true);
-    console.log("Starting credit balance polling after transaction completion", { initialBalance });
-    
     let pollCount = 0;
     const maxPolls = 24; // Poll for 2 minutes (every 5 seconds)
     
     const checkBalanceUpdate = async () => {
       pollCount++;
-      console.log(`Credit balance poll attempt ${pollCount}/${maxPolls}`);
       
       try {
         await updateCreditBalance();
         
         if (pollCount >= maxPolls) {
-          console.log("Credit balance polling timeout after 2 minutes");
           setIsAwaitingCreditUpdate(false);
           if (pollingRef.current.intervalId) {
             clearInterval(pollingRef.current.intervalId);
@@ -127,7 +52,7 @@ export const useTransactionProgress = (
           }
         }
       } catch (error) {
-        console.log("Error during balance check:", error);
+        // Silent fail for balance polling
       }
     };
     
@@ -135,7 +60,35 @@ export const useTransactionProgress = (
 
     // Initial check after 2 seconds
     setTimeout(checkBalanceUpdate, 2000);
-  };
+  }, [creditBalance, setIsAwaitingCreditUpdate, updateCreditBalance]);
+
+  const completeTransaction = useCallback((transaction?: TransactionStatus) => {
+    const txnToComplete = transaction || showTransaction;
+    
+    if (!txnToComplete) {
+      return;
+    }
+
+
+    setTransactionStatusList((prev) => {
+      const updated = prev.map((t: TransactionStatus) =>
+        t.id === txnToComplete.id
+          ? { ...t, status: "completed" as const }
+          : t
+      );
+      return updated;
+    });
+    
+    if (showTransaction?.id === txnToComplete.id) {
+      setShowTransaction({ ...txnToComplete, status: "completed" as const });
+    }
+
+    // Start polling for credit balance updates
+    startCreditBalancePolling();
+  }, [showTransaction, setTransactionStatusList, setShowTransaction, startCreditBalancePolling]);
+
+  // Auto-complete transactions after delay - DISABLED
+  // Completion is now handled directly in buy-button.tsx for each chain type
 
   // Monitor credit balance changes to stop polling
   useEffect(() => {
@@ -144,10 +97,6 @@ export const useTransactionProgress = (
     }
 
     if (creditBalance !== pollingRef.current.initialBalance) {
-      console.log("Credit balance updated successfully", {
-        previousBalance: pollingRef.current.initialBalance,
-        newBalance: creditBalance
-      });
       setIsAwaitingCreditUpdate(false);
       clearInterval(pollingRef.current.intervalId);
       pollingRef.current.intervalId = undefined;
@@ -163,10 +112,18 @@ export const useTransactionProgress = (
   };
 
   const minimizeTransaction = () => {
-    setOpen("");
     if (!showTransaction) return;
-    // You can add additional logic here if needed
-    setShowTransaction(undefined);
+    
+    setOpen("");
+    
+    // Show transaction progress toast when dialog is minimized and transaction is still active
+    if (showTransaction.status !== "completed") {
+      // Dismiss any existing toasts first to prevent duplicates
+      toast.dismiss();
+      transactionProgress({ transaction: showTransaction });
+    } else {
+      setShowTransaction(undefined);
+    }
   };
 
   return {

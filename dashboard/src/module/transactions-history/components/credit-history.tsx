@@ -1,6 +1,7 @@
 "use client";
 import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
+import { useConfig } from "@/providers/ConfigProvider";
 import HistoryService from "@/services/history";
 import { CreditRequest } from "@/services/history/response";
 import { SignInButton } from "@clerk/nextjs";
@@ -21,6 +22,7 @@ const CreditHistory = () => {
   const [loading, setLoading] = useState(true);
   const { setMainTabSelected } = useOverview();
   const { isAuthenticated, isLoggedOut, token } = useAuthState();
+  const { transactionStatusList } = useConfig();
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -30,6 +32,28 @@ const CreditHistory = () => {
       setLoading(false);
     }
   }, [isAuthenticated, token, isLoggedOut]);
+
+  // Refresh history when transactions update to get latest status
+  useEffect(() => {
+    if (isAuthenticated && token && transactionStatusList.length > 0) {
+      const hasActiveTransactions = transactionStatusList.some(tx => 
+        tx.status === "broadcast" || tx.status === "inblock" || tx.status === "finality"
+      );
+      
+      const hasCompletedTransactions = transactionStatusList.some(tx => 
+        tx.status === "completed"
+      );
+      
+      if (hasActiveTransactions || hasCompletedTransactions) {
+        // Debounce the refresh to avoid too many API calls
+        const timeoutId = setTimeout(() => {
+          fetchHistory();
+        }, hasCompletedTransactions ? 500 : 1000); // Faster refresh for completed transactions
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [transactionStatusList, isAuthenticated, token]);
 
   const fetchHistory = async () => {
     if (!token) return;
@@ -79,8 +103,45 @@ const CreditHistory = () => {
     };
   }, []);
 
+  // Helper function to check if a transaction is currently in process
+  const isTransactionInProcess = useCallback((historyItem: CreditRequest) => {
+    if (!transactionStatusList || transactionStatusList.length === 0) return false;
+    
+    
+    return transactionStatusList.some(activeTx => {
+      // Skip completed transactions - they should show real server status
+      if (activeTx.status === "completed") {
+        return false;
+      }
+      
+      // Only match truly active transactions
+      const isActiveStatus = activeTx.status === "broadcast" || activeTx.status === "inblock" || activeTx.status === "finality";
+      if (!isActiveStatus) {
+        return false;
+      }
+      
+      // Primary matching: by order ID (history.id matches activeTx.orderId)
+      if (historyItem.id && activeTx.orderId && Number(historyItem.id) === Number(activeTx.orderId)) {
+        return true;
+      }
+      
+      // Secondary matching: by transaction hash (first 5 chars) if both have hashes
+      if (historyItem.tx_hash && activeTx.txnHash && 
+          historyItem.tx_hash.length > 5 && activeTx.txnHash.length > 5) {
+        const historyHashFirst5 = historyItem.tx_hash.slice(0, 5);
+        const activeHashFirst5 = activeTx.txnHash.slice(0, 5);
+        
+        if (historyHashFirst5 === activeHashFirst5) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
+  }, [transactionStatusList]);
+
   const displayValues = useCallback(
-    (heading: string, value: any) => {
+    (heading: string, value: any, rowData?: any) => {
       switch (heading) {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
@@ -122,6 +183,11 @@ const CreditHistory = () => {
           }
           return "-";
         case "request_status":
+          // Check if this transaction is currently in process
+          if (rowData && isTransactionInProcess(rowData)) {
+            return <span style={{ fontStyle: 'italic' }}>in process</span>;
+          }
+          
           let labelStatus: "pending" | "complete" | "cancelled";
           switch (value?.toUpperCase()) {
             case "COMPLETED":
@@ -147,7 +213,7 @@ const CreditHistory = () => {
           return value ?? "-";
       }
     },
-    [getChainInfo],
+    [getChainInfo, isTransactionInProcess],
   );
 
   return (
@@ -195,7 +261,7 @@ const CreditHistory = () => {
             { key: "amount_credit", label: "Credit Received" },
           ]}
           listdata={historyList}
-          renderCell={(heading: string, value: any, last: boolean) => (
+          renderCell={(heading: string, value: any, last: boolean, rowData?: any) => (
             <div
               className={cn(
                 "flex",
@@ -220,7 +286,7 @@ const CreditHistory = () => {
                     : "p"
                 }
               >
-                {displayValues(heading, value)}
+                {displayValues(heading, value, rowData)}
               </Text>
             </div>
           )}

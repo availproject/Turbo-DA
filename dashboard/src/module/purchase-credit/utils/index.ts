@@ -82,28 +82,23 @@ export async function batchTransferAndRemark(
         account.address,
         options as any,
         (result: SubmittableResult) => {
-          console.log(`Tx status: ${result.status}`);
-
           // Emit broadcast event when transaction is broadcast
           if (result.status.isBroadcast) {
             const txHash = result.txHash.toString();
-            console.log(`Transaction broadcast: ${txHash}`);
+            clearTimeout(timeout);
             onBroadcast?.(txHash);
           }
 
           // Emit inblock event when transaction is in block
           if (result.status.isInBlock) {
             const blockHash = result.status.asInBlock?.toString();
-            console.log(`Transaction in block detected: ${blockHash}`);
             onInBlock?.(result.txHash.toString(), blockHash || "");
           }
 
           if (result.isFinalized || result.isError) {
             clearTimeout(timeout);
-            // Emit finalized event when transaction is finalized
             if (result.isFinalized) {
               const txHash = result.txHash.toString();
-              console.log(`Transaction finalized: ${txHash}`);
               onFinalized?.(txHash);
             }
             resolve(result);
@@ -139,7 +134,6 @@ export async function batchTransferAndRemark(
       txIndex: txResult.txIndex,
     });
   } catch (error) {
-    console.error("Error during batch transfer and remark:", error);
     return err(
       error instanceof Error
         ? error

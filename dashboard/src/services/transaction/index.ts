@@ -21,6 +21,7 @@ export class TransactionService {
     token: string;
   }): Promise<TransactionResult> {
     try {
+      
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
         {
@@ -36,10 +37,13 @@ export class TransactionService {
         }
       );
 
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`API call failed: ${response.status} - ${errorText}`);
       }
+
+      const responseData = await response.json();
 
       return { success: true };
     } catch (error) {
@@ -53,11 +57,13 @@ export class TransactionService {
     orderId,
     token,
     chainType,
+    onSuccess,
   }: {
     txnHash: `0x${string}`;
     orderId: number;
     token: string;
     chainType: "avail" | "ethereum" | "base";
+    onSuccess?: () => void;
   }): Promise<TransactionResult> {
     try {
       const isAvailTransaction = chainType === "avail";
@@ -71,10 +77,17 @@ export class TransactionService {
           hash: txnHash,
         });
 
-        if (receipt.status === "success") {
-          return await this.postInclusionDetails({ orderId, txnHash, token });
+
+
+        // Call inclusion API regardless of receipt status - let backend handle it
+        const result = await this.postInclusionDetails({ orderId, txnHash, token });
+        
+        
+        if (result.success) {
+          onSuccess?.(); // Trigger the 2-second UI timer
+          return result;
         } else {
-          return { success: false, error: "Transaction failed" };
+          return result;
         }
       }
     } catch (error) {
