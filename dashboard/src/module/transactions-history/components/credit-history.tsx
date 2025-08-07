@@ -24,38 +24,7 @@ const CreditHistory = () => {
   const { isAuthenticated, isLoggedOut, token } = useAuthState();
   const { transactionStatusList } = useConfig();
 
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchHistory();
-    } else if (isLoggedOut) {
-      setHistoryList([]);
-      setLoading(false);
-    }
-  }, [isAuthenticated, token, isLoggedOut]);
-
-  // Refresh history when transactions update to get latest status
-  useEffect(() => {
-    if (isAuthenticated && token && transactionStatusList.length > 0) {
-      const hasActiveTransactions = transactionStatusList.some(tx => 
-        tx.status === "broadcast" || tx.status === "inblock" || tx.status === "finality"
-      );
-      
-      const hasCompletedTransactions = transactionStatusList.some(tx => 
-        tx.status === "completed"
-      );
-      
-      if (hasActiveTransactions || hasCompletedTransactions) {
-        // Debounce the refresh to avoid too many API calls
-        const timeoutId = setTimeout(() => {
-          fetchHistory();
-        }, hasCompletedTransactions ? 500 : 1000); // Faster refresh for completed transactions
-        
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [transactionStatusList, isAuthenticated, token]);
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -66,7 +35,7 @@ const CreditHistory = () => {
       const sortedData = (response?.data ?? [])
         .sort(
           (a: CreditRequest, b: CreditRequest) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
         .map((item: CreditRequest) => ({
           ...item,
@@ -79,13 +48,72 @@ const CreditHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchHistory();
+    } else if (isLoggedOut) {
+      setHistoryList([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, token, isLoggedOut, fetchHistory]);
+
+  // Refresh history when transactions update to get latest status
+  useEffect(() => {
+    if (isAuthenticated && token && transactionStatusList.length > 0) {
+      const hasActiveTransactions = transactionStatusList.some(
+        (tx) =>
+          tx.status === "broadcast" ||
+          tx.status === "inblock" ||
+          tx.status === "finality"
+      );
+
+      const hasCompletedTransactions = transactionStatusList.some(
+        (tx) => tx.status === "completed"
+      );
+
+      if (hasActiveTransactions || hasCompletedTransactions) {
+        // Debounce the refresh to avoid too many API calls
+        const timeoutId = setTimeout(
+          () => {
+            fetchHistory();
+          },
+          hasCompletedTransactions ? 500 : 1000
+        ); // Faster refresh for completed transactions
+
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [transactionStatusList, isAuthenticated, token, fetchHistory]);
+
+  // Listen for transaction completion events to trigger immediate refresh
+  useEffect(() => {
+    const handleTransactionCompleted = () => {
+      if (isAuthenticated && token) {
+        // Immediate refresh since backend is fast
+        fetchHistory();
+      }
+    };
+
+    window.addEventListener(
+      "transaction-completed",
+      handleTransactionCompleted
+    );
+
+    return () => {
+      window.removeEventListener(
+        "transaction-completed",
+        handleTransactionCompleted
+      );
+    };
+  }, [isAuthenticated, token, fetchHistory]);
 
   // Helper function to get chain info from supportedTokensAndChains
   const getChainInfo = useCallback((chainId: number) => {
     // Find the chain by ID in supportedTokensAndChains
     for (const [chainKey, chainData] of Object.entries(
-      supportedTokensAndChains,
+      supportedTokensAndChains
     )) {
       if (chainData.id === chainId) {
         return {
@@ -104,41 +132,55 @@ const CreditHistory = () => {
   }, []);
 
   // Helper function to check if a transaction is currently in process
-  const isTransactionInProcess = useCallback((historyItem: CreditRequest) => {
-    if (!transactionStatusList || transactionStatusList.length === 0) return false;
-    
-    
-    return transactionStatusList.some(activeTx => {
-      // Skip completed transactions - they should show real server status
-      if (activeTx.status === "completed") {
+  const isTransactionInProcess = useCallback(
+    (historyItem: CreditRequest) => {
+      if (!transactionStatusList || transactionStatusList.length === 0)
         return false;
-      }
-      
-      // Only match truly active transactions
-      const isActiveStatus = activeTx.status === "broadcast" || activeTx.status === "inblock" || activeTx.status === "finality";
-      if (!isActiveStatus) {
-        return false;
-      }
-      
-      // Primary matching: by order ID (history.id matches activeTx.orderId)
-      if (historyItem.id && activeTx.orderId && Number(historyItem.id) === Number(activeTx.orderId)) {
-        return true;
-      }
-      
-      // Secondary matching: by transaction hash (first 5 chars) if both have hashes
-      if (historyItem.tx_hash && activeTx.txnHash && 
-          historyItem.tx_hash.length > 5 && activeTx.txnHash.length > 5) {
-        const historyHashFirst5 = historyItem.tx_hash.slice(0, 5);
-        const activeHashFirst5 = activeTx.txnHash.slice(0, 5);
-        
-        if (historyHashFirst5 === activeHashFirst5) {
+
+      return transactionStatusList.some((activeTx) => {
+        // Skip completed transactions - they should show real server status
+        if (activeTx.status === "completed") {
+          return false;
+        }
+
+        // Only match truly active transactions
+        const isActiveStatus =
+          activeTx.status === "broadcast" ||
+          activeTx.status === "inblock" ||
+          activeTx.status === "finality";
+        if (!isActiveStatus) {
+          return false;
+        }
+
+        // Primary matching: by order ID (history.id matches activeTx.orderId)
+        if (
+          historyItem.id &&
+          activeTx.orderId &&
+          Number(historyItem.id) === Number(activeTx.orderId)
+        ) {
           return true;
         }
-      }
-      
-      return false;
-    });
-  }, [transactionStatusList]);
+
+        // Secondary matching: by transaction hash (first 5 chars) if both have hashes
+        if (
+          historyItem.tx_hash &&
+          activeTx.txnHash &&
+          historyItem.tx_hash.length > 5 &&
+          activeTx.txnHash.length > 5
+        ) {
+          const historyHashFirst5 = historyItem.tx_hash.slice(0, 5);
+          const activeHashFirst5 = activeTx.txnHash.slice(0, 5);
+
+          if (historyHashFirst5 === activeHashFirst5) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    },
+    [transactionStatusList]
+  );
 
   const displayValues = useCallback(
     (heading: string, value: any, rowData?: any) => {
@@ -185,9 +227,9 @@ const CreditHistory = () => {
         case "request_status":
           // Check if this transaction is currently in process
           if (rowData && isTransactionInProcess(rowData)) {
-            return <span style={{ fontStyle: 'italic' }}>in process</span>;
+            return <span style={{ fontStyle: "italic" }}>in process</span>;
           }
-          
+
           let labelStatus: "pending" | "complete" | "cancelled";
           switch (value?.toUpperCase()) {
             case "COMPLETED":
@@ -213,7 +255,7 @@ const CreditHistory = () => {
           return value ?? "-";
       }
     },
-    [getChainInfo, isTransactionInProcess],
+    [getChainInfo, isTransactionInProcess]
   );
 
   return (
@@ -261,11 +303,16 @@ const CreditHistory = () => {
             { key: "amount_credit", label: "Credit Received" },
           ]}
           listdata={historyList}
-          renderCell={(heading: string, value: any, last: boolean, rowData?: any) => (
+          renderCell={(
+            heading: string,
+            value: any,
+            last: boolean,
+            rowData?: any
+          ) => (
             <div
               className={cn(
                 "flex",
-                last ? "w-[180px] justify-end" : "w-[150px]",
+                last ? "w-[180px] justify-end" : "w-[150px]"
               )}
             >
               <Text
@@ -275,7 +322,7 @@ const CreditHistory = () => {
                   "py-3 px-4 break-words",
                   !last && "text-right",
                   heading === "amount_credit" &&
-                    "whitespace-nowrap overflow-hidden text-ellipsis",
+                    "whitespace-nowrap overflow-hidden text-ellipsis"
                 )}
                 variant={heading === "request_type" ? "green" : "white"}
                 as={

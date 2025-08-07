@@ -156,44 +156,44 @@ const BuyButton = ({
                       }
                     : t
                 );
-                
-                
+
                 return updated;
               });
-              
+
               const finalizedTransaction = {
                 ...currentTransaction,
                 status: "finality" as const,
                 txnHash: txHash as `0x${string}`,
               };
-              
+
               setShowTransaction(finalizedTransaction);
-              
+
               const completionTimeoutId = setTimeout(() => {
-                const completedTransaction = { ...currentTransaction!, status: "completed" as const };
-                
+                const completedTransaction = {
+                  ...currentTransaction!,
+                  status: "completed" as const,
+                };
+
                 setTransactionStatusList((prev) => {
                   const updated = prev.map((t) =>
-                    t.id === currentTransaction!.id
-                      ? completedTransaction
-                      : t
+                    t.id === currentTransaction!.id ? completedTransaction : t
                   );
                   return updated;
                 });
-                
+
                 setShowTransaction(completedTransaction);
-                
+
                 const cleanupTimeoutId = setTimeout(() => {
-                  setTransactionStatusList((prev) => 
-                    prev.filter(t => t.id !== currentTransaction!.id)
+                  setTransactionStatusList((prev) =>
+                    prev.filter((t) => t.id !== currentTransaction!.id)
                   );
                   setShowTransaction(undefined);
                   setOpen("");
                 }, 4000);
-                
+
                 return () => clearTimeout(cleanupTimeoutId);
               }, 2000);
-              
+
               return () => clearTimeout(completionTimeoutId);
             }
           },
@@ -253,7 +253,7 @@ const BuyButton = ({
                 | "ethereum"
                 | "base",
             };
-            
+
             setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
             setShowTransaction(transaction);
             setOpen("credit-transaction");
@@ -268,7 +268,7 @@ const BuyButton = ({
                 );
                 return updated;
               });
-              
+
               // Always update showTransaction for this specific transaction
               setShowTransaction((prevShow) => {
                 if (prevShow && prevShow.id === transaction.id) {
@@ -284,7 +284,9 @@ const BuyButton = ({
               txnHash,
               orderId: orderResponse.data.id as number,
               token: token!,
-              chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+              chainType: selectedChain.name.toLowerCase() as
+                | "ethereum"
+                | "base",
               onSuccess: () => {
                 // Update transaction to finality status to trigger 2-second UI timer
                 setTimeout(() => {
@@ -296,16 +298,19 @@ const BuyButton = ({
                     );
                     return updated;
                   });
-                  
+
                   // Always update showTransaction for this specific transaction
                   setShowTransaction((prevShow) => {
                     if (prevShow && prevShow.id === transaction.id) {
-                      const updated = { ...prevShow, status: "finality" as const };
+                      const updated = {
+                        ...prevShow,
+                        status: "finality" as const,
+                      };
                       return updated;
                     }
                     return prevShow;
                   });
-                  
+
                   setTimeout(() => {
                     setTransactionStatusList((prev) => {
                       const updated = prev.map((t) =>
@@ -315,25 +320,28 @@ const BuyButton = ({
                       );
                       return updated;
                     });
-                    
+
                     setShowTransaction((prevShow) => {
                       if (prevShow && prevShow.id === transaction.id) {
-                        const completedTx = { ...prevShow, status: "completed" as const };
+                        const completedTx = {
+                          ...prevShow,
+                          status: "completed" as const,
+                        };
                         return completedTx;
                       }
                       return prevShow;
                     });
-                    
+
                     setTimeout(() => {
-                      setTransactionStatusList((prev) => 
-                        prev.filter(t => t.id !== transaction.id)
+                      setTransactionStatusList((prev) =>
+                        prev.filter((t) => t.id !== transaction.id)
                       );
                       setShowTransaction(undefined);
                       setOpen("");
                     }, 4000);
                   }, 2000);
                 }, 2000);
-              }
+              },
             });
 
             onTokenAmountClear?.();
@@ -381,7 +389,7 @@ const BuyButton = ({
                     | "ethereum"
                     | "base",
                 };
-                
+
                 setTransactionStatusList((prev) => [
                   ...(prev ?? []),
                   transaction,
@@ -399,11 +407,14 @@ const BuyButton = ({
                     );
                     return updated;
                   });
-                  
+
                   // Always update showTransaction for this specific transaction
                   setShowTransaction((prevShow) => {
                     if (prevShow && prevShow.id === transaction.id) {
-                      const updated = { ...prevShow, status: "inblock" as const };
+                      const updated = {
+                        ...prevShow,
+                        status: "inblock" as const,
+                      };
                       return updated;
                     }
                     return prevShow;
@@ -415,7 +426,9 @@ const BuyButton = ({
                   txnHash,
                   orderId: orderResponse.data.id as number,
                   token: token!,
-                  chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
+                  chainType: selectedChain.name.toLowerCase() as
+                    | "ethereum"
+                    | "base",
                   onSuccess: () => {
                     // Update transaction to finality status to trigger 2-second UI timer
                     setTimeout(() => {
@@ -427,16 +440,19 @@ const BuyButton = ({
                         );
                         return updated;
                       });
-                      
+
                       // Always update showTransaction for this specific transaction
                       setShowTransaction((prevShow) => {
                         if (prevShow && prevShow.id === transaction.id) {
-                          const updated = { ...prevShow, status: "finality" as const };
+                          const updated = {
+                            ...prevShow,
+                            status: "finality" as const,
+                          };
                           return updated;
                         }
                         return prevShow;
                       });
-                      
+
                       setTimeout(() => {
                         setTransactionStatusList((prev) => {
                           const updated = prev.map((t) =>
@@ -446,25 +462,28 @@ const BuyButton = ({
                           );
                           return updated;
                         });
-                        
+
                         setShowTransaction((prevShow) => {
                           if (prevShow && prevShow.id === transaction.id) {
-                            const completedTx = { ...prevShow, status: "completed" as const };
+                            const completedTx = {
+                              ...prevShow,
+                              status: "completed" as const,
+                            };
                             return completedTx;
                           }
                           return prevShow;
                         });
-                        
+
                         setTimeout(() => {
-                          setTransactionStatusList((prev) => 
-                            prev.filter(t => t.id !== transaction.id)
+                          setTransactionStatusList((prev) =>
+                            prev.filter((t) => t.id !== transaction.id)
                           );
                           setShowTransaction(undefined);
                           setOpen("");
                         }, 4000);
                       }, 2000);
                     }, 2000);
-                  }
+                  },
                 });
 
                 onTokenAmountClear?.();

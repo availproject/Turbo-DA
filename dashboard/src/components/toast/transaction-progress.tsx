@@ -1,10 +1,7 @@
 import { APP_TABS, cn } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
-import {
-  Maximize2,
-  SquareArrowOutUpRight,
-} from "lucide-react";
+import { Maximize2, SquareArrowOutUpRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -12,7 +9,10 @@ import { useAccount } from "wagmi";
 import Button from "../button";
 import { useDialog } from "../dialog/provider";
 import { Text } from "../text";
-import { TRANSACTION_ACTIONS, TRANSACTION_MESSAGES } from "@/constants/transaction";
+import {
+  TRANSACTION_ACTIONS,
+  TRANSACTION_MESSAGES,
+} from "@/constants/transaction";
 import { getExplorerUrl } from "@/utils/explorer";
 import { ProgressBar } from "../transaction-progress/progress-bar";
 
@@ -33,8 +33,10 @@ const TransactionProgress = ({
 
   // Sync displayTransaction with global transaction state
   useEffect(() => {
-    const updatedTransaction = transactionStatusList.find(t => t.id === transaction.id);
-    
+    const updatedTransaction = transactionStatusList.find(
+      (t) => t.id === transaction.id
+    );
+
     if (updatedTransaction) {
       setDisplayTransaction(updatedTransaction);
     }
@@ -44,12 +46,17 @@ const TransactionProgress = ({
   useEffect(() => {
     if (displayTransaction?.status === "completed") {
       const timer = setTimeout(() => {
+        // Trigger refresh when toast is dismissed
+        window.dispatchEvent(
+          new CustomEvent("transaction-completed", {
+            detail: { transactionId: displayTransaction.id },
+          })
+        );
         toast.dismiss();
       }, 2000);
       return () => clearTimeout(timer);
     }
   }, [displayTransaction?.status]);
-
 
   const handleExpandClick = () => {
     setMainTabSelected(APP_TABS.OVERVIEW);
@@ -119,7 +126,6 @@ const TransactionProgress = ({
       <Text weight="medium" variant="secondary-grey" size="sm">
         {getDescriptionMessage()}
       </Text>
-
 
       {/* Action buttons */}
       {displayTransaction.status !== "broadcast" && (
