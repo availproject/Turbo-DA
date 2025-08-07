@@ -123,7 +123,10 @@ const CreditsTransactionProgress = () => {
                   </Link>
                   <Button
                     variant="secondary"
-                    onClick={() => setMainTabSelected(APP_TABS.HISTORY)}
+                    onClick={() => {
+                      setMainTabSelected(APP_TABS.HISTORY);
+                      minimizeTransaction();
+                    }}
                   >
                     <Text weight="semibold">
                       {TRANSACTION_ACTIONS.VIEW_HISTORY}
