@@ -7,6 +7,8 @@ import { supportedTokensAndChains } from "@/lib/types";
 import { numberToBytes32 } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useSwitchChain } from "wagmi";
+import { useOverview } from "@/providers/OverviewProvider";
+import useBalance from "@/hooks/useBalance";
 
 import { writeContract } from "@wagmi/core";
 import {
@@ -67,6 +69,65 @@ const BuyButton = ({
     setShowTransaction,
   } = useConfig();
   const { switchChainAsync } = useSwitchChain();
+  const { creditBalance, setIsAwaitingCreditUpdate } = useOverview();
+  const { updateCreditBalance } = useBalance();
+
+  const startCreditBalancePolling = (initialBalance: number) => {
+    console.log("BALANCE POLLING: Starting credit balance polling");
+    console.log("BALANCE POLLING: Initial balance is", initialBalance);
+    setIsAwaitingCreditUpdate(true);
+    let pollCount = 0;
+    let intervalId: NodeJS.Timeout;
+    const maxPolls = 24; // Poll for 2 minutes (every 5 seconds)
+    
+    const checkBalanceUpdate = async () => {
+      pollCount++;
+      console.log(`BALANCE POLLING: Poll attempt ${pollCount}/${maxPolls}`);
+      
+      try {
+        const previousBalance = creditBalance;
+        await updateCreditBalance();
+        console.log("BALANCE POLLING: Balance update call completed");
+        
+        // Need to wait a bit for state to update, then check the new balance
+        setTimeout(() => {
+          console.log("BALANCE POLLING: Previous balance:", previousBalance, "Current balance:", creditBalance, "Initial balance:", initialBalance);
+          
+          // Check if balance has changed from initial balance
+          if (creditBalance !== initialBalance && creditBalance > initialBalance) {
+            console.log("BALANCE POLLING: Balance increased! Stopping polling");
+            clearInterval(intervalId);
+            setIsAwaitingCreditUpdate(false);
+            return;
+          }
+          
+          if (pollCount >= maxPolls) {
+            console.log("BALANCE POLLING: Max polls reached, stopping polling");
+            clearInterval(intervalId);
+            setIsAwaitingCreditUpdate(false);
+          }
+        }, 100); // Small delay to let state update
+        
+      } catch (error) {
+        console.log("BALANCE POLLING: Balance update failed", error);
+      }
+    };
+    
+    intervalId = setInterval(checkBalanceUpdate, 5000);
+    
+    // Initial check after 2 seconds
+    setTimeout(() => {
+      console.log("BALANCE POLLING: Running initial balance check");
+      checkBalanceUpdate();
+    }, 2000);
+    
+    // Stop polling after 2 minutes
+    setTimeout(() => {
+      console.log("BALANCE POLLING: Timeout reached, clearing interval");
+      clearInterval(intervalId);
+      setIsAwaitingCreditUpdate(false);
+    }, 120000);
+  };
 
   const handleBuyCredits = async ({ isAvail }: { isAvail: boolean }) => {
     if (!tokenAmount) return;
@@ -74,6 +135,10 @@ const BuyButton = ({
     try {
       setLoading(true);
       onBuyStart?.();
+      
+      // Capture initial balance at transaction start
+      const initialTransactionBalance = creditBalance;
+      console.log("TRANSACTION: Initial balance captured:", initialTransactionBalance);
 
       if (!isAvail && selectedChain.id !== 0) {
         try {
@@ -182,6 +247,9 @@ const BuyButton = ({
                 });
 
                 setShowTransaction(completedTransaction);
+                
+                // Start credit balance polling to show the warning message
+                startCreditBalancePolling(initialTransactionBalance);
 
                 const cleanupTimeoutId = setTimeout(() => {
                   setTransactionStatusList((prev) =>
@@ -332,6 +400,9 @@ const BuyButton = ({
                       return prevShow;
                     });
 
+                    // Start credit balance polling to show the warning message
+                    startCreditBalancePolling(initialTransactionBalance);
+
                     setTimeout(() => {
                       setTransactionStatusList((prev) =>
                         prev.filter((t) => t.id !== transaction.id)
@@ -473,6 +544,9 @@ const BuyButton = ({
                           }
                           return prevShow;
                         });
+
+                        // Start credit balance polling to show the warning message
+                        startCreditBalancePolling(initialTransactionBalance);
 
                         setTimeout(() => {
                           setTransactionStatusList((prev) =>

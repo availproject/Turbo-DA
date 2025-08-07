@@ -106,6 +106,7 @@ const CreditBalance = () => {
         </div>
       </div>
 
+{/* Temporarily disabled banner for testing
       {isAwaitingCreditUpdate && (
         <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
           <div className="flex items-center gap-x-2">
@@ -116,6 +117,7 @@ const CreditBalance = () => {
           </div>
         </div>
       )}
+      */}
 
       <DiscountEligibility />
     </>
