@@ -79,48 +79,57 @@ const BuyButton = ({
     let pollCount = 0;
     let intervalId: NodeJS.Timeout;
     const maxPolls = 24; // Poll for 2 minutes (every 5 seconds)
-    
+
     const checkBalanceUpdate = async () => {
       pollCount++;
       console.log(`BALANCE POLLING: Poll attempt ${pollCount}/${maxPolls}`);
-      
+
       try {
         const previousBalance = creditBalance;
         await updateCreditBalance();
         console.log("BALANCE POLLING: Balance update call completed");
-        
+
         // Need to wait a bit for state to update, then check the new balance
         setTimeout(() => {
-          console.log("BALANCE POLLING: Previous balance:", previousBalance, "Current balance:", creditBalance, "Initial balance:", initialBalance);
-          
+          console.log(
+            "BALANCE POLLING: Previous balance:",
+            previousBalance,
+            "Current balance:",
+            creditBalance,
+            "Initial balance:",
+            initialBalance,
+          );
+
           // Check if balance has changed from initial balance
-          if (creditBalance !== initialBalance && creditBalance > initialBalance) {
+          if (
+            creditBalance !== initialBalance &&
+            creditBalance > initialBalance
+          ) {
             console.log("BALANCE POLLING: Balance increased! Stopping polling");
             clearInterval(intervalId);
             setIsAwaitingCreditUpdate(false);
             return;
           }
-          
+
           if (pollCount >= maxPolls) {
             console.log("BALANCE POLLING: Max polls reached, stopping polling");
             clearInterval(intervalId);
             setIsAwaitingCreditUpdate(false);
           }
         }, 100); // Small delay to let state update
-        
       } catch (error) {
         console.log("BALANCE POLLING: Balance update failed", error);
       }
     };
-    
+
     intervalId = setInterval(checkBalanceUpdate, 5000);
-    
+
     // Initial check after 2 seconds
     setTimeout(() => {
       console.log("BALANCE POLLING: Running initial balance check");
       checkBalanceUpdate();
     }, 2000);
-    
+
     // Stop polling after 2 minutes
     setTimeout(() => {
       console.log("BALANCE POLLING: Timeout reached, clearing interval");
@@ -135,10 +144,13 @@ const BuyButton = ({
     try {
       setLoading(true);
       onBuyStart?.();
-      
+
       // Capture initial balance at transaction start
       const initialTransactionBalance = creditBalance;
-      console.log("TRANSACTION: Initial balance captured:", initialTransactionBalance);
+      console.log(
+        "TRANSACTION: Initial balance captured:",
+        initialTransactionBalance,
+      );
 
       if (!isAvail && selectedChain.id !== 0) {
         try {
@@ -197,8 +209,8 @@ const BuyButton = ({
                         txnHash: txHash as `0x${string}`,
                         blockhash: blockHash as `0x${string}`,
                       }
-                    : t
-                )
+                    : t,
+                ),
               );
               setShowTransaction({
                 ...currentTransaction,
@@ -219,7 +231,7 @@ const BuyButton = ({
                         status: "finality" as const,
                         txnHash: txHash as `0x${string}`,
                       }
-                    : t
+                    : t,
                 );
 
                 return updated;
@@ -241,19 +253,19 @@ const BuyButton = ({
 
                 setTransactionStatusList((prev) => {
                   const updated = prev.map((t) =>
-                    t.id === currentTransaction!.id ? completedTransaction : t
+                    t.id === currentTransaction!.id ? completedTransaction : t,
                   );
                   return updated;
                 });
 
                 setShowTransaction(completedTransaction);
-                
+
                 // Start credit balance polling to show the warning message
                 startCreditBalancePolling(initialTransactionBalance);
 
                 const cleanupTimeoutId = setTimeout(() => {
                   setTransactionStatusList((prev) =>
-                    prev.filter((t) => t.id !== currentTransaction!.id)
+                    prev.filter((t) => t.id !== currentTransaction!.id),
                   );
                   setShowTransaction(undefined);
                   setOpen("");
@@ -282,7 +294,7 @@ const BuyButton = ({
             ]);
             setShowTransaction(currentTransaction);
             setOpen("credit-transaction");
-          }
+          },
         );
 
         if (txn.isOk()) {
@@ -332,7 +344,7 @@ const BuyButton = ({
                 const updated = prev.map((t) =>
                   t.id === transaction.id
                     ? { ...t, status: "inblock" as const }
-                    : t
+                    : t,
                 );
                 return updated;
               });
@@ -362,7 +374,7 @@ const BuyButton = ({
                     const updated = prev.map((t) =>
                       t.id === transaction.id
                         ? { ...t, status: "finality" as const }
-                        : t
+                        : t,
                     );
                     return updated;
                   });
@@ -384,7 +396,7 @@ const BuyButton = ({
                       const updated = prev.map((t) =>
                         t.id === transaction.id
                           ? { ...t, status: "completed" as const }
-                          : t
+                          : t,
                       );
                       return updated;
                     });
@@ -405,7 +417,7 @@ const BuyButton = ({
 
                     setTimeout(() => {
                       setTransactionStatusList((prev) =>
-                        prev.filter((t) => t.id !== transaction.id)
+                        prev.filter((t) => t.id !== transaction.id),
                       );
                       setShowTransaction(undefined);
                       setOpen("");
@@ -474,7 +486,7 @@ const BuyButton = ({
                     const updated = prev.map((t) =>
                       t.id === transaction.id
                         ? { ...t, status: "inblock" as const }
-                        : t
+                        : t,
                     );
                     return updated;
                   });
@@ -507,7 +519,7 @@ const BuyButton = ({
                         const updated = prev.map((t) =>
                           t.id === transaction.id
                             ? { ...t, status: "finality" as const }
-                            : t
+                            : t,
                         );
                         return updated;
                       });
@@ -529,7 +541,7 @@ const BuyButton = ({
                           const updated = prev.map((t) =>
                             t.id === transaction.id
                               ? { ...t, status: "completed" as const }
-                              : t
+                              : t,
                           );
                           return updated;
                         });
@@ -550,7 +562,7 @@ const BuyButton = ({
 
                         setTimeout(() => {
                           setTransactionStatusList((prev) =>
-                            prev.filter((t) => t.id !== transaction.id)
+                            prev.filter((t) => t.id !== transaction.id),
                           );
                           setShowTransaction(undefined);
                           setOpen("");
@@ -579,6 +591,7 @@ const BuyButton = ({
           });
       }
     } catch (error) {
+      console.error("BUY FAILED", error);
       const errorMessage = ErrorHandlingUtils.getErrorMessage(error);
       errorToast?.({ label: errorMessage });
       setLoading(false);
