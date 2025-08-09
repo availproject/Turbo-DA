@@ -21,7 +21,6 @@ export class TransactionService {
     token: string;
   }): Promise<TransactionResult> {
     try {
-      
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/user/add_inclusion_details`,
         {
@@ -36,7 +35,6 @@ export class TransactionService {
           }),
         }
       );
-
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -77,12 +75,13 @@ export class TransactionService {
           hash: txnHash,
         });
 
-
-
         // Call inclusion API regardless of receipt status - let backend handle it
-        const result = await this.postInclusionDetails({ orderId, txnHash, token });
-        
-        
+        const result = await this.postInclusionDetails({
+          orderId,
+          txnHash,
+          token,
+        });
+
         if (result.success) {
           onSuccess?.(); // Trigger the 2-second UI timer
           return result;

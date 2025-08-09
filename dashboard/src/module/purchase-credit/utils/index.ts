@@ -32,7 +32,7 @@ export const postOrder = async ({
       body: JSON.stringify({
         chain: chainId,
       }),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -49,28 +49,61 @@ export async function batchTransferAndRemark(
   remarkMessage: string,
   onInBlock?: (txHash: string, blockHash: string) => void,
   onFinalized?: (txHash: string) => void,
-  onBroadcast?: (txHash: string) => void,
+  onBroadcast?: (txHash: string) => void
 ): Promise<Result<any, Error>> {
   try {
     const wallets = getWallets();
-    const matchedWallet = wallets.find((wallet) => {
-      return wallet.title === wallet?.title;
+    console.log("AVAIL_SIGN: Selected account", {
+      address: account?.address,
+      source: account?.source,
+    });
+    console.log(
+      "AVAIL_SIGN: Available wallets",
+      wallets.map((w) => ({
+        title: w?.title,
+        source: (w as any)?.extensionName || (w as any)?.metadata?.source,
+      }))
+    );
+
+    // Enable wallet matching the selected account source
+    const injector = getWalletBySource(account.source);
+    console.log("AVAIL_SIGN: Injector lookup pre-enable", {
+      source: account?.source,
+      hasInjector: Boolean(injector),
     });
 
-    await matchedWallet!.enable("turbo-da");
-    const injector = getWalletBySource(account.source);
+    if (!injector) {
+      throw new Error(`No wallet injector found for source: ${account.source}`);
+    }
+
+    console.log("AVAIL_SIGN: Enabling selected wallet injector...");
+    await (injector as any).enable?.("turbo-da");
+    console.log("AVAIL_SIGN: Selected wallet enabled");
+
+    console.log("AVAIL_SIGN: Injector lookup post-enable", {
+      hasSigner: Boolean((injector as any)?.signer),
+    });
 
     const options: Partial<LegacySignerOptions> = {
-      signer: injector?.signer as {},
+      signer: (injector as any)?.signer as {},
       app_id: 0,
     };
+    console.log("AVAIL_SIGN: Signer prepared", {
+      hasSigner: Boolean(options.signer),
+    });
 
     const transfer = api.tx.balances.transferKeepAlive(
       process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
-      atomicAmount,
+      atomicAmount
     );
     const remark = api.tx.system.remark(remarkMessage);
     const batchCall = api.tx.utility.batchAll([transfer, remark]);
+
+    console.log("AVAIL_SIGN: Calling signAndSend", {
+      address: account.address,
+      amount: atomicAmount,
+      remark: remarkMessage,
+    });
 
     const txResult = await new Promise<SubmittableResult>((resolve, reject) => {
       // Add timeout to prevent infinite waiting
@@ -78,36 +111,38 @@ export async function batchTransferAndRemark(
         reject(new Error("Transaction timeout - no response from wallet"));
       }, 60000); // 60 seconds timeout
 
-      batchCall.signAndSend(
-        account.address,
-        options as any,
-        (result: SubmittableResult) => {
-          // Emit broadcast event when transaction is broadcast
-          if (result.status.isBroadcast) {
-            const txHash = result.txHash.toString();
-            clearTimeout(timeout);
-            onBroadcast?.(txHash);
-          }
-
-          // Emit inblock event when transaction is in block
-          if (result.status.isInBlock) {
-            const blockHash = result.status.asInBlock?.toString();
-            onInBlock?.(result.txHash.toString(), blockHash || "");
-          }
-
-          if (result.isFinalized || result.isError) {
-            clearTimeout(timeout);
-            if (result.isFinalized) {
+      batchCall
+        .signAndSend(
+          account.address,
+          options as any,
+          (result: SubmittableResult) => {
+            // Emit broadcast event when transaction is broadcast
+            if (result.status.isBroadcast) {
               const txHash = result.txHash.toString();
-              onFinalized?.(txHash);
+              clearTimeout(timeout);
+              onBroadcast?.(txHash);
             }
-            resolve(result);
+
+            // Emit inblock event when transaction is in block
+            if (result.status.isInBlock) {
+              const blockHash = result.status.asInBlock?.toString();
+              onInBlock?.(result.txHash.toString(), blockHash || "");
+            }
+
+            if (result.isFinalized || result.isError) {
+              clearTimeout(timeout);
+              if (result.isFinalized) {
+                const txHash = result.txHash.toString();
+                onFinalized?.(txHash);
+              }
+              resolve(result);
+            }
           }
-        },
-      ).catch((error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
+        )
+        .catch((error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
     });
 
     const error = txResult.dispatchError;
@@ -137,7 +172,7 @@ export async function batchTransferAndRemark(
     return err(
       error instanceof Error
         ? error
-        : new Error("Failed to batch transfer and remark"),
+        : new Error("Failed to batch transfer and remark")
     );
   }
 }
@@ -154,7 +189,7 @@ export async function getTokenBalance(
   address: `0x${string}`,
   api?: ApiPromise,
   tokenAddress?: string,
-  chainId?: number,
+  chainId?: number
 ) {
   if (!validAddress(address, chain))
     throw new Error("Invalid Recipient on base");

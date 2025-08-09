@@ -18,7 +18,7 @@ import {
 } from "avail-wallet-sdk";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle } from "lucide-react";
-import { MouseEvent, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { erc20Abi, parseUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -72,12 +72,40 @@ const BuyButton = ({
   const { creditBalance, setIsAwaitingCreditUpdate } = useOverview();
   const { updateCreditBalance } = useBalance();
 
+  const latestBalanceRef = useRef<number>(creditBalance);
+  const initialBalanceRef = useRef<number | null>(null);
+  const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    console.log("BALANCE POLLING: effect observed creditBalance", {
+      creditBalance,
+      latestRef: latestBalanceRef.current,
+      initialRef: initialBalanceRef.current,
+    });
+    latestBalanceRef.current = creditBalance;
+    if (
+      initialBalanceRef.current !== null &&
+      latestBalanceRef.current > initialBalanceRef.current
+    ) {
+      console.log(
+        "BALANCE POLLING: Detected increase via effect, stopping polling"
+      );
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
+      setIsAwaitingCreditUpdate(false);
+      initialBalanceRef.current = null;
+    }
+  }, [creditBalance, setIsAwaitingCreditUpdate]);
+
   const startCreditBalancePolling = (initialBalance: number) => {
     console.log("BALANCE POLLING: Starting credit balance polling");
     console.log("BALANCE POLLING: Initial balance is", initialBalance);
     setIsAwaitingCreditUpdate(true);
+
+    initialBalanceRef.current = Number(initialBalance);
     let pollCount = 0;
-    let intervalId: NodeJS.Timeout;
     const maxPolls = 24; // Poll for 2 minutes (every 5 seconds)
 
     const checkBalanceUpdate = async () => {
@@ -85,44 +113,50 @@ const BuyButton = ({
       console.log(`BALANCE POLLING: Poll attempt ${pollCount}/${maxPolls}`);
 
       try {
-        const previousBalance = creditBalance;
         await updateCreditBalance();
-        console.log("BALANCE POLLING: Balance update call completed");
 
-        // Need to wait a bit for state to update, then check the new balance
+        // Immediate check after state turn with a short delay to allow context propagation
         setTimeout(() => {
-          console.log(
-            "BALANCE POLLING: Previous balance:",
-            previousBalance,
-            "Current balance:",
-            creditBalance,
-            "Initial balance:",
-            initialBalance,
-          );
-
-          // Check if balance has changed from initial balance
-          if (
-            creditBalance !== initialBalance &&
-            creditBalance > initialBalance
-          ) {
-            console.log("BALANCE POLLING: Balance increased! Stopping polling");
-            clearInterval(intervalId);
+          const latest = Number(latestBalanceRef.current ?? 0);
+          const initial = Number(initialBalanceRef.current ?? 0);
+          console.log("BALANCE POLLING: post-refetch values", {
+            latest,
+            initial,
+          });
+          if (initialBalanceRef.current !== null && latest > initial) {
+            console.log(
+              "BALANCE POLLING: Balance increased (inline check). Stopping."
+            );
+            if (intervalIdRef.current) {
+              clearInterval(intervalIdRef.current);
+              intervalIdRef.current = null;
+            }
             setIsAwaitingCreditUpdate(false);
+            initialBalanceRef.current = null;
             return;
           }
 
           if (pollCount >= maxPolls) {
             console.log("BALANCE POLLING: Max polls reached, stopping polling");
-            clearInterval(intervalId);
+            if (intervalIdRef.current) {
+              clearInterval(intervalIdRef.current);
+              intervalIdRef.current = null;
+            }
             setIsAwaitingCreditUpdate(false);
+            initialBalanceRef.current = null;
           }
-        }, 100); // Small delay to let state update
+        }, 150);
       } catch (error) {
         console.log("BALANCE POLLING: Balance update failed", error);
       }
     };
 
-    intervalId = setInterval(checkBalanceUpdate, 5000);
+    if (intervalIdRef.current) {
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+
+    intervalIdRef.current = setInterval(checkBalanceUpdate, 5000);
 
     // Initial check after 2 seconds
     setTimeout(() => {
@@ -130,11 +164,15 @@ const BuyButton = ({
       checkBalanceUpdate();
     }, 2000);
 
-    // Stop polling after 2 minutes
+    // Safety stop after 2 minutes
     setTimeout(() => {
       console.log("BALANCE POLLING: Timeout reached, clearing interval");
-      clearInterval(intervalId);
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
       setIsAwaitingCreditUpdate(false);
+      initialBalanceRef.current = null;
     }, 120000);
   };
 
@@ -158,7 +196,7 @@ const BuyButton = ({
       const initialTransactionBalance = creditBalance;
       console.log(
         "BUY_FLOW: Initial balance captured:",
-        initialTransactionBalance,
+        initialTransactionBalance
       );
 
       // Chain switching logic for non-Avail chains
@@ -169,7 +207,7 @@ const BuyButton = ({
             currentChainId: account.chainId,
             targetChainId: selectedChain.id,
             selectedChainName: selectedChain.name,
-          },
+          }
         );
 
         try {
@@ -225,7 +263,7 @@ const BuyButton = ({
       if (!orderResponse?.data) {
         console.error(
           "BUY_FLOW: Order creation failed - no data in response",
-          orderResponse,
+          orderResponse
         );
         setLoading(false);
         const errorMessage = orderResponse.message || "Order creation failed";
@@ -275,8 +313,8 @@ const BuyButton = ({
                         txnHash: txHash as `0x${string}`,
                         blockhash: blockHash as `0x${string}`,
                       }
-                    : t,
-                ),
+                    : t
+                )
               );
               setShowTransaction({
                 ...currentTransaction,
@@ -286,7 +324,7 @@ const BuyButton = ({
               });
             } else {
               console.warn(
-                "BUY_FLOW: No currentTransaction found in InBlock callback",
+                "BUY_FLOW: No currentTransaction found in InBlock callback"
               );
             }
           },
@@ -307,11 +345,11 @@ const BuyButton = ({
                         status: "finality" as const,
                         txnHash: txHash as `0x${string}`,
                       }
-                    : t,
+                    : t
                 );
                 console.log(
                   "BUY_FLOW: Transaction list updated to finality",
-                  updated,
+                  updated
                 );
                 return updated;
               });
@@ -325,13 +363,13 @@ const BuyButton = ({
               setShowTransaction(finalizedTransaction);
               console.log(
                 "BUY_FLOW: Show transaction updated to finality",
-                finalizedTransaction,
+                finalizedTransaction
               );
 
               console.log("BUY_FLOW: Setting completion timeout (2000ms)");
               const completionTimeoutId = setTimeout(() => {
                 console.log(
-                  "BUY_FLOW: Completion timeout triggered, updating to completed status",
+                  "BUY_FLOW: Completion timeout triggered, updating to completed status"
                 );
                 const completedTransaction = {
                   ...currentTransaction!,
@@ -340,11 +378,11 @@ const BuyButton = ({
 
                 setTransactionStatusList((prev) => {
                   const updated = prev.map((t) =>
-                    t.id === currentTransaction!.id ? completedTransaction : t,
+                    t.id === currentTransaction!.id ? completedTransaction : t
                   );
                   console.log(
                     "BUY_FLOW: Transaction list updated to completed",
-                    updated,
+                    updated
                   );
                   return updated;
                 });
@@ -352,7 +390,7 @@ const BuyButton = ({
                 setShowTransaction(completedTransaction);
                 console.log(
                   "BUY_FLOW: Show transaction updated to completed",
-                  completedTransaction,
+                  completedTransaction
                 );
 
                 // Start credit balance polling to show the warning message
@@ -364,10 +402,10 @@ const BuyButton = ({
                 console.log("BUY_FLOW: Setting cleanup timeout (4000ms)");
                 const cleanupTimeoutId = setTimeout(() => {
                   console.log(
-                    "BUY_FLOW: Cleanup timeout triggered, removing transaction from list",
+                    "BUY_FLOW: Cleanup timeout triggered, removing transaction from list"
                   );
                   setTransactionStatusList((prev) =>
-                    prev.filter((t) => t.id !== currentTransaction!.id),
+                    prev.filter((t) => t.id !== currentTransaction!.id)
                   );
                   setShowTransaction(undefined);
                   setOpen("");
@@ -386,7 +424,7 @@ const BuyButton = ({
               };
             } else {
               console.warn(
-                "BUY_FLOW: No currentTransaction found in Finalized callback",
+                "BUY_FLOW: No currentTransaction found in Finalized callback"
               );
             }
           },
@@ -408,7 +446,7 @@ const BuyButton = ({
 
             console.log(
               "BUY_FLOW: Created new transaction object",
-              currentTransaction,
+              currentTransaction
             );
 
             setTransactionStatusList((prev) => [
@@ -419,7 +457,7 @@ const BuyButton = ({
             setOpen("credit-transaction");
 
             console.log("BUY_FLOW: Transaction added to list and UI updated");
-          },
+          }
         );
 
         console.log("BUY_FLOW: batchTransferAndRemark completed", {
@@ -439,7 +477,7 @@ const BuyButton = ({
           const errorMessage = ErrorHandlingUtils.getErrorMessage(txn.error);
           console.error(
             "BUY_FLOW: Avail transaction error message:",
-            errorMessage,
+            errorMessage
           );
           errorToast?.({ label: errorMessage });
           setLoading(false);
@@ -492,7 +530,7 @@ const BuyButton = ({
 
           console.log(
             "BUY_FLOW: Created native deposit transaction object",
-            transaction,
+            transaction
           );
 
           setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
@@ -503,21 +541,21 @@ const BuyButton = ({
 
           // Progress to inblock after a short delay
           console.log(
-            "BUY_FLOW: Setting inblock timeout (1000ms) for native deposit",
+            "BUY_FLOW: Setting inblock timeout (1000ms) for native deposit"
           );
           setTimeout(() => {
             console.log(
-              "BUY_FLOW: Updating native deposit transaction to inblock",
+              "BUY_FLOW: Updating native deposit transaction to inblock"
             );
             setTransactionStatusList((prev) => {
               const updated = prev.map((t) =>
                 t.id === transaction.id
                   ? { ...t, status: "inblock" as const }
-                  : t,
+                  : t
               );
               console.log(
                 "BUY_FLOW: Native deposit transaction list updated to inblock",
-                updated,
+                updated
               );
               return updated;
             });
@@ -527,7 +565,7 @@ const BuyButton = ({
                 const updated = { ...prevShow, status: "inblock" as const };
                 console.log(
                   "BUY_FLOW: Native deposit show transaction updated to inblock",
-                  updated,
+                  updated
                 );
                 return updated;
               }
@@ -543,7 +581,7 @@ const BuyButton = ({
               orderId: orderResponse.data.id,
               token: token,
               chainType: selectedChain.name.toLowerCase(),
-            },
+            }
           );
 
           TransactionService.handleTransactionFinality({
@@ -553,23 +591,23 @@ const BuyButton = ({
             chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
             onSuccess: () => {
               console.log(
-                "BUY_FLOW: Native deposit finality service success callback triggered",
+                "BUY_FLOW: Native deposit finality service success callback triggered"
               );
 
               // Update transaction to finality status to trigger 2-second UI timer
               setTimeout(() => {
                 console.log(
-                  "BUY_FLOW: Updating native deposit transaction to finality (2000ms delay)",
+                  "BUY_FLOW: Updating native deposit transaction to finality (2000ms delay)"
                 );
                 setTransactionStatusList((prev) => {
                   const updated = prev.map((t) =>
                     t.id === transaction.id
                       ? { ...t, status: "finality" as const }
-                      : t,
+                      : t
                   );
                   console.log(
                     "BUY_FLOW: Native deposit transaction list updated to finality",
-                    updated,
+                    updated
                   );
                   return updated;
                 });
@@ -582,7 +620,7 @@ const BuyButton = ({
                     };
                     console.log(
                       "BUY_FLOW: Native deposit show transaction updated to finality",
-                      updated,
+                      updated
                     );
                     return updated;
                   }
@@ -591,17 +629,17 @@ const BuyButton = ({
 
                 setTimeout(() => {
                   console.log(
-                    "BUY_FLOW: Updating native deposit transaction to completed (2000ms delay)",
+                    "BUY_FLOW: Updating native deposit transaction to completed (2000ms delay)"
                   );
                   setTransactionStatusList((prev) => {
                     const updated = prev.map((t) =>
                       t.id === transaction.id
                         ? { ...t, status: "completed" as const }
-                        : t,
+                        : t
                     );
                     console.log(
                       "BUY_FLOW: Native deposit transaction list updated to completed",
-                      updated,
+                      updated
                     );
                     return updated;
                   });
@@ -614,7 +652,7 @@ const BuyButton = ({
                       };
                       console.log(
                         "BUY_FLOW: Native deposit show transaction updated to completed",
-                        completedTx,
+                        completedTx
                       );
                       return completedTx;
                     }
@@ -626,21 +664,21 @@ const BuyButton = ({
                     "BUY_FLOW: Starting credit balance polling for native deposit",
                     {
                       initialTransactionBalance,
-                    },
+                    }
                   );
                   startCreditBalancePolling(initialTransactionBalance);
 
                   setTimeout(() => {
                     console.log(
-                      "BUY_FLOW: Cleaning up native deposit transaction (4000ms delay)",
+                      "BUY_FLOW: Cleaning up native deposit transaction (4000ms delay)"
                     );
                     setTransactionStatusList((prev) =>
-                      prev.filter((t) => t.id !== transaction.id),
+                      prev.filter((t) => t.id !== transaction.id)
                     );
                     setShowTransaction(undefined);
                     setOpen("");
                     console.log(
-                      "BUY_FLOW: Native deposit transaction cleanup completed",
+                      "BUY_FLOW: Native deposit transaction cleanup completed"
                     );
                   }, 4000);
                 }, 2000);
@@ -657,7 +695,7 @@ const BuyButton = ({
           const errorMessage = ErrorHandlingUtils.getErrorMessage(err);
           console.error(
             "BUY_FLOW: Native deposit error message:",
-            errorMessage,
+            errorMessage
           );
           errorToast?.({ label: errorMessage });
           setLoading(false);
@@ -726,7 +764,7 @@ const BuyButton = ({
 
           console.log(
             "BUY_FLOW: Created ERC20 deposit transaction object",
-            transaction,
+            transaction
           );
 
           setTransactionStatusList((prev) => [...(prev ?? []), transaction]);
@@ -737,21 +775,21 @@ const BuyButton = ({
 
           // Progress to inblock after a short delay
           console.log(
-            "BUY_FLOW: Setting inblock timeout (1000ms) for ERC20 deposit",
+            "BUY_FLOW: Setting inblock timeout (1000ms) for ERC20 deposit"
           );
           setTimeout(() => {
             console.log(
-              "BUY_FLOW: Updating ERC20 deposit transaction to inblock",
+              "BUY_FLOW: Updating ERC20 deposit transaction to inblock"
             );
             setTransactionStatusList((prev) => {
               const updated = prev.map((t) =>
                 t.id === transaction.id
                   ? { ...t, status: "inblock" as const }
-                  : t,
+                  : t
               );
               console.log(
                 "BUY_FLOW: ERC20 deposit transaction list updated to inblock",
-                updated,
+                updated
               );
               return updated;
             });
@@ -761,7 +799,7 @@ const BuyButton = ({
                 const updated = { ...prevShow, status: "inblock" as const };
                 console.log(
                   "BUY_FLOW: ERC20 deposit show transaction updated to inblock",
-                  updated,
+                  updated
                 );
                 return updated;
               }
@@ -777,7 +815,7 @@ const BuyButton = ({
               orderId: orderResponse.data.id,
               token: token,
               chainType: selectedChain.name.toLowerCase(),
-            },
+            }
           );
 
           TransactionService.handleTransactionFinality({
@@ -787,23 +825,23 @@ const BuyButton = ({
             chainType: selectedChain.name.toLowerCase() as "ethereum" | "base",
             onSuccess: () => {
               console.log(
-                "BUY_FLOW: ERC20 deposit finality service success callback triggered",
+                "BUY_FLOW: ERC20 deposit finality service success callback triggered"
               );
 
               // Update transaction to finality status to trigger 2-second UI timer
               setTimeout(() => {
                 console.log(
-                  "BUY_FLOW: Updating ERC20 deposit transaction to finality (2000ms delay)",
+                  "BUY_FLOW: Updating ERC20 deposit transaction to finality (2000ms delay)"
                 );
                 setTransactionStatusList((prev) => {
                   const updated = prev.map((t) =>
                     t.id === transaction.id
                       ? { ...t, status: "finality" as const }
-                      : t,
+                      : t
                   );
                   console.log(
                     "BUY_FLOW: ERC20 deposit transaction list updated to finality",
-                    updated,
+                    updated
                   );
                   return updated;
                 });
@@ -816,7 +854,7 @@ const BuyButton = ({
                     };
                     console.log(
                       "BUY_FLOW: ERC20 deposit show transaction updated to finality",
-                      updated,
+                      updated
                     );
                     return updated;
                   }
@@ -825,17 +863,17 @@ const BuyButton = ({
 
                 setTimeout(() => {
                   console.log(
-                    "BUY_FLOW: Updating ERC20 deposit transaction to completed (2000ms delay)",
+                    "BUY_FLOW: Updating ERC20 deposit transaction to completed (2000ms delay)"
                   );
                   setTransactionStatusList((prev) => {
                     const updated = prev.map((t) =>
                       t.id === transaction.id
                         ? { ...t, status: "completed" as const }
-                        : t,
+                        : t
                     );
                     console.log(
                       "BUY_FLOW: ERC20 deposit transaction list updated to completed",
-                      updated,
+                      updated
                     );
                     return updated;
                   });
@@ -848,7 +886,7 @@ const BuyButton = ({
                       };
                       console.log(
                         "BUY_FLOW: ERC20 deposit show transaction updated to completed",
-                        completedTx,
+                        completedTx
                       );
                       return completedTx;
                     }
@@ -860,21 +898,21 @@ const BuyButton = ({
                     "BUY_FLOW: Starting credit balance polling for ERC20 deposit",
                     {
                       initialTransactionBalance,
-                    },
+                    }
                   );
                   startCreditBalancePolling(initialTransactionBalance);
 
                   setTimeout(() => {
                     console.log(
-                      "BUY_FLOW: Cleaning up ERC20 deposit transaction (4000ms delay)",
+                      "BUY_FLOW: Cleaning up ERC20 deposit transaction (4000ms delay)"
                     );
                     setTransactionStatusList((prev) =>
-                      prev.filter((t) => t.id !== transaction.id),
+                      prev.filter((t) => t.id !== transaction.id)
                     );
                     setShowTransaction(undefined);
                     setOpen("");
                     console.log(
-                      "BUY_FLOW: ERC20 deposit transaction cleanup completed",
+                      "BUY_FLOW: ERC20 deposit transaction cleanup completed"
                     );
                   }, 4000);
                 }, 2000);
@@ -895,7 +933,7 @@ const BuyButton = ({
           const errorMessage = ErrorHandlingUtils.getErrorMessage(err);
           console.error(
             "BUY_FLOW: ERC20 transaction error message:",
-            errorMessage,
+            errorMessage
           );
           errorToast?.({ label: errorMessage });
           setLoading(false);
