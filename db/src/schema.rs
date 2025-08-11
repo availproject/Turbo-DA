@@ -47,6 +47,7 @@ diesel::table! {
         updated_at -> Timestamp,
         #[max_length = 255]
         token_address -> Nullable<Varchar>,
+        amount_paid -> Nullable<Numeric>,
     }
 }
 

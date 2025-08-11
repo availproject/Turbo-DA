@@ -64,3 +64,6 @@ ALTER COLUMN app_id SET NOT NULL;
 
 ALTER TABLE customer_expenditures
 ALTER COLUMN app_id SET NOT NULL;
+
+ALTER TABLE credit_requests
+ADD COLUMN amount_paid NUMERIC(39, 0) DEFAULT 0;

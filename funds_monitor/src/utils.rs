@@ -80,6 +80,9 @@ impl Utils {
                 credit_requests::tx_hash.eq(Some(transaction_hash.clone())),
                 credit_requests::request_type.eq("DEPOSIT".to_string()),
                 credit_requests::token_address.eq(Some(address.clone())),
+                credit_requests::amount_paid.eq(Some(
+                    BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
+                )),
             ))
             .returning(CreditRequestsGet::as_returning())
             .get_result::<CreditRequestsGet>(&mut *connection)
