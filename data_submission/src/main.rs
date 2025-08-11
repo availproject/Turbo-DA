@@ -1,47 +1,43 @@
 use crate::redis::Redis;
 use actix_cors::Cors;
-use actix_extensible_rate_limit::{
-    backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
-    RateLimiter,
-};
+
 use actix_web::{
     middleware::Logger,
     web::{self},
     App, HttpServer,
 };
 use auth::Auth;
+use config::AppConfig;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
+use observability::{init_meter, init_tracer};
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
+    health::health_check,
 };
 use std::sync::Arc;
-use tokio::{sync::broadcast, time::Duration};
-use turbo_da_core::{routes::health::health_check, utils::generate_keygen_list};
+use tokio::sync::broadcast;
+use turbo_da_core::{logger::info, utils::generate_keygen_list};
+use workload_scheduler::consumer::Consumer;
+
 mod auth;
-mod avail;
 mod config;
-mod db;
 mod redis;
 mod routes;
 mod utils;
 mod workload_scheduler;
 
-use config::AppConfig;
-use observability::{init_meter, init_tracer};
-use workload_scheduler::consumer::Consumer;
-
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting Data Submission server....");
-
-    init_meter("data_submission");
+    info(&format!("Starting Data Submission server...."));
 
     let app_config = AppConfig::default().load_config()?;
+
+    init_meter("data_submission");
+    init_tracer("data_submission");
 
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
@@ -60,9 +56,9 @@ async fn main() -> Result<(), std::io::Error> {
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
     let consumer_server = Consumer::new(
-        sender.clone(),
-        shared_keypair.clone(),
-        shared_pool.clone(),
+        Arc::new(sender.clone()),
+        Arc::new(shared_keypair.clone()),
+        Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
         app_config.number_of_threads,
     );
@@ -77,20 +73,9 @@ async fn main() -> Result<(), std::io::Error> {
 
     HttpServer::new(move || {
         let shared_producer_send = web::Data::new(sender.clone());
-        let backend = InMemoryBackend::builder().build();
-        let input = SimpleInputFunctionBuilder::new(
-            Duration::from_secs(shared_config.rate_limit_window_size),
-            shared_config.rate_limit_max_requests,
-        )
-        .custom_key("X-API-KEY")
-        .build();
-        let rate_limiter = RateLimiter::builder(backend.clone(), input)
-            .add_headers()
-            .build();
 
         App::new()
             .wrap(Cors::permissive())
-            .wrap(rate_limiter)
             .wrap(Logger::default())
             .service(health_check)
             .service(

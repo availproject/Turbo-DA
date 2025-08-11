@@ -1,21 +1,23 @@
-use crate::utils::map_user_id_to_thread;
+use crate::config::AppConfig;
+use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
-use crate::{config::AppConfig, db::customer_expenditure::create_customer_expenditure_entry};
 use actix_web::{
     post,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use db::models::customer_expenditure::CreateCustomerExpenditure;
+use db::{
+    controllers::{
+        customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
+    },
+    models::customer_expenditure::CreateCustomerExpenditure,
+};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
-use turbo_da_core::{
-    db::users::validate_and_get_entries,
-    utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
-};
+use turbo_da_core::logger::error;
+use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
 
 /// Request payload for submitting string data
 #[derive(Deserialize, Serialize, Clone)]
@@ -46,9 +48,20 @@ pub async fn submit_data(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let user = match retrieve_user_id(http_request) {
+    let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "App Id not retrieved" }))
+        }
+    };
+
+    let user_id = match retrieve_user_id(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "User Id not retrieved" }))
+        }
     };
 
     let mut connection = match get_connection(&injected_dependency).await {
@@ -56,7 +69,7 @@ pub async fn submit_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
             return HttpResponse::InternalServerError().body(e);
@@ -70,13 +83,14 @@ pub async fn submit_data(
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload.data.as_bytes().to_vec().into(),
         submission_id,
-        user_id: user.clone(),
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.data.as_bytes().len()),
-        user_id: user,
+        user_id: user_id.clone(),
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(request_payload.data.as_bytes().to_vec()),
@@ -86,7 +100,7 @@ pub async fn submit_data(
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                error(&format!("couldn't connect to db with error "));
                 return;
             }
         };
@@ -122,20 +136,27 @@ pub async fn submit_raw_data(
     if request_payload.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let user = match retrieve_user_id(http_request) {
+    let app_id = match retrieve_app_id(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "App Id not retrieved" }))
+        }
+    };
+
+    let user_id = match retrieve_user_id(&http_request) {
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
                 .json(json!({ "error": "User Id not retrieved" }))
         }
     };
-
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
             return HttpResponse::InternalServerError().json(json!({ "error": e }));
@@ -148,7 +169,8 @@ pub async fn submit_raw_data(
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.len()),
-        user_id: user.clone(),
+        user_id: user_id.clone(),
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(request_payload.to_vec()),
@@ -158,15 +180,15 @@ pub async fn submit_raw_data(
         thread_id: map_user_id_to_thread(&config),
         raw_payload: request_payload,
         submission_id,
-        user_id: user,
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     tokio::spawn(async move {
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                error(&format!("couldn't connect to db with error "));
                 return;
             }
         };
