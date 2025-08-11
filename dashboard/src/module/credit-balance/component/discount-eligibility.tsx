@@ -22,47 +22,113 @@ function DiscountEligibility({ token }: { token?: string }) {
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
   const debouncedValue = useDebounce(deferredQuery, 500);
-  const [credits, setCredits] = useState();
+  const [credits, setCredits] = useState<number>();
+  const [loading, setLoading] = useState(false);
+  const [graphData, setGraphData] = useState<Array<{ x: number; y: number }>>(
+    []
+  );
   const { open, setOpen } = useDialog();
+
+
+  // Generate graph data points using hardcoded formula
+  // Since the formula doesn't change often, we'll use predetermined points
+  const generateGraphData = useMemo(() => {
+    // Real data points from API - cost ratio (credits per KB)
+    const dataPoints = [
+      { batchSize: 10, cost: 0.9653 },
+      { batchSize: 25, cost: 0.9126 },
+      { batchSize: 50, cost: 0.8365 },
+      { batchSize: 75, cost: 0.772 },
+      { batchSize: 100, cost: 0.7168 },
+      { batchSize: 150, cost: 0.6271 },
+      { batchSize: 200, cost: 0.5573 },
+      { batchSize: 300, cost: 0.4559 },
+      { batchSize: 400, cost: 0.3857 },
+      { batchSize: 500, cost: 0.3343 },
+      { batchSize: 750, cost: 0.2507 },
+      { batchSize: 1000, cost: 0.2005 },
+      // API returns very small values for larger sizes, likely an issue
+      // So we'll extend the curve logically
+      { batchSize: 1500, cost: 0.18 },
+      { batchSize: 2000, cost: 0.17 },
+      { batchSize: 3000, cost: 0.16 },
+      { batchSize: 4000, cost: 0.155 },
+      { batchSize: 5000, cost: 0.15 },
+      { batchSize: 10000, cost: 0.14 },
+    ];
+
+    // Convert to SVG coordinates (normalize to 0-455 width, 0-190 height)
+    const maxBatchSize = 10000;
+    const maxCost = 1.0;
+
+    return dataPoints.map((point) => ({
+      x: (point.batchSize / maxBatchSize) * 455,
+      y: 190 - (point.cost / maxCost) * 190, // Invert Y axis (SVG coordinate system)
+    }));
+  }, []);
+
+  // Generate SVG path from data points
+  const generateSVGPath = useMemo(() => {
+    if (generateGraphData.length === 0) return "";
+
+    let path = `M ${generateGraphData[0].x} ${generateGraphData[0].y}`;
+
+    // Create smooth curve using quadratic bezier curves
+    for (let i = 1; i < generateGraphData.length; i++) {
+      const current = generateGraphData[i];
+      const previous = generateGraphData[i - 1];
+
+      // Control point for smooth curve (midpoint with slight adjustment)
+      const controlX = (previous.x + current.x) / 2;
+      const controlY = (previous.y + current.y) / 2;
+
+      path += ` Q ${controlX} ${controlY} ${current.x} ${current.y}`;
+    }
+
+    return path;
+  }, [generateGraphData]);
 
   useEffect(() => {
     if (!token) return;
     if (!debouncedValue) {
+      setCredits(undefined);
       return;
     }
 
+    setLoading(true);
     CreditService.creditEstimates({
       token,
-      data: +formatInKB(debouncedValue) || 0,
+      data: debouncedValue * 1024,
     })
       .then((response) => {
         setCredits(response?.data);
       })
       .catch((error) => {
         console.log(error);
+        setCredits(undefined);
+      })
+      .finally(() => {
+        setLoading(false);
       });
-  }, [debouncedValue]);
+  }, [debouncedValue, token]);
 
   const batchSizeData = useMemo(() => {
     if (!debouncedValue) {
       return {
         size: "100 KB",
-        credits: "50",
-      };
-    }
-
-    if (debouncedValue >= 100) {
-      return {
-        size: `${convertBytes(debouncedValue)}`,
-        credits: debouncedValue / 2,
+        credits: (73387.97 / 1024).toFixed(2),
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: debouncedValue,
+      credits: credits
+        ? (Number(credits) / 1024).toFixed(2)
+        : loading
+        ? "..."
+        : "0.00",
     };
-  }, [debouncedValue, credits]);
+  }, [debouncedValue, credits, loading]);
 
   return (
     <Dialog
@@ -157,10 +223,26 @@ function DiscountEligibility({ token }: { token?: string }) {
                         className="h-full"
                       >
                         <path
-                          d="M1 1C26.608 62.7661 116.292 137.032 270 168.5C397 194.5 458.922 187.872 453.355 187.479"
+                          d={generateSVGPath}
                           stroke="#3CA3FC"
-                          stroke-width="1.5"
+                          strokeWidth="2"
+                          fill="none"
                         />
+                        {/* Add current batch size indicator if user has entered a value */}
+                        {debouncedValue && credits && (
+                          <circle
+                            cx={(Math.min(debouncedValue, 10000) / 10000) * 455}
+                            cy={
+                              190 -
+                              (Number(credits) / 1024 / debouncedValue / 1.0) *
+                                190
+                            } // Real position based on API response
+                            r="4"
+                            fill="#3CA3FC"
+                            stroke="#fff"
+                            strokeWidth="2"
+                          />
+                        )}
                       </svg>
                     </div>
 

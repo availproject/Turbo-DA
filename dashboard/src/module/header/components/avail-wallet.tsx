@@ -2,7 +2,11 @@ import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
 import { chainList } from "@/module/purchase-credit/utils/constant";
 import { useConfig } from "@/providers/ConfigProvider";
-import { AvailWalletConnect, useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
+import {
+  AvailWalletConnect,
+  useAvailAccount,
+  useAvailWallet,
+} from "avail-wallet-sdk";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -22,24 +26,24 @@ const AvailWallet = () => {
 
   const fetchAvailBalance = async () => {
     if (!api || !selected?.address) return;
-    
+
     try {
       const balance = await api.query.system.account(selected.address);
       // @ts-ignore - Balance type compatibility between different Polkadot versions
       const freeBalance = balance.data.free.toString();
-      
+
       // Avail uses 18 decimals
       const decimals = 18;
       const divisor = BigInt(10 ** decimals);
       const freeBalanceBigInt = BigInt(freeBalance);
       const wholePart = freeBalanceBigInt / divisor;
       const remainder = freeBalanceBigInt % divisor;
-      
+
       // Convert remainder to decimal with proper precision
-      const fractionalPart = remainder.toString().padStart(decimals, '0');
+      const fractionalPart = remainder.toString().padStart(decimals, "0");
       const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
       const balanceNumber = parseFloat(balanceStr);
-      
+
       setAvailBalance(balanceNumber.toFixed(4));
     } catch (error) {
       console.error("Error fetching Avail balance:", error);

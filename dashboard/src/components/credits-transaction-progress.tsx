@@ -1,14 +1,16 @@
 "use client";
 import { config } from "@/config/walletConfig";
-import { APP_TABS, cn } from "@/lib/utils";
+import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useOverview } from "@/providers/OverviewProvider";
+import useBalance from "@/hooks/useBalance";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import Image from "next/image";
 import { Close } from "@radix-ui/react-dialog";
 import { waitForTransactionReceipt } from "@wagmi/core";
 import { LoaderCircle, Minus, SquareArrowOutUpRight, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import Button from "./button";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
@@ -21,6 +23,7 @@ const CreditsTransactionProgress = () => {
   const { open, setOpen } = useDialog();
   const { transactionProgress, error } = useAppToast();
   const { setMainTabSelected } = useOverview();
+  const { updateCreditBalance } = useBalance();
   const {
     token,
     setTransactionStatusList,
@@ -29,6 +32,18 @@ const CreditsTransactionProgress = () => {
   } = useConfig();
   const account = useAccount();
 
+  // State to control initial animation
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  // Start animation after dialog opens
+  useEffect(() => {
+    if (showTransaction?.status === "initialised") {
+      // Small delay to allow dialog to render, then start animation
+      setTimeout(() => setShouldAnimate(true), 100);
+    }
+  }, [showTransaction?.status]);
+
+  // Handle finality state - start blockchain monitoring
   useEffect(() => {
     if (showTransaction?.id && showTransaction.status === "finality") {
       finalityTransaction({ txnHash: showTransaction.txnHash! });
@@ -71,6 +86,23 @@ const CreditsTransactionProgress = () => {
     txnHash: `0x${string}`;
   }) => {
     if (!showTransaction) return;
+
+    // After 3 seconds, update to "Almost Done" status
+    setTimeout(() => {
+      const almostDoneTransaction = {
+        ...showTransaction,
+        status: "almost_done" as const,
+      };
+      setTransactionStatusList((prev) =>
+        prev.map((transaction: TransactionStatus) =>
+          transaction.id === showTransaction?.id
+            ? almostDoneTransaction
+            : transaction
+        )
+      );
+      setShowTransaction(almostDoneTransaction);
+    }, 3000);
+
     try {
       const transactionReceipt = await waitForTransactionReceipt(config, {
         hash: txnHash,
@@ -93,6 +125,9 @@ const CreditsTransactionProgress = () => {
               )
             );
             setShowTransaction({ ...showTransaction, status: "completed" });
+            
+            // Refresh credit balance after successful transaction
+            updateCreditBalance();
           })
           .catch((error) => {
             console.log(error);
@@ -146,9 +181,9 @@ const CreditsTransactionProgress = () => {
             <CardContent className="flex flex-col items-center justify-center h-full pt-0 w-[444px] mx-auto gap-y-4">
               <DialogTitle>
                 {showTransaction?.status === "completed" ? (
-                  <DotLottieReact
-                    src={"credit-added.lottie"}
-                    autoplay
+                  <Image
+                    src="/credit-success.svg"
+                    alt="Credit Success"
                     width={50}
                     height={50}
                   />
@@ -162,66 +197,95 @@ const CreditsTransactionProgress = () => {
               </DialogTitle>
               {showTransaction?.tokenAmount ? (
                 <>
-                  <Text
-                    weight={"semibold"}
-                    size={"2xl"}
-                    className="relative self-stretch text-center"
-                  >
-                    {showTransaction.status === "initialised" &&
-                      "Credit Buying Initiated"}
-                    {showTransaction.status === "finality" &&
-                      "Finalization In Progress"}
-                    {showTransaction.status === "completed" && "Almost Done"}
-                  </Text>
-                  <div className="flex gap-x-2">
-                    <div
-                      className={cn(
-                        "bg-white rounded-full w-[84px] h-2 overflow-hidden"
-                      )}
+                  {showTransaction?.status === "completed" ? (
+                    <Text
+                      weight={"semibold"}
+                      size={"2xl"}
+                      as="div"
+                      className="relative self-stretch text-center"
                     >
-                      <div
-                        className={cn(
-                          "h-full bg-green rounded-full",
-                          showTransaction.status === "initialised" && "w-1/2",
-                          (showTransaction.status === "finality" ||
-                            showTransaction.status === "completed") &&
-                            "w-full"
-                        )}
-                      ></div>
-                    </div>
-                    <div
-                      className={cn(
-                        "rounded-full w-[84px] h-2 overflow-hidden",
-                        showTransaction.status === "finality" ||
-                          showTransaction.status === "completed"
-                          ? "bg-white"
-                          : "bg-[#999]"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "h-full bg-green w-0 rounded-full",
-                          showTransaction.status === "finality" && "w-1/2",
-                          showTransaction.status === "completed" && "w-full"
-                        )}
-                      ></div>
-                    </div>
-                    <div
-                      className={cn(
-                        "rounded-full w-[84px] h-2 overflow-hidden",
-                        showTransaction.status === "completed"
-                          ? "bg-white"
-                          : "bg-[#999]"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "h-full bg-green w-0 rounded-full",
-                          showTransaction.status === "completed" && "w-full"
-                        )}
-                      ></div>
-                    </div>
-                  </div>
+                      <Text
+                        as="span"
+                        weight={"semibold"}
+                        size={"2xl"}
+                        variant={"green"}
+                      >
+                        {showTransaction?.creditAmount
+                          ? formatDataBytes(showTransaction.creditAmount)
+                          : ""}
+                      </Text>
+                      Credited Successfully
+                    </Text>
+                  ) : (
+                    <>
+                      <Text
+                        weight={"semibold"}
+                        size={"2xl"}
+                        className="relative self-stretch text-center"
+                      >
+                        {showTransaction?.status === "initialised" &&
+                          "Credit Buying Initiated"}
+                        {showTransaction?.status === "finality" &&
+                          "Finalization In Progress"}
+                        {showTransaction?.status === "almost_done" &&
+                          "Almost Done"}
+                      </Text>
+                      <div className="flex gap-x-2">
+                        {/* First Progress Bar - Credit Buying Initiated */}
+                        <div className="bg-white rounded-full w-[84px] h-2 overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
+                              showTransaction?.status === "initialised" &&
+                                shouldAnimate &&
+                                "w-full",
+                              (showTransaction?.status === "finality" ||
+                                showTransaction?.status === "almost_done") &&
+                                "w-full"
+                            )}
+                          ></div>
+                        </div>
+
+                        {/* Second Progress Bar - Finalization In Progress */}
+                        <div
+                          className={cn(
+                            "rounded-full w-[84px] h-2 overflow-hidden transition-colors duration-500",
+                            showTransaction?.status === "finality" ||
+                              showTransaction?.status === "almost_done"
+                              ? "bg-white"
+                              : "bg-[#999]"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
+                              (showTransaction?.status === "finality" ||
+                                showTransaction?.status === "almost_done") &&
+                                "w-full"
+                            )}
+                          ></div>
+                        </div>
+
+                        {/* Third Progress Bar - Almost Done */}
+                        <div
+                          className={cn(
+                            "rounded-full w-[84px] h-2 overflow-hidden transition-colors duration-500",
+                            showTransaction?.status === "almost_done"
+                              ? "bg-white"
+                              : "bg-[#999]"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "h-full bg-green rounded-full transition-all duration-2000 ease-in-out w-0",
+                              showTransaction?.status === "almost_done" &&
+                                "w-full"
+                            )}
+                          ></div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <Text
@@ -236,7 +300,9 @@ const CreditsTransactionProgress = () => {
                     size={"2xl"}
                     variant={"green"}
                   >
-                    1000 KB{" "}
+                    {showTransaction?.creditAmount
+                      ? formatDataBytes(showTransaction.creditAmount)
+                      : "1000 KB"}{" "}
                   </Text>
                   Credited Successfully
                 </Text>
@@ -259,10 +325,13 @@ const CreditsTransactionProgress = () => {
                   variant={"secondary-grey"}
                   className="relative self-stretch text-center"
                 >
-                  Processing transaction on Avail chain
+                  {(showTransaction?.status === "initialised" ||
+                    showTransaction?.status === "finality" ||
+                    showTransaction?.status === "almost_done") &&
+                    "Processing transaction on Avail chain"}
                 </Text>
               )}
-              {showTransaction?.status !== "initialised" && (
+              {showTransaction?.status !== "completed" && (
                 <div className="flex gap-x-4 w-full justify-center">
                   <Link
                     href={
