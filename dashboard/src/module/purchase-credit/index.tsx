@@ -10,7 +10,10 @@ import { config } from "@/config/walletConfig";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useDesiredChain } from "@/hooks/useDesiredChain";
 import useWallet from "@/hooks/useWallet";
-import useBalance from "@/hooks/useBalance";
+import useBalance, {
+  dispatchTransactionCompleted,
+  dispatchCreditBalanceUpdated,
+} from "@/hooks/useBalance";
 import { TOKEN_MAP } from "@/lib/types";
 import { formatDataBytes, numberToBytes32 } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
@@ -18,10 +21,13 @@ import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import CreditService from "@/services/credit";
 import { LegacySignerOptions } from "@/utils/web3-services";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { ISubmittableResult } from "@polkadot/types/types";
-import { getWalletBySource, WalletAccount } from "@talismn/connect-wallets";
+import {
+  getWalletBySource,
+  getWallets,
+  WalletAccount,
+} from "@talismn/connect-wallets";
 import { readContract, writeContract } from "@wagmi/core";
-import { ApiPromise } from "avail-js-sdk";
+import { ApiPromise, SubmittableResult } from "avail-js-sdk";
 import {
   AvailWalletConnect,
   useAvailAccount,
@@ -30,7 +36,7 @@ import {
 import BigNumber from "bignumber.js";
 import { ConnectKitButton } from "connectkit";
 import { LoaderCircle, Wallet } from "lucide-react";
-import { err, ok } from "neverthrow";
+import { Result, err, ok } from "neverthrow";
 import {
   MouseEvent,
   useCallback,
@@ -41,6 +47,14 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { Abi, parseUnits } from "viem";
 import { useAccount, useBalance as useWagmiBalance } from "wagmi";
+import Image from "next/image";
+
+// Circle loader component
+const CircleLoader = () => (
+  <div className="inline-flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
 
 export const abi: Abi = [
   {
@@ -109,7 +123,8 @@ const DESIRED_CHAIN = 11155111;
 
 const BuyCreditsCard = ({ token }: { token?: string }) => {
   const { activeNetworkId, showBalance } = useWallet();
-  const { updateCreditBalance } = useBalance();
+  const { updateAllBalances, refreshCounter, pollCreditBalanceUpdate } =
+    useBalance();
 
   // Helper function to check if value is effectively zero
   const isZeroValue = (value: string): boolean => {
@@ -126,6 +141,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   const [error, setError] = useState("");
   const [availBalance, setAvailBalance] = useState<string>("0");
   const [availERC20Balance, setAvailERC20Balance] = useState<string>("0");
+  const [balanceChecking, setBalanceChecking] = useState(false);
   const account = useAccount();
   const { selected, selectedWallet } = useAvailAccount();
   const { api } = useAvailWallet();
@@ -139,9 +155,45 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
+    chainId: account.chainId,
   });
-  const debouncedValue = useDebounce(deferredTokenValue, 500);
+  const debouncedValue = useDebounce(deferredTokenValue, 800); // Increased from 500ms to 800ms
   const { chainChangerAsync } = useDesiredChain(DESIRED_CHAIN);
+
+  // Force balance refresh when refreshCounter changes
+  useEffect(() => {
+    if (refreshCounter > 0) {
+      console.log("Refresh counter changed, updating balances...");
+      // This will trigger the balance hooks to refresh
+      fetchAvailERC20Balance();
+      if (api && selected?.address && selectedChain?.name === "Avail") {
+        fetchAvailBalance();
+      }
+    }
+  }, [refreshCounter]);
+
+  // Enhanced balance update function
+  const updateAllBalancesComprehensive = useCallback(async () => {
+    console.log("Comprehensive balance update triggered...");
+
+    // Update credit balance
+    await updateAllBalances();
+
+    // Force refresh of local balance states
+    if (account.address && account.isConnected) {
+      fetchAvailERC20Balance();
+    }
+    if (api && selected?.address && selectedChain?.name === "Avail") {
+      fetchAvailBalance();
+    }
+  }, [
+    updateAllBalances,
+    account.address,
+    account.isConnected,
+    api,
+    selected?.address,
+    selectedChain?.name,
+  ]);
   console.log({
     api,
   });
@@ -171,14 +223,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     if (api && selected?.address && selectedChain?.name === "Avail") {
       fetchAvailBalance();
     }
-  }, [api, selected?.address, selectedChain?.name]);
+  }, [api, selected?.address, selectedChain?.name, refreshCounter]);
 
   // Fetch AVAIL ERC20 balance on Ethereum
   useEffect(() => {
     if (account.address && account.isConnected) {
       fetchAvailERC20Balance();
     }
-  }, [account.address, account.isConnected]);
+  }, [account.address, account.isConnected, refreshCounter]);
 
   const fetchAvailERC20Balance = async () => {
     if (!account.address) return;
@@ -245,13 +297,63 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
   };
 
   useEffect(() => {
-    if (debouncedValue && !tokenAmountError) {
+    console.log("useEffect triggered with:", {
+      debouncedValue,
+      tokenAmountError,
+      selectedToken: selectedToken?.name,
+      accountChainId: account.chainId,
+      deferredTokenValue,
+      tokenAmount,
+    });
+
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
+    if (debouncedValue && selectedToken && effectiveChainId) {
+      console.log(
+        "Calling calculateEstimateCredits with effectiveChainId:",
+        effectiveChainId,
+      );
       calculateEstimateCredits({ amount: +debouncedValue });
+    } else {
+      console.log("Not calling calculateEstimateCredits because:", {
+        noDebouncedValue: !debouncedValue,
+        noSelectedToken: !selectedToken,
+        noEffectiveChainId: !effectiveChainId,
+        originalChainId: account.chainId,
+        fallbackChainId: DESIRED_CHAIN,
+      });
     }
-  }, [debouncedValue, tokenAmountError]);
+  }, [debouncedValue, selectedToken, account.chainId]);
+
+  // Alternative approach for Arc browser - direct API call on tokenAmount change
+  useEffect(() => {
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
+    if (tokenAmount && selectedToken && effectiveChainId && !tokenAmountError) {
+      console.log(
+        "Direct API call triggered for Arc browser compatibility with effectiveChainId:",
+        effectiveChainId,
+      );
+      const timeoutId = setTimeout(() => {
+        calculateEstimateCredits({ amount: +tokenAmount });
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [tokenAmount, selectedToken, account.chainId, tokenAmountError]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
+    console.log("calculateEstimateCredits called with:", {
+      amount,
+      selectedToken,
+      accountChainId: account.chainId,
+      effectiveChainId: account.chainId ?? DESIRED_CHAIN,
+    });
+
     if (!selectedToken) {
+      console.log("No selectedToken, returning early");
       return;
     }
     const tokenKey = selectedToken?.name?.toLowerCase();
@@ -264,20 +366,33 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       return;
     }
 
+    // Use fallback chainId if account.chainId is undefined (Arc browser issue)
+    const effectiveChainId = account.chainId ?? DESIRED_CHAIN;
+
     setEstimateDataLoading(true);
     try {
+      console.log("Making API call with:", {
+        token,
+        amount,
+        tokenAddress: tokenAddress.toLowerCase(),
+        chain_id: effectiveChainId,
+        originalChainId: account.chainId,
+        fallbackChainId: DESIRED_CHAIN,
+      });
+
       const response = await CreditService.calculateEstimateCreditsAgainstToken(
         {
           token: token!,
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
-          chain_id: account.chainId ?? DESIRED_CHAIN,
-        }
+          chain_id: effectiveChainId,
+        },
       );
 
+      console.log("API response:", response);
       setEstimateData(response?.data);
     } catch (error) {
-      console.log(error);
+      console.log("API error:", error);
     } finally {
       setEstimateDataLoading(false);
     }
@@ -295,7 +410,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
         body: JSON.stringify({
           chain: chain_id_override ?? account.chainId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -398,16 +513,38 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                 };
                 setTransactionStatusList((prev) =>
                   prev.map((t) =>
-                    t.id === transaction.id ? updatedTransaction : t
-                  )
+                    t.id === transaction.id ? updatedTransaction : t,
+                  ),
                 );
                 setShowTransaction(updatedTransaction);
               }, 2000);
               setTokenAmount("");
               setLoading(false);
 
-              // Refresh credit balance after successful transaction initiation
-              updateCreditBalance();
+              // Dispatch transaction completed event to update all balances
+              dispatchTransactionCompleted();
+
+              // Refresh token balances immediately
+              updateAllBalancesComprehensive();
+
+              // Start polling for credit balance update
+              if (estimateData) {
+                console.log(
+                  `Starting credit balance polling for ${estimateData} credits...`,
+                );
+                pollCreditBalanceUpdate(estimateData).then((success) => {
+                  if (success) {
+                    console.log(
+                      "Credit balance polling completed successfully",
+                    );
+                    // Dispatch events after successful polling
+                    dispatchTransactionCompleted();
+                    dispatchCreditBalanceUpdated();
+                  } else {
+                    console.log("Credit balance polling timed out or failed");
+                  }
+                });
+              }
             })
             .catch((err) => {
               const message = err.message.split(".")[0];
@@ -434,106 +571,109 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
     }
   };
 
-  const batchTransferAndRemark = async (
+  // Function to validate balance asynchronously
+  const validateBalance = useCallback(
+    async (value: string) => {
+      if (!value || value.trim() === "") {
+        setTokenAmountError("");
+        return;
+      }
+
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        setTokenAmountError("Enter valid amount");
+        return;
+      }
+
+      setBalanceChecking(true);
+
+      try {
+        // Wait a bit for balance updates to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const getCurrentBalance = () => {
+          if (selectedChain?.name === "Avail") {
+            return Number(availBalance);
+          } else if (selectedChain?.name === "Ethereum") {
+            if (selectedToken?.name === "ETH") {
+              return Number(balance.data?.formatted || 0);
+            } else if (selectedToken?.name === "AVAIL") {
+              return Number(availERC20Balance);
+            }
+          }
+          return 0;
+        };
+
+        const currentBalance = getCurrentBalance();
+
+        if (currentBalance < numValue) {
+          setTokenAmountError(
+            "Insufficient balance. Please enter a smaller amount",
+          );
+        } else {
+          setTokenAmountError("");
+        }
+      } catch (error) {
+        console.error("Error validating balance:", error);
+        setTokenAmountError("");
+      } finally {
+        setBalanceChecking(false);
+      }
+    },
+    [
+      selectedChain?.name,
+      selectedToken?.name,
+      availBalance,
+      balance.data?.formatted,
+      availERC20Balance,
+    ],
+  );
+
+  async function batchTransferAndRemark(
     api: ApiPromise,
     account: WalletAccount,
     atomicAmount: string,
     remarkMessage: string,
-    onTransactionReady?: (txHash: string) => void
-  ) => {
+    onTransactionReady?: (txHash: string) => void,
+  ): Promise<Result<any, Error>> {
     try {
-      // Get the proper signer from the wallet
-      const walletSource = account.source;
-      console.log("Getting signer for wallet source:", walletSource);
-
-      if (!walletSource) {
-        return err(new Error("No wallet source available"));
-      }
-
-      // Enable the extension and get the injector
-      const { web3Enable, web3FromSource } = await import(
-        "@polkadot/extension-dapp"
-      );
-
-      // Enable web3 extensions
-      const extensions = await web3Enable("Turbo DA Dashboard");
-      console.log("Available extensions:", extensions.length);
-
-      if (extensions.length === 0) {
-        return err(
-          new Error(
-            "No wallet extensions found. Please install a Polkadot wallet extension."
-          )
-        );
-      }
-
-      // Get the injector for this specific wallet
-      const injector = await web3FromSource(walletSource);
-
-      if (!injector?.signer) {
-        return err(
-          new Error(
-            `No signer found for ${walletSource} wallet. Please make sure the wallet extension is installed and connected.`
-          )
-        );
-      }
-
-      console.log("Signer found:", injector.signer);
-      console.log("Signer methods:", {
-        hasSignPayload: typeof injector.signer.signPayload === "function",
-        hasSignRaw: typeof injector.signer.signRaw === "function",
+      const wallets = getWallets();
+      const matchedWallet = wallets.find((wallet) => {
+        return wallet.title === wallet?.title;
       });
 
-      // Set the signer on the API instance
-      // @ts-ignore - Type incompatibility between polkadot/extension-dapp and avail-js-sdk signer types
-      api.setSigner(injector.signer);
-      console.log(
-        "signer address",
-        process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string
-      );
+      await matchedWallet!.enable("turbo-da");
+      const injector = getWalletBySource(account.source);
+
+      const options: Partial<LegacySignerOptions> = {
+        signer: injector?.signer as {},
+        app_id: 0,
+      };
+
       const transfer = api.tx.balances.transferKeepAlive(
         process.env.NEXT_PUBLIC_AVAIL_ADDRESS as string,
-        atomicAmount
+        atomicAmount,
       );
       const remark = api.tx.system.remark(remarkMessage);
 
       //using batchall, so in case of the transfer not being successful, remark will not be executed.
       const batchCall = api.tx.utility.batchAll([transfer, remark]);
 
-      console.log("About to submit transaction...");
-
-      const txResult = await new Promise<ISubmittableResult>(
-        (resolve, reject) => {
-          batchCall
-            .signAndSend(
-              selected?.address as `0x${string}`,
-              // @ts-ignore - Type incompatibility between polkadot versions in different packages
-              (result: ISubmittableResult) => {
-                console.log(`Tx status: ${result.status}`);
-
-                // Trigger callback when transaction is ready (user accepted and transaction is processing)
-                if (
-                  result.status.toString() === "Ready" &&
-                  onTransactionReady
-                ) {
-                  onTransactionReady(result.txHash?.toString() || "");
-                }
-
-                if (result.isInBlock) {
-                  console.log("Transaction included in block");
-                  resolve(result);
-                } else if (result.isError) {
-                  console.log("Transaction error");
-                  resolve(result);
-                }
-              }
-            )
-            .catch((error) => {
-              console.error("Transaction submission failed:", error);
-              reject(error);
-            });
-        }
-      );
+      const txResult = await new Promise<SubmittableResult>((resolve) => {
+        batchCall.signAndSend(
+          account.address,
+          options,
+          (result: SubmittableResult) => {
+            console.log(`Tx status: ${result.status}`);
+            if (result.status.toString() === "Ready" && onTransactionReady) {
+              onTransactionReady(result.txHash?.toString() || "");
+            }
+            if (result.isInBlock || result.isError) {
+              resolve(result);
+            }
+          },
+        );
+      });
 
       const error = txResult.dispatchError;
 
@@ -560,16 +700,30 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
       return err(
         error instanceof Error
           ? error
-          : new Error("Failed to batch transfer and remark")
+          : new Error("Failed to batch transfer and remark"),
       );
     }
-  };
+  }
 
   const handleClick = (e: MouseEvent, callback?: VoidFunction) => {
     e.preventDefault();
     e.stopPropagation();
     callback?.();
   };
+
+  // Re-validate balance when balance values change (e.g., when switching networks)
+  useEffect(() => {
+    if (tokenAmount && !balanceChecking) {
+      validateBalance(tokenAmount);
+    }
+  }, [
+    availBalance,
+    availERC20Balance,
+    balance.data?.formatted,
+    selectedChain?.name,
+    selectedToken?.name,
+    validateBalance,
+  ]);
 
   return (
     <div className="relative min-lg:w-[466px] h-[455px]">
@@ -604,6 +758,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                       value={tokenAmount}
                       onChange={(e) => {
                         const value = e.target.value;
+                        console.log("Input onChange triggered:", {
+                          value,
+                          browser: navigator.userAgent,
+                          timestamp: new Date().toISOString(),
+                        });
+
                         if (value === "") {
                           setTokenAmount("");
                           setEstimateData(undefined);
@@ -614,30 +774,10 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                         if (validValue) {
                           setTokenAmount(value);
+                          // Use async balance validation
+                          validateBalance(value);
                         } else {
                           setTokenAmountError("Enter valid amount");
-                          return;
-                        }
-                        const getCurrentBalance = () => {
-                          if (selectedChain?.name === "Avail") {
-                            return Number(availBalance);
-                          } else if (selectedChain?.name === "Ethereum") {
-                            if (selectedToken?.name === "ETH") {
-                              return Number(balance.data?.formatted || 0);
-                            } else if (selectedToken?.name === "AVAIL") {
-                              return Number(availERC20Balance);
-                            }
-                          }
-                          return 0;
-                        };
-
-                        const currentBalance = getCurrentBalance();
-
-                        if (currentBalance < +value) {
-                          setTokenAmountError(`Insufficient Balance`);
-                          setEstimateData(undefined);
-                        } else {
-                          setTokenAmountError("");
                         }
                       }}
                     />
@@ -691,19 +831,28 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                   >
                     You Receive (Credits)
                   </Text>
-                  <Input
-                    className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
-                    placeholder="00"
-                    id="creditsAmount"
-                    name="creditsAmount"
-                    tabIndex={-1}
-                    readOnly
-                    defaultValue={
-                      estimateData && !estimateDataLoading
-                        ? formatDataBytes(+estimateData)
-                        : ""
-                    }
-                  />
+                  <div className="relative">
+                    <Input
+                      className="border-none font-semibold text-white placeholder:font-semibold md:text-[32px] placeholder:text-[32px] placeholder:text-[#999] h-10 px-0 pointer-events-none"
+                      placeholder={estimateDataLoading ? "" : "00"}
+                      id="creditsAmount"
+                      name="creditsAmount"
+                      tabIndex={-1}
+                      readOnly
+                      value={
+                        estimateDataLoading
+                          ? ""
+                          : estimateData
+                            ? formatDataBytes(+estimateData)
+                            : ""
+                      }
+                    />
+                    {estimateDataLoading && (
+                      <div className="absolute inset-0 flex items-center justify-start pl-0 pt-3 pointer-events-none w-1/2">
+                        <CircleLoader />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -713,6 +862,33 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                     <Text variant={"error"} size={"sm"} weight={"medium"}>
                       {error}
                     </Text>
+                  )}
+                  {/* Warning message for insufficient balance or zero amount */}
+                  {tokenAmount && (
+                    <div className="w-full">
+                      {isZeroValue(tokenAmount) && (
+                        <Text variant={"error"} size={"sm"} weight={"medium"}>
+                          Please enter a valid amount greater than 0
+                        </Text>
+                      )}
+                      {!isZeroValue(tokenAmount) && balanceChecking && (
+                        <Text
+                          variant={"secondary-grey"}
+                          size={"sm"}
+                          weight={"medium"}
+                        >
+                          Checking balance...
+                        </Text>
+                      )}
+                      {!isZeroValue(tokenAmount) &&
+                        !balanceChecking &&
+                        tokenAmountError ===
+                          "Insufficient balance. Please enter a smaller amount" && (
+                          <Text variant={"error"} size={"sm"} weight={"medium"}>
+                            Insufficient balance. Please enter a smaller amount
+                          </Text>
+                        )}
+                    </div>
                   )}
                   {(!selectedChain || !selectedToken) && (
                     <Button
@@ -750,7 +926,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedChain ||
                               !tokenAmount ||
                               isZeroValue(tokenAmount) ||
-                              tokenAmountError !== ""
+                              tokenAmountError !== "" ||
+                              balanceChecking
                                 ? "disabled"
                                 : "primary"
                             }
@@ -760,7 +937,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               !selectedChain ||
                               !tokenAmount ||
                               isZeroValue(tokenAmount) ||
-                              tokenAmountError !== ""
+                              tokenAmountError !== "" ||
+                              balanceChecking
                             }
                           >
                             {loading ? (
@@ -771,6 +949,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                   size={24}
                                 />
                                 Waiting for confirmation
+                              </div>
+                            ) : balanceChecking ? (
+                              <div className="flex gap-x-1 justify-center">
+                                <LoaderCircle
+                                  className="animate-spin"
+                                  color="#fff"
+                                  size={24}
+                                />
+                                Checking balance...
                               </div>
                             ) : (
                               "Buy Now"
@@ -798,7 +985,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             if (!api || !selected) {
                               console.error(
                                 "API or selected account not available",
-                                { api, selected }
+                                { api, selected },
                               );
                               errorToast?.({
                                 label: "Wallet not connected properly",
@@ -840,7 +1027,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 (txHash: string) => {
                                   // This callback triggers when "Tx status: Ready" appears
                                   console.log(
-                                    "Transaction is ready, showing dialog..."
+                                    "Transaction is ready, showing dialog...",
                                   );
 
                                   const newTransaction: TransactionStatus = {
@@ -877,13 +1064,13 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? finalityTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(finalityTransaction);
                                     // Now CreditsTransactionProgress will handle finality → almost_done
                                   }, 2000); // Same timing as Ethereum flow
-                                }
+                                },
                               );
 
                               if (result.isErr()) {
@@ -892,7 +1079,7 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
 
                               console.log(
                                 "Transaction successful:",
-                                result.value
+                                result.value,
                               );
 
                               if (transaction) {
@@ -910,12 +1097,12 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                           order_id: +orderResponse?.data?.id,
                                           tx_hash: result.value.txHash,
                                         }),
-                                      }
+                                      },
                                     );
 
                                     if (!response.ok) {
                                       throw new Error(
-                                        `HTTP error! Status: ${response.status}`
+                                        `HTTP error! Status: ${response.status}`,
                                       );
                                     }
 
@@ -937,14 +1124,14 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? completedTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(completedTransaction);
                                   } catch (error) {
                                     console.error(
                                       "Failed to post inclusion details:",
-                                      error
+                                      error,
                                     );
                                     // Still mark as completed since blockchain transaction succeeded
                                     const completedTransaction: TransactionStatus =
@@ -962,8 +1149,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                       prev.map((t) =>
                                         t.id === transactionId
                                           ? completedTransaction
-                                          : t
-                                      )
+                                          : t,
+                                      ),
                                     );
                                     setShowTransaction(completedTransaction);
                                   }
@@ -973,8 +1160,34 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                               setTokenAmount("");
                               setLoading(false);
 
-                              // Refresh credit balance after successful transaction
-                              updateCreditBalance();
+                              // Dispatch transaction completed event to update all balances
+                              dispatchTransactionCompleted();
+
+                              // Refresh token balances immediately
+                              updateAllBalancesComprehensive();
+
+                              // Start polling for credit balance update
+                              if (estimateData) {
+                                console.log(
+                                  `Starting credit balance polling for ${estimateData} credits...`,
+                                );
+                                pollCreditBalanceUpdate(estimateData).then(
+                                  (success) => {
+                                    if (success) {
+                                      console.log(
+                                        "Credit balance polling completed successfully",
+                                      );
+                                      // Dispatch events after successful polling
+                                      dispatchTransactionCompleted();
+                                      dispatchCreditBalanceUpdated();
+                                    } else {
+                                      console.log(
+                                        "Credit balance polling timed out or failed",
+                                      );
+                                    }
+                                  },
+                                );
+                              }
                             } catch (error) {
                               console.error("Transaction failed:", error);
                               const message =
@@ -993,7 +1206,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedChain ||
                             !tokenAmount ||
                             isZeroValue(tokenAmount) ||
-                            tokenAmountError !== ""
+                            tokenAmountError !== "" ||
+                            balanceChecking
                               ? "disabled"
                               : "primary"
                           }
@@ -1003,7 +1217,8 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                             !selectedChain ||
                             !tokenAmount ||
                             isZeroValue(tokenAmount) ||
-                            tokenAmountError !== ""
+                            tokenAmountError !== "" ||
+                            balanceChecking
                           }
                         >
                           {loading ? (
@@ -1014,6 +1229,15 @@ const BuyCreditsCard = ({ token }: { token?: string }) => {
                                 size={24}
                               />
                               Waiting for confirmation
+                            </div>
+                          ) : balanceChecking ? (
+                            <div className="flex gap-x-1 justify-center">
+                              <LoaderCircle
+                                className="animate-spin"
+                                color="#fff"
+                                size={24}
+                              />
+                              Checking balance...
                             </div>
                           ) : (
                             "Buy Now"

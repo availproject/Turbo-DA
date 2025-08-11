@@ -18,6 +18,13 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
+// Circle loader component
+const CircleLoader = () => (
+  <div className="inline-flex items-center justify-center">
+    <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
+
 function DiscountEligibility({ token }: { token?: string }) {
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
@@ -28,7 +35,6 @@ function DiscountEligibility({ token }: { token?: string }) {
     []
   );
   const { open, setOpen } = useDialog();
-
 
   // Generate graph data points using hardcoded formula
   // Since the formula doesn't change often, we'll use predetermined points
@@ -117,16 +123,14 @@ function DiscountEligibility({ token }: { token?: string }) {
       return {
         size: "100 KB",
         credits: (73387.97 / 1024).toFixed(2),
+        isLoading: false,
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: credits
-        ? (Number(credits) / 1024).toFixed(2)
-        : loading
-        ? "..."
-        : "0.00",
+      credits: credits ? (Number(credits) / 1024).toFixed(2) : " - ",
+      isLoading: loading,
     };
   }, [debouncedValue, credits, loading]);
 
@@ -192,8 +196,13 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} credits. The higher the batch size,
-                    the lower would be your credit consumption.
+                    {batchSizeData.isLoading ? (
+                      <CircleLoader />
+                    ) : (
+                      batchSizeData.credits
+                    )}{" "}
+                    credits. The higher the batch size, the lower would be your
+                    credit consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">

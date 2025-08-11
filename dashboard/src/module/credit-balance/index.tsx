@@ -5,8 +5,14 @@ import { Text } from "@/components/text";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
-import { Wallet } from "lucide-react";
+import { Wallet, AlertTriangle, RefreshCw } from "lucide-react";
 import DiscountEligibility from "./component/discount-eligibility";
+import { useEffect, useState } from "react";
+import useBalance from "@/hooks/useBalance";
+
+// Custom event for transaction completion
+const TRANSACTION_COMPLETED_EVENT = "transactionCompleted";
+const CREDIT_BALANCE_UPDATED_EVENT = "creditBalanceUpdated";
 
 type CreditBalanceProps = {
   token?: string;
@@ -15,10 +21,73 @@ type CreditBalanceProps = {
 const CreditBalance = ({ token }: CreditBalanceProps) => {
   const { setOpen } = useDialog();
   const { creditBalance } = useOverview();
+  const { updateCreditBalance } = useBalance();
+  const [isProcessingCredits, setIsProcessingCredits] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Listen for transaction completion events
+  useEffect(() => {
+    const handleTransactionCompleted = () => {
+      console.log(
+        "Credit balance: Transaction completed event received, showing processing warning..."
+      );
+      setIsProcessingCredits(true);
+
+      // Hide the warning after 60 seconds (backend processing time) as fallback
+      setTimeout(() => {
+        setIsProcessingCredits(false);
+      }, 60000);
+    };
+
+    const handleCreditBalanceUpdated = () => {
+      console.log(
+        "Credit balance: Credit balance updated event received, hiding processing warning..."
+      );
+      setIsProcessingCredits(false);
+    };
+
+    window.addEventListener(
+      TRANSACTION_COMPLETED_EVENT,
+      handleTransactionCompleted
+    );
+    window.addEventListener(
+      CREDIT_BALANCE_UPDATED_EVENT,
+      handleCreditBalanceUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        TRANSACTION_COMPLETED_EVENT,
+        handleTransactionCompleted
+      );
+      window.removeEventListener(
+        CREDIT_BALANCE_UPDATED_EVENT,
+        handleCreditBalanceUpdated
+      );
+    };
+  }, []);
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+
+    setIsRefreshing(true);
+    try {
+      await updateCreditBalance();
+    } catch (error) {
+      console.error("Error refreshing credit balance:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <>
-      <div className="relative w-full h-[124px]">
+      <div
+        className={`relative w-full ${
+          isProcessingCredits ? "h-[178px]" : "h-[124px]"
+        }`}
+      >
         <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
           <Card className="relative shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden">
             <div className="bg-[url('/credit-balance-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
@@ -40,30 +109,63 @@ const CreditBalance = ({ token }: CreditBalanceProps) => {
                     >
                       Main Credit Balance
                     </Text>
-                    <Text
-                      as="span"
-                      weight={"bold"}
-                      size={"2xl"}
-                      className="mt-1"
-                    >
-                      {+creditBalance ? formatDataBytes(+creditBalance) : "-"}
-                    </Text>
+                    <div className="flex items-center gap-x-2 mt-1">
+                      <Text as="span" weight={"bold"} size={"2xl"}>
+                        {+creditBalance ? formatDataBytes(+creditBalance) : "-"}
+                      </Text>
+                      <button
+                        onClick={handleManualRefresh}
+                        disabled={isRefreshing}
+                        className="p-1 hover:bg-white/10 rounded-full transition-colors disabled:opacity-50"
+                        title="Refresh credit balance"
+                      >
+                        <RefreshCw
+                          size={16}
+                          color="#B3B3B3"
+                          strokeWidth={2}
+                          className={`${isRefreshing ? "animate-spin" : ""}`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <Button
-                  variant={"link"}
-                  className="underline-offset-[1.5px] decoration-[1px] mt-2.5 ml-10 w-fit"
-                  onClick={() => setOpen("main-credit-balance")}
-                >
-                  <Text
-                    as="span"
-                    size={"sm"}
-                    weight={"semibold"}
-                    variant={"grey-500"}
+                <div className="flex flex-col gap-y-2">
+                  <Button
+                    variant={"link"}
+                    className="underline-offset-[1.5px] decoration-[1px] mt-2.5 ml-10 w-fit"
+                    onClick={() => setOpen("main-credit-balance")}
                   >
-                    Calculate Credit Consumption
-                  </Text>
-                </Button>
+                    <Text
+                      as="span"
+                      size={"sm"}
+                      weight={"semibold"}
+                      variant={"grey-500"}
+                    >
+                      Calculate Credit Consumption
+                    </Text>
+                  </Button>
+
+                  {/* Warning message when credits are being processed */}
+                  {isProcessingCredits && (
+                    <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                      <div className="flex items-center gap-x-2">
+                        <AlertTriangle
+                          size={16}
+                          color="#F59E0B"
+                          strokeWidth={2}
+                        />
+                        <Text
+                          size={"sm"}
+                          weight={"medium"}
+                          className="text-yellow-500"
+                        >
+                          It takes around 40s to reflect your newly bought
+                          credits
+                        </Text>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

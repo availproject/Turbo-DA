@@ -82,6 +82,18 @@ class CreditService {
     chain_id: number;
   }) {
     const atomicAmount: string = parseUnits(amount.toString(), 18).toString();
+
+    console.log("API Request Details:", {
+      browser: navigator.userAgent,
+      url: `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}&chain_id=${chain_id}`,
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}&chain_id=${chain_id}`,
       {
