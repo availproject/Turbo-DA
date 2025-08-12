@@ -10,17 +10,10 @@ import Input from "@/components/input";
 import { Text } from "@/components/text";
 import { useConfig } from "@/providers/ConfigProvider";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
-import { config } from "@/config/walletConfig";
-import { TOKEN_MAP } from "@/lib/types";
-import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
-import BigNumber from "bignumber.js";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { readContract } from "wagmi/actions";
-import { useAccount, useBalance } from "wagmi";
-import { availChain, chainList } from "../utils/constant";
-import AvailChainConnect from "./avail-chain-connect";
+import { useState } from "react";
+import { supportedTokensAndChains } from "@/lib/types";
 
 const SelectChainToken = () => {
   const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
@@ -28,111 +21,6 @@ const SelectChainToken = () => {
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
-
-  // Wallet connections
-  const account = useAccount();
-  const { selected } = useAvailAccount();
-  const { api } = useAvailWallet();
-
-  // Balance states
-  const [availBalance, setAvailBalance] = useState<string>("0.0000");
-  const [availERC20Balance, setAvailERC20Balance] = useState<string>("0.0000");
-  const ethBalance = useBalance({ address: account.address });
-
-  // Fetch Avail balance
-  useEffect(() => {
-    if (api && selected?.address) {
-      fetchAvailBalance();
-    }
-  }, [api, selected?.address]);
-
-  // Fetch AVAIL ERC20 balance on Ethereum
-  useEffect(() => {
-    if (account.address && account.isConnected) {
-      fetchAvailERC20Balance();
-    }
-  }, [account.address, account.isConnected]);
-
-  const fetchAvailBalance = async () => {
-    if (!api || !selected?.address) return;
-
-    try {
-      const balance = await api.query.system.account(selected.address);
-      // @ts-ignore - Balance type compatibility
-      const freeBalance = balance.data.free.toString();
-
-      const decimals = 18;
-      const divisor = BigInt(10 ** decimals);
-      const freeBalanceBigInt = BigInt(freeBalance);
-      const wholePart = freeBalanceBigInt / divisor;
-      const remainder = freeBalanceBigInt % divisor;
-
-      const fractionalPart = remainder.toString().padStart(decimals, "0");
-      const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
-      const balanceNumber = parseFloat(balanceStr);
-
-      setAvailBalance(balanceNumber.toFixed(4));
-    } catch (error) {
-      console.error("Error fetching Avail balance:", error);
-      setAvailBalance("0.0000");
-    }
-  };
-
-  const fetchAvailERC20Balance = async () => {
-    if (!account.address) return;
-
-    try {
-      const availTokenAddress = TOKEN_MAP.avail?.token_address;
-      if (!availTokenAddress) return;
-
-      const erc20Abi = [
-        {
-          type: "function",
-          name: "balanceOf",
-          stateMutability: "view",
-          inputs: [{ name: "account", type: "address" }],
-          outputs: [{ name: "", type: "uint256" }],
-        },
-      ] as const;
-
-      const balance = await readContract(config, {
-        address: availTokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [account.address],
-        chainId: account.chainId,
-      });
-
-      // Convert from wei to AVAIL (18 decimals)
-      const balanceBN = new BigNumber(balance.toString());
-      const divisor = new BigNumber(10).pow(18);
-      const balanceInAvail = balanceBN.div(divisor).toFixed(4);
-
-      setAvailERC20Balance(balanceInAvail);
-    } catch (error) {
-      console.error("Error fetching AVAIL ERC20 balance:", error);
-      setAvailERC20Balance("0.0000");
-    }
-  };
-
-  const getTokenBalance = (chainName: string, tokenName: string) => {
-    if (chainName.toLowerCase() === "avail") {
-      // Avail chain - all tokens use Avail wallet balance
-      return availBalance;
-    } else if (chainName.toLowerCase() === "ethereum") {
-      if (tokenName.toLowerCase() === "eth") {
-        // ETH token on Ethereum - use ETH balance
-        return ethBalance.data?.formatted
-          ? Number(ethBalance.data.formatted).toFixed(4)
-          : "0.0000";
-      } else if (tokenName.toLowerCase() === "avail") {
-        // AVAIL token on Ethereum - use ERC20 balance
-        return availERC20Balance;
-      }
-      return "0.0000";
-    }
-    return "0.0000";
-  };
 
   return (
     <Dialog
@@ -162,39 +50,71 @@ const SelectChainToken = () => {
                 </div>
               </div>
               <div className="flex gap-y-2 flex-col my-6 px-3">
-                {Object.values(chainList).map((chain) => {
+                {Object.values(supportedTokensAndChains)
+                  .filter((chain) => chain.name !== "Avail")
+                  .map((chain) => {
+                    return (
+                      <Button
+                        variant={"outline"}
+                        key={`evm-${chain.name}`}
+                        className="flex gap-x-1.5 items-center justify-between"
+                        data-state={
+                          selectedChain?.name === chain.name
+                            ? "active"
+                            : "inactive"
+                        }
+                        onClick={() => {
+                          setSelectedChain(chain);
+                          setSelectedToken(undefined);
+                        }}
+                      >
+                        <div className="flex gap-x-2 items-center">
+                          <Image
+                            src={chain.icon}
+                            alt={chain.name}
+                            width={24}
+                            height={24}
+                            className="border border-border-blue rounded-full"
+                          />
+                          <Text weight={"semibold"}>{chain.name}</Text>
+                        </div>
+                      </Button>
+                    );
+                  })}
+              </div>
+              <div className="bg-border-blue h-px w-full" />
+              <div className="flex gap-y-2 flex-col mt-6 px-3">
+                {/* Avail Chain */}
+                {(() => {
+                  const availChain = supportedTokensAndChains.avail;
                   return (
                     <Button
                       variant={"outline"}
-                      key={`evm-${chain.name}`}
+                      key="avail-chain"
                       className="flex gap-x-1.5 items-center justify-between"
                       data-state={
-                        selectedChain?.name === chain.name
+                        selectedChain?.name === availChain.name
                           ? "active"
                           : "inactive"
                       }
                       onClick={() => {
-                        setSelectedChain(chain);
+                        setSelectedChain(availChain);
                         setSelectedToken(undefined);
                       }}
                     >
                       <div className="flex gap-x-2 items-center">
                         <Image
-                          src={chain.icon}
-                          alt={chain.name}
+                          src={availChain.icon}
+                          alt={availChain.name}
                           width={24}
                           height={24}
                           className="border border-border-blue rounded-full"
                         />
-                        <Text weight={"semibold"}>{chain.name}</Text>
+                        <Text weight={"semibold"}>{availChain.name}</Text>
                       </div>
                     </Button>
                   );
-                })}
-              </div>
-              <div className="bg-border-blue h-px w-full" />
-              <div className="flex gap-y-2 flex-col mt-6 px-3">
-                <AvailChainConnect />
+                })()}
               </div>
             </div>
             <div className="px-4 py-8 flex-1 h-full flex flex-col gap-y-2">
@@ -224,7 +144,7 @@ const SelectChainToken = () => {
               </div>
               <div className="flex flex-col gap-y-3 mt-2">
                 {selectedChain &&
-                  { ...chainList, ...availChain }[
+                  supportedTokensAndChains[
                     selectedChain.name.toLowerCase()
                   ]?.tokens.map((token) => (
                     <Button
@@ -244,16 +164,13 @@ const SelectChainToken = () => {
                       <div className="flex gap-x-2 items-center">
                         <Image
                           src={token.icon}
-                          alt="ethereum"
+                          alt={token.name}
                           width={24}
                           height={24}
                           className="border border-border-blue rounded-full"
                         />
                         <Text weight={"semibold"}>{token.name}</Text>
                       </div>
-                      <Text className="text-[#999]" weight={"semibold"}>
-                        {getTokenBalance(selectedChain.name, token.name)}
-                      </Text>
                     </Button>
                   ))}
               </div>
