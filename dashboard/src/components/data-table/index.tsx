@@ -7,7 +7,7 @@ import { Text } from "../text";
 type DynamicTableProps = {
   headings: { key: string; label: string }[];
   listdata: { [key: string]: any }[];
-  renderCell?: (heading: string, value: any, last: boolean) => ReactNode;
+  renderCell?: (heading: string, value: any, last: boolean, rowData?: any) => ReactNode;
 };
 
 const DynamicTable: FC<DynamicTableProps> = ({
@@ -77,7 +77,8 @@ const DynamicTable: FC<DynamicTableProps> = ({
                       {renderCell?.(
                         heading.key,
                         data[heading.key],
-                        array.length - 1 === index
+                        array.length - 1 === index,
+                        data
                       ) ??
                         defaultRenderCell(
                           heading.key,

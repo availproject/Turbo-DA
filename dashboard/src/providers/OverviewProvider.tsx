@@ -14,10 +14,10 @@ import React, {
   useState,
 } from "react";
 import { useConfig } from "./ConfigProvider";
+import { useUser } from "./UserProvider";
 
 interface OverviewContextType {
   creditBalance: number;
-  setCreditBalance: Dispatch<SetStateAction<number>>;
   filter: Filter;
   setFilter: Dispatch<SetStateAction<Filter>>;
   appsList: AppDetails[];
@@ -30,6 +30,8 @@ interface OverviewContextType {
   setMainTabSelected: Dispatch<SetStateAction<APP_TABS>>;
   transactionProgress: TransactionProgress[];
   setTransactionProgress: Dispatch<SetStateAction<TransactionProgress[]>>;
+  isAwaitingCreditUpdate: boolean;
+  setIsAwaitingCreditUpdate: Dispatch<SetStateAction<boolean>>;
 }
 
 type TransactionProgress = {
@@ -39,33 +41,30 @@ type TransactionProgress = {
 export type Filter = "All" | "Using Assigned Credits" | "Using Main Credits";
 
 export const OverviewContext = createContext<OverviewContextType | undefined>(
-  undefined
+  undefined,
 );
 
 interface OverviewProviderProps {
   children?: React.ReactNode;
-  creditBalance?: number;
 }
 
 export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   children,
-  creditBalance: mainCreditBalance,
 }) => {
-  const [creditBalance, setCreditBalance] = useState<number>(
-    mainCreditBalance ?? 0
-  );
+  const { creditBalance } = useUser();
   const [supportedTokens, setSupportedTokens] = useState<Tokens[]>([]);
   const [appsList, setAppsList] = useState<AppDetails[]>([]);
   const [apiKeys, setAPIKeys] = useState<Record<string, string[]>>();
   const [filter, setFilter] = useState<Filter>("All");
   const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
-    APP_TABS.OVERVIEW
+    APP_TABS.OVERVIEW,
   );
   const [tokenList, setTokenList] =
     useState<Record<string, Record<string, any>>>();
   const [transactionProgress, setTransactionProgress] = useState<
     TransactionProgress[]
   >([]);
+  const [isAwaitingCreditUpdate, setIsAwaitingCreditUpdate] = useState(false);
   const tokenMap = useTokenMap();
   const { token } = useConfig();
 
@@ -86,22 +85,21 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         filter === "Using Assigned Credits"
           ? app.credit_balance !== "0"
           : filter === "Using Main Credits"
-          ? app.credit_balance === "0"
-          : true
+            ? app.credit_balance === "0"
+            : true,
       ),
-    [appsList, filter]
+    [appsList, filter],
   );
 
   const allAppList = useMemo(
     () => filterAppList.filter((app) => app.app_name),
-    [filterAppList]
+    [filterAppList],
   );
 
   return (
     <OverviewContext.Provider
       value={{
         creditBalance,
-        setCreditBalance,
         appsList: allAppList,
         setAppsList,
         supportedTokens,
@@ -114,6 +112,8 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         setMainTabSelected,
         transactionProgress,
         setTransactionProgress,
+        isAwaitingCreditUpdate,
+        setIsAwaitingCreditUpdate,
       }}
     >
       {children}

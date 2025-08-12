@@ -74,16 +74,16 @@ class CreditService {
     token,
     amount,
     tokenAddress,
-    chain_id,
+    chainId,
   }: {
     token: string;
     amount: number;
     tokenAddress: string;
-    chain_id: number;
+    chainId: number;
   }) {
     const atomicAmount: string = parseUnits(amount.toString(), 18).toString();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}&chain_id=${chain_id}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_token?amount=${atomicAmount}&token_address=${tokenAddress}&chain_id=${chainId}`,
       {
         method: "GET",
         headers: {

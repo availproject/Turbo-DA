@@ -1,7 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { config } from "@/config/walletConfig";
-import { getChainId } from "@wagmi/core";
+import { getChainId, readContract } from "@wagmi/core";
 import { useCallback, useMemo } from "react";
+import { erc20Abi } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
 import { getBalance } from "wagmi/actions";
 
@@ -30,19 +31,38 @@ export default function useWallet() {
   }, [chainId]);
 
   const showBalance = useCallback(
-    async ({ token }: { token?: `0x${string}` }) => {
+    async ({ token, chainId: targetChainId }: { token?: `0x${string}`, chainId?: number }) => {
       if (!address) {
         return null;
       }
-      //TOCHECK: should we use the chainId from the parameter or the one from the hook or does it even matter?
       const balance = await getBalance(config, {
         address: address,
         token: token,
-        chainId: activeNetworkId,
+        chainId: targetChainId || activeNetworkId,
       });
       return balance.formatted;
     },
-    [address, chainId]
+    [address, chainId, activeNetworkId],
+  );
+
+  const getERC20AvailBalance = useCallback(
+    async (address: `0x${string}`, tokenAddress?: string, chainId?: number) => {
+      await readContract(config, {
+        address: (tokenAddress || "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44") as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [address],
+        chainId: chainId || activeNetworkId,
+      })
+        .then((balance) => {
+          if (!balance) return new BigNumber(0);
+          return new BigNumber(balance as bigint);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    },
+    [activeNetworkId],
   );
 
   /**
@@ -56,5 +76,6 @@ export default function useWallet() {
     activeNetworkId,
     switchNetwork,
     showBalance,
+    getERC20AvailBalance,
   };
 }

@@ -18,15 +18,6 @@ const SelectTokenButton = () => {
         {selectedChain ? (
           <div className="flex gap-x-3 justify-center items-center">
             <div className="relative w-10 h-10">
-              {selectedToken && (
-                <Image
-                  src={selectedToken.icon}
-                  width={40}
-                  height={40}
-                  alt={selectedToken.name}
-                />
-              )}
-
               {selectedChain && (
                 <Image
                   src={selectedChain.icon}
@@ -34,6 +25,15 @@ const SelectTokenButton = () => {
                   height={24}
                   alt={selectedChain.name}
                   className="absolute bottom-0 -right-2 border border-border-blue rounded-full"
+                />
+              )}
+
+              {selectedToken && (
+                <Image
+                  src={selectedToken.icon}
+                  width={40}
+                  height={40}
+                  alt={selectedToken.name}
                 />
               )}
             </div>

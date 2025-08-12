@@ -49,18 +49,21 @@ const SecondarySelect = ({
             />
           </SelectTrigger>
           <SelectContent
-            className="bg-grey-700 p-0 border border-border-blue mt-1"
+            className="p-0 border border-border-blue bg-[#112235] mt-1"
             defaultValue={defaultValue}
           >
-            {options.map((option) => (
+            {options.map((option, index: number) => (
               <SelectItem
                 key={option}
                 value={option}
-                className="cursor-pointer hover:bg-grey-800 focus:bg-grey-800 h-10"
+                className={cn(
+                  "cursor-pointer hover:bg-[#2b47613d] focus:bg-[#2b47613d] h-10",
+                  index === options.length - 1
+                    ? "border-b-0"
+                    : "border-b border-b-border-blue"
+                )}
               >
-                <Text weight={"bold"} size={"base"}>
-                  {option}
-                </Text>
+                <Text weight={"semibold"}>{option}</Text>
               </SelectItem>
             ))}
           </SelectContent>

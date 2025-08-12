@@ -10,6 +10,7 @@ import { useDialog } from "../../components/dialog/provider";
 import { Text } from "../../components/text";
 import { useAppToast } from "../../components/toast";
 import { Dialog, DialogContent } from "../../components/ui/dialog";
+import { ClickHandler } from "../purchase-credit/utils/types";
 
 const DeleteKeyAlert = ({
   id,
@@ -18,7 +19,7 @@ const DeleteKeyAlert = ({
 }: {
   id: string;
   identifier: string;
-  clearAlertCallback: () => void;
+  clearAlertCallback: ClickHandler;
 }) => {
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
@@ -72,10 +73,10 @@ const DeleteKeyAlert = ({
             <div className="flex flex-col gap-y-2 text-center">
               <DialogTitle>
                 <>
-                  <Text weight={"bold"} size={"4xl"}>
+                  <Text weight={"bold"} size={"2xl"}>
                     Are you sure you want to delete your key?
                   </Text>
-                  <Text weight={"bold"} size={"4xl"} className="mt-1">
+                  <Text weight={"bold"} size={"2xl"} className="mt-1">
                     ....{identifier}
                   </Text>
                 </>

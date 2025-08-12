@@ -11,29 +11,63 @@ import {
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import { turboDADocLink } from "@/lib/constant";
-import { convertBytes, formatInKB } from "@/lib/utils";
+import { convertBytes, formatInBytes, kbToCredits } from "@/lib/utils";
 import CreditService from "@/services/credit";
+import { useAuth } from "@/providers/AuthProvider";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 
-function DiscountEligibility({ token }: { token?: string }) {
+function DiscountEligibility() {
+  const { token } = useAuth();
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
   const debouncedValue = useDebounce(deferredQuery, 500);
-  const [credits, setCredits] = useState<number>();
-  const [loading, setLoading] = useState(false);
-  const [graphData, setGraphData] = useState<Array<{ x: number; y: number }>>(
-    []
-  );
+  const [credits, setCredits] = useState<number | null>();
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const { open, setOpen } = useDialog();
 
+  useEffect(() => {
+    if (!token) return;
+    if (!debouncedValue) {
+      return;
+    }
 
-  // Generate graph data points using hardcoded formula
-  // Since the formula doesn't change often, we'll use predetermined points
-  const generateGraphData = useMemo(() => {
-    // Real data points from API - cost ratio (credits per KB)
+    setIsLoadingCredits(true);
+    CreditService.creditEstimates({
+      token,
+      data: formatInBytes(debouncedValue) || 0,
+    })
+      .then((response) => {
+        // Convert API response from KB to credits
+        const creditsValue = response?.data ? kbToCredits(response.data) : null;
+        setCredits(creditsValue);
+      })
+      .catch((error) => {
+        console.log(error);
+      })
+      .finally(() => {
+        setIsLoadingCredits(false);
+      });
+  }, [debouncedValue]);
+
+  const batchSizeData = useMemo(() => {
+    if (!debouncedValue) {
+      return {
+        size: "100 KB",
+        credits: "71.82",
+      };
+    }
+
+    return {
+      size: `${convertBytes(debouncedValue)}`,
+      credits: credits || "71.82",
+    };
+  }, [debouncedValue, credits]);
+
+  const graphData = useMemo(() => {
     const dataPoints = [
       { batchSize: 10, cost: 0.9653 },
       { batchSize: 25, cost: 0.9126 },
@@ -47,8 +81,6 @@ function DiscountEligibility({ token }: { token?: string }) {
       { batchSize: 500, cost: 0.3343 },
       { batchSize: 750, cost: 0.2507 },
       { batchSize: 1000, cost: 0.2005 },
-      // API returns very small values for larger sizes, likely an issue
-      // So we'll extend the curve logically
       { batchSize: 1500, cost: 0.18 },
       { batchSize: 2000, cost: 0.17 },
       { batchSize: 3000, cost: 0.16 },
@@ -56,79 +88,22 @@ function DiscountEligibility({ token }: { token?: string }) {
       { batchSize: 5000, cost: 0.15 },
       { batchSize: 10000, cost: 0.14 },
     ];
-
-    // Convert to SVG coordinates (normalize to 0-455 width, 0-190 height)
     const maxBatchSize = 10000;
     const maxCost = 1.0;
 
-    return dataPoints.map((point) => ({
+    const points = dataPoints.map((point) => ({
       x: (point.batchSize / maxBatchSize) * 455,
-      y: 190 - (point.cost / maxCost) * 190, // Invert Y axis (SVG coordinate system)
+      y: 190 - (point.cost / maxCost) * 190,
     }));
+
+    const pathData = points
+      .map((point, index) =>
+        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`
+      )
+      .join(" ");
+
+    return pathData;
   }, []);
-
-  // Generate SVG path from data points
-  const generateSVGPath = useMemo(() => {
-    if (generateGraphData.length === 0) return "";
-
-    let path = `M ${generateGraphData[0].x} ${generateGraphData[0].y}`;
-
-    // Create smooth curve using quadratic bezier curves
-    for (let i = 1; i < generateGraphData.length; i++) {
-      const current = generateGraphData[i];
-      const previous = generateGraphData[i - 1];
-
-      // Control point for smooth curve (midpoint with slight adjustment)
-      const controlX = (previous.x + current.x) / 2;
-      const controlY = (previous.y + current.y) / 2;
-
-      path += ` Q ${controlX} ${controlY} ${current.x} ${current.y}`;
-    }
-
-    return path;
-  }, [generateGraphData]);
-
-  useEffect(() => {
-    if (!token) return;
-    if (!debouncedValue) {
-      setCredits(undefined);
-      return;
-    }
-
-    setLoading(true);
-    CreditService.creditEstimates({
-      token,
-      data: debouncedValue * 1024,
-    })
-      .then((response) => {
-        setCredits(response?.data);
-      })
-      .catch((error) => {
-        console.log(error);
-        setCredits(undefined);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [debouncedValue, token]);
-
-  const batchSizeData = useMemo(() => {
-    if (!debouncedValue) {
-      return {
-        size: "100 KB",
-        credits: (73387.97 / 1024).toFixed(2),
-      };
-    }
-
-    return {
-      size: `${convertBytes(debouncedValue)}`,
-      credits: credits
-        ? (Number(credits) / 1024).toFixed(2)
-        : loading
-        ? "..."
-        : "0.00",
-    };
-  }, [debouncedValue, credits, loading]);
 
   return (
     <Dialog
@@ -192,8 +167,16 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} credits. The higher the batch size,
-                    the lower would be your credit consumption.
+                    {isLoadingCredits && debouncedValue ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 className="w-2 h-2 animate-spin" />
+                        credits
+                      </span>
+                    ) : (
+                      `${batchSizeData.credits} credits`
+                    )}
+                    . The higher the batch size, the lower would be your credit
+                    consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">
@@ -223,26 +206,11 @@ function DiscountEligibility({ token }: { token?: string }) {
                         className="h-full"
                       >
                         <path
-                          d={generateSVGPath}
+                          d={graphData}
                           stroke="#3CA3FC"
-                          strokeWidth="2"
+                          strokeWidth="1.5"
                           fill="none"
                         />
-                        {/* Add current batch size indicator if user has entered a value */}
-                        {debouncedValue && credits && (
-                          <circle
-                            cx={(Math.min(debouncedValue, 10000) / 10000) * 455}
-                            cy={
-                              190 -
-                              (Number(credits) / 1024 / debouncedValue / 1.0) *
-                                190
-                            } // Real position based on API response
-                            r="4"
-                            fill="#3CA3FC"
-                            stroke="#fff"
-                            strokeWidth="2"
-                          />
-                        )}
                       </svg>
                     </div>
 
