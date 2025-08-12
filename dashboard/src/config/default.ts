@@ -14,6 +14,7 @@ type AppConfig = {
   bridgePricePollingInterval: number;
   bridgeHeadsPollingInterval: number;
   liquidityBridgeApiBaseUrl: string;
+  rpcUrl: string;
   bridgeLimits: {
     baseAvail: {
       min: number;
@@ -60,6 +61,7 @@ export const appConfig: AppConfig = {
   liquidityBridgeApiBaseUrl:
     process.env.NEXT_PUBLIC_LIQUIDITY_BRIDGE_API_URL ||
     "https://turing-liquidity-bridge.fra.avail.so",
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "wss://hex-rpc.avail.tools/ws",
   bridgeIndexerBaseUrl:
     process.env.NEXT_PUBLIC_BRIDGE_INDEXER_URL || "http://167.71.41.169:3000",
   bridgeIndexerPollingInterval: 30,
@@ -115,8 +117,8 @@ export const appConfig: AppConfig = {
     },
     avail: {
       liquidityBridgeAddress:
-        process.env.NEXT_PUBLIC_LP_ADDRESS_AVAIL ||
-        "5Hn8x2fstQmcqLg4C8pEiLWdAJhGaRv8jfYRUrnHeiMALvAX",
+        process.env.NEXT_PUBLIC_AVAIL_ADDRESS ||
+        "5EDAzYNAu561hN837GPZnfAjUh61vEJZFg3Sqyx9HzfHpccY",
     },
   },
 };

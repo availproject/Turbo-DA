@@ -2,6 +2,7 @@
 import { cn } from "@/lib/utils";
 import HistoryService from "@/services/history";
 import { DataTransaction } from "@/services/history/response";
+import { useAuthState } from "@/providers/AuthProvider";
 import { useCallback, useEffect, useState } from "react";
 
 import DynamicTable from "@/components/data-table";
@@ -9,18 +10,26 @@ import { Text } from "@/components/text";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "./empty-state";
 
-const DataPostingHistory = ({ token }: { token?: string }) => {
+const DataPostingHistory = () => {
   const [historyList, setHistoryList] = useState<DataTransaction[]>();
   const [loading, setLoading] = useState<boolean>(true);
+  const { isAuthenticated, isLoggedOut, token } = useAuthState();
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    if (isAuthenticated && token) {
+      fetchHistory();
+    } else if (isLoggedOut) {
+      setHistoryList([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, token, isLoggedOut]);
 
   const fetchHistory = async () => {
+    if (!token) return;
+
     try {
       const response = await HistoryService.getDataPostingHistory({
-        token: token!,
+        token,
       });
 
       setHistoryList(response?.data?.results ?? []);

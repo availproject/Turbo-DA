@@ -11,22 +11,22 @@ import {
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import { turboDADocLink } from "@/lib/constant";
-import { convertBytes, formatInKB } from "@/lib/utils";
+import { convertBytes, formatInBytes, kbToCredits } from "@/lib/utils";
 import CreditService from "@/services/credit";
+import { useAuth } from "@/providers/AuthProvider";
 import { Close } from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 
-function DiscountEligibility({ token }: { token?: string }) {
+function DiscountEligibility() {
+  const { token } = useAuth();
   const [batchValue, setBatchValue] = useState<number>();
   const deferredQuery = useDeferredValue(batchValue);
   const debouncedValue = useDebounce(deferredQuery, 500);
-  const [credits, setCredits] = useState<number>();
-  const [loading, setLoading] = useState(false);
-  const [graphData, setGraphData] = useState<Array<{ x: number; y: number }>>(
-    []
-  );
+  const [credits, setCredits] = useState<number | null>();
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const { open, setOpen } = useDialog();
 
 
@@ -95,20 +95,21 @@ function DiscountEligibility({ token }: { token?: string }) {
       return;
     }
 
-    setLoading(true);
+    setIsLoadingCredits(true);
     CreditService.creditEstimates({
       token,
-      data: debouncedValue * 1024,
+      data: formatInBytes(debouncedValue) || 0,
     })
       .then((response) => {
-        setCredits(response?.data);
+        // Convert API response from KB to credits
+        const creditsValue = response?.data ? kbToCredits(response.data) : null;
+        setCredits(creditsValue);
       })
       .catch((error) => {
         console.log(error);
-        setCredits(undefined);
       })
       .finally(() => {
-        setLoading(false);
+        setIsLoadingCredits(false);
       });
   }, [debouncedValue, token]);
 
@@ -116,19 +117,53 @@ function DiscountEligibility({ token }: { token?: string }) {
     if (!debouncedValue) {
       return {
         size: "100 KB",
-        credits: (73387.97 / 1024).toFixed(2),
+        credits: "71.82",
       };
     }
 
     return {
       size: `${convertBytes(debouncedValue)}`,
-      credits: credits
-        ? (Number(credits) / 1024).toFixed(2)
-        : loading
-        ? "..."
-        : "0.00",
+      credits: credits || "71.82",
     };
   }, [debouncedValue, credits, loading]);
+
+  const graphData = useMemo(() => {
+    const dataPoints = [
+      { batchSize: 10, cost: 0.9653 },
+      { batchSize: 25, cost: 0.9126 },
+      { batchSize: 50, cost: 0.8365 },
+      { batchSize: 75, cost: 0.772 },
+      { batchSize: 100, cost: 0.7168 },
+      { batchSize: 150, cost: 0.6271 },
+      { batchSize: 200, cost: 0.5573 },
+      { batchSize: 300, cost: 0.4559 },
+      { batchSize: 400, cost: 0.3857 },
+      { batchSize: 500, cost: 0.3343 },
+      { batchSize: 750, cost: 0.2507 },
+      { batchSize: 1000, cost: 0.2005 },
+      { batchSize: 1500, cost: 0.18 },
+      { batchSize: 2000, cost: 0.17 },
+      { batchSize: 3000, cost: 0.16 },
+      { batchSize: 4000, cost: 0.155 },
+      { batchSize: 5000, cost: 0.15 },
+      { batchSize: 10000, cost: 0.14 },
+    ];
+    const maxBatchSize = 10000;
+    const maxCost = 1.0;
+
+    const points = dataPoints.map((point) => ({
+      x: (point.batchSize / maxBatchSize) * 455,
+      y: 190 - (point.cost / maxCost) * 190,
+    }));
+
+    const pathData = points
+      .map((point, index) =>
+        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`,
+      )
+      .join(" ");
+
+    return pathData;
+  }, []);
 
   return (
     <Dialog
@@ -192,8 +227,16 @@ function DiscountEligibility({ token }: { token?: string }) {
                     you will consume{" "}
                   </Text>
                   <Text as="span" size={"sm"} weight={"bold"}>
-                    {batchSizeData.credits} credits. The higher the batch size,
-                    the lower would be your credit consumption.
+                    {isLoadingCredits && debouncedValue ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 className="w-2 h-2 animate-spin" />
+                        credits
+                      </span>
+                    ) : (
+                      `${batchSizeData.credits} credits`
+                    )}
+                    . The higher the batch size, the lower would be your credit
+                    consumption.
                   </Text>
                 </Text>
                 <Link href={turboDADocLink} target="_blank" className="w-fit">
@@ -223,9 +266,9 @@ function DiscountEligibility({ token }: { token?: string }) {
                         className="h-full"
                       >
                         <path
-                          d={generateSVGPath}
+                          d={graphData}
                           stroke="#3CA3FC"
-                          strokeWidth="2"
+                          strokeWidth="1.5"
                           fill="none"
                         />
                         {/* Add current batch size indicator if user has entered a value */}
