@@ -12,7 +12,6 @@ import { supportedTokensAndChains } from "@/lib/types";
 
 import Button from "@/components/button";
 import DynamicTable from "@/components/data-table";
-import Label from "@/components/label";
 import { Text } from "@/components/text";
 import { Skeleton } from "@/components/ui/skeleton";
 import Label from "@/components/label";
@@ -188,31 +187,8 @@ const CreditHistory = () => {
       switch (heading) {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
-        case "request_status":
-          // Map the API status to Label component status
-          let labelStatus: "pending" | "complete" | "cancelled";
-          switch (value?.toLowerCase()) {
-            case "completed":
-            case "success":
-              labelStatus = "complete";
-              break;
-            case "pending":
-              labelStatus = "pending";
-              break;
-            case "failed":
-            case "cancelled":
-              labelStatus = "cancelled";
-              break;
-            default:
-              labelStatus = "pending";
-          }
-          return <Label status={labelStatus} />;
         case "amount_credit":
-          return value ? `${Number(value).toLocaleString()} Credits` : "-";
-        case "amount_paid":
-          return value === "-" ? <Text variant={"light-grey"} size={"sm"}>-</Text> : 
-                 value === "Amount from blockchain" ? <Text variant={"light-grey"} size={"sm"}>View on Explorer</Text> : 
-                 value;
+          return value ? formatDataBytes(value) : "-";
         case "chain_id":
           const chainInfo = getChainInfo(value);
           return (
