@@ -30,7 +30,7 @@ const getTokenInfo = (chainName: string, tokenName: string) => {
 const BuyCreditsCard = () => {
   // Initialize global transaction processing
   useTransactionProgress();
-  
+
   const { getERC20AvailBalance, showBalance } = useWallet();
   const {
     isAuthenticated,
@@ -98,84 +98,6 @@ const BuyCreditsCard = () => {
     getERC20AvailBalance,
     showBalance,
   ]);
-
-  // Fetch Avail balance when selected account changes
-  useEffect(() => {
-    if (api && selected?.address && selectedChain?.name === "Avail") {
-      fetchAvailBalance();
-    }
-  }, [api, selected?.address, selectedChain?.name]);
-
-  // Fetch AVAIL ERC20 balance on Ethereum
-  useEffect(() => {
-    if (account.address && account.isConnected) {
-      fetchAvailERC20Balance();
-    }
-  }, [account.address, account.isConnected]);
-
-  const fetchAvailERC20Balance = async () => {
-    if (!account.address) return;
-
-    try {
-      const availTokenAddress = TOKEN_MAP.avail?.token_address;
-      if (!availTokenAddress) return;
-
-      const erc20Abi = [
-        {
-          type: "function",
-          name: "balanceOf",
-          stateMutability: "view",
-          inputs: [{ name: "account", type: "address" }],
-          outputs: [{ name: "", type: "uint256" }],
-        },
-      ] as const;
-
-      const balance = await readContract(config, {
-        address: availTokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [account.address],
-        chainId: account.chainId,
-      });
-
-      // Convert from wei to AVAIL (18 decimals)
-      const balanceBN = new BigNumber(balance.toString());
-      const divisor = new BigNumber(10).pow(18);
-      const balanceInAvail = balanceBN.div(divisor).toFixed(4);
-
-      setAvailERC20Balance(balanceInAvail);
-    } catch (error) {
-      console.error("Error fetching AVAIL ERC20 balance:", error);
-      setAvailERC20Balance("0");
-    }
-  };
-
-  const fetchAvailBalance = async () => {
-    if (!api || !selected?.address) return;
-
-    try {
-      const balance = await api.query.system.account(selected.address);
-      // @ts-ignore - Balance type compatibility between different Polkadot versions
-      const freeBalance = balance.data.free.toString();
-
-      // Avail uses 18 decimals
-      const decimals = 18;
-      const divisor = BigInt(10 ** decimals);
-      const freeBalanceBigInt = BigInt(freeBalance);
-      const wholePart = freeBalanceBigInt / divisor;
-      const remainder = freeBalanceBigInt % divisor;
-
-      // Convert remainder to decimal with proper precision
-      const fractionalPart = remainder.toString().padStart(decimals, "0");
-      const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
-      const balanceNumber = parseFloat(balanceStr);
-
-      setAvailBalance(balanceNumber.toFixed(4));
-    } catch (error) {
-      console.error("Error fetching Avail balance:", error);
-      setAvailBalance("0");
-    }
-  };
 
   useEffect(() => {
     if (debouncedValue && +debouncedValue > 0) {
@@ -286,24 +208,24 @@ const BuyCreditsCard = () => {
                   <Skeleton className="w-8 h-8 rounded-lg" sheen={false} />
                   <Skeleton className="w-32 h-6 rounded" />
                 </div>
-                
+
                 <div className="space-y-4">
                   <div>
                     <Skeleton className="w-24 h-4 rounded mb-2" />
                     <Skeleton className="w-full h-12 rounded-lg" />
                   </div>
-                  
+
                   <div>
                     <Skeleton className="w-32 h-4 rounded mb-2" />
                     <Skeleton className="w-full h-12 rounded-lg" />
                   </div>
-                  
+
                   <div>
                     <Skeleton className="w-40 h-4 rounded mb-2" />
                     <Skeleton className="w-full h-12 rounded-lg" />
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <Skeleton className="w-32 h-4 rounded" />
                   <Skeleton className="w-full h-12 rounded-lg" />

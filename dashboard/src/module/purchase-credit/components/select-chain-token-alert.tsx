@@ -10,10 +10,6 @@ import Input from "@/components/input";
 import { Text } from "@/components/text";
 import { useConfig } from "@/providers/ConfigProvider";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
-import { config } from "@/config/walletConfig";
-import { TOKEN_MAP } from "@/lib/types";
-import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
-import BigNumber from "bignumber.js";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
@@ -25,111 +21,6 @@ const SelectChainToken = () => {
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
-
-  // Wallet connections
-  const account = useAccount();
-  const { selected } = useAvailAccount();
-  const { api } = useAvailWallet();
-
-  // Balance states
-  const [availBalance, setAvailBalance] = useState<string>("0.0000");
-  const [availERC20Balance, setAvailERC20Balance] = useState<string>("0.0000");
-  const ethBalance = useBalance({ address: account.address });
-
-  // Fetch Avail balance
-  useEffect(() => {
-    if (api && selected?.address) {
-      fetchAvailBalance();
-    }
-  }, [api, selected?.address]);
-
-  // Fetch AVAIL ERC20 balance on Ethereum
-  useEffect(() => {
-    if (account.address && account.isConnected) {
-      fetchAvailERC20Balance();
-    }
-  }, [account.address, account.isConnected]);
-
-  const fetchAvailBalance = async () => {
-    if (!api || !selected?.address) return;
-
-    try {
-      const balance = await api.query.system.account(selected.address);
-      // @ts-ignore - Balance type compatibility
-      const freeBalance = balance.data.free.toString();
-
-      const decimals = 18;
-      const divisor = BigInt(10 ** decimals);
-      const freeBalanceBigInt = BigInt(freeBalance);
-      const wholePart = freeBalanceBigInt / divisor;
-      const remainder = freeBalanceBigInt % divisor;
-
-      const fractionalPart = remainder.toString().padStart(decimals, "0");
-      const balanceStr = `${wholePart.toString()}.${fractionalPart}`;
-      const balanceNumber = parseFloat(balanceStr);
-
-      setAvailBalance(balanceNumber.toFixed(4));
-    } catch (error) {
-      console.error("Error fetching Avail balance:", error);
-      setAvailBalance("0.0000");
-    }
-  };
-
-  const fetchAvailERC20Balance = async () => {
-    if (!account.address) return;
-
-    try {
-      const availTokenAddress = TOKEN_MAP.avail?.token_address;
-      if (!availTokenAddress) return;
-
-      const erc20Abi = [
-        {
-          type: "function",
-          name: "balanceOf",
-          stateMutability: "view",
-          inputs: [{ name: "account", type: "address" }],
-          outputs: [{ name: "", type: "uint256" }],
-        },
-      ] as const;
-
-      const balance = await readContract(config, {
-        address: availTokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [account.address],
-        chainId: account.chainId,
-      });
-
-      // Convert from wei to AVAIL (18 decimals)
-      const balanceBN = new BigNumber(balance.toString());
-      const divisor = new BigNumber(10).pow(18);
-      const balanceInAvail = balanceBN.div(divisor).toFixed(4);
-
-      setAvailERC20Balance(balanceInAvail);
-    } catch (error) {
-      console.error("Error fetching AVAIL ERC20 balance:", error);
-      setAvailERC20Balance("0.0000");
-    }
-  };
-
-  const getTokenBalance = (chainName: string, tokenName: string) => {
-    if (chainName.toLowerCase() === "avail") {
-      // Avail chain - all tokens use Avail wallet balance
-      return availBalance;
-    } else if (chainName.toLowerCase() === "ethereum") {
-      if (tokenName.toLowerCase() === "eth") {
-        // ETH token on Ethereum - use ETH balance
-        return ethBalance.data?.formatted
-          ? Number(ethBalance.data.formatted).toFixed(4)
-          : "0.0000";
-      } else if (tokenName.toLowerCase() === "avail") {
-        // AVAIL token on Ethereum - use ERC20 balance
-        return availERC20Balance;
-      }
-      return "0.0000";
-    }
-    return "0.0000";
-  };
 
   return (
     <Dialog

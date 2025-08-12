@@ -29,69 +29,9 @@ function DiscountEligibility() {
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const { open, setOpen } = useDialog();
 
-
-  // Generate graph data points using hardcoded formula
-  // Since the formula doesn't change often, we'll use predetermined points
-  const generateGraphData = useMemo(() => {
-    // Real data points from API - cost ratio (credits per KB)
-    const dataPoints = [
-      { batchSize: 10, cost: 0.9653 },
-      { batchSize: 25, cost: 0.9126 },
-      { batchSize: 50, cost: 0.8365 },
-      { batchSize: 75, cost: 0.772 },
-      { batchSize: 100, cost: 0.7168 },
-      { batchSize: 150, cost: 0.6271 },
-      { batchSize: 200, cost: 0.5573 },
-      { batchSize: 300, cost: 0.4559 },
-      { batchSize: 400, cost: 0.3857 },
-      { batchSize: 500, cost: 0.3343 },
-      { batchSize: 750, cost: 0.2507 },
-      { batchSize: 1000, cost: 0.2005 },
-      // API returns very small values for larger sizes, likely an issue
-      // So we'll extend the curve logically
-      { batchSize: 1500, cost: 0.18 },
-      { batchSize: 2000, cost: 0.17 },
-      { batchSize: 3000, cost: 0.16 },
-      { batchSize: 4000, cost: 0.155 },
-      { batchSize: 5000, cost: 0.15 },
-      { batchSize: 10000, cost: 0.14 },
-    ];
-
-    // Convert to SVG coordinates (normalize to 0-455 width, 0-190 height)
-    const maxBatchSize = 10000;
-    const maxCost = 1.0;
-
-    return dataPoints.map((point) => ({
-      x: (point.batchSize / maxBatchSize) * 455,
-      y: 190 - (point.cost / maxCost) * 190, // Invert Y axis (SVG coordinate system)
-    }));
-  }, []);
-
-  // Generate SVG path from data points
-  const generateSVGPath = useMemo(() => {
-    if (generateGraphData.length === 0) return "";
-
-    let path = `M ${generateGraphData[0].x} ${generateGraphData[0].y}`;
-
-    // Create smooth curve using quadratic bezier curves
-    for (let i = 1; i < generateGraphData.length; i++) {
-      const current = generateGraphData[i];
-      const previous = generateGraphData[i - 1];
-
-      // Control point for smooth curve (midpoint with slight adjustment)
-      const controlX = (previous.x + current.x) / 2;
-      const controlY = (previous.y + current.y) / 2;
-
-      path += ` Q ${controlX} ${controlY} ${current.x} ${current.y}`;
-    }
-
-    return path;
-  }, [generateGraphData]);
-
   useEffect(() => {
     if (!token) return;
     if (!debouncedValue) {
-      setCredits(undefined);
       return;
     }
 
@@ -111,7 +51,7 @@ function DiscountEligibility() {
       .finally(() => {
         setIsLoadingCredits(false);
       });
-  }, [debouncedValue, token]);
+  }, [debouncedValue]);
 
   const batchSizeData = useMemo(() => {
     if (!debouncedValue) {
@@ -125,7 +65,7 @@ function DiscountEligibility() {
       size: `${convertBytes(debouncedValue)}`,
       credits: credits || "71.82",
     };
-  }, [debouncedValue, credits, loading]);
+  }, [debouncedValue, credits]);
 
   const graphData = useMemo(() => {
     const dataPoints = [
@@ -158,7 +98,7 @@ function DiscountEligibility() {
 
     const pathData = points
       .map((point, index) =>
-        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`,
+        index === 0 ? `M${point.x} ${point.y}` : `L${point.x} ${point.y}`
       )
       .join(" ");
 
@@ -271,21 +211,6 @@ function DiscountEligibility() {
                           strokeWidth="1.5"
                           fill="none"
                         />
-                        {/* Add current batch size indicator if user has entered a value */}
-                        {debouncedValue && credits && (
-                          <circle
-                            cx={(Math.min(debouncedValue, 10000) / 10000) * 455}
-                            cy={
-                              190 -
-                              (Number(credits) / 1024 / debouncedValue / 1.0) *
-                                190
-                            } // Real position based on API response
-                            r="4"
-                            fill="#3CA3FC"
-                            stroke="#fff"
-                            strokeWidth="2"
-                          />
-                        )}
                       </svg>
                     </div>
 
