@@ -16,7 +16,7 @@ import AuthenticationService from "@/services/authentication";
 import AppService from "@/services/app";
 
 export class KYCService {
-  private static baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/v1/user/kyc`;
+  private static baseUrl = "http://localhost:8000/v1/user/kyc";
 
   static async generateAccessToken(
     clerkJWT: string,

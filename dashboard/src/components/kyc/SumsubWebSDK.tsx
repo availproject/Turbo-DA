@@ -7,11 +7,6 @@ interface SumsubWebSDKProps {
   onTokenExpiration: () => Promise<string>;
   onCompleted: () => void;
   onError: (error: any) => void;
-  onStatusUpdate?: (status: {
-    reviewStatus?: string;
-    answer?: string;
-    payload: any;
-  }) => void;
   className?: string;
 }
 
@@ -20,7 +15,6 @@ export default function SumsubWebSDK({
   onTokenExpiration,
   onCompleted,
   onError,
-  onStatusUpdate,
   className,
 }: SumsubWebSDKProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -32,7 +26,6 @@ export default function SumsubWebSDK({
   const onCompletedRef = useRef(onCompleted);
   const onErrorRef = useRef(onError);
   const onTokenExpirationRef = useRef(onTokenExpiration);
-  const onStatusUpdateRef = useRef(onStatusUpdate);
   const firedCompletedRef = useRef(false);
 
   function extractDecisionAnswer(payload: any): string | undefined {
@@ -61,10 +54,6 @@ export default function SumsubWebSDK({
   useEffect(() => {
     onTokenExpirationRef.current = onTokenExpiration;
   }, [onTokenExpiration]);
-
-  useEffect(() => {
-    onStatusUpdateRef.current = onStatusUpdate;
-  }, [onStatusUpdate]);
 
   useEffect(() => {
     let disposed = false;
@@ -132,9 +121,6 @@ export default function SumsubWebSDK({
                 "answer=",
                 answerRaw
               );
-              try {
-                onStatusUpdateRef.current?.({ reviewStatus, answer, payload });
-              } catch {}
               if (
                 !firedCompletedRef.current &&
                 reviewStatus === "completed" &&
@@ -151,13 +137,6 @@ export default function SumsubWebSDK({
             try {
               const answerRaw = extractDecisionAnswer(payload);
               const answer = answerRaw?.toString?.().toUpperCase?.();
-              try {
-                onStatusUpdateRef.current?.({
-                  reviewStatus: undefined,
-                  answer,
-                  payload,
-                });
-              } catch {}
               if (!firedCompletedRef.current && answer === "GREEN") {
                 firedCompletedRef.current = true;
                 onCompletedRef.current();

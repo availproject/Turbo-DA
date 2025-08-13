@@ -13,7 +13,6 @@ interface KYCDialogProps {
 }
 
 type KYCStep = "checking" | "verification" | "completed";
-type InterimStatus = "pending" | "cancelled" | null;
 
 export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   const { token } = useAuth();
@@ -21,7 +20,6 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   const [step, setStep] = useState<KYCStep>("checking");
   const [accessToken, setAccessToken] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [interimStatus, setInterimStatus] = useState<InterimStatus>(null);
 
   // Initialize when dialog opens
   useEffect(() => {
@@ -121,37 +119,6 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         );
 
       case "verification":
-        if (interimStatus === "pending") {
-          return (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mb-4" />
-              <DialogTitle>
-                <div className="text-xl font-bold text-white text-center">
-                  Verification in review
-                </div>
-              </DialogTitle>
-              <div className="text-gray-300 text-center mt-2">
-                Your documents are submitted and being reviewed. You can close
-                this window and return later.
-              </div>
-            </div>
-          );
-        }
-        if (interimStatus === "cancelled") {
-          return (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-4" />
-              <DialogTitle>
-                <div className="text-xl font-bold text-white text-center">
-                  Verification cancelled
-                </div>
-              </DialogTitle>
-              <div className="text-gray-300 text-center mt-2">
-                Your verification was cancelled.
-              </div>
-            </div>
-          );
-        }
         return (
           <div className="h-full w-full overflow-auto">
             <SumsubWebSDK
@@ -159,17 +126,6 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
               onTokenExpiration={getNewAccessToken}
               onCompleted={handleVerificationCompleted}
               onError={handleVerificationError}
-              onStatusUpdate={({ reviewStatus, answer }) => {
-                const status = (reviewStatus || "").toLowerCase();
-                const ans = (answer || "").toUpperCase();
-                if (status === "pending" || ans === "YELLOW") {
-                  setInterimStatus("pending");
-                } else if (status === "canceled" || status === "cancelled") {
-                  setInterimStatus("cancelled");
-                } else {
-                  setInterimStatus(null);
-                }
-              }}
               className="min-h-[500px]"
             />
           </div>
