@@ -31,6 +31,7 @@ const AppsCard = () => {
       return;
     }
 
+    setLoading(true);
     updateAPIKeys();
     AppService.getApps({ token })
       .then((response) => {
@@ -65,10 +66,7 @@ const AppsCard = () => {
                     className="flex items-center justify-between p-4 border border-border-blue rounded-lg"
                   >
                     <div className="flex items-center gap-4">
-                      <Skeleton
-                        className="w-12 h-12 rounded-lg"
-                        sheen={false}
-                      />
+                      <Skeleton className="w-12 h-12 rounded-lg" />
                       <div className="space-y-2">
                         <Skeleton className="w-32 h-5 rounded" />
                         <Skeleton className="w-24 h-4 rounded" />
@@ -76,7 +74,7 @@ const AppsCard = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <Skeleton className="w-20 h-4 rounded" />
-                      <Skeleton className="w-6 h-6 rounded" sheen={false} />
+                      <Skeleton className="w-6 h-6 rounded" />
                     </div>
                   </div>
                 ))}
@@ -152,8 +150,8 @@ const AppsCard = () => {
               ) : null}
               {loading ? (
                 <div className="flex flex-col gap-y-4 mt-4 px-4">
-                  <Skeleton className="h-52" sheen={false} />
-                  <Skeleton className="h-52" sheen={false} />
+                  <Skeleton className="h-52" />
+                  <Skeleton className="h-52" />
                 </div>
               ) : (
                 <AppList />
