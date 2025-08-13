@@ -14,12 +14,15 @@ class AuthenticationService {
       );
 
       if (!response.ok) {
-        return undefined;
+        const errorText = await response.text();
+        throw new Error(
+          `Registration failed: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       return await response.json();
     } catch (error) {
-      return undefined;
+      throw error;
     }
   }
 

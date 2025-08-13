@@ -4,6 +4,7 @@ import Header from "@/module/header";
 import { OverviewProvider } from "@/providers/OverviewProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { UserProvider } from "@/providers/UserProvider";
+import { KYCProvider } from "@/providers/KYCProvider";
 import { ReactNode } from "react";
 import { ToastContainer } from "react-toastify";
 import { Providers } from "./providers";
@@ -16,24 +17,26 @@ export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <AuthProvider>
       <UserProvider>
-        <Providers>
-          <Header />
-          <OverviewProvider>
-            {children}
-            <ToastContainer
-              className={"backdrop-blur-lg"}
-              containerId={"toast-container"}
-              style={{ top: "80px" }}
-            />
-            <ToastContainer
-              containerId={"stacked-toast-container"}
-              style={{ top: "80px", width: "100%", maxWidth: "530px" }}
-              newestOnTop={true}
-              stacked={true}
-            />
-          </OverviewProvider>
-          <Footer />
-        </Providers>
+        <KYCProvider>
+          <Providers>
+            <Header />
+            <OverviewProvider>
+              {children}
+              <ToastContainer
+                className={"backdrop-blur-lg"}
+                containerId={"toast-container"}
+                style={{ top: "80px" }}
+              />
+              <ToastContainer
+                containerId={"stacked-toast-container"}
+                style={{ top: "80px", width: "100%", maxWidth: "530px" }}
+                newestOnTop={true}
+                stacked={true}
+              />
+            </OverviewProvider>
+            <Footer />
+          </Providers>
+        </KYCProvider>
       </UserProvider>
     </AuthProvider>
   );

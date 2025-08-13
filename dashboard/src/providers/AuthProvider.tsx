@@ -58,7 +58,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       const newToken = await fetchToken();
       setToken(newToken);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Authentication failed";
+      const errorMessage =
+        err instanceof Error ? err.message : "Authentication failed";
       setError(errorMessage);
       setToken(null);
     } finally {
@@ -99,9 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
 
@@ -141,7 +140,9 @@ export const withAuth = <P extends object>(
     if (!isAuthenticated) {
       return (
         <div className="flex items-center justify-center min-h-[200px]">
-          <div className="text-gray-400">Please sign in to access this content.</div>
+          <div className="text-gray-400">
+            Please sign in to access this content.
+          </div>
         </div>
       );
     }
