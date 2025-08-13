@@ -41,7 +41,7 @@ type TransactionProgress = {
 export type Filter = "All" | "Using Assigned Credits" | "Using Main Credits";
 
 export const OverviewContext = createContext<OverviewContextType | undefined>(
-  undefined,
+  undefined
 );
 
 interface OverviewProviderProps {
@@ -57,7 +57,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [apiKeys, setAPIKeys] = useState<Record<string, string[]>>();
   const [filter, setFilter] = useState<Filter>("All");
   const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
-    APP_TABS.OVERVIEW,
+    APP_TABS.OVERVIEW
   );
   const [tokenList, setTokenList] =
     useState<Record<string, Record<string, any>>>();
@@ -85,15 +85,15 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         filter === "Using Assigned Credits"
           ? app.credit_balance !== "0"
           : filter === "Using Main Credits"
-            ? app.credit_balance === "0"
-            : true,
+          ? app.credit_balance === "0"
+          : true
       ),
-    [appsList, filter],
+    [appsList, filter]
   );
 
   const allAppList = useMemo(
-    () => filterAppList.filter((app) => app.app_name),
-    [filterAppList],
+    () => filterAppList.filter((app) => app.app_id),
+    [filterAppList]
   );
 
   return (

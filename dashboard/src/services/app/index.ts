@@ -2,7 +2,13 @@ import { BaseResponse } from "../response";
 import { AppDetails } from "./response";
 
 class AppService {
-  static async getApps({ token }: { token: string }) {
+  static async getApps({
+    token,
+    signal,
+  }: {
+    token: string;
+    signal?: AbortSignal;
+  }) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_apps`,
       {
@@ -11,6 +17,7 @@ class AppService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        signal,
       }
     );
 
