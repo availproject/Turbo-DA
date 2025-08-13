@@ -20,6 +20,7 @@ import PrimaryInput from "../../components/input/primary";
 import AvatarList from "../../components/lottie-comp/avatar-list";
 import { Text } from "../../components/text";
 import { useAppToast } from "../../components/toast";
+import { useOverview } from "@/providers/OverviewProvider";
 
 type CreateAppProps = {
   type?: "create" | "edit";
@@ -46,10 +47,24 @@ export default function CreateApp({
   const { token } = useConfig();
   const { updateAppList } = useApp();
   const { success, error: failure } = useAppToast();
+  const { appsList } = useOverview();
+  const [appIdError, setAppIdError] = useState("");
 
   const saveAppDetails = useCallback(async () => {
     if ((!selectedAvatar && !previewUploadedAvatar) || !appId || !appName) {
       setError("All fields are required");
+      return;
+    }
+
+    // Prevent duplicate App ID on submit (allow same ID when editing the same app)
+    const numericAppId = +appId!;
+    const isDuplicate = appsList?.some((app) => {
+      const sameId = app.app_id === numericAppId;
+      const isSameApp = type === "edit" && appData && app.id === appData.id;
+      return sameId && !isSameApp;
+    });
+    if (isDuplicate) {
+      setAppIdError("This App ID is already in use");
       return;
     }
 
@@ -106,7 +121,7 @@ export default function CreateApp({
     } finally {
       setLoading(false);
     }
-  }, [token, selectedAvatar, appId, appName, previewUploadedAvatar]);
+  }, [token, selectedAvatar, appId, appName, previewUploadedAvatar, appsList]);
 
   const handleClick = () => inputRef.current?.click();
 
@@ -268,14 +283,26 @@ export default function CreateApp({
               onChange={(value) => {
                 if (value === "") {
                   setAppId("");
+                  setAppIdError("");
                   return;
                 }
                 const validValue = /^\d+(\.\d*)?$/.test(value);
 
                 if (validValue) {
                   setAppId(value);
+                  const numeric = +value;
+                  const isDuplicate = appsList?.some((app) => {
+                    const sameId = app.app_id === numeric;
+                    const isSameApp =
+                      type === "edit" && appData && app.id === appData.id;
+                    return sameId && !isSameApp;
+                  });
+                  setAppIdError(
+                    isDuplicate ? "This App ID is already in use" : ""
+                  );
                 }
               }}
+              error={appIdError}
             />
           </div>
 
@@ -288,7 +315,10 @@ export default function CreateApp({
             <Button
               onClick={saveAppDetails}
               variant={
-                !appName || !appId || (!selectedAvatar && !uploadedAvatar)
+                !appName ||
+                !appId ||
+                (!selectedAvatar && !uploadedAvatar) ||
+                !!appIdError
                   ? "disabled"
                   : "primary"
               }
@@ -296,7 +326,8 @@ export default function CreateApp({
                 loading ||
                 !appName ||
                 !appId ||
-                (!selectedAvatar && !uploadedAvatar)
+                (!selectedAvatar && !uploadedAvatar) ||
+                !!appIdError
               }
             >
               {loading ? (

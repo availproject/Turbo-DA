@@ -90,8 +90,8 @@ const AppsCard = () => {
                         sheen={false}
                       />
                       <div className="space-y-2">
-                        <Skeleton className="w-32 h-5 rounded" />
-                        <Skeleton className="w-24 h-4 rounded" />
+                        <Skeleton className="w-32 h-5 rounded" sheen={false} />
+                        <Skeleton className="w-24 h-4 rounded" sheen={false} />
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
