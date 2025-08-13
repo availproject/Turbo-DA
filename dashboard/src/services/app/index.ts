@@ -287,6 +287,37 @@ class AppService {
     return await response.json();
   }
 
+  static async updateAppId({
+    token,
+    appId,
+    availAppId,
+  }: {
+    token: string;
+    appId: string; // UUID
+    availAppId: number; // numeric avail app id
+  }) {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/update_app_id`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          app_id: appId,
+          avail_app_id: availAppId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   static async getTokens({ token }: { token: string }) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/token_map`,
