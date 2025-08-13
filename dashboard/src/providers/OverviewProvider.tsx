@@ -91,7 +91,10 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
     [appsList, filter]
   );
 
-  const allAppList = useMemo(() => filterAppList, [filterAppList]);
+  const allAppList = useMemo(
+    () => filterAppList.filter((app) => app.app_id),
+    [filterAppList]
+  );
 
   return (
     <OverviewContext.Provider

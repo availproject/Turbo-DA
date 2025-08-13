@@ -124,7 +124,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   });
 
   return (
-    <div className="w-full p-4 pb-10 rounded-lg border border-solid border-border-blue relative overflow-hidden">
+    <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
       <div className="flex w-full gap-x-1.5">
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
           {app?.app_logo?.includes(".") ? (
@@ -394,7 +394,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       <div
         className={cn(
           "absolute transition-all duration-500 bg-[#13334F] w-full left-0 p-4 flex gap-y-1 flex-col border-t border-border-blue",
-          displayAPIKey ? "bottom-0" : "-bottom-40"
+          displayAPIKey ? "bottom-0" : "-bottom-32"
         )}
       >
         <div className="flex justify-between items-center">
