@@ -96,14 +96,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   const creditsData = useMemo(() => {
     if (useMainBalance) {
-      const totalMainCredit = creditBalance
-        ? +app.fallback_credit_used + creditBalance
-        : +app.fallback_credit_used;
+      const used = +app.fallback_credit_used;
+      const total = creditBalance || 0;
+      const remaining = Math.max(total - used, 0);
 
       return {
-        usedCredit: +app.fallback_credit_used,
-        totalCredit: +totalMainCredit,
-        remainingCredits: creditBalance,
+        usedCredit: used,
+        totalCredit: total,
+        remainingCredits: remaining,
       };
     }
     return {
@@ -113,10 +113,11 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     };
   }, [useMainBalance, creditBalance]);
 
-  const progress = useMemo(
-    () => (creditsData?.usedCredit / creditsData?.totalCredit) * 100,
-    [creditsData?.usedCredit, creditsData?.totalCredit]
-  );
+  const progress = useMemo(() => {
+    if (!creditsData?.totalCredit) return 0;
+    const pct = (creditsData.usedCredit / creditsData.totalCredit) * 100;
+    return Math.min(Math.max(pct, 0), 100);
+  }, [creditsData?.usedCredit, creditsData?.totalCredit]);
 
   console.log({
     creditBalance,
@@ -330,7 +331,8 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         <div className="flex flex-col w-full items-start gap-1 mt-2">
           <Text size={"sm"} weight={"semibold"}>
             {formatDataBytes(creditsData.usedCredit)} used of{" "}
-            {formatDataBytes(creditsData.totalCredit)} assigned
+            {formatDataBytes(creditsData.totalCredit)}{" "}
+            {useMainBalance ? "main balance" : "assigned"}
           </Text>
           <div className="w-full">
             {useMainBalance ? (
