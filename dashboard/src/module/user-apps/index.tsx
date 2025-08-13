@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "../transactions-history/components/empty-state";
 import AppList from "./app-list";
 import CreateApp from "./create-app";
+import { useUser } from "@/providers/UserProvider";
 
 const AppsCard = () => {
   const { setOpen } = useDialog();
@@ -22,6 +23,7 @@ const AppsCard = () => {
   const { setFilter, filter, appsList, setAppsList } = useOverview();
   const { updateAPIKeys } = useAPIKeys();
   const { isAuthenticated, isLoading, isLoggedOut, token } = useAuthState();
+  const { user } = useUser();
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -40,7 +42,7 @@ const AppsCard = () => {
       .finally(() => {
         setLoading(false);
       });
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, user?.id]);
 
   // Don't render anything if user is logged out
   if (isLoggedOut) {
