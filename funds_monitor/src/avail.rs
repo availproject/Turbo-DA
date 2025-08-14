@@ -27,7 +27,9 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
 
     let mut connection = utils.establish_connection()?;
 
-    let _ = sync_database(&mut connection, &sdk, &utils, &cfg.avail_deposit_address).await;
+    if let Err(e) = sync_database(&mut connection, &sdk, &utils, &cfg.avail_deposit_address).await {
+        error(&format!("Failed to sync database: {}", e.to_string()));
+    }
 
     let mut stream = sdk.client.blocks().subscribe_finalized().await?;
     while let Some(avail_block) = stream.next().await {
@@ -40,8 +42,11 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
                         continue;
                     }
                 };
-                info(&format!("block: {}", block.block.number()));
-                let _ = process_block(block, &utils, &cfg.avail_deposit_address).await;
+                info(&format!("Avail block number: {}", block.block.number()));
+
+                if let Err(e) = process_block(block, &utils, &cfg.avail_deposit_address).await {
+                    error(&format!("Failed to sync database: {}", e.to_string()));
+                }
             }
             Err(e) => {
                 error(&format!("Error fetching block: {}", e));
@@ -80,7 +85,7 @@ async fn process_block(
     // Filtering
     for batch_all in all_batch_calls {
         let number = block.block.number();
-        let hash = block.block.hash().to_string();
+        let hash = hex::encode(block.block.hash().as_bytes());
         let account = hex::encode(batch_all.account_id().unwrap().0);
         let tx_hash = hex::encode(batch_all.tx_hash().as_bytes());
         let calls = batch_all.value.calls;
