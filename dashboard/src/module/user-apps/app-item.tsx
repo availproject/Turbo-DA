@@ -21,6 +21,7 @@ import { useOverview } from "@/providers/OverviewProvider";
 import AppService from "@/services/app";
 import { AppDetails } from "@/services/app/response";
 import {
+  AlertTriangle,
   Copy,
   EllipsisVertical,
   Eye,
@@ -36,6 +37,7 @@ import AssignCredits from "./assign-credits";
 import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
+import ManageCredits from "./manage-credits";
 import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
@@ -44,7 +46,9 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(app?.fallback_enabled);
+  const [useMainBalance, setUseMainBalance] = useState(
+    !+app?.credit_balance // If no assigned credits, then using main balance
+  );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
@@ -53,13 +57,6 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
   const { success } = useAppToast();
 
-  useEffect(() => {
-    if (app.credit_balance) {
-      if (app?.fallback_enabled) {
-        setUseMainBalance(true);
-      }
-    }
-  }, []);
 
   const generateApiKey = async () => {
     if (!token) return;
@@ -119,13 +116,37 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     return Math.min(Math.max(pct, 0), 100);
   }, [creditsData?.usedCredit, creditsData?.totalCredit]);
 
+  // Check if assigned credits are near exhaustion (less than 5%)
+  const isNearExhaustion = useMemo(() => {
+    if (!+app.credit_balance || app.fallback_enabled) return false;
+    const remainingPercentage = (creditsData.remainingCredits / creditsData.totalCredit) * 100;
+    return remainingPercentage < 5;
+  }, [app.credit_balance, app.fallback_enabled, creditsData.remainingCredits, creditsData.totalCredit]);
+
+  // Check if assigned credits are fully exhausted
+  const isFullyExhausted = useMemo(() => {
+    if (!+app.credit_balance) return false;
+    return creditsData.remainingCredits === 0;
+  }, [app.credit_balance, creditsData.remainingCredits]);
+
   console.log({
     creditBalance,
     useMainBalance,
   });
 
   return (
-    <div className="w-full p-4 rounded-lg border border-solid border-border-blue relative overflow-hidden">
+    <div 
+      className={cn(
+        "w-full p-4 rounded-lg border border-solid relative overflow-hidden",
+        isNearExhaustion 
+          ? "border-[#425C72]" 
+          : "border-border-blue"
+      )}
+      style={isNearExhaustion ? {
+        background: "rgba(207, 102, 121, 0.16)",
+        boxShadow: "4px 4px 23.1px 0 rgba(207, 102, 121, 0.32) inset"
+      } : {}}
+    >
       <div className="flex w-full gap-x-1.5">
         <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
           {app?.app_logo?.includes(".") ? (
@@ -226,70 +247,15 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                     ) : null}
                   </MenubarItem>
                   <MenubarItem
-                    onClick={() =>
-                      !useMainBalance &&
-                      creditBalance &&
-                      setOpen("assign-credits" + app.id)
-                    }
-                    className={cn(
-                      "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
-                      !useMainBalance && +creditBalance
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed"
-                    )}
+                    onClick={() => setOpen("manage-credits" + app.id)}
+                    className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
                   >
                     <ScrollText
-                      className={cn(
-                        "text-[#B3B3B3]",
-                        !useMainBalance && +creditBalance
-                          ? "group-hover:text-white"
-                          : "opacity-40"
-                      )}
+                      className="text-[#B3B3B3] group-hover:text-white"
                       strokeWidth={2}
                       size={24}
                     />
-                    <Text
-                      weight={"semibold"}
-                      className={cn(
-                        !useMainBalance && +creditBalance ? "" : "opacity-30"
-                      )}
-                    >
-                      Assign Credits
-                    </Text>
-                  </MenubarItem>
-                  <MenubarItem
-                    onClick={() =>
-                      +app.credit_balance &&
-                      !useMainBalance &&
-                      setOpen("reclaim-credits" + app.id)
-                    }
-                    className={cn(
-                      "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
-                      +app.credit_balance && !useMainBalance
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed"
-                    )}
-                  >
-                    <ScrollText
-                      className={cn(
-                        "text-[#B3B3B3]",
-                        +app.credit_balance && !useMainBalance
-                          ? "group-hover:text-white"
-                          : "opacity-40"
-                      )}
-                      strokeWidth={2}
-                      size={24}
-                    />
-                    <Text
-                      weight={"semibold"}
-                      className={cn(
-                        +app.credit_balance && !useMainBalance
-                          ? ""
-                          : "opacity-30"
-                      )}
-                    >
-                      Unassigned Credits
-                    </Text>
+                    <Text weight={"semibold"}>Manage Credits</Text>
                   </MenubarItem>
                   <MenubarItem
                     onClick={() => setOpen("update-app" + app.id)}
@@ -327,41 +293,59 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Menubar>
         </div>
       </div>
-      {creditsData.totalCredit ? (
-        <div className="flex flex-col w-full items-start gap-1 mt-2">
+      {!+app.credit_balance ? (
+        <div className="mt-2">
           <Text size={"sm"} weight={"semibold"}>
-            {formatDataBytes(creditsData.usedCredit)} used of{" "}
-            {formatDataBytes(creditsData.totalCredit)}{" "}
-            {useMainBalance ? "main balance" : "assigned"}
+            {formatDataBytes(creditsData.usedCredit || 0)} credits used from
+            main balance
           </Text>
-          <div className="w-full">
-            {useMainBalance ? (
-              <PrimaryProgress progress={progress} color={"green"} />
-            ) : (
-              <PrimaryProgress progress={progress} color="#FF82C8" />
-            )}
-          </div>
         </div>
       ) : null}
-      <SwitchDescription
-        id={app.id}
-        disabled={!creditBalance}
-        checked={useMainBalance}
-        onChecked={(value) => {
-          if (app?.credit_balance && +app?.credit_balance > 0) {
-            setUseMainBalance(value);
-            updateFallbackHandler();
-          } else {
-            if (value) {
-              setUseMainBalance(value);
-              updateFallbackHandler();
-              return;
-            }
-            setOpen("switch-to-main-balance" + app.id);
-          }
-        }}
-      />
-      {useMainBalance && +creditBalance ? (
+      {+app.credit_balance ? (
+        <div className="flex flex-col w-full items-start gap-2 mt-2">
+          {/* Show different text based on exhaustion state */}
+          {isFullyExhausted && app?.fallback_enabled ? (
+            <Text size={"sm"} weight={"semibold"}>
+              {formatDataBytes(creditsData.totalCredit)} credits used of{" "}
+              {formatDataBytes(creditsData.totalCredit)} assigned.{" "}
+            </Text>
+          ) : (
+            <Text size={"sm"} weight={"semibold"}>
+              {formatDataBytes(creditsData.usedCredit)} credits used of{" "}
+              {formatDataBytes(creditsData.totalCredit)} assigned.{" "}
+              {!isFullyExhausted && `${formatDataBytes(creditsData.remainingCredits)} left.`}
+            </Text>
+          )}
+          
+          {/* Progress bar */}
+          <div className="w-full h-1.5 rounded-md bg-[#2B4761]">
+            <div
+              className={cn(
+                "h-1.5 rounded-md transition-all duration-300 ease-in-out",
+                isFullyExhausted && !app?.fallback_enabled && "opacity-40"
+              )}
+              style={{
+                width: `${progress}%`,
+                backgroundColor: isFullyExhausted && app?.fallback_enabled ? "#1FC16B" : "#FF82C8",
+              }}
+            />
+          </div>
+
+          {/* Show fallback text or main balance usage for exhausted with fallback */}
+          {isFullyExhausted && app?.fallback_enabled ? (
+            <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
+              {formatDataBytes(+app.fallback_credit_used || 0)} credits used from main balance
+            </Text>
+          ) : (
+            app?.fallback_enabled && (
+              <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
+                Main credits will be used as fallback
+              </Text>
+            )
+          )}
+        </div>
+      ) : null}
+      {!+app.credit_balance && +creditBalance ? (
         <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
           <div className="h-1.5 w-1.5 rounded-full bg-green" />
           <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -369,12 +353,71 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Text>
         </div>
       ) : null}
-      {+app.credit_balance && !useMainBalance ? (
-        <div className="flex gap-x-1 border border-[#FF82C8CC] bg-[#FF82C829] py-0.5 px-2 rounded-full w-fit items-center mt-3">
-          <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
-          <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-            Using Assigned Credits
-          </Text>
+      {+app.credit_balance ? (
+        <div className="flex flex-col gap-2 mt-3">
+          <div className="flex gap-[12px]">
+            {/* Fully exhausted without fallback - show yellow warning */}
+            {isFullyExhausted && !app?.fallback_enabled && (
+              <div className="flex gap-x-1 border border-[#E4A354CC] bg-[#E4A35429] py-0.5 px-2 rounded-full w-fit items-center">
+                <div className="h-1.5 w-1.5 rounded-full bg-[#E4A354]" />
+                <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+                  App Inactive — Please Assign Some Or Use Main Balance
+                </Text>
+              </div>
+            )}
+            
+            {/* Fully exhausted with fallback - show green fallback label */}
+            {isFullyExhausted && app?.fallback_enabled && (
+              <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center">
+                <div className="h-1.5 w-1.5 rounded-full bg-green" />
+                <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+                  Using Main Credit Balance as fallback
+                </Text>
+              </div>
+            )}
+
+            {/* Near exhaustion without fallback - show red warning */}
+            {!isFullyExhausted && isNearExhaustion && !app?.fallback_enabled && (
+              <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center">
+                <AlertTriangle size={12} color="#CF6679" />
+                <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+                  Assigned Credits near exhaustion!
+                </Text>
+              </div>
+            )}
+
+            {/* Normal state - show regular labels */}
+            {!isFullyExhausted && !isNearExhaustion && (
+              <>
+                <div
+                  className="flex gap-x-1 py-0.5 px-2 w-fit items-center"
+                  style={{
+                    borderRadius: "24px",
+                    border: "1px solid #FF82C8",
+                    background: "rgba(255, 130, 200, 0.16)",
+                  }}
+                >
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#FF82C8]" />
+                  <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+                    Using Assigned Credits
+                  </Text>
+                </div>
+                {app?.fallback_enabled && (
+                  <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green" />
+                    <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
+                      Fallback enabled
+                    </Text>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {!isFullyExhausted && isNearExhaustion && !app?.fallback_enabled && (
+            <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
+              Assign more credits or use main balance else your app might stop working.
+            </Text>
+          )}
         </div>
       ) : null}
       {!+app?.credit_balance && !useMainBalance && +creditBalance ? (
@@ -439,6 +482,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       )}
       {open === "reclaim-credits" + app.id && (
         <ReclaimCredits id={"reclaim-credits" + app.id} appData={app} />
+      )}
+      {open === "manage-credits" + app.id && (
+        <ManageCredits id={"manage-credits" + app.id} appData={app} />
       )}
       {open === "view-key" + app.id && (
         <ViewKeys

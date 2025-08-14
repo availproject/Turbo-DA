@@ -91,7 +91,7 @@ class AppService {
           avail_app_id: +appId,
           app_name: appName,
           app_logo: avatar,
-          fallback_enabled: true,
+          fallback_enabled: false,
         }),
       }
     );
