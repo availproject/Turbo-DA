@@ -136,9 +136,9 @@ async fn process_failed_transactions(
             let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
             if credits_used >= account_details.credit_balance {
-                if !account_details.fallback_enabled
-                    || &credits_used - &account_details.credit_balance
-                        >= user_details.credit_balance
+                if !(account_details.fallback_enabled
+                    && &credits_used - &account_details.credit_balance
+                        <= user_details.credit_balance)
                 {
                     log_error(
                         &customer_expenditure_details.id.to_string(),
