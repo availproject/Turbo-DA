@@ -261,8 +261,8 @@ impl<'a> ProcessSubmitResponse<'a> {
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
         if credits_used >= account.credit_balance {
-            if !account.fallback_enabled
-                || &credits_used - &account.credit_balance >= user.credit_balance
+            if !(account.fallback_enabled
+                && &credits_used - &account.credit_balance > user.credit_balance)
             {
                 return Err("Insufficient credits".to_string());
             }
