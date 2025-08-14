@@ -76,7 +76,7 @@ export default function CreateApp({
         type === "edit"
           ? await AppService.updateApp({
               token: token!,
-              appId: +appData?.app_id!,
+              appId: +appId!,
               appName,
               avatar: uploadAvatar,
               id: appData?.id!,
@@ -93,6 +93,18 @@ export default function CreateApp({
         setLoading(false);
         failure({ label: response?.message ?? "Failed to create app" });
         return;
+      }
+
+      // If editing and avail app id changed, update it via dedicated endpoint
+      if (type === "edit" && `${appData?.app_id ?? ""}` !== `${appId}`) {
+        const idUpdate = await AppService.updateAppId({
+          token: token!,
+          appId: appData!.id,
+          availAppId: +appId!,
+        });
+        if (idUpdate.state !== "SUCCESS") {
+          failure({ label: idUpdate?.message ?? "Failed to update App ID" });
+        }
       }
 
       updateAppList();
@@ -149,7 +161,7 @@ export default function CreateApp({
     <Dialog
       open={open === (id ?? "create-app")}
       onOpenChange={(value) => {
-        setOpen(value ? "create-app" : "");
+        setOpen(value ? id ?? "create-app" : "");
         if (!value) {
           resetFields();
         }

@@ -98,7 +98,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({
       return await fetchUser();
     } catch (err) {
       console.error("Failed to register user:", err);
-      throw new Error("Failed to complete user registration. Please try again.");
+      throw new Error(
+        "Failed to complete user registration. Please try again."
+      );
     }
   };
 
@@ -117,9 +119,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({
       }
 
       setUser(userData);
-      setCreditBalance(userData?.credit_balance || 0);
+      setCreditBalance(Number(userData?.credit_balance ?? 0));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load user data";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load user data";
       setError(errorMessage);
       setUser(null);
       setCreditBalance(0);
@@ -155,9 +158,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({
   };
 
   return (
-    <UserContext.Provider value={contextValue}>
-      {children}
-    </UserContext.Provider>
+    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
   );
 };
 

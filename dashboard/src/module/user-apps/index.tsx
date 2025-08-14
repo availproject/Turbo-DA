@@ -11,7 +11,7 @@ import { Filter, useOverview } from "@/providers/OverviewProvider";
 import { useAuthState } from "@/providers/AuthProvider";
 import AppService from "@/services/app";
 import { CirclePlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EmptyState from "../transactions-history/components/empty-state";
 import AppList from "./app-list";
 import CreateApp from "./create-app";
@@ -25,24 +25,43 @@ const AppsCard = () => {
   const { isAuthenticated, isLoading, isLoggedOut, token } = useAuthState();
   const { user } = useUser();
 
+  const requestCounterRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     if (!isAuthenticated || !token) {
       setLoading(false);
+      abortRef.current?.abort();
       return;
     }
 
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Track the latest request id to ignore stale completions
+    const requestId = ++requestCounterRef.current;
+
     setLoading(true);
     updateAPIKeys();
-    AppService.getApps({ token })
+    AppService.getApps({ token, signal: controller.signal })
       .then((response) => {
+        if (requestId !== requestCounterRef.current) return; // stale
         setAppsList(response?.data ?? []);
       })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.log(error);
       })
       .finally(() => {
+        if (requestId !== requestCounterRef.current) return; // stale
         setLoading(false);
       });
+
+    return () => {
+      controller.abort();
+    };
   }, [isAuthenticated, token, user?.id]);
 
   // Don't render anything if user is logged out
@@ -66,7 +85,10 @@ const AppsCard = () => {
                     className="flex items-center justify-between p-4 border border-border-blue rounded-lg"
                   >
                     <div className="flex items-center gap-4">
-                      <Skeleton className="w-12 h-12 rounded-lg" />
+                      <Skeleton
+                        className="w-12 h-12 rounded-lg"
+                        sheen={false}
+                      />
                       <div className="space-y-2">
                         <Skeleton className="w-32 h-5 rounded" />
                         <Skeleton className="w-24 h-4 rounded" />
