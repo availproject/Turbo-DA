@@ -262,7 +262,7 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         if credits_used >= account.credit_balance {
             if !(account.fallback_enabled
-                && &credits_used - &account.credit_balance > user.credit_balance)
+                && &credits_used - &account.credit_balance <= user.credit_balance)
             {
                 return Err("Insufficient credits".to_string());
             }
