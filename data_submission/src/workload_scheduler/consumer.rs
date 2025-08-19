@@ -11,7 +11,7 @@ use db::{
         customer_expenditure::{
             add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
         },
-        misc::{get_account_by_id, update_credit_balance},
+        misc::{get_account_by_id, update_credit_balance, update_database_on_submission},
         users::TxParams,
     },
     errors::*,
@@ -260,14 +260,26 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used >= account.credit_balance {
-            if !(account.fallback_enabled
-                && &credits_used - &account.credit_balance <= user.credit_balance)
-            {
-                return Err("Insufficient credits".to_string());
+        match account.credit_selection {
+            Some(0) => {
+                if &credits_used >= &account.credit_balance {
+                    return Err("Insufficient assigned credits for user id".to_string());
+                }
+            }
+            Some(1) => {
+                if &credits_used >= &user.credit_balance {
+                    return Err("Insufficient fallback credits for user id".to_string());
+                }
+            }
+            Some(2) => {
+                if &(&credits_used - &account.credit_balance) >= &user.credit_balance {
+                    return Err("Insufficient credits for user id".to_string());
+                }
+            }
+            _ => {
+                return Err("Invalid credit selection".to_string());
             }
         }
-
         let result = self.submit_avail_class.submit_data(&data).await?;
 
         let params = TxParams {
@@ -276,78 +288,16 @@ impl<'a> ProcessSubmitResponse<'a> {
             fees: result.gas_fee,
         };
 
-        self.update_database(result, &account, params).await?;
+        update_database_on_submission(
+            self.response.submission_id,
+            &mut self.connection,
+            result,
+            &account,
+            params,
+        )
+        .await?;
 
         Ok(self.response)
-    }
-
-    pub async fn update_database(
-        &mut self,
-        result: TransactionInfo,
-        account: &Apps,
-        tx_params: TxParams,
-    ) -> Result<(), String> {
-        let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
-        let (billed_from_credit, billed_from_fallback) =
-            if account.credit_balance >= BigDecimal::from(0) {
-                if tx_params.amount_data_billed > account.credit_balance {
-                    (
-                        account.credit_balance.clone(),
-                        &tx_params.amount_data_billed - &account.credit_balance,
-                    )
-                } else {
-                    (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
-                }
-            } else {
-                (BigDecimal::from(0), tx_params.amount_data_billed.clone())
-            };
-
-        println!("billed_from_fallback: {}", billed_from_fallback);
-        println!("billed_from_credit: {}", billed_from_credit);
-
-        // Convert BigDecimal values to u64 and create wallet store
-        let fallback_u64 = billed_from_fallback
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-        let credit_u64 = billed_from_credit
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-
-        let mut wallet_store = vec![0u8; 32];
-        wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
-        wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
-
-        let retrieve_original_fallback =
-            i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
-        let retrieve_original_credit =
-            i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
-
-        println!("retrieve_original_fallback: {}", retrieve_original_fallback);
-        println!("retrieve_original_credit: {}", retrieve_original_credit);
-
-        update_customer_expenditure(
-            result,
-            &fees_as_bigdecimal,
-            &tx_params.amount_data_billed,
-            &wallet_store,
-            self.response.submission_id,
-            self.connection,
-        )
-        .await?;
-        update_credit_balance(
-            self.connection,
-            &account,
-            &tx_params,
-            &billed_from_credit,
-            &billed_from_fallback,
-        )
-        .await?;
-
-        Ok(())
     }
 }
 
