@@ -34,15 +34,25 @@ class AppService {
     appName,
     avatar,
     id,
-    fallbackEnabled = false,
+    creditSelection = 1,
   }: {
     token: string;
     appId: number;
     appName: string;
     avatar: string;
     id: string;
-    fallbackEnabled?: boolean;
+    creditSelection?: number; // 0: assigned only, 1: fallback only, 2: assigned then fallback
   }) {
+    const requestBody = {
+      avail_app_id: +appId,
+      app_id: id,
+      app_name: appName,
+      app_logo: avatar,
+      credit_selection: creditSelection,
+    };
+    
+    console.log('AppService.updateApp payload:', requestBody);
+    
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/edit_app_account`,
       {
@@ -51,13 +61,7 @@ class AppService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          avail_app_id: +appId,
-          app_id: id,
-          app_name: appName,
-          app_logo: avatar,
-          fallback_enabled: fallbackEnabled,
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 
@@ -91,7 +95,7 @@ class AppService {
           avail_app_id: +appId,
           app_name: appName,
           app_logo: avatar,
-          fallback_enabled: false,
+          credit_selection: 1, // Default to using main credit balance
         }),
       }
     );

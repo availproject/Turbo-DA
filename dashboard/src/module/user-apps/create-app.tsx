@@ -72,6 +72,14 @@ export default function CreateApp({
 
       if (!uploadAvatar) return;
 
+      const creditSelectionToSend = appData?.credit_selection ?? 1;
+      console.log('Edit App Debug:', {
+        original_credit_selection: appData?.credit_selection,
+        typeof_original: typeof appData?.credit_selection,
+        sending_credit_selection: creditSelectionToSend,
+        appData: appData
+      });
+      
       const response =
         type === "edit"
           ? await AppService.updateApp({
@@ -80,7 +88,7 @@ export default function CreateApp({
               appName,
               avatar: uploadAvatar,
               id: appData?.id!,
-              fallbackEnabled: appData?.fallback_enabled,
+              creditSelection: creditSelectionToSend,
             })
           : await AppService.createApp({
               token: token!,

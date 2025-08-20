@@ -45,10 +45,25 @@ export default function ManageCredits({ id, appData }: ManageCreditsProps) {
   const totalAssignedCredits = assignedCreditsLeft + +appData.credit_used;
 
   const [selectedOption, setSelectedOption] = useState(() => {
-    if (assignedCreditsLeft > 0) {
-      return appData.fallback_enabled ? "assigned-with-fallback" : "assigned-credits";
+    // Use credit_selection from API to determine current option
+    const creditSelection = appData.credit_selection ?? 1; // Use nullish coalescing to handle 0 properly
+    
+    console.log('ManageCredits Initial Selection:', {
+      creditSelection,
+      original: appData.credit_selection,
+      typeof: typeof appData.credit_selection
+    });
+    
+    switch (creditSelection) {
+      case 0:
+        return "assigned-credits"; // Assigned credits only
+      case 1:
+        return "main-balance"; // Main balance only
+      case 2:
+        return "assigned-with-fallback"; // Assigned credits with fallback
+      default:
+        return "main-balance";
     }
-    return "main-balance";
   });
   const [activeTab, setActiveTab] = useState("assign");
   const [assignAmount, setAssignAmount] = useState("");
@@ -84,6 +99,19 @@ export default function ManageCredits({ id, appData }: ManageCreditsProps) {
       });
 
       if (response?.state === "SUCCESS") {
+        // If user has selected assigned credits options, update the app's credit selection
+        if (selectedOption === "assigned-credits" || selectedOption === "assigned-with-fallback") {
+          const creditSelection = selectedOption === "assigned-credits" ? 0 : 2;
+          await AppService.updateApp({
+            token,
+            appId: appData.app_id,
+            appName: appData.app_name,
+            avatar: appData.app_logo,
+            id: appData.id,
+            creditSelection,
+          });
+        }
+        
         success({
           label: "Credits Assigned Successfully!",
           description: `${assignAmount} credits successfully assigned from main credit balance`,
@@ -127,16 +155,16 @@ export default function ManageCredits({ id, appData }: ManageCreditsProps) {
 
   const handleOptionChange = (newOption: string) => {
     // If switching to main balance from any assigned credit option
-    if (newOption === "main-balance" && assignedCreditsLeft > 0) {
+    if (newOption === "main-balance" && (appData.credit_selection === 0 || appData.credit_selection === 2)) {
       setPendingOption(newOption);
       setShowSwitchWarning(true);
       return;
     }
 
-    // If switching between assigned credit options and user has assigned credits
+    // If switching between assigned credit options (0 ↔ 2)
     if ((newOption === "assigned-credits" || newOption === "assigned-with-fallback") && 
         (selectedOption === "assigned-credits" || selectedOption === "assigned-with-fallback") &&
-        selectedOption !== newOption && assignedCreditsLeft > 0) {
+        selectedOption !== newOption && (appData.credit_selection === 0 || appData.credit_selection === 2)) {
       setPendingOption(newOption);
       setShowSwitchWarning(true);
       return;
@@ -152,32 +180,48 @@ export default function ManageCredits({ id, appData }: ManageCreditsProps) {
     try {
       setLoading(true);
 
-      // If switching to main balance, unassign all credits
-      if (pendingOption === "main-balance" && assignedCreditsLeft > 0) {
-        const response = await AppService.reclaimCredits({
-          token,
-          amount: `${assignedCreditsLeft}`, // Use raw bytes, not formatted
-          appId: appData.id,
-        });
-
-        if (response?.state === "SUCCESS") {
-          success({
-            label: "Switched to Main Balance!",
-            description: `All assigned credits returned to main balance`,
+      // If switching to main balance
+      if (pendingOption === "main-balance") {
+        // First unassign all credits if any exist
+        if (assignedCreditsLeft > 0) {
+          const response = await AppService.reclaimCredits({
+            token,
+            amount: `${assignedCreditsLeft}`, // Use raw bytes, not formatted
+            appId: appData.id,
           });
-          updateCreditBalance();
-          updateAppList();
+
+          if (response?.state === "SUCCESS") {
+            updateCreditBalance();
+          }
         }
+        
+        // Update the app's credit selection to use main balance
+        await AppService.updateApp({
+          token,
+          appId: appData.app_id,
+          appName: appData.app_name,
+          avatar: appData.app_logo,
+          id: appData.id,
+          creditSelection: 1, // Use main balance
+        });
+        
+        success({
+          label: "Switched to Main Balance!",
+          description: assignedCreditsLeft > 0 
+            ? `All assigned credits returned to main balance`
+            : `App now using main balance`,
+        });
+        updateAppList();
       } else if (pendingOption === "assigned-credits" || pendingOption === "assigned-with-fallback") {
-        // For switching between assigned credit options, just update the fallback setting
-        const fallbackEnabled = pendingOption === "assigned-with-fallback";
+        // For switching between assigned credit options, just update the credit selection
+        const creditSelection = pendingOption === "assigned-credits" ? 0 : 2; // 0: assigned only, 2: assigned then fallback
         const response = await AppService.updateApp({
           token,
           appId: appData.app_id,
           appName: appData.app_name,
           avatar: appData.app_logo,
           id: appData.id,
-          fallbackEnabled,
+          creditSelection,
         });
 
         if (response) {

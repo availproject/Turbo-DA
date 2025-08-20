@@ -46,9 +46,6 @@ import ViewKeys from "./view-keys";
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
   const [displayAPIKey, setDisplayAPIKey] = useState(false);
-  const [useMainBalance, setUseMainBalance] = useState(
-    !+app?.credit_balance // If no assigned credits, then using main balance
-  );
   const { setOpen, open } = useDialog();
   const { token } = useConfig();
   const { updateAPIKeys } = useAPIKeys();
@@ -74,7 +71,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  const updateFallbackHandler = async () => {
+  const updateFallbackHandler = async (creditSelection: number) => {
     try {
       const response = await AppService.updateApp({
         token: token!,
@@ -82,7 +79,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appName: app.app_name,
         avatar: app.app_logo,
         id: app.id,
-        fallbackEnabled: !useMainBalance,
+        creditSelection,
       });
     } catch (error) {
       console.log({
@@ -92,7 +89,17 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   };
 
   const creditsData = useMemo(() => {
-    if (useMainBalance) {
+    // Use credit_selection from API to determine mode
+    const creditSelection = app.credit_selection ?? 1; // Use nullish coalescing to avoid issues with 0
+    
+    console.log('Credit Selection Debug:', {
+      creditSelection,
+      original: app.credit_selection,
+      typeof: typeof app.credit_selection
+    });
+    
+    if (creditSelection === 1) {
+      // Using main balance only (credit_selection: 1)
       const used = +app.fallback_credit_used;
       const total = creditBalance || 0;
       const remaining = Math.max(total - used, 0);
@@ -101,14 +108,31 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         usedCredit: used,
         totalCredit: total,
         remainingCredits: remaining,
+        mode: 'main-balance' as const
+      };
+    } else if (creditSelection === 0 || creditSelection === 2) {
+      // Using assigned credits (credit_selection: 0 or 2)
+      return {
+        usedCredit: +app.credit_used,
+        totalCredit: +app.credit_balance + +app.credit_used,
+        remainingCredits: +app.credit_balance,
+        mode: 'assigned-credits' as const
+      };
+    } else {
+      // Fallback case
+      console.warn('Unexpected credit_selection value:', creditSelection);
+      const used = +app.fallback_credit_used;
+      const total = creditBalance || 0;
+      const remaining = Math.max(total - used, 0);
+
+      return {
+        usedCredit: used,
+        totalCredit: total,
+        remainingCredits: remaining,
+        mode: 'main-balance' as const
       };
     }
-    return {
-      usedCredit: +app.credit_used,
-      totalCredit: +app.credit_balance + +app.credit_used,
-      remainingCredits: +app.credit_balance,
-    };
-  }, [useMainBalance, creditBalance]);
+  }, [app.credit_selection, app.credit_balance, app.credit_used, app.fallback_credit_used, creditBalance]);
 
   const progress = useMemo(() => {
     if (!creditsData?.totalCredit) return 0;
@@ -118,20 +142,27 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   // Check if assigned credits are near exhaustion (less than 5%)
   const isNearExhaustion = useMemo(() => {
-    if (!+app.credit_balance || app.fallback_enabled) return false;
-    const remainingPercentage = (creditsData.remainingCredits / creditsData.totalCredit) * 100;
-    return remainingPercentage < 5;
-  }, [app.credit_balance, app.fallback_enabled, creditsData.remainingCredits, creditsData.totalCredit]);
+    // Only show near exhaustion for credit_selection: 0 (assigned credits only, no fallback)
+    if (creditsData.mode !== 'assigned-credits' || app.credit_selection === 2) return false;
+    const fivePercentThreshold = Math.ceil((creditsData.totalCredit * 5) / 100);
+    return creditsData.remainingCredits <= fivePercentThreshold && creditsData.remainingCredits > 0;
+  }, [creditsData.mode, app.credit_selection, creditsData.remainingCredits, creditsData.totalCredit]);
 
   // Check if assigned credits are fully exhausted
   const isFullyExhausted = useMemo(() => {
-    if (!+app.credit_balance) return false;
+    if (creditsData.mode !== 'assigned-credits') return false;
     return creditsData.remainingCredits === 0;
-  }, [app.credit_balance, creditsData.remainingCredits]);
+  }, [creditsData.mode, creditsData.remainingCredits]);
 
   console.log({
     creditBalance,
-    useMainBalance,
+    creditsData,
+    app: {
+      credit_balance: app.credit_balance,
+      credit_used: app.credit_used,
+      fallback_credit_used: app.fallback_credit_used,
+      credit_selection: app.credit_selection
+    }
   });
 
   return (
@@ -293,7 +324,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Menubar>
         </div>
       </div>
-      {!+app.credit_balance ? (
+      {creditsData.mode === 'main-balance' ? (
         <div className="mt-2">
           <Text size={"sm"} weight={"semibold"}>
             {formatDataBytes(creditsData.usedCredit || 0)} credits used from
@@ -301,10 +332,10 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Text>
         </div>
       ) : null}
-      {+app.credit_balance ? (
+      {creditsData.mode === 'assigned-credits' ? (
         <div className="flex flex-col w-full items-start gap-2 mt-2">
           {/* Show different text based on exhaustion state */}
-          {isFullyExhausted && app?.fallback_enabled ? (
+          {isFullyExhausted && app?.credit_selection === 2 ? (
             <Text size={"sm"} weight={"semibold"}>
               {formatDataBytes(creditsData.totalCredit)} credits used of{" "}
               {formatDataBytes(creditsData.totalCredit)} assigned.{" "}
@@ -322,30 +353,30 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             <div
               className={cn(
                 "h-1.5 rounded-md transition-all duration-300 ease-in-out",
-                isFullyExhausted && !app?.fallback_enabled && "opacity-40"
+                isFullyExhausted && app?.credit_selection === 0 && "opacity-40"
               )}
               style={{
                 width: `${progress}%`,
-                backgroundColor: isFullyExhausted && app?.fallback_enabled ? "#1FC16B" : "#FF82C8",
+                backgroundColor: isFullyExhausted && app?.credit_selection === 2 ? "#1FC16B" : "#FF82C8",
               }}
             />
           </div>
 
-          {/* Show fallback text or main balance usage for exhausted with fallback */}
-          {isFullyExhausted && app?.fallback_enabled ? (
-            <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
-              {formatDataBytes(+app.fallback_credit_used || 0)} credits used from main balance
-            </Text>
-          ) : (
-            app?.fallback_enabled && (
+          {/* Show fallback text or main balance usage */}
+          {app?.credit_selection === 2 ? (
+            +app.fallback_credit_used > 0 ? (
+              <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
+                {formatDataBytes(+app.fallback_credit_used)} credits used from main balance
+              </Text>
+            ) : (
               <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
                 Main credits will be used as fallback
               </Text>
             )
-          )}
+          ) : null}
         </div>
       ) : null}
-      {!+app.credit_balance && +creditBalance ? (
+      {creditsData.mode === 'main-balance' && +creditBalance ? (
         <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center mt-3">
           <div className="h-1.5 w-1.5 rounded-full bg-green" />
           <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -353,11 +384,11 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           </Text>
         </div>
       ) : null}
-      {+app.credit_balance ? (
+      {creditsData.mode === 'assigned-credits' ? (
         <div className="flex flex-col gap-2 mt-3">
           <div className="flex gap-[12px]">
-            {/* Fully exhausted without fallback - show yellow warning */}
-            {isFullyExhausted && !app?.fallback_enabled && (
+            {/* Fully exhausted or no assigned credits without fallback - show yellow warning */}
+            {((isFullyExhausted && app?.credit_selection === 0) || (app?.credit_selection === 0 && creditsData.totalCredit === 0)) && (
               <div className="flex gap-x-1 border border-[#E4A354CC] bg-[#E4A35429] py-0.5 px-2 rounded-full w-fit items-center">
                 <div className="h-1.5 w-1.5 rounded-full bg-[#E4A354]" />
                 <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -367,7 +398,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             )}
             
             {/* Fully exhausted with fallback - show green fallback label */}
-            {isFullyExhausted && app?.fallback_enabled && (
+            {isFullyExhausted && app?.credit_selection === 2 && (
               <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center">
                 <div className="h-1.5 w-1.5 rounded-full bg-green" />
                 <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -377,7 +408,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             )}
 
             {/* Near exhaustion without fallback - show red warning */}
-            {!isFullyExhausted && isNearExhaustion && !app?.fallback_enabled && (
+            {!isFullyExhausted && isNearExhaustion && app?.credit_selection === 0 && (
               <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center">
                 <AlertTriangle size={12} color="#CF6679" />
                 <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -402,7 +433,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                     Using Assigned Credits
                   </Text>
                 </div>
-                {app?.fallback_enabled && (
+                {app?.credit_selection === 2 && (
                   <div className="flex gap-x-1 border border-[#1FC16B] bg-[#1FC16B1A] py-0.5 px-2 rounded-full w-fit items-center">
                     <div className="h-1.5 w-1.5 rounded-full bg-green" />
                     <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -413,22 +444,14 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               </>
             )}
           </div>
-          {!isFullyExhausted && isNearExhaustion && !app?.fallback_enabled && (
+          {!isFullyExhausted && isNearExhaustion && app?.credit_selection === 0 && (
             <Text size={"xs"} weight={"medium"} variant={"light-grey"}>
               Assign more credits or use main balance else your app might stop working.
             </Text>
           )}
         </div>
       ) : null}
-      {!+app?.credit_balance && !useMainBalance && +creditBalance ? (
-        <div className="flex gap-x-1 border border-[#E4A354CC] bg-[#E4A35429] py-0.5 px-2 rounded-full w-fit items-center mt-3">
-          <div className="h-1.5 w-1.5 rounded-full bg-[#E4A354]" />
-          <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
-            Credits Inactive — Please Assign Some Or Use Main Balance
-          </Text>
-        </div>
-      ) : null}
-      {!+creditBalance && !+app?.credit_balance ? (
+      {!+creditBalance && creditsData.mode === 'main-balance' && creditsData.totalCredit === 0 ? (
         <div className="flex gap-x-1 border border-[#CF6679] bg-[#CF667929] py-0.5 px-2 rounded-full w-fit items-center mt-3">
           <div className="h-1.5 w-1.5 rounded-full bg-[#CF6679]" />
           <Text weight={"semibold"} size={"xs"} className="uppercase mt-0.5">
@@ -519,8 +542,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         <SwitchToMainBalanceAlert
           id={"switch-to-main-balance" + app.id}
           callback={() => {
-            setUseMainBalance(false);
-            updateFallbackHandler();
+            updateFallbackHandler(1); // Switch to main balance (credit_selection: 1)
             setOpen("");
           }}
         />
