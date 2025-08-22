@@ -76,18 +76,13 @@ export class KYCService {
       }
 
       const responseText = await response.text();
-      console.log("[KYC Service] Success response body:", responseText);
 
       const response_data = JSON.parse(responseText);
-      console.log("[KYC Service] Parsed response data:", response_data);
+      console.log("[KYC Service] response data:", response_data);
 
       // Extract token from nested structure
       const token = response_data?.data?.token;
-      console.log("[KYC Service] Extracted access token:", token);
-      console.log(
-        "[KYC Service] Access token received, length:",
-        token?.length || 0
-      );
+      console.log("[KYC Service] Extracted access token");
 
       if (!token) {
         throw new Error("No access token in response");

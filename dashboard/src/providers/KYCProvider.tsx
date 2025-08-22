@@ -25,8 +25,6 @@ interface KYCProviderProps {
   children: ReactNode;
 }
 
-const KYC_STATUS_KEY = "kyc_completed";
-
 export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
   const { isAuthenticated, token, isLoading: authLoading } = useAuth();
   const { user, isLoading: userLoading, refetchUser } = useUser();
@@ -35,26 +33,7 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
   const [kycError, setKycError] = useState<string | null>(null);
   const [showKYCDialog, setShowKYCDialog] = useState(false);
 
-  // Load KYC status from localStorage
-  const loadKYCStatus = () => {
-    try {
-      const stored = localStorage.getItem(KYC_STATUS_KEY);
-      return stored === "true";
-    } catch {
-      return false;
-    }
-  };
-
-  // Save KYC status to localStorage
-  const saveKYCStatus = (completed: boolean) => {
-    try {
-      localStorage.setItem(KYC_STATUS_KEY, completed.toString());
-    } catch (error) {
-      console.warn("Failed to save KYC status to localStorage:", error);
-    }
-  };
-
-  // Check KYC status (primary: backend user presence; secondary: localStorage fallback)
+  // Check KYC status based on backend user presence
   const checkKYCStatus = async () => {
     console.log("[KYC Provider] Starting KYC status check", {
       isAuthenticated,
@@ -98,11 +77,10 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
     }
   };
 
-  // Mark KYC as completed
+  // Mark KYC as completed (server-side validation only)
   const markKYCCompleted = () => {
     console.log("[KYC Provider] Marking KYC as completed");
     setIsKYCCompleted(true);
-    saveKYCStatus(true);
     setShowKYCDialog(false);
     setKycError(null);
     console.log("[KYC Provider] KYC completion state updated");
