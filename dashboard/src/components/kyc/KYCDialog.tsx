@@ -6,13 +6,17 @@ import { KYCService } from "@/services/kyc";
 import { useUser as useClerkUser } from "@clerk/nextjs";
 import SumsubWebSDK from "@/components/kyc/SumsubWebSDK";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import Button from "@/components/button";
+import { Text } from "@/components/text";
+import { tnc, privacyPolicy } from "@/lib/constant";
+import Link from "next/link";
 
 interface KYCDialogProps {
   isOpen: boolean;
   onCompleted: () => void;
 }
 
-type KYCStep = "checking" | "verification" | "completed";
+type KYCStep = "checking" | "terms-acceptance" | "verification" | "completed";
 
 export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   const { token } = useAuth();
@@ -20,6 +24,9 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   const [step, setStep] = useState<KYCStep>("checking");
   const [accessToken, setAccessToken] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [tosAccepted, setTosAccepted] = useState(false);
+  const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
+  const [tosCheckboxChecked, setTosCheckboxChecked] = useState(false);
 
   // Initialize when dialog opens
   useEffect(() => {
@@ -34,6 +41,9 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
       setStep("checking");
       setAccessToken("");
       setError(null);
+      setTosAccepted(false);
+      setTosAcceptedAt(null);
+      setTosCheckboxChecked(false);
     }
   }, [isOpen]);
 
@@ -47,8 +57,35 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         return;
       }
 
+      // Skip directly to terms acceptance since this is a new user flow
+      console.log("[KYC Dialog] Moving to terms acceptance step");
+      setStep("terms-acceptance");
+    } catch (err) {
+      console.error("[KYC Dialog] Error initializing verification:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to initialize verification"
+      );
+    }
+  };
+
+  const handleTosAcceptance = () => {
+    if (!tosCheckboxChecked) {
+      console.warn("[KYC Dialog] ToS checkbox not checked");
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    setTosAccepted(true);
+    setTosAcceptedAt(timestamp);
+    console.log("[KYC Dialog] ToS accepted at:", timestamp);
+
+    // Move to verification step and initialize Sumsub
+    proceedToVerification();
+  };
+
+  const proceedToVerification = async () => {
+    try {
       console.log("[KYC Dialog] Fetching access token from Next.js API route");
-      // Use Next.js API route instead of direct service call
       const response = await fetch("/api/kyc/token", {
         method: "POST",
         headers: {
@@ -92,6 +129,8 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
       hasClerkUser: !!clerkUser,
       clerkUserFullName: clerkUser?.fullName,
       currentStep: step,
+      tosAccepted,
+      tosAcceptedAt,
     });
 
     try {
@@ -103,13 +142,20 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         return;
       }
 
+      if (!tosAccepted || !tosAcceptedAt) {
+        console.error("[KYC Dialog] ToS not accepted before registration");
+        setError("Terms of service must be accepted");
+        return;
+      }
+
       console.log(
         "[KYC Dialog] Calling KYCService.registerUserAfterVerification..."
       );
 
       await KYCService.registerUserAfterVerification(
         token,
-        clerkUser?.fullName || undefined
+        clerkUser?.fullName || undefined,
+        tosAcceptedAt
       );
 
       console.log("[KYC Dialog] User registration completed successfully!");
@@ -128,23 +174,17 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         );
       }, 2000);
     } catch (err) {
-      console.error(
+      console.error("[KYC Dialog] Registration error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to complete registration. Please try again."
+      );
+      console.log(
         "[KYC Dialog] ========== VERIFICATION COMPLETED END (ERROR) =========="
       );
-      console.error("[KYC Dialog] Error during registration process:", {
-        error: err,
-        errorMessage: err instanceof Error ? err.message : "Unknown error",
-        errorStack: err instanceof Error ? err.stack : "No stack trace",
-        errorType: typeof err,
-      });
-
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to complete registration";
-      console.error("[KYC Dialog] Setting error state:", errorMessage);
-
-      setError(errorMessage);
     }
-  }, [token, onCompleted, clerkUser?.fullName, step]);
+  }, [token, clerkUser, onCompleted, tosAccepted, tosAcceptedAt]);
 
   const handleVerificationError = useCallback((error: any) => {
     console.error("[KYC Dialog] ========== VERIFICATION ERROR ==========");
@@ -213,6 +253,81 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
           </div>
         );
 
+      case "terms-acceptance":
+        return (
+          <div className="h-full flex flex-col p-6 z-1 justify-between">
+            <div className="flex flex-col gap-y-6 text-center max-w-[500px] mx-auto">
+              <DialogTitle>
+                <Text weight={"bold"} size={"2xl"}>
+                  Terms of Service Agreement
+                </Text>
+              </DialogTitle>
+
+              <div className="flex flex-col gap-y-4">
+                <Text
+                  weight={"medium"}
+                  variant={"secondary-grey"}
+                  size={"base"}
+                >
+                  By proceeding with KYC verification, you acknowledge that you
+                  have read and agree to our{" "}
+                  <Link
+                    href={tnc}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href={privacyPolicy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </Text>
+              </div>
+
+              {/* Checkbox for agreement */}
+              <div className="flex items-center justify-center gap-x-3 p-4 bg-[#1a2332] rounded-lg border border-[#2B4761]">
+                <input
+                  type="checkbox"
+                  id="tos-checkbox"
+                  checked={tosCheckboxChecked}
+                  onChange={(e) => setTosCheckboxChecked(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <label
+                  htmlFor="tos-checkbox"
+                  className="text-white cursor-pointer flex-1 text-left"
+                >
+                  <Text size={"sm"} weight={"medium"}>
+                    I have read and agree to the Terms of Service and Privacy
+                    Policy
+                  </Text>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-x-4 max-w-[500px] mx-auto w-full">
+              <Button
+                onClick={handleTosAcceptance}
+                className="w-full"
+                disabled={!tosCheckboxChecked}
+                variant={tosCheckboxChecked ? "primary" : "disabled"}
+              >
+                <Text weight={"semibold"} size={"lg"}>
+                  Continue to Verification
+                </Text>
+              </Button>
+            </div>
+          </div>
+        );
+
       case "verification":
         return (
           <div className="h-full w-full overflow-auto">
@@ -261,7 +376,11 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}} modal>
       <DialogContent
-        className="max-w-4xl w-full h-[80vh] p-0 border-none rounded-3xl"
+        className={`${
+          step === "verification"
+            ? "max-w-4xl w-full h-[80vh]"
+            : "min-w-[600px] h-[500px]"
+        } p-0 border-none rounded-3xl`}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

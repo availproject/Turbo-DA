@@ -1,5 +1,13 @@
 class AuthenticationService {
-  static async registerUser({ name, token }: { name?: string; token: string }) {
+  static async registerUser({
+    name,
+    token,
+    tosAcceptedAt,
+  }: {
+    name?: string;
+    token: string;
+    tosAcceptedAt?: string;
+  }) {
     console.log(
       "[AuthenticationService] ========== REGISTER USER START =========="
     );
@@ -23,7 +31,7 @@ class AuthenticationService {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, tosAcceptedAt }),
       });
 
       console.log("[AuthenticationService] API route response received:", {

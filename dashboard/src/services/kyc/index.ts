@@ -18,7 +18,8 @@ import AppService from "@/services/app";
 export class KYCService {
   static async registerUserAfterVerification(
     clerkJWT: string,
-    fullName?: string
+    fullName?: string,
+    tosAcceptedAt?: string
   ): Promise<void> {
     console.log(
       "[KYC Service] ========== REGISTER USER AFTER VERIFICATION START =========="
@@ -38,6 +39,7 @@ export class KYCService {
       await AuthenticationService.registerUser({
         token: clerkJWT,
         name: fullName,
+        tosAcceptedAt,
       });
 
       console.log(

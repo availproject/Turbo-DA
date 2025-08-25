@@ -51,20 +51,33 @@ export async function POST(request: NextRequest) {
     });
 
     // Call the backend KYC endpoint server-side
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/kyc/generate_access_token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          level_name: levelName,
-          ttl_in_secs: ttlInSecs,
-        }),
-      }
-    );
+    const kycRequestHeaders = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+
+    const kycRequestBody = {
+      level_name: levelName,
+      ttl_in_secs: ttlInSecs,
+    };
+
+    const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/v1/user/kyc/generate_access_token`;
+
+    console.log("[KYC Token API] Request details:", {
+      url: apiUrl,
+      method: "POST",
+      headers: kycRequestHeaders,
+      body: kycRequestBody,
+      bodyString: JSON.stringify(kycRequestBody),
+      tokenLength: token?.length,
+      tokenSample: token ? `${token.substring(0, 50)}...` : "null",
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: kycRequestHeaders,
+      body: JSON.stringify(kycRequestBody),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();

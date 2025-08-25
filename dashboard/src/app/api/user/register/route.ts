@@ -32,12 +32,14 @@ export async function POST(request: NextRequest) {
     // Parse and validate request body
     console.log("[User Registration API] Parsing request body...");
     const body = await request.json();
-    const { name } = body;
+    const { name, tosAcceptedAt } = body;
 
     console.log("[User Registration API] Request body parsed:", {
       hasName: !!name,
       nameType: typeof name,
       nameValue: name,
+      hasTosAcceptedAt: !!tosAcceptedAt,
+      tosAcceptedAt,
       bodyKeys: Object.keys(body),
     });
 
@@ -92,7 +94,11 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name: sanitizedName }),
+        body: JSON.stringify({
+          name: sanitizedName,
+          // TODO: Uncomment when backend supports tos_accepted_at
+          // tos_accepted_at: tosAcceptedAt,
+        }),
       }
     );
 
