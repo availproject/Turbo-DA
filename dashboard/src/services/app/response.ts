@@ -11,9 +11,9 @@ export interface AppDetails {
   assigned_credits_logs: any | null;
   created_at: string;
   credit_balance: string;
+  credit_selection: number;
   credit_used: string;
   fallback_credit_used: string;
-  fallback_enabled: boolean;
   id: string;
   user_id: string;
 }
