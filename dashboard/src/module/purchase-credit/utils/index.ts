@@ -77,7 +77,15 @@ export async function batchTransferAndRemark(
     }
 
     console.log("AVAIL_SIGN: Enabling selected wallet injector...");
-    await (injector as any).enable?.("turbo-da");
+
+    // Add timeout for wallet enable operation to prevent hanging
+    const enableTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Wallet enable timeout")), 30000)
+    );
+
+    const enablePromise = (injector as any).enable?.("turbo-da");
+
+    await Promise.race([enablePromise, enableTimeoutPromise]);
     console.log("AVAIL_SIGN: Selected wallet enabled");
 
     console.log("AVAIL_SIGN: Injector lookup post-enable", {
@@ -111,11 +119,16 @@ export async function batchTransferAndRemark(
         reject(new Error("Transaction timeout - no response from wallet"));
       }, 60000); // 60 seconds timeout
 
+      let isResolved = false;
+
       batchCall
         .signAndSend(
           account.address,
           options as any,
           (result: SubmittableResult) => {
+            // Prevent multiple resolutions
+            if (isResolved) return;
+
             // Emit broadcast event when transaction is broadcast
             if (result.status.isBroadcast) {
               const txHash = result.txHash.toString();
@@ -131,6 +144,7 @@ export async function batchTransferAndRemark(
 
             if (result.isFinalized || result.isError) {
               clearTimeout(timeout);
+              isResolved = true;
               if (result.isFinalized) {
                 const txHash = result.txHash.toString();
                 onFinalized?.(txHash);
@@ -140,8 +154,11 @@ export async function batchTransferAndRemark(
           }
         )
         .catch((error) => {
-          clearTimeout(timeout);
-          reject(error);
+          if (!isResolved) {
+            clearTimeout(timeout);
+            isResolved = true;
+            reject(error);
+          }
         });
     });
 

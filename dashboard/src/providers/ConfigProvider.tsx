@@ -44,7 +44,7 @@ interface ConfigContextType {
 }
 
 export const ConfigContext = createContext<ConfigContextType | undefined>(
-  undefined,
+  undefined
 );
 
 interface ConfigProviderProps {
@@ -78,11 +78,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const { token } = useAuth();
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
-  
+
   const [selectedChain, setSelectedChain] =
     useState<ChainType>(getDefaultChain);
   const [selectedToken, setSelectedToken] = useState<Token | undefined>(
-    getDefaultToken,
+    getDefaultToken
   );
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
@@ -91,6 +91,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [availNativeBalance, setAvailNativeBalance] = useState<string>("0");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Add debounce ref to prevent rapid API calls
+  const lastFetchTimeRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -116,9 +120,58 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (selected?.address && api) {
-      fetchAvailBalance();
+    // Define fetchAvailBalance inside useEffect to ensure stable reference
+    const fetchAvailBalance = async () => {
+      if (!selected?.address || !api) {
+        return;
+      }
 
+      // Debounce mechanism: prevent calls within 1 second of each other
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current < 1000) {
+        console.log("Skipping balance fetch due to debounce");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Skipping balance fetch - already in progress");
+        return;
+      }
+
+      isFetchingRef.current = true;
+      lastFetchTimeRef.current = now;
+
+      try {
+        // Add timeout to prevent hanging requests
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Balance fetch timeout")), 10000)
+        );
+
+        const balancePromise = getTokenBalance(
+          Chain.AVAIL,
+          selected.address as `0x${string}`,
+          api
+        );
+
+        // Race between the balance call and timeout
+        const balance = await Promise.race([balancePromise, timeoutPromise]);
+        setAvailNativeBalance(balance as string);
+      } catch (error) {
+        console.error("Failed to fetch Avail balance:", error);
+        setAvailNativeBalance("0");
+      } finally {
+        isFetchingRef.current = false;
+      }
+    };
+
+    if (selected?.address && api) {
+      // Initial balance fetch with small delay to allow wallet to stabilize
+      setTimeout(() => {
+        fetchAvailBalance();
+      }, 1000);
+
+      // Set up interval for periodic updates
       intervalRef.current = setInterval(() => {
         fetchAvailBalance();
       }, 20000);
@@ -127,16 +180,19 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+      // Reset debounce state on cleanup
+      isFetchingRef.current = false;
     };
-  }, [selected?.address, api]);
+  }, [selected?.address, api]); // Now properly depends only on primitive values
 
   useEffect(() => {
     if (isHydrated) {
       try {
         localStorage.setItem(
           STORAGE_KEYS.SELECTED_CHAIN,
-          JSON.stringify(selectedChain),
+          JSON.stringify(selectedChain)
         );
       } catch (error) {
         console.warn("Failed to save selected chain to localStorage:", error);
@@ -149,31 +205,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       try {
         localStorage.setItem(
           STORAGE_KEYS.SELECTED_TOKEN,
-          JSON.stringify(selectedToken),
+          JSON.stringify(selectedToken)
         );
       } catch (error) {
         console.warn("Failed to save selected token to localStorage:", error);
       }
     }
   }, [selectedToken, isHydrated]);
-
-  const fetchAvailBalance = async () => {
-    if (!selected?.address || !api) {
-      return;
-    }
-
-    try {
-      const balance = await getTokenBalance(
-        Chain.AVAIL,
-        selected.address as `0x${string}`,
-        api,
-      );
-      setAvailNativeBalance(balance);
-    } catch (error) {
-      console.error("Failed to fetch Avail balance:", error);
-      setAvailNativeBalance("0");
-    }
-  };
 
   return (
     <ConfigContext.Provider

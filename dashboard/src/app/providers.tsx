@@ -11,7 +11,21 @@ import { ReactNode } from "react";
 import { State, WagmiProvider } from "wagmi";
 import "./globals.css";
 
-const queryClient = new QueryClient();
+// Enhanced QueryClient with better error handling
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Retry failed requests less aggressively
+      retry: 2,
+      // Add timeout to prevent hanging queries
+      staleTime: 30000,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 export function Providers({
   children,
@@ -26,7 +40,10 @@ export function Providers({
         <AvailWalletProvider rpcUrl={appConfig.rpcUrl}>
           <ConnectKitProvider
             theme="midnight"
-            options={{ overlayBlur: 2, embedGoogleFonts: true }}
+            options={{
+              overlayBlur: 2,
+              embedGoogleFonts: true,
+            }}
           >
             <ConfigProvider>
               <DialogProvider>{children}</DialogProvider>
