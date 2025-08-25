@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { template } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
     // Get the authenticated user
     const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getToken({ template });
 
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     const { levelName = "basic-kyc-level", ttlInSecs = 3600 } = body;
 
     // Validate levelName
-    if (typeof levelName !== 'string' || levelName.length === 0) {
+    if (typeof levelName !== "string" || levelName.length === 0) {
       return NextResponse.json(
         { error: "Level name must be a non-empty string" },
         { status: 400 }
@@ -33,7 +34,10 @@ export async function POST(request: NextRequest) {
     // Validate ttlInSecs
     if (!Number.isInteger(ttlInSecs) || ttlInSecs < 300 || ttlInSecs > 86400) {
       return NextResponse.json(
-        { error: "TTL must be an integer between 300 (5 min) and 86400 (24 hours)" },
+        {
+          error:
+            "TTL must be an integer between 300 (5 min) and 86400 (24 hours)",
+        },
         { status: 400 }
       );
     }
@@ -42,6 +46,8 @@ export async function POST(request: NextRequest) {
       levelName,
       ttlInSecs,
       hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? `${token.substring(0, 10)}...` : "null",
     });
 
     // Call the backend KYC endpoint server-side

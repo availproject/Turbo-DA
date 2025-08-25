@@ -47,8 +47,25 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         return;
       }
 
-      console.log("[KYC Dialog] Fetching access token from backend");
-      const sumsubToken = await KYCService.generateAccessToken(token);
+      console.log("[KYC Dialog] Fetching access token from Next.js API route");
+      // Use Next.js API route instead of direct service call
+      const response = await fetch("/api/kyc/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          levelName: "basic-kyc-level",
+          ttlInSecs: 3600,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate access token");
+      }
+
+      const { accessToken: sumsubToken } = await response.json();
 
       console.log("[KYC Dialog] Access token received, starting WebSDK");
       setAccessToken(sumsubToken);
@@ -62,44 +79,122 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   };
 
   const handleVerificationCompleted = useCallback(async () => {
-    console.log("[KYC Dialog] Verification completed, registering user...");
+    console.log(
+      "[KYC Dialog] ========== VERIFICATION COMPLETED START =========="
+    );
+    console.log(
+      "[KYC Dialog] Verification completed, starting registration process..."
+    );
+    console.log("[KYC Dialog] Current state:", {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : "null",
+      hasClerkUser: !!clerkUser,
+      clerkUserFullName: clerkUser?.fullName,
+      currentStep: step,
+    });
 
     try {
       if (!token) {
-        console.error("[KYC Dialog] No token available for registration");
+        console.error(
+          "[KYC Dialog] No authentication token available for registration"
+        );
+        setError("Authentication token not available");
         return;
       }
+
+      console.log(
+        "[KYC Dialog] Calling KYCService.registerUserAfterVerification..."
+      );
 
       await KYCService.registerUserAfterVerification(
         token,
         clerkUser?.fullName || undefined
       );
-      console.log("[KYC Dialog] User registered successfully");
+
+      console.log("[KYC Dialog] User registration completed successfully!");
+      console.log("[KYC Dialog] Setting step to 'completed'...");
 
       setStep("completed");
 
+      console.log("[KYC Dialog] Starting timeout for completion callback...");
       setTimeout(() => {
-        console.log("[KYC Dialog] Completing KYC flow");
+        console.log(
+          "[KYC Dialog] Timeout reached, calling onCompleted callback"
+        );
         onCompleted();
+        console.log(
+          "[KYC Dialog] ========== VERIFICATION COMPLETED END (SUCCESS) =========="
+        );
       }, 2000);
     } catch (err) {
-      console.error("[KYC Dialog] Error registering user:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to complete registration"
+      console.error(
+        "[KYC Dialog] ========== VERIFICATION COMPLETED END (ERROR) =========="
       );
+      console.error("[KYC Dialog] Error during registration process:", {
+        error: err,
+        errorMessage: err instanceof Error ? err.message : "Unknown error",
+        errorStack: err instanceof Error ? err.stack : "No stack trace",
+        errorType: typeof err,
+      });
+
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to complete registration";
+      console.error("[KYC Dialog] Setting error state:", errorMessage);
+
+      setError(errorMessage);
     }
-  }, [token, onCompleted, clerkUser?.fullName]);
+  }, [token, onCompleted, clerkUser?.fullName, step]);
 
   const handleVerificationError = useCallback((error: any) => {
-    console.log("[KYC Dialog] Verification error:", error);
-    setError(error.error || "Verification failed. Please try again.");
+    console.error("[KYC Dialog] ========== VERIFICATION ERROR ==========");
+    console.error("[KYC Dialog] Verification error occurred:", {
+      error: error,
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown verification error",
+      errorStack: error instanceof Error ? error.stack : "No stack trace",
+      errorType: typeof error,
+      errorToString: String(error),
+      hasErrorProperty: !!error?.error,
+      errorProperty: error?.error,
+    });
+
+    const errorMessage =
+      error.error || "Verification failed. Please try again.";
+    console.error(
+      "[KYC Dialog] Setting verification error state:",
+      errorMessage
+    );
+    setError(errorMessage);
   }, []);
 
-  const getNewAccessToken = useCallback(async () => {
-    console.log("[KYC Dialog] Token expired, refreshing...");
-    if (!token) throw new Error("No auth token available");
-    return await KYCService.generateAccessToken(token);
-  }, [token]);
+  const getNewAccessToken = async (): Promise<string> => {
+    console.log("[KYC Dialog] Token expired, getting new access token");
+    try {
+      // Use Next.js API route instead of direct service call
+      const response = await fetch("/api/kyc/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          levelName: "basic-kyc-level",
+          ttlInSecs: 3600,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate access token");
+      }
+
+      const { accessToken } = await response.json();
+      return accessToken;
+    } catch (error) {
+      console.error("[KYC Dialog] Failed to refresh access token:", error);
+      throw error;
+    }
+  };
 
   const renderContent = () => {
     switch (step) {
@@ -113,7 +208,7 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
               </div>
             </DialogTitle>
             <div className="text-gray-300 text-center mt-2">
-              Please wait while we prepare your verification
+              Please wait while we check your verification status
             </div>
           </div>
         );

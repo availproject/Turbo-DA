@@ -1,48 +1,103 @@
 class AuthenticationService {
   static async registerUser({ name, token }: { name?: string; token: string }) {
+    console.log(
+      "[AuthenticationService] ========== REGISTER USER START =========="
+    );
+    console.log("[AuthenticationService] registerUser called with:", {
+      hasName: !!name,
+      nameValue: name,
+      nameType: typeof name,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : "null",
+    });
+
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_new_user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ name }),
-        }
+      console.log(
+        "[AuthenticationService] Making request to Next.js API route..."
       );
 
+      // Use Next.js API route instead of direct backend call
+      const response = await fetch("/api/user/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      console.log("[AuthenticationService] API route response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        url: response.url,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Registration failed: ${response.status} ${response.statusText} - ${errorText}`
-        );
+        console.error("[AuthenticationService] API route request failed");
+
+        const errorData = await response.json();
+        console.error("[AuthenticationService] Error data from API:", {
+          errorData: errorData,
+          errorDataKeys: Object.keys(errorData),
+        });
+
+        const errorMessage =
+          errorData.error ||
+          `Registration failed: ${response.status} ${response.statusText}`;
+        console.error("[AuthenticationService] Throwing error:", errorMessage);
+
+        throw new Error(errorMessage);
       }
 
-      return await response.json();
+      console.log(
+        "[AuthenticationService] API route request successful, parsing response..."
+      );
+      const result = await response.json();
+
+      console.log("[AuthenticationService] Registration response parsed:", {
+        hasResult: !!result,
+        resultKeys: result ? Object.keys(result) : [],
+        hasData: !!result?.data,
+        dataKeys: result?.data ? Object.keys(result.data) : [],
+        fullResult: result,
+      });
+
+      console.log(
+        "[AuthenticationService] ========== REGISTER USER END (SUCCESS) =========="
+      );
+      return result.data;
     } catch (error) {
+      console.error(
+        "[AuthenticationService] ========== REGISTER USER END (ERROR) =========="
+      );
+      console.error("[AuthenticationService] Registration error:", {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorStack: error instanceof Error ? error.stack : "No stack trace",
+        errorType: typeof error,
+      });
       throw error;
     }
   }
 
   static async fetchUser({ token }: { token: string }) {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/v1/user/get_user`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Use Next.js API route instead of direct backend call
+      const response = await fetch("/api/user/profile", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
       if (!response.ok) {
         return undefined;
       }
 
-      return await response.json();
+      const result = await response.json();
+      return result.data;
     } catch (error) {
       return undefined;
     }

@@ -16,110 +16,51 @@ import AuthenticationService from "@/services/authentication";
 import AppService from "@/services/app";
 
 export class KYCService {
-  private static baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/v1/user/kyc`;
-
-  static async generateAccessToken(
-    clerkJWT: string,
-    levelName: string = "basic-kyc-level",
-    ttlInSecs: number = 3600
-  ): Promise<string> {
-    console.log("[KYC Service] Starting generateAccessToken request", {
-      levelName,
-      ttlInSecs,
-      hasClerkJWT: !!clerkJWT,
-      clerkJWTLength: clerkJWT?.length || 0,
-    });
-
-    try {
-      const requestBody = {
-        level_name: levelName,
-        ttl_in_secs: ttlInSecs,
-      };
-
-      console.log(
-        "[KYC Service] Making API request to:",
-        `${this.baseUrl}/generate_access_token`
-      );
-      console.log("[KYC Service] Request body:", requestBody);
-
-      const response = await fetch(`${this.baseUrl}/generate_access_token`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${clerkJWT}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log("[KYC Service] Response status:", response.status);
-      console.log(
-        "[KYC Service] Response headers:",
-        Object.fromEntries(response.headers.entries())
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[KYC Service] Error response body:", errorText);
-
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-
-        const errorMessage =
-          errorData.message ||
-          `KYC API error: ${response.status} ${response.statusText}`;
-        console.error("[KYC Service] Parsed error:", errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const responseText = await response.text();
-
-      const response_data = JSON.parse(responseText);
-      console.log("[KYC Service] response data:", response_data);
-
-      // Extract token from nested structure
-      const token = response_data?.data?.token;
-      console.log("[KYC Service] Extracted access token");
-
-      if (!token) {
-        throw new Error("No access token in response");
-      }
-
-      return token;
-    } catch (error) {
-      console.error(
-        "[KYC Service] Failed to generate KYC access token:",
-        error
-      );
-
-      if (error instanceof Error) {
-        console.error("[KYC Service] Error details:", {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        });
-        throw error;
-      }
-
-      throw new Error("Failed to generate KYC access token. Please try again.");
-    }
-  }
-
   static async registerUserAfterVerification(
     clerkJWT: string,
     fullName?: string
   ): Promise<void> {
     console.log(
-      "[KYC Service] Registering user after verification via /v1/user/register_new_user"
+      "[KYC Service] ========== REGISTER USER AFTER VERIFICATION START =========="
     );
-    await AuthenticationService.registerUser({
-      token: clerkJWT,
-      name: fullName,
+    console.log("[KYC Service] registerUserAfterVerification called with:", {
+      hasClerkJWT: !!clerkJWT,
+      clerkJWTLength: clerkJWT?.length,
+      clerkJWTPreview: clerkJWT ? `${clerkJWT.substring(0, 20)}...` : "null",
+      hasFullName: !!fullName,
+      fullNameValue: fullName,
+      fullNameType: typeof fullName,
     });
+
+    console.log("[KYC Service] Calling AuthenticationService.registerUser...");
+
+    try {
+      await AuthenticationService.registerUser({
+        token: clerkJWT,
+        name: fullName,
+      });
+
+      console.log(
+        "[KYC Service] User registration successful, proceeding to create default app..."
+      );
+    } catch (registrationError) {
+      console.error("[KYC Service] User registration failed:", {
+        error: registrationError,
+        errorMessage:
+          registrationError instanceof Error
+            ? registrationError.message
+            : "Unknown error",
+        errorStack:
+          registrationError instanceof Error
+            ? registrationError.stack
+            : "No stack trace",
+      });
+      throw registrationError; // Re-throw to propagate the error
+    }
+
     // Attempt to create a default app, non-fatal on failure
+    console.log("[KYC Service] Attempting to create default app...");
+
     try {
       await AppService.createApp({
         token: clerkJWT,
@@ -127,12 +68,22 @@ export class KYCService {
         appName: `${fullName || "My"}'s App`,
         avatar: "avatar_1",
       });
+
+      console.log("[KYC Service] Default app created successfully");
     } catch (e) {
       console.warn(
-        "[KYC Service] Failed to create default app after registration:",
-        e
+        "[KYC Service] Failed to create default app after registration (non-fatal):",
+        {
+          error: e,
+          errorMessage: e instanceof Error ? e.message : "Unknown error",
+          errorType: typeof e,
+        }
       );
     }
+
+    console.log(
+      "[KYC Service] ========== REGISTER USER AFTER VERIFICATION END (SUCCESS) =========="
+    );
   }
 }
 

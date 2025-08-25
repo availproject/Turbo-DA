@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { template } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   try {
     // Get the authenticated user
     const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getToken({ template });
 
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,10 +30,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           kycCompleted: false,
           userExists: false,
-          kycStatus: 'required',
+          kycStatus: "required",
         });
       }
-      
+
       // Other errors
       return NextResponse.json(
         { error: "Failed to check user status" },
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       kycCompleted: true,
       userExists: true,
-      kycStatus: 'verified',
+      kycStatus: "verified",
       user: userData,
     });
   } catch (error) {
