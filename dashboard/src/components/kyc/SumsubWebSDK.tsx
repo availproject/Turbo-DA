@@ -85,7 +85,11 @@ export default function SumsubWebSDK({
 
         sdkInstance = snsWebSdk
           .init(accessToken, tokenCb)
-          .withConf({ lang: "en", theme: "dark" })
+          .withConf({
+            lang: "en",
+            theme: "dark",
+            hideSuccessScreen: true, // Hide Sumsub's default success screen
+          })
           .withOptions({ addViewportTag: false, adaptIframeHeight: true })
           .on("idCheck.onError", (e: any) => {
             if (disposed) return;
@@ -126,6 +130,9 @@ export default function SumsubWebSDK({
                 reviewStatus === "completed" &&
                 answer === "GREEN"
               ) {
+                console.log(
+                  "[Sumsub SDK] TRIGGERING COMPLETION via onApplicantStatusChanged"
+                );
                 firedCompletedRef.current = true;
                 onCompletedRef.current();
               }
@@ -138,6 +145,9 @@ export default function SumsubWebSDK({
               const answerRaw = extractDecisionAnswer(payload);
               const answer = answerRaw?.toString?.().toUpperCase?.();
               if (!firedCompletedRef.current && answer === "GREEN") {
+                console.log(
+                  "[Sumsub SDK] TRIGGERING COMPLETION via moduleResultPresented"
+                );
                 firedCompletedRef.current = true;
                 onCompletedRef.current();
               }

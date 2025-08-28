@@ -27,6 +27,8 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   const [tosAccepted, setTosAccepted] = useState(false);
   const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
   const [tosCheckboxChecked, setTosCheckboxChecked] = useState(false);
+  const [isInitializingVerification, setIsInitializingVerification] =
+    useState(false);
 
   // Initialize when dialog opens
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
       setTosAccepted(false);
       setTosAcceptedAt(null);
       setTosCheckboxChecked(false);
+      setIsInitializingVerification(false);
     }
   }, [isOpen]);
 
@@ -57,13 +60,36 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
         return;
       }
 
-      // Skip directly to terms acceptance since this is a new user flow
-      console.log("[KYC Dialog] Moving to terms acceptance step");
+      // Check KYC status using the API endpoint
+      console.log("[KYC Dialog] Checking KYC status via API...");
+      const statusResponse = await fetch("/api/kyc/status", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!statusResponse.ok) {
+        const errorData = await statusResponse.json();
+        throw new Error(errorData.error || "Failed to check KYC status");
+      }
+
+      const statusData = await statusResponse.json();
+      console.log("[KYC Dialog] KYC status response:", statusData);
+
+      // Since the KYC Provider only shows this dialog when KYC is required,
+      // we should proceed directly to terms acceptance instead of auto-completing
+      // The KYC Provider already handles the case where KYC is completed
+      console.log(
+        "[KYC Dialog] Dialog opened for KYC verification, proceeding to terms acceptance"
+      );
       setStep("terms-acceptance");
     } catch (err) {
-      console.error("[KYC Dialog] Error initializing verification:", err);
+      console.error("[KYC Dialog] Error checking KYC status:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to initialize verification"
+        err instanceof Error
+          ? err.message
+          : "Failed to check verification status"
       );
     }
   };
@@ -84,6 +110,7 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
   };
 
   const proceedToVerification = async () => {
+    setIsInitializingVerification(true);
     try {
       console.log("[KYC Dialog] Fetching access token from Next.js API route");
       const response = await fetch("/api/kyc/token", {
@@ -112,6 +139,8 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
       setError(
         err instanceof Error ? err.message : "Failed to initialize verification"
       );
+    } finally {
+      setIsInitializingVerification(false);
     }
   };
 
@@ -244,11 +273,11 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
             <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mb-4" />
             <DialogTitle>
               <div className="text-xl font-bold text-white text-center">
-                Checking Verification Status...
+                Checking KYC Status...
               </div>
             </DialogTitle>
             <div className="text-gray-300 text-center mt-2">
-              Please wait while we check your verification status
+              Please wait while we verify your KYC status
             </div>
           </div>
         );
@@ -317,12 +346,25 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
               <Button
                 onClick={handleTosAcceptance}
                 className="w-full"
-                disabled={!tosCheckboxChecked}
-                variant={tosCheckboxChecked ? "primary" : "disabled"}
+                disabled={!tosCheckboxChecked || isInitializingVerification}
+                variant={
+                  tosCheckboxChecked && !isInitializingVerification
+                    ? "primary"
+                    : "disabled"
+                }
               >
-                <Text weight={"semibold"} size={"lg"}>
-                  Continue to Verification
-                </Text>
+                {isInitializingVerification ? (
+                  <div className="flex items-center justify-center gap-x-2">
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    <Text weight={"semibold"} size={"lg"}>
+                      Accept Terms of Service
+                    </Text>
+                  </div>
+                ) : (
+                  <Text weight={"semibold"} size={"lg"}>
+                    Accept Terms of Service
+                  </Text>
+                )}
               </Button>
             </div>
           </div>
@@ -359,7 +401,7 @@ export default function KYCDialog({ isOpen, onCompleted }: KYCDialogProps) {
             </div>
             <DialogTitle>
               <div className="text-xl font-bold text-white text-center">
-                Verification Completed!
+                User is Verified!
               </div>
             </DialogTitle>
             <div className="text-gray-300 text-center mt-2">

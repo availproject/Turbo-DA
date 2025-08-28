@@ -17,10 +17,10 @@ export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <AuthProvider>
       <UserProvider>
-        <KYCProvider>
-          <Providers>
-            <Header />
-            <OverviewProvider>
+        <Providers>
+          <OverviewProvider>
+            <KYCProvider>
+              <Header />
               {children}
               <ToastContainer
                 className={"backdrop-blur-lg"}
@@ -33,10 +33,10 @@ export function ClientProviders({ children }: ClientProvidersProps) {
                 newestOnTop={true}
                 stacked={true}
               />
-            </OverviewProvider>
-            <Footer />
-          </Providers>
-        </KYCProvider>
+              <Footer />
+            </KYCProvider>
+          </OverviewProvider>
+        </Providers>
       </UserProvider>
     </AuthProvider>
   );

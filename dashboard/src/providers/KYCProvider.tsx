@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useAuth } from "./AuthProvider";
 import { useUser } from "./UserProvider";
+import { useOverview } from "./OverviewProvider";
 import KYCDialog from "@/components/kyc/KYCDialog";
 
 interface KYCContextType {
@@ -28,6 +29,7 @@ interface KYCProviderProps {
 export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
   const { isAuthenticated, token, isLoading: authLoading } = useAuth();
   const { user, isLoading: userLoading, refetchUser } = useUser();
+  const { refreshAppsList } = useOverview();
   const [isKYCCompleted, setIsKYCCompleted] = useState(false);
   const [isCheckingKYC, setIsCheckingKYC] = useState(false);
   const [kycError, setKycError] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
         "[KYC Provider] User not authenticated, setting KYC completed to false"
       );
       setIsKYCCompleted(false);
+      setShowKYCDialog(false);
       return;
     }
 
@@ -72,7 +75,6 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
       console.error("[KYC Provider] Failed to check KYC status:", error);
       setKycError("Failed to check verification status");
     } finally {
-      console.log("[KYC Provider] Setting checking KYC to false");
       setIsCheckingKYC(false);
     }
   };
@@ -109,6 +111,13 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
     }
   }, [isAuthenticated, authLoading, token, userLoading, user]);
 
+  // Reset KYC state when user changes (important for user switching)
+  useEffect(() => {
+    console.log("[KYC Provider] User change detected, resetting dialog state");
+    setShowKYCDialog(false);
+    setIsKYCCompleted(false);
+  }, [token]); // Reset when token changes (indicates new user)
+
   const contextValue: KYCContextType = {
     isKYCRequired: isAuthenticated && !isKYCCompleted && !isCheckingKYC,
     isKYCCompleted,
@@ -128,6 +137,8 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
         onCompleted={async () => {
           // After KYC verified + registration, refetch user, then mark completed
           await refetchUser();
+          // Refresh apps list to show the newly created default app
+          await refreshAppsList();
           markKYCCompleted();
         }}
       />

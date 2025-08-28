@@ -22,6 +22,7 @@ interface OverviewContextType {
   setFilter: Dispatch<SetStateAction<Filter>>;
   appsList: AppDetails[];
   setAppsList: Dispatch<SetStateAction<AppDetails[]>>;
+  refreshAppsList: () => Promise<void>;
   supportedTokens: Tokens[];
   setSupportedTokens: Dispatch<SetStateAction<Tokens[]>>;
   setAPIKeys: Dispatch<SetStateAction<Record<string, string[]> | undefined>>;
@@ -41,7 +42,7 @@ type TransactionProgress = {
 export type Filter = "All" | "Using Assigned Credits" | "Using Main Credits";
 
 export const OverviewContext = createContext<OverviewContextType | undefined>(
-  undefined,
+  undefined
 );
 
 interface OverviewProviderProps {
@@ -57,7 +58,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [apiKeys, setAPIKeys] = useState<Record<string, string[]>>();
   const [filter, setFilter] = useState<Filter>("All");
   const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
-    APP_TABS.OVERVIEW,
+    APP_TABS.OVERVIEW
   );
   const [tokenList, setTokenList] =
     useState<Record<string, Record<string, any>>>();
@@ -67,6 +68,25 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [isAwaitingCreditUpdate, setIsAwaitingCreditUpdate] = useState(false);
   const tokenMap = useTokenMap();
   const { token } = useConfig();
+
+  // Function to refresh the apps list
+  const refreshAppsList = async () => {
+    if (!token) {
+      console.log(
+        "[Overview Provider] No token available for refreshing apps list"
+      );
+      return;
+    }
+
+    try {
+      console.log("[Overview Provider] Refreshing apps list...");
+      const response = await AppService.getApps({ token });
+      setAppsList(response?.data ?? []);
+      console.log("[Overview Provider] Apps list refreshed successfully");
+    } catch (error) {
+      console.error("[Overview Provider] Failed to refresh apps list:", error);
+    }
+  };
 
   useEffect(() => {
     token &&
@@ -85,15 +105,15 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         filter === "Using Assigned Credits"
           ? app.credit_balance !== "0"
           : filter === "Using Main Credits"
-            ? app.credit_balance === "0"
-            : true,
+          ? app.credit_balance === "0"
+          : true
       ),
-    [appsList, filter],
+    [appsList, filter]
   );
 
   const allAppList = useMemo(
     () => filterAppList.filter((app) => app.app_name),
-    [filterAppList],
+    [filterAppList]
   );
 
   return (
@@ -102,6 +122,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         creditBalance,
         appsList: allAppList,
         setAppsList,
+        refreshAppsList,
         supportedTokens,
         setSupportedTokens,
         apiKeys,
