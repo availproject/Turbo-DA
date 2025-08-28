@@ -31,7 +31,8 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
   const { user, isLoading: userLoading, refetchUser } = useUser();
   const { refreshAppsList } = useOverview();
   const [isKYCCompleted, setIsKYCCompleted] = useState(false);
-  const [isCheckingKYC, setIsCheckingKYC] = useState(false);
+  // Start with checking=true by default to prevent dashboard flash
+  const [isCheckingKYC, setIsCheckingKYC] = useState(true);
   const [kycError, setKycError] = useState<string | null>(null);
   const [showKYCDialog, setShowKYCDialog] = useState(false);
 
@@ -49,10 +50,11 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
       );
       setIsKYCCompleted(false);
       setShowKYCDialog(false);
+      setIsCheckingKYC(false);
       return;
     }
 
-    console.log("[KYC Provider] Setting checking KYC to true");
+    console.log("[KYC Provider] Confirming checking KYC state");
     setIsCheckingKYC(true);
     setKycError(null);
 
@@ -85,17 +87,37 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
     setIsKYCCompleted(true);
     setShowKYCDialog(false);
     setKycError(null);
+    setIsCheckingKYC(false);
     console.log("[KYC Provider] KYC completion state updated");
   };
 
-  // Check KYC status when authentication or user state changes
+  // Initialize checking state based on authentication
   useEffect(() => {
-    console.log("[KYC Provider] useEffect triggered", {
+    console.log("[KYC Provider] Auth state effect triggered", {
+      authLoading,
+      isAuthenticated,
+      currentIsCheckingKYC: isCheckingKYC,
+    });
+
+    if (!authLoading && !isAuthenticated) {
+      console.log("[KYC Provider] User not authenticated, stopping KYC check");
+      setIsKYCCompleted(false);
+      setShowKYCDialog(false);
+      setKycError(null);
+      setIsCheckingKYC(false);
+    }
+    // For authenticated users, keep isCheckingKYC=true until checkKYCStatus runs
+  }, [isAuthenticated, authLoading]);
+
+  // Check KYC status when user data is available
+  useEffect(() => {
+    console.log("[KYC Provider] User data effect triggered", {
       authLoading,
       isAuthenticated,
       hasToken: !!token,
       userLoading,
       hasUser: !!user,
+      currentIsCheckingKYC: isCheckingKYC,
     });
 
     if (!authLoading && !userLoading && isAuthenticated) {
@@ -103,20 +125,27 @@ export const KYCProvider: React.FC<KYCProviderProps> = ({ children }) => {
         "[KYC Provider] Auth loaded and user authenticated, checking KYC status"
       );
       checkKYCStatus();
-    } else if (!isAuthenticated) {
-      console.log("[KYC Provider] User not authenticated, resetting KYC state");
-      setIsKYCCompleted(false);
-      setShowKYCDialog(false);
-      setKycError(null);
     }
   }, [isAuthenticated, authLoading, token, userLoading, user]);
 
   // Reset KYC state when user changes (important for user switching)
   useEffect(() => {
-    console.log("[KYC Provider] User change detected, resetting dialog state");
+    console.log("[KYC Provider] Token change detected", {
+      hasToken: !!token,
+      isAuthenticated,
+      currentIsCheckingKYC: isCheckingKYC,
+    });
+
     setShowKYCDialog(false);
     setIsKYCCompleted(false);
-  }, [token]); // Reset when token changes (indicates new user)
+    // Reset to checking state for new authenticated users
+    if (isAuthenticated) {
+      console.log(
+        "[KYC Provider] Setting checking state for authenticated user"
+      );
+      setIsCheckingKYC(true);
+    }
+  }, [token, isAuthenticated]);
 
   const contextValue: KYCContextType = {
     isKYCRequired: isAuthenticated && !isKYCCompleted && !isCheckingKYC,

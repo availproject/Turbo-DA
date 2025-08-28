@@ -11,6 +11,7 @@ import { formatDataBytes } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { useConfig } from "@/providers/ConfigProvider";
 import { useAuthState } from "@/providers/AuthProvider";
+import { useKYC } from "@/providers/KYCProvider";
 import CreditService from "@/services/credit";
 import { Wallet } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
@@ -38,6 +39,7 @@ const BuyCreditsCard = () => {
     isLoggedOut,
     token,
   } = useAuthState();
+  const { isCheckingKYC } = useKYC();
   const [tokenAmount, setTokenAmount] = useState("");
   const [tokenAmountError, setTokenAmountError] = useState("");
   const [estimateData, setEstimateData] = useState();
@@ -195,43 +197,36 @@ const BuyCreditsCard = () => {
     setTokenAmount("");
   };
 
-  // Show loading state while authentication is loading
-  if (authLoading) {
+  // Don't render anything if user is logged out
+  if (isLoggedOut) {
+    return null;
+  }
+
+  // Show loading state while authentication is loading or KYC is being checked
+  if (authLoading || isCheckingKYC) {
     return (
       <div className="relative min-lg:w-[466px] h-[455px]">
         <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
           <Card className="w-full border-none shadow-primary bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl pt-0 pb-0 relative h-full">
-            <div className="bg-[url('/purchase-credits-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
-            <CardContent className="p-6 z-1 relative">
-              <div className="space-y-6">
-                <div className="flex items-center gap-x-2">
-                  <Skeleton className="w-8 h-8 rounded-lg" sheen={false} />
-                  <Skeleton className="w-32 h-6 rounded" />
+            <div className="bg-[url('/buy-credits-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+            <div className="h-full z-1 relative">
+              <CardContent className="h-full px-0 flex flex-col">
+                <div className="mb-2 pt-6">
+                  <Skeleton className="w-32 h-8 mx-4 mb-6" />
+                  <div className="bg-border-blue w-full h-px" />
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <Skeleton className="w-24 h-4 rounded mb-2" />
-                    <Skeleton className="w-full h-12 rounded-lg" />
-                  </div>
-
-                  <div>
-                    <Skeleton className="w-32 h-4 rounded mb-2" />
-                    <Skeleton className="w-full h-12 rounded-lg" />
-                  </div>
-
-                  <div>
-                    <Skeleton className="w-40 h-4 rounded mb-2" />
-                    <Skeleton className="w-full h-12 rounded-lg" />
-                  </div>
+                <div className="flex flex-col gap-y-4 p-4">
+                  <Skeleton className="w-full h-12" />
+                  <Skeleton className="w-full h-12" />
+                  <Skeleton className="w-full h-12" />
+                  <div className="bg-border-blue w-full h-px" />
+                  <Skeleton className="w-full h-12" />
                 </div>
-
-                <div className="space-y-4">
-                  <Skeleton className="w-32 h-4 rounded" />
-                  <Skeleton className="w-full h-12 rounded-lg" />
+                <div className="mt-auto p-4">
+                  <Skeleton className="w-full h-12" />
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            </div>
           </Card>
         </div>
       </div>

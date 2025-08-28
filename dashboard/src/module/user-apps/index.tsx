@@ -9,6 +9,7 @@ import useAPIKeys from "@/hooks/useApiKeys";
 import { cn } from "@/lib/utils";
 import { Filter, useOverview } from "@/providers/OverviewProvider";
 import { useAuthState } from "@/providers/AuthProvider";
+import { useKYC } from "@/providers/KYCProvider";
 import AppService from "@/services/app";
 import { CirclePlus } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -22,6 +23,7 @@ const AppsCard = () => {
   const { setFilter, filter, appsList, setAppsList } = useOverview();
   const { updateAPIKeys } = useAPIKeys();
   const { isAuthenticated, isLoading, isLoggedOut, token } = useAuthState();
+  const { isCheckingKYC } = useKYC();
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -47,41 +49,33 @@ const AppsCard = () => {
     return null;
   }
 
-  // Show loading state while authentication is loading
-  if (isLoading) {
+  // Show loading state while authentication is loading or KYC is being checked
+  if (isLoading || isCheckingKYC) {
     return (
-      <div className={cn("relative w-full h-[780px]")}>
-        <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px overflow-hidden">
-          <Card className="shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary rounded-2xl to-[100%] pt-0 gap-0 flex-1 pb-0 block relative h-full">
-            <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
-
-            <CardContent className="p-4 z-1 relative">
-              <div className="space-y-4">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border border-border-blue rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Skeleton
-                        className="w-12 h-12 rounded-lg"
-                        sheen={false}
-                      />
-                      <div className="space-y-2">
-                        <Skeleton className="w-32 h-5 rounded" />
-                        <Skeleton className="w-24 h-4 rounded" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="w-20 h-4 rounded" />
-                      <Skeleton className="w-6 h-6 rounded" sheen={false} />
-                    </div>
-                  </div>
-                ))}
+      <div
+        className={`relative w-full h-[615px] mb-4 rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px`}
+      >
+        <Card className="relative h-full shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary to-[100%] rounded-2xl p-0 overflow-hidden">
+          <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
+          <CardHeader className="border-b border-[#2B4761] px-4 py-6 z-1 relative">
+            <div className="flex justify-between items-center w-full">
+              <div className="flex gap-x-2 items-center">
+                <Skeleton className="w-6 h-6 rounded" />
+                <Skeleton className="w-20 h-6 rounded" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="flex gap-x-2">
+                <Skeleton className="w-24 h-8 rounded" />
+                <Skeleton className="w-20 h-8 rounded" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="flex flex-col gap-y-4 mt-4 px-4">
+              <Skeleton className="h-52" sheen={false} />
+              <Skeleton className="h-52" sheen={false} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

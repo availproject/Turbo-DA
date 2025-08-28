@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { useAuthState } from "@/providers/AuthProvider";
+import { useKYC } from "@/providers/KYCProvider";
 import { AlertTriangle, Wallet } from "lucide-react";
 import DiscountEligibility from "./component/discount-eligibility";
 
@@ -14,14 +15,15 @@ const CreditBalance = () => {
   const { setOpen } = useDialog();
   const { creditBalance, isAwaitingCreditUpdate } = useOverview();
   const { isAuthenticated, isLoading, isLoggedOut } = useAuthState();
+  const { isCheckingKYC } = useKYC();
 
   // Don't render anything if user is logged out
   if (isLoggedOut) {
     return null;
   }
 
-  // Show loading state with shimmer
-  if (isLoading) {
+  // Show loading state while authentication is loading or KYC is being checked
+  if (isLoading || isCheckingKYC) {
     return (
       <div className="relative w-full h-[124px]">
         <div className="absolute w-full h-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px">
@@ -47,7 +49,7 @@ const CreditBalance = () => {
     );
   }
 
-  // Only render if authenticated
+  // Only render if authenticated and KYC is not being checked
   if (!isAuthenticated) {
     return null;
   }
