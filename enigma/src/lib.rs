@@ -35,11 +35,7 @@ impl EnigmaEncryptionService {
     /// * `Vec<u8>` - The encrypted data
     pub async fn encrypt(&self, payload: EncryptRequest) -> Result<Vec<u8>, reqwest::Error> {
         let response = Client::new()
-            .post(format!(
-                "{}/{}/encrypt",
-                self.service_version.clone(),
-                self.service_url.clone()
-            ))
+            .post(format!("{}/v1/encrypt", self.service_url.clone()))
             .json(&payload)
             .send()
             .await?;

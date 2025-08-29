@@ -25,6 +25,7 @@ pub struct CreditRequestsGet {
     pub request_type: String,
     pub tx_hash: Option<String>,
     pub token_address: Option<String>,
+    pub amount_paid: Option<BigDecimal>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
@@ -39,6 +40,7 @@ pub struct CreditRequestInfo {
     pub tx_hash: Option<String>,
     pub created_at: chrono::NaiveDateTime,
     pub token_address: Option<String>,
+    pub amount_paid: Option<BigDecimal>,
 }
 
 #[derive(Queryable, Selectable)]

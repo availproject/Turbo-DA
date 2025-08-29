@@ -13,11 +13,13 @@ pub struct EncryptRequest {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EncryptResponse {
     pub ciphertext: Vec<u8>,
-    pub signature: Signature,
+    pub ciphertext_hash: Vec<u8>,
+    pub plaintext_hash: Vec<u8>,
+    pub signature_ciphertext_hash: Signature,
+    pub signature_plaintext_hash: Signature,
     pub address: Address,
     pub ephemeral_pub_key: Vec<u8>,
 }
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DecryptRequest {
     pub app_id: u32,

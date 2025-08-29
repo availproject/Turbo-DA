@@ -2,17 +2,23 @@ import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
 import { chainList } from "@/module/purchase-credit/utils/constant";
 import { useConfig } from "@/providers/ConfigProvider";
-import { AvailWalletConnect, useAvailAccount } from "avail-wallet-sdk";
+import {
+  AvailWalletConnect,
+  useAvailAccount,
+  useAvailWallet,
+} from "avail-wallet-sdk";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 const AvailWallet = () => {
   const { selected, selectedWallet, clearWalletState } = useAvailAccount();
-  const { selectedChain, setSelectedChain, setSelectedToken } = useConfig();
-  console.log({
-    selectedWallet,
-    selected,
-  });
+  const {
+    selectedChain,
+    setSelectedChain,
+    setSelectedToken,
+    availNativeBalance,
+  } = useConfig();
 
   return (
     <div className="w-full">
@@ -81,7 +87,7 @@ const AvailWallet = () => {
                   </Text>
                 </div>
                 <Text weight={"semibold"} size={"sm"}>
-                  1.32 ETH
+                  {availNativeBalance} AVAIL
                 </Text>
               </div>
             </div>

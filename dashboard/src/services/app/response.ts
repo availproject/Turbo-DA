@@ -14,7 +14,6 @@ export interface AppDetails {
   credit_used: string;
   fallback_credit_used: string;
   fallback_enabled: boolean;
-  fallback_updated_at: CreditLog[];
   id: string;
   user_id: string;
 }

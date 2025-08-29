@@ -5,13 +5,14 @@ import { DialogTitle } from "../../components/dialog";
 import { useDialog } from "../../components/dialog/provider";
 import { Text } from "../../components/text";
 import { Dialog, DialogContent } from "../../components/ui/dialog";
+import { ClickHandler } from "../purchase-credit/utils/types";
 
 const SwitchToMainBalanceAlert = ({
   id,
   callback,
 }: {
   id: string;
-  callback: () => void;
+  callback: ClickHandler;
 }) => {
   const { open, setOpen } = useDialog();
 

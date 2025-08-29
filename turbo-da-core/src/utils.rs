@@ -19,11 +19,7 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{
-    collections::{Bound, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
@@ -376,63 +372,84 @@ pub async fn calculate_avail_token_equivalent(
         "level": "debug"
     }));
 
-    let token_symbol = TOKEN_MAP
-        .iter()
-        .find_map(|(chain_id, tokens)| {
-            if chain_id == chain {
-                tokens.iter().find_map(|(key, token)| {
-                    if token.token_address == token_address {
-                        Some(key.clone())
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| String::from("Token address not found in token mapping"))?;
+    let equivalent_amount;
+    if token_address == "0x0000000000000000000000000000000000000000".to_string() {
+        let token_symbol = "avail".to_string();
+        let (token_usd_price, avail_usd_price) = get_prices(
+            &http_client,
+            &coingecko_api_url,
+            &coingecko_api_key,
+            token_symbol.as_str(),
+        )
+        .await
+        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-    let (token_usd_price, avail_usd_price) = get_prices(
-        &http_client,
-        &coingecko_api_url,
-        &coingecko_api_key,
-        token_symbol.as_str(),
-    )
-    .await
-    .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
+        let token_avail_ratio = token_usd_price / avail_usd_price;
+        let token_avail_ratio_decimal =
+            BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+                .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 
-    debug_json(json!({
-        "message": "Current Token USD price",
-        "token_usd_price": token_usd_price,
-        "level": "debug"
-    }));
-    debug_json(json!({
-        "message": "Current AVAIL USD price",
-        "avail_usd_price": avail_usd_price,
-        "level": "debug"
-    }));
+        equivalent_amount = token_amount * token_avail_ratio_decimal;
+    } else {
+        let token_symbol = TOKEN_MAP
+            .iter()
+            .find_map(|(chain_id, tokens)| {
+                if chain_id == chain {
+                    tokens.iter().find_map(|(key, token)| {
+                        if token.token_address == token_address {
+                            Some(key.clone())
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| String::from("Token address not found in token mapping"))?;
 
-    let token_avail_ratio = token_usd_price / avail_usd_price;
-    let source_token_decimals = TOKEN_MAP
-        .get(chain)
-        .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
-        .get(token_symbol.as_str())
-        .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
-        .token_decimals;
-    let avail_token_decimals = TOKEN_MAP
-        .get(chain)
-        .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
-        .get("avail")
-        .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
-        .token_decimals;
-    let token_avail_ratio_decimal = BigDecimal::from_str(token_avail_ratio.to_string().as_str())
-        .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
+        let (token_usd_price, avail_usd_price) = get_prices(
+            &http_client,
+            &coingecko_api_url,
+            &coingecko_api_key,
+            token_symbol.as_str(),
+        )
+        .await
+        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-    let equivalent_amount = token_avail_ratio_decimal
-        * token_amount
-        * BigDecimal::from(10_u64.pow(avail_token_decimals as u32))
-        / BigDecimal::from(10_u64.pow(source_token_decimals as u32));
+        debug_json(json!({
+            "message": "Current Token USD price",
+            "token_usd_price": token_usd_price,
+            "level": "debug"
+        }));
+        debug_json(json!({
+            "message": "Current AVAIL USD price",
+            "avail_usd_price": avail_usd_price,
+            "level": "debug"
+        }));
+
+        let token_avail_ratio = token_usd_price / avail_usd_price;
+        let source_token_decimals = TOKEN_MAP
+            .get(chain)
+            .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
+            .get(token_symbol.as_str())
+            .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
+            .token_decimals;
+        let avail_token_decimals = TOKEN_MAP
+            .get(chain)
+            .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
+            .get("avail")
+            .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
+            .token_decimals;
+        let token_avail_ratio_decimal =
+            BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+                .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
+
+        equivalent_amount = token_avail_ratio_decimal
+            * token_amount
+            * BigDecimal::from(10_u64.pow(avail_token_decimals as u32))
+            / BigDecimal::from(10_u64.pow(source_token_decimals as u32));
+    };
 
     Ok(equivalent_amount.round(0))
 }

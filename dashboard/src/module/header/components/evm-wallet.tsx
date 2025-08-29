@@ -14,6 +14,7 @@ const EVMWallet = () => {
   const { disconnect } = useDisconnect();
   const result = useBalance({
     address: account.address,
+    chainId: selectedChain?.id !== 0 ? selectedChain?.id : undefined,
   });
 
   console.log({

@@ -25,6 +25,9 @@ pub struct AppConfig {
     pub aws_region: String,
     pub s3_bucket_name: String,
     pub aws_secret_access_key: String,
+    pub sumsub_app_token: String,
+    pub sumsub_secret_key: String,
+    pub sumsub_base_url: String,
 }
 
 impl Default for AppConfig {
@@ -46,6 +49,9 @@ impl Default for AppConfig {
             aws_region: String::new(),
             s3_bucket_name: String::new(),
             aws_secret_access_key: String::new(),
+            sumsub_app_token: String::new(),
+            sumsub_secret_key: String::new(),
+            sumsub_base_url: String::new(),
         }
     }
 }
@@ -176,6 +182,10 @@ impl AppConfig {
                 e.to_string()
             })?;
 
+        let sumsub_app_token = env::var("SUMSUB_APP_TOKEN")?;
+        let sumsub_secret_key = env::var("SUMSUB_SECRET_KEY")?;
+        let sumsub_base_url = env::var("SUMSUB_BASE_URL")?;
+
         let mut avail_rpc_endpoint = Vec::new();
         let mut index = 1;
         while let Ok(endpoint) = env::var(format!("AVAIL_RPC_ENDPOINT_{}", index)) {
@@ -209,6 +219,9 @@ impl AppConfig {
             aws_region,
             s3_bucket_name,
             aws_secret_access_key,
+            sumsub_app_token,
+            sumsub_secret_key,
+            sumsub_base_url,
         })
     }
 }

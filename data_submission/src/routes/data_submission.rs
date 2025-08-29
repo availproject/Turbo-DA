@@ -263,16 +263,23 @@ pub async fn submit_data_encrypted(
 
     let submission_id = generate_submission_id();
 
+    println!("avail_app_id: {}", avail_app_id);
+    println!("request_payload: {}", request_payload.data);
+
     let encrypted_data = match enigma_encryption_service
         .encrypt(EncryptRequest {
             app_id: avail_app_id as u32,
             plaintext: request_payload.data.as_bytes().to_vec(),
-            turbo_da_app_id: submission_id.clone(),
+            turbo_da_app_id: app_id.clone(),
         })
         .await
     {
         Ok(encrypted_data) => encrypted_data,
         Err(e) => {
+            error(&format!(
+                "couldn't encrypt data with error {}",
+                e.to_string()
+            ));
             return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
         }
     };
