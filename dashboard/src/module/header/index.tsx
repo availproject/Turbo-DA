@@ -31,7 +31,17 @@ function Header() {
         {isAuthenticated && (
           <>
             <WalletsMenu />
-            <UserButton />
+            <UserButton
+              userProfileMode="navigation"
+              userProfileUrl="#"
+              appearance={{
+                elements: {
+                  userButtonPopoverActionButton__manageAccount: {
+                    display: "none",
+                  },
+                },
+              }}
+            />
           </>
         )}
         {isLoggedOut && (
