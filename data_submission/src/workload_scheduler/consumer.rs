@@ -4,22 +4,19 @@
 use super::common::Response;
 use actix_web::web;
 use avail_rust::Keypair;
-use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
-use bigdecimal::BigDecimal;
+use avail_utils::submit_data::SubmitDataAvail;
 use db::{
     controllers::{
-        customer_expenditure::{
-            add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
-        },
-        misc::{get_account_by_id, update_credit_balance, update_database_on_submission},
+        customer_expenditure::{add_error_entry, get_did_fallback_resolved},
+        misc::{get_account_by_id, update_database_on_submission},
         users::TxParams,
     },
     errors::*,
-    models::apps::Apps,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{types::EncryptRequest, EnigmaEncryptionService};
 use observability::log_txn;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -33,6 +30,7 @@ pub struct Consumer {
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
     number_of_threads: i32,
+    enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
 }
 
 impl Consumer {
@@ -42,6 +40,7 @@ impl Consumer {
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
         number_of_threads: i32,
+        enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
     ) -> Self {
         Consumer {
             sender,
@@ -49,6 +48,7 @@ impl Consumer {
             injected_dependency,
             endpoints,
             number_of_threads,
+            enigma_encryption_service,
         }
     }
 
@@ -62,6 +62,7 @@ impl Consumer {
             let keygen = self.keypair.clone();
             let sender = self.sender.clone();
             let arc_endpoints = self.endpoints.clone();
+            let enigma_encryption_service = self.enigma_encryption_service.clone();
             let heartbeat_tx = heartbeat_tx.clone();
 
             self.spawn_thread(
@@ -69,6 +70,7 @@ impl Consumer {
                 sender,
                 keygen,
                 injected_dependency,
+                enigma_encryption_service,
                 arc_endpoints,
                 heartbeat_tx,
             )
@@ -96,6 +98,7 @@ impl Consumer {
                         thread_id
                     ));
                     let injected_dependency = self.injected_dependency.clone();
+                    let enigma_encryption_service = self.enigma_encryption_service.clone();
                     let keygen = self.keypair.clone();
                     let sender = self.sender.clone();
                     let arc_endpoints = self.endpoints.clone();
@@ -106,6 +109,7 @@ impl Consumer {
                         sender,
                         keygen,
                         injected_dependency,
+                        enigma_encryption_service,
                         arc_endpoints,
                         heartbeat_tx,
                     )
@@ -121,6 +125,7 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
+        enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
     ) {
@@ -157,9 +162,15 @@ impl Consumer {
                         continue;
                     }
 
-                    let result =
-                        response_handler(&response, &injected_dependency, &endpoints, &keygen, i)
-                            .await;
+                    let result = response_handler(
+                        &response,
+                        &injected_dependency,
+                        &enigma_encryption_service,
+                        &endpoints,
+                        &keygen,
+                        i,
+                    )
+                    .await;
 
                     if let Err(e) = result {
                         log_txn(&response.submission_id.to_string(), response.thread_id, &e);
@@ -176,6 +187,7 @@ impl Consumer {
 async fn response_handler(
     response: &Response,
     injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
+    enigma_encryption_service: &web::Data<EnigmaEncryptionService>,
     endpoints: &Arc<Vec<String>>,
     keygen: &Vec<Keypair>,
     i: i32,
@@ -200,8 +212,12 @@ async fn response_handler(
 
     let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
-    let mut process_response =
-        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class);
+    let mut process_response = ProcessSubmitResponse::new(
+        &response,
+        enigma_encryption_service,
+        &mut connection,
+        submit_data_class,
+    );
 
     match timeout(
         Duration::from_secs(120),
@@ -232,17 +248,20 @@ struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
+    enigma_encryption_service: &'a EnigmaEncryptionService,
 }
 
 impl<'a> ProcessSubmitResponse<'a> {
     pub fn new(
         response: &'a Response,
+        enigma_encryption_service: &'a EnigmaEncryptionService,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
     ) -> Self {
         Self {
             response,
             connection,
+            enigma_encryption_service,
             submit_avail_class,
         }
     }
@@ -251,7 +270,28 @@ impl<'a> ProcessSubmitResponse<'a> {
         let (account, user) =
             get_account_by_id(&mut self.connection, &self.response.app_id).await?;
 
-        let data = self.response.raw_payload.clone();
+        let encrypted_response = if self.response.encrypted {
+            let response = self
+                .enigma_encryption_service
+                .encrypt(EncryptRequest {
+                    app_id: self.response.avail_app_id as u32,
+                    plaintext: self.response.raw_payload.to_vec(),
+                    turbo_da_app_id: self.response.app_id.clone(),
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Some(response)
+        } else {
+            None
+        };
+
+        let data = if let Some(encrypted_response) = &encrypted_response {
+            self.enigma_encryption_service
+                .format_encrypt_response_to_data_submission(encrypted_response)
+        } else {
+            self.response.raw_payload.to_vec()
+        };
 
         let convertor = Convertor::new(
             &self.submit_avail_class.client,
@@ -294,6 +334,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             result,
             &account,
             params,
+            encrypted_response,
         )
         .await?;
 

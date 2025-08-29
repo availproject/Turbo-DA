@@ -58,22 +58,23 @@ async fn main() -> Result<(), std::io::Error> {
 
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
-    let consumer_server = Consumer::new(
-        Arc::new(sender.clone()),
-        Arc::new(shared_keypair.clone()),
-        Arc::new(shared_pool.clone()),
-        Arc::new(app_config.avail_rpc_endpoint.clone()),
-        app_config.number_of_threads,
-    );
-
-    let port = app_config.port;
-
     let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
         app_config.enigma_encryption_service_url.clone(),
         app_config.enigma_encryption_service_version.clone(),
     );
 
     let shared_enigma_encryption_service = web::Data::new(enigma_encryption_service);
+
+    let consumer_server = Consumer::new(
+        Arc::new(sender.clone()),
+        Arc::new(shared_keypair.clone()),
+        Arc::new(shared_pool.clone()),
+        Arc::new(app_config.avail_rpc_endpoint.clone()),
+        app_config.number_of_threads,
+        Arc::new(shared_enigma_encryption_service.clone()),
+    );
+
+    let port = app_config.port;
 
     let shared_config = web::Data::new(app_config);
 

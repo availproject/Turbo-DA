@@ -85,6 +85,7 @@ pub async fn submit_data(
         submission_id,
         app_id,
         avail_app_id,
+        encrypted: false,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
@@ -182,6 +183,7 @@ pub async fn submit_raw_data(
         submission_id,
         app_id,
         avail_app_id,
+        encrypted: false,
     };
 
     tokio::spawn(async move {
@@ -266,39 +268,22 @@ pub async fn submit_data_encrypted(
     println!("avail_app_id: {}", avail_app_id);
     println!("request_payload: {}", request_payload.data);
 
-    let encrypted_data = match enigma_encryption_service
-        .encrypt(EncryptRequest {
-            app_id: avail_app_id as u32,
-            plaintext: request_payload.data.as_bytes().to_vec(),
-            turbo_da_app_id: app_id.clone(),
-        })
-        .await
-    {
-        Ok(encrypted_data) => encrypted_data,
-        Err(e) => {
-            error(&format!(
-                "couldn't encrypt data with error {}",
-                e.to_string()
-            ));
-            return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
-        }
-    };
-
     let response = Response {
         thread_id: map_user_id_to_thread(&config),
-        raw_payload: encrypted_data.clone().into(),
+        raw_payload: request_payload.data.as_bytes().to_vec().into(),
         submission_id,
         app_id,
         avail_app_id,
+        encrypted: true,
     };
 
     let expenditure_entry = CreateCustomerExpenditure {
-        amount_data: format_size(encrypted_data.len()),
+        amount_data: format_size(request_payload.data.as_bytes().len()),
         user_id: user_id,
         app_id: app_id,
         id: submission_id,
         error: None,
-        payload: Some(encrypted_data),
+        payload: Some(request_payload.data.as_bytes().to_vec()),
     };
 
     tokio::spawn(async move {
