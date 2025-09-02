@@ -197,11 +197,6 @@ const BuyCreditsCard = () => {
     setTokenAmount("");
   };
 
-  // Don't render anything if user is logged out
-  if (isLoggedOut) {
-    return null;
-  }
-
   // Show loading state while authentication is loading or KYC is being checked
   if (authLoading || isCheckingKYC) {
     return (
