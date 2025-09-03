@@ -8,18 +8,6 @@ class CreditService {
     token: string;
     data: number;
   }) {
-<<<<<<< HEAD
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_size?size=${data}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-=======
     const url = `${process.env.NEXT_PUBLIC_API_URL}/v1/user/estimate_credits_against_size?size=${data}`;
 
     console.log("Credit Estimates API Request:", {
@@ -41,7 +29,6 @@ class CreditService {
         Authorization: `Bearer ${token}`,
       },
     });
->>>>>>> develop-enigma
 
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
