@@ -72,6 +72,14 @@ export const formatDataBytes = (bytes: number) => {
   return fixedValue + ` Credit${kb > 1 ? "s" : ""}`;
 };
 
+export const formatDataBytesWithPrecision = (bytes: number, decimals = 2) => {
+  const kb = bytes / 1024;
+  const truncatedValue = Number.isInteger(kb)
+    ? kb
+    : truncateToFixed(kb, decimals);
+  return truncatedValue + ` Credit${kb > 1 ? "s" : ""}`;
+};
+
 export function formatBalance(balance: string) {
   return parseFloat(balance).toFixed(2);
 }

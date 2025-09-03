@@ -1,5 +1,5 @@
 "use client";
-import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
+import { APP_TABS, cn, formatDataBytesWithPrecision } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { useConfig } from "@/providers/ConfigProvider";
 import HistoryService from "@/services/history";
@@ -188,7 +188,7 @@ const CreditHistory = () => {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
-          return value ? formatDataBytes(value) : "-";
+          return value ? formatDataBytesWithPrecision(value, 2) : "-";
         case "chain_id":
           const chainInfo = getChainInfo(value);
           return (
