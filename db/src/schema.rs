@@ -91,6 +91,7 @@ diesel::table! {
         credit_balance -> Numeric,
         credit_used -> Numeric,
         allocated_credit_balance -> Numeric,
+        sumsub_timestamp -> Nullable<Timestamp>,
     }
 }
 
