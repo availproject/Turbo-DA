@@ -1,3 +1,4 @@
+import { ClickHandler } from "@/module/purchase-credit/utils/types";
 import { useMemo } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 
@@ -6,7 +7,7 @@ export const useDesiredChain = (desiredChain: number) => {
   const { chains, error, switchChain, switchChainAsync } = useSwitchChain();
 
   const selectedChain = chains.find(
-    (ch: { id: number }) => ch.id === desiredChain
+    (ch: { id: number }) => ch.id === desiredChain,
   );
 
   const isDesiredChain = useMemo(() => {
@@ -25,7 +26,7 @@ export const useDesiredChain = (desiredChain: number) => {
     }
   };
 
-  const chainChangerAsync = async (callback?: () => void) => {
+  const chainChangerAsync = async (callback?: ClickHandler) => {
     try {
       return switchChainAsync?.({ chainId: selectedChain?.id! })
         .then(() => {

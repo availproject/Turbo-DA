@@ -13,8 +13,7 @@ import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { availChain, chainList } from "../utils/constant";
-import AvailChainConnect from "./avail-chain-connect";
+import { supportedTokensAndChains } from "@/lib/types";
 
 const SelectChainToken = () => {
   const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
@@ -51,39 +50,71 @@ const SelectChainToken = () => {
                 </div>
               </div>
               <div className="flex gap-y-2 flex-col my-6 px-3">
-                {Object.values(chainList).map((chain) => {
+                {Object.values(supportedTokensAndChains)
+                  .filter((chain) => chain.name !== "Avail")
+                  .map((chain) => {
+                    return (
+                      <Button
+                        variant={"outline"}
+                        key={`evm-${chain.name}`}
+                        className="flex gap-x-1.5 items-center justify-between"
+                        data-state={
+                          selectedChain?.name === chain.name
+                            ? "active"
+                            : "inactive"
+                        }
+                        onClick={() => {
+                          setSelectedChain(chain);
+                          setSelectedToken(undefined);
+                        }}
+                      >
+                        <div className="flex gap-x-2 items-center">
+                          <Image
+                            src={chain.icon}
+                            alt={chain.name}
+                            width={24}
+                            height={24}
+                            className="border border-border-blue rounded-full"
+                          />
+                          <Text weight={"semibold"}>{chain.name}</Text>
+                        </div>
+                      </Button>
+                    );
+                  })}
+              </div>
+              <div className="bg-border-blue h-px w-full" />
+              <div className="flex gap-y-2 flex-col mt-6 px-3">
+                {/* Avail Chain */}
+                {(() => {
+                  const availChain = supportedTokensAndChains.avail;
                   return (
                     <Button
                       variant={"outline"}
-                      key={`evm-${chain.name}`}
+                      key="avail-chain"
                       className="flex gap-x-1.5 items-center justify-between"
                       data-state={
-                        selectedChain?.name === chain.name
+                        selectedChain?.name === availChain.name
                           ? "active"
                           : "inactive"
                       }
                       onClick={() => {
-                        setSelectedChain(chain);
+                        setSelectedChain(availChain);
                         setSelectedToken(undefined);
                       }}
                     >
                       <div className="flex gap-x-2 items-center">
                         <Image
-                          src={chain.icon}
-                          alt={chain.name}
+                          src={availChain.icon}
+                          alt={availChain.name}
                           width={24}
                           height={24}
                           className="border border-border-blue rounded-full"
                         />
-                        <Text weight={"semibold"}>{chain.name}</Text>
+                        <Text weight={"semibold"}>{availChain.name}</Text>
                       </div>
                     </Button>
                   );
-                })}
-              </div>
-              <div className="bg-border-blue h-px w-full" />
-              <div className="flex gap-y-2 flex-col mt-6 px-3">
-                <AvailChainConnect />
+                })()}
               </div>
             </div>
             <div className="px-4 py-8 flex-1 h-full flex flex-col gap-y-2">
@@ -113,7 +144,7 @@ const SelectChainToken = () => {
               </div>
               <div className="flex flex-col gap-y-3 mt-2">
                 {selectedChain &&
-                  { ...chainList, ...availChain }[
+                  supportedTokensAndChains[
                     selectedChain.name.toLowerCase()
                   ]?.tokens.map((token) => (
                     <Button
@@ -133,16 +164,13 @@ const SelectChainToken = () => {
                       <div className="flex gap-x-2 items-center">
                         <Image
                           src={token.icon}
-                          alt="ethereum"
+                          alt={token.name}
                           width={24}
                           height={24}
                           className="border border-border-blue rounded-full"
                         />
                         <Text weight={"semibold"}>{token.name}</Text>
                       </div>
-                      <Text className="text-[#999]" weight={"semibold"}>
-                        00.00
-                      </Text>
                     </Button>
                   ))}
               </div>

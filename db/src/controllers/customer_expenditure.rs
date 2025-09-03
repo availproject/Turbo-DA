@@ -8,6 +8,7 @@ use bigdecimal::BigDecimal;
 
 use diesel::{prelude::*, result::Error};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use enigma::types::EncryptResponse;
 use log::{error, info};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -77,7 +78,13 @@ pub async fn handle_submission_info(
                         "data_hash": sub.data_hash.map(|h| format!("0x{}", h)),
                         "tx_index": sub.extrinsic_index,
                         "data_billed": sub.converted_fees.map(|f| f.to_string()),
-                        "created_at": sub.created_at
+                        "created_at": sub.created_at,
+                        "ciphertext_hash": sub.ciphertext_hash,
+                        "plaintext_hash": sub.plaintext_hash,
+                        "signature_ciphertext_hash": sub.signature_ciphertext_hash,
+                        "signature_plaintext_hash": sub.signature_plaintext_hash,
+                        "address": sub.address,
+                        "ephemeral_pub_key": sub.ephemeral_pub_key
                     }))
                 }
             });
@@ -90,6 +97,7 @@ pub async fn handle_submission_info(
 
 pub async fn update_customer_expenditure(
     result: TransactionInfo,
+    encrypted_response: Option<EncryptResponse>,
     fees_as_bigdecimal: &BigDecimal,
     fees_as_bigdecimal_in_avail: &BigDecimal,
     wallet_store: &Vec<u8>,
@@ -108,6 +116,22 @@ pub async fn update_customer_expenditure(
         wallet.eq(wallet_store),
         payload.eq(None::<Vec<u8>>),
         error.eq(None::<String>),
+        ciphertext_hash.eq(encrypted_response
+            .as_ref()
+            .map(|r| r.ciphertext_hash.clone())),
+        plaintext_hash.eq(encrypted_response
+            .as_ref()
+            .map(|r| r.plaintext_hash.clone())),
+        signature_ciphertext_hash.eq(encrypted_response
+            .as_ref()
+            .map(|r| r.signature_ciphertext_hash.as_bytes())),
+        signature_plaintext_hash.eq(encrypted_response
+            .as_ref()
+            .map(|r| r.signature_plaintext_hash.as_bytes())),
+        address.eq(encrypted_response.as_ref().map(|r| r.address.to_vec())),
+        ephemeral_pub_key.eq(encrypted_response
+            .as_ref()
+            .map(|r| r.ephemeral_pub_key.clone())),
     );
 
     diesel::update(customer_expenditures.filter(id.eq(submission_id)))
@@ -116,8 +140,8 @@ pub async fn update_customer_expenditure(
         .await
         .map_err(|e| {
             format!(
-                "Couldn't insert customer expenditure entry {:?}. Error: {:?}",
-                update_values, e
+                "Couldn't insert customer expenditure entry {:?} {:?} {:?}. Error: {:?}",
+                update_values.0, update_values.1, update_values.2, e
             )
         })?;
     Ok(())
@@ -377,7 +401,7 @@ pub async fn update_wallet_store(connection: &mut AsyncPgConnection) -> Result<(
                     .to_be_bytes(),
             );
 
-            let i = diesel::update(customer_expenditures.filter(id.eq(item.id)))
+            let _ = diesel::update(customer_expenditures.filter(id.eq(item.id)))
                 .set(wallet.eq(wallet_store))
                 .execute(connection)
                 .await

@@ -1,4 +1,5 @@
 use crate::{
+    controllers::customer_expenditure::update_customer_expenditure,
     models::{
         apps::Apps, customer_expenditure::CustomerExpenditureGetWithPayload,
         indexer::IndexerBlockNumbers, user_model::User,
@@ -8,9 +9,11 @@ use crate::{
         indexer_block_numbers::dsl as indexer_block_numbers, users::dsl as users,
     },
 };
+use avail_utils::submit_data::TransactionInfo;
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use enigma::types::EncryptResponse;
 use uuid::Uuid;
 
 use super::{
@@ -225,4 +228,82 @@ pub async fn indexer_status(
         .load(connection)
         .await
         .map_err(|e| e.to_string())
+}
+
+pub async fn update_database_on_submission(
+    submission_id: Uuid,
+    connection: &mut AsyncPgConnection,
+    result: TransactionInfo,
+    account: &Apps,
+    tx_params: TxParams,
+    encrypted_response: Option<EncryptResponse>,
+) -> Result<(), String> {
+    let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
+    let (billed_from_credit, billed_from_fallback) = match account.credit_selection {
+        Some(0) => (tx_params.amount_data_billed.clone(), BigDecimal::from(0)),
+        Some(1) => (BigDecimal::from(0), tx_params.amount_data_billed.clone()),
+        Some(2) => {
+            if account.credit_balance >= BigDecimal::from(0) {
+                if tx_params.amount_data_billed > account.credit_balance {
+                    (
+                        account.credit_balance.clone(),
+                        &tx_params.amount_data_billed - &account.credit_balance,
+                    )
+                } else {
+                    (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
+                }
+            } else {
+                (BigDecimal::from(0), tx_params.amount_data_billed.clone())
+            }
+        }
+        _ => (BigDecimal::from(0), tx_params.amount_data_billed.clone()),
+    };
+
+    println!("billed_from_fallback: {}", billed_from_fallback);
+    println!("billed_from_credit: {}", billed_from_credit);
+
+    // Convert BigDecimal values to u64 and create wallet store
+    let fallback_u64 = billed_from_fallback
+        .round(0)
+        .to_string()
+        .parse::<i128>()
+        .unwrap_or(0);
+    let credit_u64 = billed_from_credit
+        .round(0)
+        .to_string()
+        .parse::<i128>()
+        .unwrap_or(0);
+
+    let mut wallet_store = vec![0u8; 32];
+    wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
+    wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
+
+    let retrieve_original_fallback =
+        i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
+    let retrieve_original_credit =
+        i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
+
+    println!("retrieve_original_fallback: {}", retrieve_original_fallback);
+    println!("retrieve_original_credit: {}", retrieve_original_credit);
+
+    update_customer_expenditure(
+        result,
+        encrypted_response,
+        &fees_as_bigdecimal,
+        &tx_params.amount_data_billed,
+        &wallet_store,
+        submission_id,
+        connection,
+    )
+    .await?;
+    update_credit_balance(
+        connection,
+        &account,
+        &tx_params,
+        &billed_from_credit,
+        &billed_from_fallback,
+    )
+    .await?;
+
+    Ok(())
 }

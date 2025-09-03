@@ -1,4 +1,10 @@
-use crate::redis::Redis;
+use crate::{
+    redis::Redis,
+    routes::{
+        data_retrieval::{decrypt_data, get_decrypt_status},
+        data_submission::submit_data_encrypted,
+    },
+};
 use actix_cors::Cors;
 
 use actix_web::{
@@ -55,12 +61,20 @@ async fn main() -> Result<(), std::io::Error> {
 
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
+    let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
+        app_config.enigma_encryption_service_url.clone(),
+        app_config.enigma_encryption_service_version.clone(),
+    );
+
+    let shared_enigma_encryption_service = web::Data::new(enigma_encryption_service);
+
     let consumer_server = Consumer::new(
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
         app_config.number_of_threads,
+        Arc::new(shared_enigma_encryption_service.clone()),
     );
 
     let port = app_config.port;
@@ -89,10 +103,14 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
+                    .app_data(shared_enigma_encryption_service.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
-                    .service(get_submission_info),
+                    .service(get_submission_info)
+                    .service(submit_data_encrypted)
+                    .service(decrypt_data)
+                    .service(get_decrypt_status),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?

@@ -40,6 +40,9 @@ diesel-async = { workspace = true }
 futures = { workspace = true }
 threadpool = "1.8"
 crossbeam-channel = "0.5.13"
+hmac = "0.12"
+sha2 = "0.10"
+urlencoding = "2.1"
 worker = "0.3.3"
 redis = {workspace = true}
 rayon = "1.10.0"

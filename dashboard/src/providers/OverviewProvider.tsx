@@ -14,10 +14,10 @@ import React, {
   useState,
 } from "react";
 import { useConfig } from "./ConfigProvider";
+import { useUser } from "./UserProvider";
 
 interface OverviewContextType {
   creditBalance: number;
-  setCreditBalance: Dispatch<SetStateAction<number>>;
   filter: Filter;
   setFilter: Dispatch<SetStateAction<Filter>>;
   appsList: AppDetails[];
@@ -30,6 +30,8 @@ interface OverviewContextType {
   setMainTabSelected: Dispatch<SetStateAction<APP_TABS>>;
   transactionProgress: TransactionProgress[];
   setTransactionProgress: Dispatch<SetStateAction<TransactionProgress[]>>;
+  isAwaitingCreditUpdate: boolean;
+  setIsAwaitingCreditUpdate: Dispatch<SetStateAction<boolean>>;
 }
 
 type TransactionProgress = {
@@ -44,16 +46,12 @@ export const OverviewContext = createContext<OverviewContextType | undefined>(
 
 interface OverviewProviderProps {
   children?: React.ReactNode;
-  creditBalance?: number;
 }
 
 export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   children,
-  creditBalance: mainCreditBalance,
 }) => {
-  const [creditBalance, setCreditBalance] = useState<number>(
-    mainCreditBalance ?? 0
-  );
+  const { creditBalance } = useUser();
   const [supportedTokens, setSupportedTokens] = useState<Tokens[]>([]);
   const [appsList, setAppsList] = useState<AppDetails[]>([]);
   const [apiKeys, setAPIKeys] = useState<Record<string, string[]>>();
@@ -66,6 +64,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [transactionProgress, setTransactionProgress] = useState<
     TransactionProgress[]
   >([]);
+  const [isAwaitingCreditUpdate, setIsAwaitingCreditUpdate] = useState(false);
   const tokenMap = useTokenMap();
   const { token } = useConfig();
 
@@ -93,7 +92,7 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   );
 
   const allAppList = useMemo(
-    () => filterAppList.filter((app) => app.app_name),
+    () => filterAppList.filter((app) => Boolean(app.id)),
     [filterAppList]
   );
 
@@ -101,7 +100,6 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
     <OverviewContext.Provider
       value={{
         creditBalance,
-        setCreditBalance,
         appsList: allAppList,
         setAppsList,
         supportedTokens,
@@ -114,6 +112,8 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
         setMainTabSelected,
         transactionProgress,
         setTransactionProgress,
+        isAwaitingCreditUpdate,
+        setIsAwaitingCreditUpdate,
       }}
     >
       {children}

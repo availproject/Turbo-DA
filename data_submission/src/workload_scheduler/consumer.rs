@@ -4,22 +4,19 @@
 use super::common::Response;
 use actix_web::web;
 use avail_rust::Keypair;
-use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
-use bigdecimal::BigDecimal;
+use avail_utils::submit_data::SubmitDataAvail;
 use db::{
     controllers::{
-        customer_expenditure::{
-            add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
-        },
-        misc::{get_account_by_id, update_credit_balance},
+        customer_expenditure::{add_error_entry, get_did_fallback_resolved},
+        misc::{get_account_by_id, update_database_on_submission},
         users::TxParams,
     },
     errors::*,
-    models::apps::Apps,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{types::EncryptRequest, EnigmaEncryptionService};
 use observability::log_txn;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -33,6 +30,7 @@ pub struct Consumer {
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
     number_of_threads: i32,
+    enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
 }
 
 impl Consumer {
@@ -42,6 +40,7 @@ impl Consumer {
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
         number_of_threads: i32,
+        enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
     ) -> Self {
         Consumer {
             sender,
@@ -49,6 +48,7 @@ impl Consumer {
             injected_dependency,
             endpoints,
             number_of_threads,
+            enigma_encryption_service,
         }
     }
 
@@ -62,6 +62,7 @@ impl Consumer {
             let keygen = self.keypair.clone();
             let sender = self.sender.clone();
             let arc_endpoints = self.endpoints.clone();
+            let enigma_encryption_service = self.enigma_encryption_service.clone();
             let heartbeat_tx = heartbeat_tx.clone();
 
             self.spawn_thread(
@@ -69,6 +70,7 @@ impl Consumer {
                 sender,
                 keygen,
                 injected_dependency,
+                enigma_encryption_service,
                 arc_endpoints,
                 heartbeat_tx,
             )
@@ -96,6 +98,7 @@ impl Consumer {
                         thread_id
                     ));
                     let injected_dependency = self.injected_dependency.clone();
+                    let enigma_encryption_service = self.enigma_encryption_service.clone();
                     let keygen = self.keypair.clone();
                     let sender = self.sender.clone();
                     let arc_endpoints = self.endpoints.clone();
@@ -106,6 +109,7 @@ impl Consumer {
                         sender,
                         keygen,
                         injected_dependency,
+                        enigma_encryption_service,
                         arc_endpoints,
                         heartbeat_tx,
                     )
@@ -121,6 +125,7 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
+        enigma_encryption_service: Arc<web::Data<EnigmaEncryptionService>>,
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
     ) {
@@ -157,9 +162,15 @@ impl Consumer {
                         continue;
                     }
 
-                    let result =
-                        response_handler(&response, &injected_dependency, &endpoints, &keygen, i)
-                            .await;
+                    let result = response_handler(
+                        &response,
+                        &injected_dependency,
+                        &enigma_encryption_service,
+                        &endpoints,
+                        &keygen,
+                        i,
+                    )
+                    .await;
 
                     if let Err(e) = result {
                         log_txn(&response.submission_id.to_string(), response.thread_id, &e);
@@ -176,6 +187,7 @@ impl Consumer {
 async fn response_handler(
     response: &Response,
     injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
+    enigma_encryption_service: &web::Data<EnigmaEncryptionService>,
     endpoints: &Arc<Vec<String>>,
     keygen: &Vec<Keypair>,
     i: i32,
@@ -200,8 +212,12 @@ async fn response_handler(
 
     let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
-    let mut process_response =
-        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class);
+    let mut process_response = ProcessSubmitResponse::new(
+        &response,
+        enigma_encryption_service,
+        &mut connection,
+        submit_data_class,
+    );
 
     match timeout(
         Duration::from_secs(120),
@@ -232,17 +248,20 @@ struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
+    enigma_encryption_service: &'a EnigmaEncryptionService,
 }
 
 impl<'a> ProcessSubmitResponse<'a> {
     pub fn new(
         response: &'a Response,
+        enigma_encryption_service: &'a EnigmaEncryptionService,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
     ) -> Self {
         Self {
             response,
             connection,
+            enigma_encryption_service,
             submit_avail_class,
         }
     }
@@ -251,7 +270,28 @@ impl<'a> ProcessSubmitResponse<'a> {
         let (account, user) =
             get_account_by_id(&mut self.connection, &self.response.app_id).await?;
 
-        let data = self.response.raw_payload.clone();
+        let encrypted_response = if self.response.encrypted {
+            let response = self
+                .enigma_encryption_service
+                .encrypt(EncryptRequest {
+                    app_id: self.response.avail_app_id as u32,
+                    plaintext: self.response.raw_payload.to_vec(),
+                    turbo_da_app_id: self.response.app_id.clone(),
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Some(response)
+        } else {
+            None
+        };
+
+        let data = if let Some(encrypted_response) = &encrypted_response {
+            self.enigma_encryption_service
+                .format_encrypt_response_to_data_submission(encrypted_response)
+        } else {
+            self.response.raw_payload.to_vec()
+        };
 
         let convertor = Convertor::new(
             &self.submit_avail_class.client,
@@ -260,14 +300,26 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used >= account.credit_balance {
-            if !account.fallback_enabled
-                || &credits_used - &account.credit_balance >= user.credit_balance
-            {
-                return Err("Insufficient credits".to_string());
+        match account.credit_selection {
+            Some(0) => {
+                if &credits_used >= &account.credit_balance {
+                    return Err("Insufficient assigned credits for user id".to_string());
+                }
+            }
+            Some(1) => {
+                if &credits_used >= &user.credit_balance {
+                    return Err("Insufficient fallback credits for user id".to_string());
+                }
+            }
+            Some(2) => {
+                if &(&credits_used - &account.credit_balance) >= &user.credit_balance {
+                    return Err("Insufficient credits for user id".to_string());
+                }
+            }
+            _ => {
+                return Err("Invalid credit selection".to_string());
             }
         }
-
         let result = self.submit_avail_class.submit_data(&data).await?;
 
         let params = TxParams {
@@ -276,78 +328,17 @@ impl<'a> ProcessSubmitResponse<'a> {
             fees: result.gas_fee,
         };
 
-        self.update_database(result, &account, params).await?;
+        update_database_on_submission(
+            self.response.submission_id,
+            &mut self.connection,
+            result,
+            &account,
+            params,
+            encrypted_response,
+        )
+        .await?;
 
         Ok(self.response)
-    }
-
-    pub async fn update_database(
-        &mut self,
-        result: TransactionInfo,
-        account: &Apps,
-        tx_params: TxParams,
-    ) -> Result<(), String> {
-        let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
-        let (billed_from_credit, billed_from_fallback) =
-            if account.credit_balance >= BigDecimal::from(0) {
-                if tx_params.amount_data_billed > account.credit_balance {
-                    (
-                        account.credit_balance.clone(),
-                        &tx_params.amount_data_billed - &account.credit_balance,
-                    )
-                } else {
-                    (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
-                }
-            } else {
-                (BigDecimal::from(0), tx_params.amount_data_billed.clone())
-            };
-
-        println!("billed_from_fallback: {}", billed_from_fallback);
-        println!("billed_from_credit: {}", billed_from_credit);
-
-        // Convert BigDecimal values to u64 and create wallet store
-        let fallback_u64 = billed_from_fallback
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-        let credit_u64 = billed_from_credit
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-
-        let mut wallet_store = vec![0u8; 32];
-        wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
-        wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
-
-        let retrieve_original_fallback =
-            i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
-        let retrieve_original_credit =
-            i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
-
-        println!("retrieve_original_fallback: {}", retrieve_original_fallback);
-        println!("retrieve_original_credit: {}", retrieve_original_credit);
-
-        update_customer_expenditure(
-            result,
-            &fees_as_bigdecimal,
-            &tx_params.amount_data_billed,
-            &wallet_store,
-            self.response.submission_id,
-            self.connection,
-        )
-        .await?;
-        update_credit_balance(
-            self.connection,
-            &account,
-            &tx_params,
-            &billed_from_credit,
-            &billed_from_fallback,
-        )
-        .await?;
-
-        Ok(())
     }
 }
 

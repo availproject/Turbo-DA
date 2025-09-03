@@ -24,10 +24,10 @@ diesel::table! {
         credit_balance -> Numeric,
         credit_used -> Numeric,
         fallback_credit_used -> Numeric,
-        fallback_enabled -> Bool,
         metadata_path -> Nullable<Varchar>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        credit_selection -> Nullable<Int2>,
     }
 }
 
@@ -47,6 +47,7 @@ diesel::table! {
         updated_at -> Timestamp,
         #[max_length = 255]
         token_address -> Nullable<Varchar>,
+        amount_paid -> Nullable<Numeric>,
     }
 }
 
@@ -70,6 +71,12 @@ diesel::table! {
         updated_at -> Timestamp,
         app_id -> Uuid,
         wallet -> Nullable<Bytea>,
+        ciphertext_hash -> Nullable<Bytea>,
+        plaintext_hash -> Nullable<Bytea>,
+        signature_ciphertext_hash -> Nullable<Bytea>,
+        signature_plaintext_hash -> Nullable<Bytea>,
+        address -> Nullable<Bytea>,
+        ephemeral_pub_key -> Nullable<Bytea>,
     }
 }
 

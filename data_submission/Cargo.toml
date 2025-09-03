@@ -32,3 +32,4 @@ observability = { path = "../observability" }
 avail-utils = {path = "../avail"}
 tracing-subscriber = { workspace = true, features = ["json"] }
 tracing = { workspace = true }
+enigma = { path = "../enigma" }
