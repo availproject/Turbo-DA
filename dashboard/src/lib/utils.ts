@@ -97,6 +97,16 @@ export const getTokenDecimals = (tokenName: string): number => {
   return TOKEN_MAP[tokenName]?.token_decimals ?? 18;
 };
 
+export const formatTokenAmount = (
+  weiAmount: string | number,
+  decimals: number = 18,
+  precision: number = 6
+): string => {
+  if (!weiAmount) return "0";
+  const amount = parseFloat(weiAmount.toString()) / Math.pow(10, decimals);
+  return amount.toFixed(precision);
+};
+
 export const getTokenTicker = (tokenName: string): string => {
   return TOKEN_MAP[tokenName]?.token_ticker ?? tokenName.toUpperCase();
 };
