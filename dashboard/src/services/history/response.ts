@@ -3,7 +3,14 @@ export interface CreditRequest {
   user_id: string;
   chain_id: number;
   amount_credit: string | null;
-  request_status: "PENDING" | "COMPLETED" | "FAILED" | "pending" | "completed" | "failed";
+  amount_paid: string | null;
+  request_status:
+    | "PENDING"
+    | "COMPLETED"
+    | "FAILED"
+    | "pending"
+    | "completed"
+    | "failed";
   request_type: "DEPOSIT" | "credit" | "debit";
   tx_hash: string | null;
   token_address: string | null;
