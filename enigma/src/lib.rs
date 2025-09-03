@@ -1,5 +1,11 @@
 use reqwest::Client;
-use types::{DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse};
+use types::{
+    DecryptRequest, DecryptResponse, EncryptRequest, EncryptResponse,
+    GetDecryptRequestStatusRequest,
+};
+use uuid::Uuid;
+
+use crate::types::GetDecryptRequestStatusResponse;
 
 pub mod types;
 
@@ -33,14 +39,17 @@ impl EnigmaEncryptionService {
     ///
     /// # Returns
     /// * `Vec<u8>` - The encrypted data
-    pub async fn encrypt(&self, payload: EncryptRequest) -> Result<Vec<u8>, reqwest::Error> {
+    pub async fn encrypt(
+        &self,
+        payload: EncryptRequest,
+    ) -> Result<EncryptResponse, reqwest::Error> {
         let response = Client::new()
             .post(format!("{}/v1/encrypt", self.service_url.clone()))
             .json(&payload)
             .send()
             .await?;
         let response = response.json::<EncryptResponse>().await?;
-        Ok(self.format_encrypt_response_to_data_submission(response))
+        Ok(response)
     }
 
     /// Decrypts the payload using the Enigma service
@@ -50,24 +59,36 @@ impl EnigmaEncryptionService {
     ///
     /// # Returns
     /// * `Vec<u8>` - The decrypted data
-    pub async fn decrypt(&self, payload: DecryptRequest) -> Result<Vec<u8>, reqwest::Error> {
+    pub async fn decrypt(&self, payload: DecryptRequest) -> Result<Uuid, reqwest::Error> {
         let response = Client::new()
-            .post(format!(
-                "{}/{}/decrypt",
-                self.service_version.clone(),
-                self.service_url.clone()
-            ))
+            .post(format!("{}/v1/decrypt", self.service_url.clone()))
             .json(&payload)
             .send()
             .await?;
+
         let response = response.json::<DecryptResponse>().await?;
-        Ok(response.plaintext)
+        Ok(response.job_id)
+    }
+
+    pub async fn get_decrypt_status(
+        &self,
+        payload: GetDecryptRequestStatusRequest,
+    ) -> Result<GetDecryptRequestStatusResponse, reqwest::Error> {
+        let response = Client::new()
+            .get(format!("{}/v1/decrypt-status", self.service_url.clone()))
+            .query(&payload)
+            .send()
+            .await?;
+
+        println!("response: {:?}", response);
+        let response = response.json::<GetDecryptRequestStatusResponse>().await?;
+        Ok(response)
     }
 
     // format the encrypt response to the data submission format
     // | ephemeral_pub_key (constant size 65 bytes) | ciphertext (encrypted DA payload) |
     // * Here we are assuming that the ephemeral_pub_key is returned in the uncompressed format.
-    fn format_encrypt_response_to_data_submission(&self, payload: EncryptResponse) -> Vec<u8> {
+    pub fn format_encrypt_response_to_data_submission(&self, payload: &EncryptResponse) -> Vec<u8> {
         let mut formatted_payload = Vec::new();
         formatted_payload.extend_from_slice(&payload.ephemeral_pub_key);
         formatted_payload.extend_from_slice(&payload.ciphertext);

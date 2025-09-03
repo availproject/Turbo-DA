@@ -1,6 +1,9 @@
 use crate::{
     redis::Redis,
-    routes::{data_retrieval::decrypt_data, data_submission::submit_data_encrypted},
+    routes::{
+        data_retrieval::{decrypt_data, get_decrypt_status},
+        data_submission::submit_data_encrypted,
+    },
 };
 use actix_cors::Cors;
 
@@ -106,7 +109,8 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(get_pre_image)
                     .service(get_submission_info)
                     .service(submit_data_encrypted)
-                    .service(decrypt_data),
+                    .service(decrypt_data)
+                    .service(get_decrypt_status),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?

@@ -8,7 +8,10 @@ use db::controllers::{
 };
 use diesel::result::Error;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use enigma::{types::DecryptRequest, EnigmaEncryptionService};
+use enigma::{
+    types::{DecryptRequest, GetDecryptRequestStatusRequest},
+    EnigmaEncryptionService,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
@@ -203,42 +206,62 @@ pub async fn decrypt_data(
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
 
     // If the payload is not found, retrieve it from the Avail DA client
-    // Assuming that if payload is found in submission table, it means that the tx is not finalised yet on Avail DA
-    let payload = if submission.payload.is_none() {
+    // Original Payload is found in submission table, it means that the tx is not finalised yet on Avail DA / if the enigma service doesn't returns correct data
+    let payload = if submission.payload.is_some() {
+        return HttpResponse::InternalServerError()
+            .json(json!({"error": "encrypted data was not settled on Avail yet. Please wait."}));
+    } else {
         if submission.extrinsic_index.is_none() || submission.block_hash.is_none() {
             return HttpResponse::NotImplemented()
                 .body("Customer Expenditure found but tx isn't finalised yet.");
         }
 
-        retrieve_data(
+        match retrieve_data(
             sdk,
             H256::from_str(&submission.block_hash.unwrap()).unwrap(),
             submission.extrinsic_index.unwrap() as u32,
         )
         .await
-        .map_err(|e| HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })))
-        .unwrap()
-    } else {
-        submission.payload.clone().unwrap()
+        {
+            Ok(data) => data,
+            Err(e) => {
+                return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
+            }
+        }
     };
 
     let (ephemeral_pub_key, ciphertext) = get_key_and_ciphertext_from_payload(payload);
-
+    println!("ciphertext: {:?}", ciphertext);
     let decrypted_data = match enigma_encryption_service
         .decrypt(DecryptRequest {
-            app_id: app_id as u32,
             turbo_da_app_id: submission.app_id,
-            ciphertext: ciphertext,
-            ephemeral_pub_key: ephemeral_pub_key,
+            ciphertext: vec![ciphertext],
+            ephemeral_pub_key: vec![ephemeral_pub_key],
         })
         .await
     {
         Ok(decrypted_data) => decrypted_data,
         Err(e) => {
+            println!("working ");
             return HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }));
         }
     };
     HttpResponse::Ok().json(json!({ "data": decrypted_data }))
+}
+
+#[get("/get_decrypt_status")]
+pub async fn get_decrypt_status(
+    request_payload: web::Query<GetDecryptRequestStatusRequest>,
+    enigma_encryption_service: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    let i = enigma_encryption_service
+        .get_decrypt_status(request_payload.clone().into_inner())
+        .await;
+
+    match i {
+        Ok(data) => HttpResponse::Ok().json(json!({ "data": data })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+    }
 }
 
 /// Retrieves the ephemeral public key and the ciphertext from the submission.

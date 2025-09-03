@@ -22,13 +22,39 @@ pub struct EncryptResponse {
 }
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DecryptRequest {
-    pub app_id: u32,
     pub turbo_da_app_id: Uuid,
-    pub ciphertext: Vec<u8>,
-    pub ephemeral_pub_key: Vec<u8>,
+    pub ciphertext: Vec<Vec<u8>>,
+    pub ephemeral_pub_key: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GetDecryptRequestStatusRequest {
+    pub job_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RequestStatus {
+    Pending,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecryptRequestData {
+    pub app_id: String,
+    pub ciphertext_array: Vec<Vec<u8>>,
+    pub ephemeral_pub_key_array: Vec<Vec<u8>>,
+    pub decrypted_array: Option<Vec<Vec<u8>>>,
+    pub job_id: uuid::Uuid,
+    pub status: RequestStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetDecryptRequestStatusResponse {
+    pub request: DecryptRequestData,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DecryptResponse {
-    pub plaintext: Vec<u8>,
+    pub job_id: Uuid,
 }

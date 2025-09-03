@@ -71,6 +71,12 @@ diesel::table! {
         updated_at -> Timestamp,
         app_id -> Uuid,
         wallet -> Nullable<Bytea>,
+        ciphertext_hash -> Nullable<Bytea>,
+        plaintext_hash -> Nullable<Bytea>,
+        signature_ciphertext_hash -> Nullable<Bytea>,
+        signature_plaintext_hash -> Nullable<Bytea>,
+        address -> Nullable<Bytea>,
+        ephemeral_pub_key -> Nullable<Bytea>,
     }
 }
 

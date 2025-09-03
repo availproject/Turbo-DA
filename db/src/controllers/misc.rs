@@ -13,6 +13,7 @@ use avail_utils::submit_data::TransactionInfo;
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use enigma::types::EncryptResponse;
 use uuid::Uuid;
 
 use super::{
@@ -235,6 +236,7 @@ pub async fn update_database_on_submission(
     result: TransactionInfo,
     account: &Apps,
     tx_params: TxParams,
+    encrypted_response: Option<EncryptResponse>,
 ) -> Result<(), String> {
     let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
     let (billed_from_credit, billed_from_fallback) = match account.credit_selection {
@@ -286,6 +288,7 @@ pub async fn update_database_on_submission(
 
     update_customer_expenditure(
         result,
+        encrypted_response,
         &fees_as_bigdecimal,
         &tx_params.amount_data_billed,
         &wallet_store,

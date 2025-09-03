@@ -4151,6 +4151,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "dotenv",
+ "enigma",
  "log",
  "serde",
  "serde_json",
