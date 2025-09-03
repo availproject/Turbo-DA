@@ -19,3 +19,6 @@ ADD COLUMN signature_ciphertext_hash BYTEA,
 ADD COLUMN signature_plaintext_hash BYTEA,
 ADD COLUMN address BYTEA,
 ADD COLUMN ephemeral_pub_key BYTEA;
+
+ALTER TABLE users 
+ADD COLUMN sumsub_timestamp TIMESTAMP;

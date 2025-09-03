@@ -12,3 +12,6 @@ DROP COLUMN ephemeral_pub_key;
 
 ALTER TABLE apps
 DROP COLUMN credit_selection;
+
+ALTER TABLE users
+DROP COLUMN sumsub_timestamp;

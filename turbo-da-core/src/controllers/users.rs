@@ -45,6 +45,7 @@ struct GetAllUsersParams {
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
     pub name: Option<String>,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 /// Request payload for user registration
@@ -358,6 +359,7 @@ pub async fn register_new_user(
         UserCreate {
             id: user,
             name: username.clone(),
+            sumsub_timestamp: payload.sumsub_timestamp,
         },
     )
     .await;

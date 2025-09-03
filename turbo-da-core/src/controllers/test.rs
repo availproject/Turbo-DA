@@ -80,8 +80,10 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
 
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
             name: Some("Jane Doe".to_string()),
+            sumsub_timestamp: Some(sumsub_timestamp),
         };
 
         let app = test::init_service(
@@ -109,7 +111,9 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
 
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
+            sumsub_timestamp: Some(sumsub_timestamp),
             name: Some("Jane Doe".to_string()),
         };
 
@@ -154,8 +158,10 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
 
         let payload = RegisterUser {
+            sumsub_timestamp: Some(sumsub_timestamp),
             name: Some("Jane Doe".to_string()),
         };
 
@@ -185,7 +191,9 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
+            sumsub_timestamp: Some(sumsub_timestamp),
             name: Some("Jane Doe".to_string()),
         };
 
@@ -226,7 +234,9 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
+            sumsub_timestamp: Some(sumsub_timestamp),
             name: Some("Jane Doe".to_string()),
         };
 
