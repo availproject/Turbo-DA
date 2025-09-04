@@ -77,10 +77,35 @@ export async function POST(request: NextRequest) {
       nameChanged: name !== sanitizedName,
     });
 
+    // Prepare sumsub_timestamp from tosAcceptedAt (RFC3339 -> YYYY-MM-DDTHH:MM:SS)
+    let sumsubTimestamp: string | undefined = undefined;
+    if (tosAcceptedAt) {
+      try {
+        const d = new Date(tosAcceptedAt);
+        if (!isNaN(d.getTime())) {
+          const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+          const yyyy = d.getUTCFullYear();
+          const mm = pad(d.getUTCMonth() + 1);
+          const dd = pad(d.getUTCDate());
+          const hh = pad(d.getUTCHours());
+          const mi = pad(d.getUTCMinutes());
+          const ss = pad(d.getUTCSeconds());
+          sumsubTimestamp = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+        }
+      } catch (_) {
+        console.error(
+          "[User Registration API] Error parsing sumsubTimestamp",
+          _
+        );
+      }
+    }
+
     console.log("[User Registration API] Preparing backend request:", {
       backendUrl: `${process.env.NEXT_PUBLIC_API_URL}/v1/user/register_new_user`,
       hasToken: !!token,
       hasSanitizedName: !!sanitizedName,
+      hasSumsubTimestamp: !!sumsubTimestamp,
+      sumsubTimestamp,
     });
 
     // Call the backend register_new_user endpoint server-side
@@ -96,8 +121,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           name: sanitizedName,
-          // TODO: Uncomment when backend supports tos_accepted_at
-          // tos_accepted_at: tosAcceptedAt,
+          sumsub_timestamp: sumsubTimestamp,
         }),
       }
     );
