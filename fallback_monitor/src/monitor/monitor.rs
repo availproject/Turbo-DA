@@ -192,6 +192,7 @@ async fn process_failed_transactions(
                         success,
                         &account_details,
                         tx_params,
+                        None,
                     )
                     .await
                     {
