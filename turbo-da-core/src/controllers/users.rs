@@ -463,6 +463,7 @@ pub async fn generate_app_account(
         app_name: payload.app_name.clone(),
         app_description: payload.app_description.clone(),
         app_logo: payload.app_logo.clone(),
+        encrypted_data: false,
     };
 
     let tx = create_account(&mut connection, &account).await;
@@ -555,6 +556,67 @@ pub async fn edit_app_account(
         Ok(_) => HttpResponse::Ok().json(json!({
             "state": "SUCCESS",
             "message": "App account updated successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct ToggleEncryptedData {
+    pub app_id: Uuid,
+    pub encrypted_data: bool,
+}
+
+#[put("/toggle_encrypted_data")]
+pub async fn toggle_encrypted_data(
+    payload: web::Json<ToggleEncryptedData>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
+    http_request: HttpRequest,
+) -> impl Responder {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let app_result =
+        db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id).await;
+    if app_result.is_err() {
+        return HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": app_result.err().unwrap().to_string(),
+        }));
+    }
+    let mut account = app_result.unwrap();
+
+    account.encrypted_data = payload.encrypted_data;
+
+    let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
+
+    // TODO: update redis if exists
+    // let redis = Redis::new(config.redis_url.clone());
+    // let mut redis_client = match redis.get_client() {
+    //     Ok(client) => client,
+    //     Err(e) => {
+    //         return HttpResponse::InternalServerError().json(json!({
+    //             "state": "ERROR",
+    //             "error": e.to_string(),
+    //         }))
+    //     }
+    // };
+
+    match tx {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Encrypted data toggled successfully",
         })),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "state": "ERROR",

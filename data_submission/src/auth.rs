@@ -122,13 +122,14 @@ where
 
                 // 2. If there is no entry in redis, make a call to db and update redis
                 let api_key_info = api_keys
-                    .inner_join(apps::apps)
                     .filter(api_keys::api_key.eq(api_key_hash.as_str()))
+                    .inner_join(apps::apps)
                     .select((ApiKey::as_select(), Apps::as_select()))
                     .first::<(ApiKey, Apps)>(&mut conn);
 
                 match api_key_info {
-                    Err(_) => {
+                    Err(e) => {
+                        println!("Error: {}", e);
                         return Box::pin(async move {
                             Err(actix_error::ErrorUnauthorized(
                                 "Invalid API key: API Key does not exist",
