@@ -17,6 +17,7 @@ pub struct Apps {
     pub app_logo: Option<String>,
     pub credit_selection: Option<i16>,
     pub fallback_credit_used: BigDecimal,
+    pub encrypted_data: bool,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]
@@ -31,4 +32,5 @@ pub struct AppsCreate {
     pub app_name: Option<String>,
     pub app_description: Option<String>,
     pub app_logo: Option<String>,
+    pub encrypted_data: bool,
 }

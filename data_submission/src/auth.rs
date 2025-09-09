@@ -6,8 +6,11 @@ use actix_web::{
     Error,
 };
 use db::{
-    models::api::ApiKey,
-    schema::api_keys::{self, dsl::*},
+    models::{api::ApiKey, apps::Apps},
+    schema::{
+        api_keys::{self, dsl::*},
+        apps::dsl as apps,
+    },
 };
 use diesel::prelude::*;
 use diesel::QueryDsl;
@@ -91,11 +94,16 @@ where
             Ok(value) => {
                 let user = value.split(":").next().unwrap();
                 let account = value.split(":").nth(1).unwrap();
+                let encrypted_data = value.split(":").nth(2).unwrap();
 
                 if let Err(e) = insert_headers(&mut headers, "user_id", &user) {
                     return e;
                 }
                 if let Err(e) = insert_headers(&mut headers, "app_id", &account) {
+                    return e;
+                }
+
+                if let Err(e) = insert_headers(&mut headers, "encrypted_data", &encrypted_data) {
                     return e;
                 }
             }
@@ -114,9 +122,10 @@ where
 
                 // 2. If there is no entry in redis, make a call to db and update redis
                 let api_key_info = api_keys
+                    .inner_join(apps::apps)
                     .filter(api_keys::api_key.eq(api_key_hash.as_str()))
-                    .select(ApiKey::as_select())
-                    .first::<ApiKey>(&mut conn);
+                    .select((ApiKey::as_select(), Apps::as_select()))
+                    .first::<(ApiKey, Apps)>(&mut conn);
 
                 match api_key_info {
                     Err(_) => {
@@ -126,11 +135,17 @@ where
                             ))
                         });
                     }
-                    Ok(key) => {
+                    Ok((key, app)) => {
                         if let Err(e) = insert_headers(&mut headers, "user_id", &key.user_id) {
                             return e;
                         }
                         if let Err(e) = insert_headers(&mut headers, "app_id", &key.app_id) {
+                            return e;
+                        }
+
+                        if let Err(e) =
+                            insert_headers(&mut headers, "encrypted_data", &app.encrypted_data)
+                        {
                             return e;
                         }
 
@@ -140,8 +155,13 @@ where
                         );
                         match self.redis.set(
                             api_key_hash.as_str(),
-                            format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())
-                                .as_str(),
+                            format!(
+                                "{}:{}:{}",
+                                key.user_id.to_string(),
+                                key.app_id.to_string(),
+                                app.encrypted_data
+                            )
+                            .as_str(),
                         ) {
                             Ok(_) => {
                                 info(&format!(

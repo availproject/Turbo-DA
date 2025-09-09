@@ -22,3 +22,6 @@ ADD COLUMN ephemeral_pub_key BYTEA;
 
 ALTER TABLE users 
 ADD COLUMN sumsub_timestamp TIMESTAMP;
+
+ALTER TABLE apps
+ADD COLUMN encrypted_data BOOLEAN NOT NULL DEFAULT FALSE;

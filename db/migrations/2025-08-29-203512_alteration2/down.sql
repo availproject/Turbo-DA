@@ -15,3 +15,6 @@ DROP COLUMN credit_selection;
 
 ALTER TABLE users
 DROP COLUMN sumsub_timestamp;
+
+ALTER TABLE apps
+DROP COLUMN encrypted_data;

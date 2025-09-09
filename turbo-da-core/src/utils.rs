@@ -134,6 +134,23 @@ pub fn retrieve_user_id(http_request: &HttpRequest) -> Option<String> {
     }
     None
 }
+
+/// Retrieves encrypted data from HTTP request headers
+///
+/// # Arguments
+/// * `http_request` - HTTP request to extract encrypted data from
+pub fn retrieve_encrypted_data(http_request: &HttpRequest) -> Option<bool> {
+    let headers = http_request.headers();
+
+    for (name, value) in headers.iter() {
+        if name == "encrypted_data" {
+            if let Ok(encrypted_data) = value.to_str() {
+                return Some(encrypted_data.to_string() == "true");
+            }
+        }
+    }
+    None
+}
 /// Retrieves user ID from JWT in HTTP request
 ///
 /// # Arguments
