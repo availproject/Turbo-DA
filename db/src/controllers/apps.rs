@@ -138,3 +138,15 @@ pub async fn update_app_account(
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+pub async fn toggle_encrypted_data(
+    connection: &mut AsyncPgConnection,
+    payload: &Apps,
+) -> Result<(), String> {
+    diesel::update(apps.filter(id.eq(payload.id)))
+        .set(encrypted_data.eq(payload.encrypted_data))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

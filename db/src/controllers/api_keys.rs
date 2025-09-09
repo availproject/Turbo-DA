@@ -7,6 +7,7 @@ use diesel::ExpressionMethods;
 use diesel::QueryDsl;
 use diesel::SelectableHelper;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use uuid::Uuid;
 
 use super::misc::get_account_by_id;
 
@@ -32,6 +33,21 @@ pub async fn get_api_keys(
 ) -> Result<Vec<ApiKey>, String> {
     let result = api_keys
         .filter(user_id.eq(user))
+        .select(ApiKey::as_select())
+        .load(&mut *connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(result)
+}
+
+pub async fn get_api_keys_for_app(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    app: &Uuid,
+) -> Result<Vec<ApiKey>, String> {
+    let result = api_keys
+        .filter(user_id.eq(user))
+        .filter(app_id.eq(app))
         .select(ApiKey::as_select())
         .load(&mut *connection)
         .await

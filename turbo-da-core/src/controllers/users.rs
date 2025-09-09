@@ -12,6 +12,7 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder,
 };
 use bigdecimal::BigDecimal;
+use db::schema::api_keys::api_key;
 /// Database models and schema definitions
 use db::{
     controllers::{
@@ -566,7 +567,7 @@ pub async fn edit_app_account(
 
 #[derive(Deserialize, Serialize, Validate)]
 pub struct ToggleEncryptedData {
-    pub app_id: Uuid,
+    pub turbo_da_app_id: Uuid,
     pub encrypted_data: bool,
 }
 
@@ -588,7 +589,8 @@ pub async fn toggle_encrypted_data(
     };
 
     let app_result =
-        db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.app_id).await;
+        db::controllers::apps::get_app_by_id(&mut connection, &user, &payload.turbo_da_app_id)
+            .await;
     if app_result.is_err() {
         return HttpResponse::InternalServerError().json(json!({
             "state": "ERROR",
@@ -599,30 +601,36 @@ pub async fn toggle_encrypted_data(
 
     account.encrypted_data = payload.encrypted_data;
 
-    let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
+    println!("account: {:?}", account);
 
-    // TODO: update redis if exists
-    // let redis = Redis::new(config.redis_url.clone());
-    // let mut redis_client = match redis.get_client() {
-    //     Ok(client) => client,
-    //     Err(e) => {
-    //         return HttpResponse::InternalServerError().json(json!({
-    //             "state": "ERROR",
-    //             "error": e.to_string(),
-    //         }))
-    //     }
-    // };
+    let tx = db::controllers::apps::toggle_encrypted_data(&mut connection, &account).await;
 
-    match tx {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "state": "SUCCESS",
-            "message": "Encrypted data toggled successfully",
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
+    if let Err(e) = tx {
+        return HttpResponse::InternalServerError().json(json!({
             "state": "ERROR",
-            "error": e.to_string(),
-        })),
+            "error": format!("Error updating app account: {}", e),
+        }));
     }
+
+    if let Err(e) = update_redis_api_keys(
+        &mut connection,
+        &config.redis_url,
+        &user,
+        &payload.turbo_da_app_id,
+        payload.encrypted_data,
+    )
+    .await
+    {
+        return HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e,
+        }));
+    }
+
+    HttpResponse::Ok().json(json!({
+        "state": "SUCCESS",
+        "message": "Encrypted data toggled successfully",
+    }))
 }
 /// Retrieves all apps for the authenticated user
 ///
@@ -1180,4 +1188,31 @@ async fn update_app_id(
             "error": e.to_string(),
         })),
     }
+}
+
+async fn update_redis_api_keys(
+    connection: &mut AsyncPgConnection,
+    redis_url: &str,
+    user: &String,
+    app_id: &Uuid,
+    encrypted_data: bool,
+) -> Result<(), String> {
+    let mut client =
+        redis::Client::open(redis_url).map_err(|e| format!("Error connecting to Redis: {}", e))?;
+
+    let api_keys = db::controllers::api_keys::get_api_keys_for_app(connection, user, app_id)
+        .await
+        .map_err(|e| format!("Error getting API keys for app: {}", e))?;
+
+    for key in api_keys {
+        let hashed_key = &key.api_key;
+        let value = format!("{}:{}:{}", key.user_id, key.app_id, encrypted_data);
+
+        client.set(hashed_key, value).map_err(|e| {
+            error(&format!("Error setting API key in Redis: {}", e));
+            format!("Error setting API key in Redis: {}", e)
+        })?;
+    }
+
+    Ok(())
 }
