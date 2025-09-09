@@ -9,7 +9,15 @@ pub struct EncryptRequest {
     pub plaintext: Vec<u8>,
     pub turbo_da_app_id: Uuid,
 }
-
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EnigmaRegister {
+    pub turbo_da_app_id: Uuid,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EnigmaRegisterResponse {
+    pub turbo_da_app_id: Uuid,
+    pub job_id: Uuid,
+}
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EncryptResponse {
     pub ciphertext: Vec<u8>,

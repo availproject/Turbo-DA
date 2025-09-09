@@ -1,4 +1,5 @@
 use crate::logger::{error, info, warn};
+use avail_rust::subxt_core::ext::scale_decode::visitor::types::Str;
 /// Configuration setup
 /// Checks presence of `config.toml`
 /// Else checks environment variables to populate Application Configurations
@@ -28,6 +29,8 @@ pub struct AppConfig {
     pub sumsub_app_token: String,
     pub sumsub_secret_key: String,
     pub sumsub_base_url: String,
+    pub enigma_encryption_service_url: String,
+    pub enigma_encryption_service_version: String,
 }
 
 impl Default for AppConfig {
@@ -52,6 +55,8 @@ impl Default for AppConfig {
             sumsub_app_token: String::new(),
             sumsub_secret_key: String::new(),
             sumsub_base_url: String::new(),
+            enigma_encryption_service_url: String::new(),
+            enigma_encryption_service_version: String::new(),
         }
     }
 }
@@ -115,7 +120,8 @@ impl AppConfig {
 
         let database_url = env::var("DATABASE_URL")?;
         let redis_url = env::var("REDIS_URL")?;
-
+        let enigma_encryption_service_url = env::var("ENIGMA_ENCRYPTION_SERVICE_URL")?;
+        let enigma_encryption_service_version = env::var("ENIGMA_ENCRYPTION_SERVICE_VERSION")?;
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
                 error(&format!(
@@ -222,6 +228,8 @@ impl AppConfig {
             sumsub_app_token,
             sumsub_secret_key,
             sumsub_base_url,
+            enigma_encryption_service_url,
+            enigma_encryption_service_version,
         })
     }
 }

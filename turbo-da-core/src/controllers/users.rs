@@ -23,6 +23,7 @@ use db::{
 };
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::types::EnigmaRegister;
 /// Redis caching functionality
 use redis::Commands;
 /// Serialization/deserialization
@@ -601,8 +602,6 @@ pub async fn toggle_encrypted_data(
 
     account.encrypted_data = payload.encrypted_data;
 
-    println!("account: {:?}", account);
-
     let tx = db::controllers::apps::toggle_encrypted_data(&mut connection, &account).await;
 
     if let Err(e) = tx {
@@ -610,6 +609,24 @@ pub async fn toggle_encrypted_data(
             "state": "ERROR",
             "error": format!("Error updating app account: {}", e),
         }));
+    }
+
+    if account.encrypted_data {
+        let enigma_encryption_service = enigma::EnigmaEncryptionService::new(
+            config.enigma_encryption_service_url.clone(),
+            config.enigma_encryption_service_version.clone(),
+        );
+
+        let register = EnigmaRegister {
+            turbo_da_app_id: payload.turbo_da_app_id,
+        };
+
+        if let Err(e) = enigma_encryption_service.register(register).await {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": e.to_string(),
+            }));
+        };
     }
 
     if let Err(e) = update_redis_api_keys(

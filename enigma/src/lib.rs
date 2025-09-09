@@ -5,7 +5,7 @@ use types::{
 };
 use uuid::Uuid;
 
-use crate::types::GetDecryptRequestStatusResponse;
+use crate::types::{EnigmaRegister, EnigmaRegisterResponse, GetDecryptRequestStatusResponse};
 
 pub mod types;
 
@@ -30,6 +30,19 @@ impl EnigmaEncryptionService {
             service_url,
             service_version,
         }
+    }
+
+    pub async fn register(
+        &self,
+        payload: EnigmaRegister,
+    ) -> Result<EnigmaRegisterResponse, reqwest::Error> {
+        let response = Client::new()
+            .post(format!("{}/v1/register", self.service_url.clone()))
+            .json(&payload)
+            .send()
+            .await?;
+        let response = response.json::<EnigmaRegisterResponse>().await?;
+        Ok(response)
     }
 
     /// Encrypts the payload using the Enigma service
