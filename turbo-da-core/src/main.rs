@@ -192,6 +192,11 @@ async fn main() -> Result<(), std::io::Error> {
                                     Ok(res)
                                 }
                             })
+                            .wrap(ClerkMiddleware::new(
+                                MemoryCacheJwksProvider::new(clerk.clone()),
+                                None,
+                                true,
+                            ))
                             .service(get_all_users)
                             .service(get_all_apps)
                             .service(get_all_fund_requests)
