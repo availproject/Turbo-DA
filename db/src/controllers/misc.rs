@@ -23,12 +23,12 @@ use super::{
 pub async fn validate_and_get_entries(
     connection: &mut AsyncPgConnection,
     account_id: &Uuid,
-) -> Result<(i32, BigDecimal), String> {
-    let query: Result<(i32, BigDecimal), diesel::result::Error> = apps::apps
+) -> Result<(i32, BigDecimal, BigDecimal), String> {
+    let query: Result<(i32, BigDecimal, BigDecimal), diesel::result::Error> = apps::apps
         .inner_join(users::users)
         .filter(apps::id.eq(account_id))
-        .select((apps::app_id, users::credit_balance))
-        .first::<(i32, BigDecimal)>(connection)
+        .select((apps::app_id, apps::credit_balance, users::credit_balance))
+        .first::<(i32, BigDecimal, BigDecimal)>(connection)
         .await;
 
     match query {

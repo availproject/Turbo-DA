@@ -1,4 +1,5 @@
 use crate::config::AppConfig;
+use crate::redis::Redis;
 use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
 use actix_web::{
@@ -13,11 +14,15 @@ use db::{
     models::customer_expenditure::CreateCustomerExpenditure,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use r2d2;
+use redis::Commands;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
 use turbo_da_core::logger::error;
-use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
+use turbo_da_core::utils::{
+    format_size, generate_submission_id, get_connection, retrieve_user_id, Convertor,
+};
 
 /// Request payload for submitting string data
 #[derive(Deserialize, Serialize, Clone)]
@@ -69,7 +74,7 @@ pub async fn submit_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
+    let (avail_app_id, _, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
             return HttpResponse::InternalServerError().body(e);
@@ -156,12 +161,13 @@ pub async fn submit_raw_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &app_id).await {
-        Ok(app) => app,
-        Err(e) => {
-            return HttpResponse::InternalServerError().json(json!({ "error": e }));
-        }
-    };
+    let (avail_app_id, app_balance, user_balance) =
+        match validate_and_get_entries(&mut connection, &app_id).await {
+            Ok(app) => app,
+            Err(e) => {
+                return HttpResponse::InternalServerError().json(json!({ "error": e }));
+            }
+        };
 
     drop(connection);
 

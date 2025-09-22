@@ -1,4 +1,4 @@
-use crate::redis::Redis;
+use crate::{auth::Auth, redis::Redis};
 use actix_cors::Cors;
 
 use actix_web::{
@@ -6,7 +6,7 @@ use actix_web::{
     web::{self},
     App, HttpServer,
 };
-use auth::Auth;
+
 use config::AppConfig;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
@@ -55,11 +55,14 @@ async fn main() -> Result<(), std::io::Error> {
 
     let (sender, _receiver) = broadcast::channel(app_config.broadcast_channel_size);
 
+    let shared_redis = Redis::new(app_config.redis_url.as_str());
+
     let consumer_server = Consumer::new(
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
+        Arc::new(shared_redis.clone()),
         app_config.number_of_threads,
     );
 
@@ -81,7 +84,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(
                 web::scope("/v1")
                     .wrap(Auth::new(
-                        Redis::new(shared_config.redis_url.as_str()),
+                        shared_redis.clone(),
                         shared_config.database_url.clone(),
                     ))
                     .app_data(web::PayloadConfig::new(shared_config.payload_size))
