@@ -1,5 +1,10 @@
 "use client";
-import { APP_TABS, cn, formatDataBytes } from "@/lib/utils";
+import {
+  APP_TABS,
+  cn,
+  formatDataBytesWithPrecision,
+  formatTokenAmount,
+} from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { useConfig } from "@/providers/ConfigProvider";
 import HistoryService from "@/services/history";
@@ -188,7 +193,9 @@ const CreditHistory = () => {
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
-          return value ? formatDataBytes(value) : "-";
+          return value ? formatDataBytesWithPrecision(value, 2) : "-";
+        case "amount_paid":
+          return value ? formatTokenAmount(value, 18, 2) : "-";
         case "chain_id":
           const chainInfo = getChainInfo(value);
           return (
@@ -299,7 +306,7 @@ const CreditHistory = () => {
             { key: "request_type", label: "Type" },
             { key: "chain_id", label: "Chain" },
             { key: "token", label: "Token" },
-            { key: "tx_hash", label: "Amount Paid" },
+            { key: "amount_paid", label: "Amount Paid" },
             { key: "amount_credit", label: "Credit Received" },
           ]}
           listdata={historyList}

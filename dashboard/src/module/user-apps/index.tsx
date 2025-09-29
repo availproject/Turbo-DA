@@ -17,6 +17,29 @@ import AppList from "./app-list";
 import CreateApp from "./create-app";
 import { useUser } from "@/providers/UserProvider";
 
+const AppListSkeleton = () => (
+  <div className="space-y-4 px-4 pt-4">
+    {Array.from({ length: 3 }).map((_, index) => (
+      <div
+        key={index}
+        className="flex items-center justify-between p-4 border border-border-blue rounded-lg"
+      >
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-12 h-12 rounded-lg" sheen={false} />
+          <div className="space-y-2">
+            <Skeleton className="w-32 h-5 rounded" />
+            <Skeleton className="w-24 h-4 rounded" />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-20 h-4 rounded" />
+          <Skeleton className="w-6 h-6 rounded" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const AppsCard = () => {
   const { setOpen } = useDialog();
   const [loading, setLoading] = useState(true);
@@ -77,30 +100,8 @@ const AppsCard = () => {
           <Card className="shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary rounded-2xl to-[100%] pt-0 gap-0 flex-1 pb-0 block relative h-full">
             <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
 
-            <CardContent className="p-4 z-1 relative">
-              <div className="space-y-4">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border border-border-blue rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Skeleton
-                        className="w-12 h-12 rounded-lg"
-                        sheen={false}
-                      />
-                      <div className="space-y-2">
-                        <Skeleton className="w-32 h-5 rounded" />
-                        <Skeleton className="w-24 h-4 rounded" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="w-20 h-4 rounded" />
-                      <Skeleton className="w-6 h-6 rounded" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <CardContent className="p-0 z-1 relative">
+              <AppListSkeleton />
             </CardContent>
           </Card>
         </div>
@@ -170,14 +171,7 @@ const AppsCard = () => {
                   multiple keys for the same app.
                 </Text>
               ) : null}
-              {loading ? (
-                <div className="flex flex-col gap-y-4 mt-4 px-4">
-                  <Skeleton className="h-52" />
-                  <Skeleton className="h-52" />
-                </div>
-              ) : (
-                <AppList />
-              )}
+              {loading ? <AppListSkeleton /> : <AppList />}
             </CardContent>
           </Card>
         </div>

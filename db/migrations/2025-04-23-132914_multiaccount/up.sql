@@ -67,3 +67,15 @@ ALTER COLUMN app_id SET NOT NULL;
 
 ALTER TABLE credit_requests
 ADD COLUMN amount_paid NUMERIC(39, 0) DEFAULT 0;
+
+ALTER TABLE apps
+ADD COLUMN credit_selection SMALLINT DEFAULT 0 
+CHECK (credit_selection IN (0, 1, 2));
+
+UPDATE apps 
+SET credit_selection = CASE 
+    WHEN fallback_enabled = TRUE THEN 1
+END;
+
+ALTER TABLE apps
+DROP COLUMN fallback_enabled;

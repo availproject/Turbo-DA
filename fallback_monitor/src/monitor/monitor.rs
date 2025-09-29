@@ -7,7 +7,7 @@ use bigdecimal::BigDecimal;
 use db::{
     controllers::{
         customer_expenditure::increase_retry_count,
-        misc::{get_unresolved_transactions, update_credit_balance},
+        misc::{get_unresolved_transactions, update_credit_balance, update_database_on_submission},
     },
     models::apps::Apps,
 };
@@ -135,14 +135,40 @@ async fn process_failed_transactions(
             let convertor = Convertor::new(client, &account[index]);
             let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-            if credits_used >= account_details.credit_balance {
-                if !(account_details.fallback_enabled
-                    && &credits_used - &account_details.credit_balance
-                        <= user_details.credit_balance)
-                {
+            match account_details.credit_selection {
+                Some(0) => {
+                    if &credits_used >= &account_details.credit_balance {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "Insufficient assigned credits for user id",
+                        );
+                        return;
+                    }
+                }
+                Some(1) => {
+                    if &credits_used >= &user_details.credit_balance {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "Insufficient fallback credits for user id",
+                        );
+                        return;
+                    }
+                }
+                Some(2) => {
+                    if &(&credits_used - &account_details.credit_balance)
+                        >= &user_details.credit_balance
+                    {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "Insufficient credits for user id",
+                        );
+                        return;
+                    }
+                }
+                _ => {
                     log_error(
                         &customer_expenditure_details.id.to_string(),
-                        "Insufficient credits for user id",
+                        "Invalid credit selection",
                     );
                     return;
                 }
@@ -154,78 +180,31 @@ async fn process_failed_transactions(
 
             match submission {
                 Ok(success) => {
-                    let fees_as_bigdecimal = BigDecimal::from(&success.gas_fee);
-
                     let tx_params = TxParams {
                         amount_data: format_size(data.len()),
                         amount_data_billed: credits_used,
                         fees: success.gas_fee,
                     };
 
-                    let (billed_from_credit, billed_from_fallback) =
-                        if account_details.credit_balance >= BigDecimal::from(0) {
-                            if tx_params.amount_data_billed > account_details.credit_balance {
-                                (
-                                    account_details.credit_balance.clone(),
-                                    &tx_params.amount_data_billed - &account_details.credit_balance,
-                                )
-                            } else {
-                                (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
-                            }
-                        } else {
-                            (BigDecimal::from(0), tx_params.amount_data_billed.clone())
-                        };
-
-                    // Convert BigDecimal values to u64 and create wallet store
-                    let fallback_u64 = billed_from_fallback
-                        .round(0)
-                        .to_string()
-                        .parse::<i128>()
-                        .unwrap_or(0);
-                    let credit_u64 = billed_from_credit
-                        .round(0)
-                        .to_string()
-                        .parse::<i128>()
-                        .unwrap_or(0);
-
-                    let mut wallet_store = vec![0u8; 32];
-                    wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
-                    wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
-
-                    let result = update_customer_expenditure(
-                        success,
-                        &fees_as_bigdecimal,
-                        &tx_params.amount_data_billed,
-                        &wallet_store,
+                    match update_database_on_submission(
                         customer_expenditure_details.id,
                         &mut connection,
-                    )
-                    .await;
-                    if result.is_err() {
-                        log_error(
-                            &customer_expenditure_details.id.to_string(),
-                            "Failed to update customer expenditure",
-                        );
-                    }
-                    let result = update_credit_balance(
-                        &mut connection,
+                        success,
                         &account_details,
-                        &tx_params,
-                        &billed_from_credit,
-                        &billed_from_fallback,
+                        tx_params,
                     )
-                    .await;
-                    if result.is_err() {
-                        log_error(
-                            &customer_expenditure_details.id.to_string(),
-                            "Failed to update credit balance",
-                        );
-                        return;
+                    .await
+                    {
+                        Ok(_) => {
+                            info(&format!(
+                                "Successfully processed failed transaction submission id: {:?} ",
+                                customer_expenditure_details.id
+                            ));
+                        }
+                        Err(e) => {
+                            log_error(&customer_expenditure_details.id.to_string(), &e);
+                        }
                     }
-                    info(&format!(
-                        "Successfully processed failed transaction submission id: {:?} ",
-                        customer_expenditure_details.id
-                    ));
                 }
                 Err(e) => {
                     log_error(&customer_expenditure_details.id.to_string(), &e);

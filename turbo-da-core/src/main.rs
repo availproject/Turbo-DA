@@ -15,6 +15,7 @@ use crate::controllers::{
         estimate_credits, estimate_credits_for_bytes, get_all_fund_requests, get_token_map,
         request_funds_status,
     },
+    kyc::generate_access_token,
     users::{get_all_users, get_user, register_new_user, update_app_id},
 };
 use actix_cors::Cors;
@@ -69,10 +70,6 @@ async fn main() -> Result<(), std::io::Error> {
         .expect("Failed to create pool");
 
     let shared_pool = web::Data::new(pool);
-    // let mut connection = shared_pool.get().await.unwrap();
-    // db::controllers::customer_expenditure::update_wallet_store(&mut connection)
-    //     .await
-    //     .unwrap();
 
     let shared_config = web::Data::new(app_config);
 
@@ -171,7 +168,8 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(reclaim_credits)
                             .service(estimate_credits_against_token)
                             .service(add_inclusion_details)
-                            .service(get_wallet_usage),
+                            .service(get_wallet_usage)
+                            .service(generate_access_token),
                     )
                     .service(
                         web::scope("/admin")
@@ -194,6 +192,11 @@ async fn main() -> Result<(), std::io::Error> {
                                     Ok(res)
                                 }
                             })
+                            .wrap(ClerkMiddleware::new(
+                                MemoryCacheJwksProvider::new(clerk.clone()),
+                                None,
+                                true,
+                            ))
                             .service(get_all_users)
                             .service(get_all_apps)
                             .service(get_all_fund_requests)

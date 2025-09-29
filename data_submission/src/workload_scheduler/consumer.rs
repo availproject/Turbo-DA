@@ -1,3 +1,5 @@
+use crate::redis::Redis;
+
 /// A consumer that accepts response through a broadcast channel on the spawned threads.
 /// The thread in turn process the request: generate extrinsic and submit it to avail.
 /// Records any failure entry.
@@ -11,7 +13,7 @@ use db::{
         customer_expenditure::{
             add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
         },
-        misc::{get_account_by_id, update_credit_balance},
+        misc::{get_account_by_id, update_credit_balance, update_database_on_submission},
         users::TxParams,
     },
     errors::*,
@@ -19,12 +21,14 @@ use db::{
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use observability::log_txn;
+use r2d2;
+use redis::Commands;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
-use turbo_da_core::logger::{error, info};
+use turbo_da_core::logger::{debug, error, info};
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
@@ -32,6 +36,7 @@ pub struct Consumer {
     keypair: Arc<web::Data<Vec<Keypair>>>,
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
+    redis: Arc<Redis>,
     number_of_threads: i32,
 }
 
@@ -41,6 +46,7 @@ impl Consumer {
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
+        redis: Arc<Redis>,
         number_of_threads: i32,
     ) -> Self {
         Consumer {
@@ -48,6 +54,7 @@ impl Consumer {
             keypair,
             injected_dependency,
             endpoints,
+            redis,
             number_of_threads,
         }
     }
@@ -63,12 +70,14 @@ impl Consumer {
             let sender = self.sender.clone();
             let arc_endpoints = self.endpoints.clone();
             let heartbeat_tx = heartbeat_tx.clone();
+            let redis = self.redis.clone();
 
             self.spawn_thread(
                 i,
                 sender,
                 keygen,
                 injected_dependency,
+                redis,
                 arc_endpoints,
                 heartbeat_tx,
             )
@@ -100,12 +109,14 @@ impl Consumer {
                     let sender = self.sender.clone();
                     let arc_endpoints = self.endpoints.clone();
                     let heartbeat_tx = heartbeat_tx.clone();
+                    let redis = self.redis.clone();
 
                     self.spawn_thread(
                         thread_id,
                         sender,
                         keygen,
                         injected_dependency,
+                        redis,
                         arc_endpoints,
                         heartbeat_tx,
                     )
@@ -121,6 +132,8 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
+        redis: Arc<Redis>,
+
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
     ) {
@@ -140,8 +153,7 @@ impl Consumer {
             let injected_dependency = injected_dependency.clone();
             let keygen = keypair.clone();
             let heartbeat_tx = heartbeat_tx.clone();
-
-            runtime.block_on(async move {
+            let redis = runtime.block_on(async move {
                 tokio::spawn(async move {
                     info(&format!("Sending heartbeat for thread {}", i));
                     let mut interval = tokio::time::interval(Duration::from_secs(120));
@@ -157,9 +169,15 @@ impl Consumer {
                         continue;
                     }
 
-                    let result =
-                        response_handler(&response, &injected_dependency, &endpoints, &keygen, i)
-                            .await;
+                    let result = response_handler(
+                        &response,
+                        &injected_dependency,
+                        &endpoints,
+                        &keygen,
+                        &redis,
+                        i,
+                    )
+                    .await;
 
                     if let Err(e) = result {
                         log_txn(&response.submission_id.to_string(), response.thread_id, &e);
@@ -178,6 +196,7 @@ async fn response_handler(
     injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
     endpoints: &Arc<Vec<String>>,
     keygen: &Vec<Keypair>,
+    redis: &Arc<Redis>,
     i: i32,
 ) -> Result<(), String> {
     let mut connection = get_connection(&injected_dependency)
@@ -201,7 +220,7 @@ async fn response_handler(
     let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
     let mut process_response =
-        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class);
+        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class, redis);
 
     match timeout(
         Duration::from_secs(120),
@@ -232,6 +251,7 @@ struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
+    redis: &'a Arc<Redis>,
 }
 
 impl<'a> ProcessSubmitResponse<'a> {
@@ -239,11 +259,13 @@ impl<'a> ProcessSubmitResponse<'a> {
         response: &'a Response,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
+        redis: &'a Arc<Redis>,
     ) -> Self {
         Self {
             response,
             connection,
             submit_avail_class,
+            redis,
         }
     }
 
@@ -260,11 +282,83 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used >= account.credit_balance {
-            if !(account.fallback_enabled
-                && &credits_used - &account.credit_balance <= user.credit_balance)
-            {
-                return Err("Insufficient credits".to_string());
+        // blocking code for race condition
+        let mut queue = self.redis.redis_pool.get().unwrap();
+
+        let key = format!(
+            "user:{}_main_balance:{}_app_balance:{}",
+            account.user_id, account.credit_balance, user.credit_balance
+        );
+
+        let member = format!("{}:{}", self.response.submission_id, credits_used);
+        // blocking code to add to redis queue to check race condition
+        let _ = queue.rpush::<&str, &str, i64>(&key, &member).unwrap();
+
+        // error out if balance mismatch
+        match account.credit_selection {
+            Some(0) => {
+                if &credits_used >= &account.credit_balance {
+                    return Err("Insufficient assigned credits for user id".to_string());
+                }
+            }
+            Some(1) => {
+                if &credits_used >= &user.credit_balance {
+                    return Err("Insufficient fallback credits for user id".to_string());
+                }
+            }
+            Some(2) => {
+                if &(&credits_used - &account.credit_balance) >= &user.credit_balance {
+                    return Err("Insufficient credits for user id".to_string());
+                }
+            }
+            _ => {
+                return Err("Invalid credit selection".to_string());
+            }
+        }
+
+        // Error out if in redis the ordering means this
+
+        // Get all items from the list to check cumulative cost
+        let all_items: Vec<String> = queue.lrange(&key, 0, -1).unwrap();
+
+        debug(&format!("All items: {:?}", all_items));
+
+        let mut cumulative_cost = BigDecimal::from(0);
+        for (_, item) in all_items.iter().enumerate() {
+            // Parse the cost from "submission_id-cost" format
+            let parts: Vec<&str> = item.split(':').collect();
+
+            let submission_id = parts[0];
+            if let Ok(cost) = BigDecimal::from_str(parts[1]) {
+                cumulative_cost += cost;
+            }
+
+            debug(&format!("Cumulative cost: {:?}", cumulative_cost));
+
+            // Check if this is our submission - if so, validate the cumulative cost
+            if submission_id == self.response.submission_id.to_string() {
+                match account.credit_selection {
+                    Some(0) => {
+                        if cumulative_cost > account.credit_balance {
+                            return Err("Insufficient assigned credits - would exceed balance with pending transactions".to_string());
+                        }
+                    }
+                    Some(1) => {
+                        if cumulative_cost > user.credit_balance {
+                            return Err("Insufficient fallback credits - would exceed balance with pending transactions".to_string());
+                        }
+                    }
+                    Some(2) => {
+                        let total_available = &account.credit_balance + &user.credit_balance;
+                        if cumulative_cost > total_available {
+                            return Err("Insufficient total credits - would exceed balance with pending transactions".to_string());
+                        }
+                    }
+                    _ => {
+                        return Err("Invalid credit selection".to_string());
+                    }
+                }
+                break;
             }
         }
 
@@ -276,78 +370,16 @@ impl<'a> ProcessSubmitResponse<'a> {
             fees: result.gas_fee,
         };
 
-        self.update_database(result, &account, params).await?;
+        update_database_on_submission(
+            self.response.submission_id,
+            &mut self.connection,
+            result,
+            &account,
+            params,
+        )
+        .await?;
 
         Ok(self.response)
-    }
-
-    pub async fn update_database(
-        &mut self,
-        result: TransactionInfo,
-        account: &Apps,
-        tx_params: TxParams,
-    ) -> Result<(), String> {
-        let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
-        let (billed_from_credit, billed_from_fallback) =
-            if account.credit_balance >= BigDecimal::from(0) {
-                if tx_params.amount_data_billed > account.credit_balance {
-                    (
-                        account.credit_balance.clone(),
-                        &tx_params.amount_data_billed - &account.credit_balance,
-                    )
-                } else {
-                    (tx_params.amount_data_billed.clone(), BigDecimal::from(0))
-                }
-            } else {
-                (BigDecimal::from(0), tx_params.amount_data_billed.clone())
-            };
-
-        println!("billed_from_fallback: {}", billed_from_fallback);
-        println!("billed_from_credit: {}", billed_from_credit);
-
-        // Convert BigDecimal values to u64 and create wallet store
-        let fallback_u64 = billed_from_fallback
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-        let credit_u64 = billed_from_credit
-            .round(0)
-            .to_string()
-            .parse::<i128>()
-            .unwrap_or(0);
-
-        let mut wallet_store = vec![0u8; 32];
-        wallet_store[0..16].copy_from_slice(&fallback_u64.to_be_bytes());
-        wallet_store[16..32].copy_from_slice(&credit_u64.to_be_bytes());
-
-        let retrieve_original_fallback =
-            i128::from_be_bytes(wallet_store[0..16].try_into().unwrap_or_else(|_| [0; 16]));
-        let retrieve_original_credit =
-            i128::from_be_bytes(wallet_store[16..32].try_into().unwrap_or_else(|_| [0; 16]));
-
-        println!("retrieve_original_fallback: {}", retrieve_original_fallback);
-        println!("retrieve_original_credit: {}", retrieve_original_credit);
-
-        update_customer_expenditure(
-            result,
-            &fees_as_bigdecimal,
-            &tx_params.amount_data_billed,
-            &wallet_store,
-            self.response.submission_id,
-            self.connection,
-        )
-        .await?;
-        update_credit_balance(
-            self.connection,
-            &account,
-            &tx_params,
-            &billed_from_credit,
-            &billed_from_fallback,
-        )
-        .await?;
-
-        Ok(())
     }
 }
 

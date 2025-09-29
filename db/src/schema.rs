@@ -24,10 +24,10 @@ diesel::table! {
         credit_balance -> Numeric,
         credit_used -> Numeric,
         fallback_credit_used -> Numeric,
-        fallback_enabled -> Bool,
         metadata_path -> Nullable<Varchar>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        credit_selection -> Nullable<Int2>,
     }
 }
 
@@ -91,6 +91,7 @@ diesel::table! {
         credit_balance -> Numeric,
         credit_used -> Numeric,
         allocated_credit_balance -> Numeric,
+        sumsub_timestamp -> Nullable<Timestamp>,
     }
 }
 

@@ -72,6 +72,14 @@ export const formatDataBytes = (bytes: number) => {
   return fixedValue + ` Credit${kb > 1 ? "s" : ""}`;
 };
 
+export const formatDataBytesWithPrecision = (bytes: number, decimals = 2) => {
+  const kb = bytes / 1024;
+  const truncatedValue = Number.isInteger(kb)
+    ? kb
+    : truncateToFixed(kb, decimals);
+  return truncatedValue + ` Credit${kb > 1 ? "s" : ""}`;
+};
+
 export function formatBalance(balance: string) {
   return parseFloat(balance).toFixed(2);
 }
@@ -87,6 +95,16 @@ export const getTokenNameByAddress = (address: string): string => {
 
 export const getTokenDecimals = (tokenName: string): number => {
   return TOKEN_MAP[tokenName]?.token_decimals ?? 18;
+};
+
+export const formatTokenAmount = (
+  weiAmount: string | number,
+  decimals: number = 18,
+  precision: number = 6
+): string => {
+  if (!weiAmount) return "0";
+  const amount = parseFloat(weiAmount.toString()) / Math.pow(10, decimals);
+  return amount.toFixed(precision);
 };
 
 export const getTokenTicker = (tokenName: string): string => {

@@ -42,26 +42,26 @@ async fn main() {
         }
     }));
 
-    // for (network_name, network_config) in &cfg_ref_2.network {
-    //     let network_name = network_name.clone();
-    //     let network_config = network_config.clone();
+    for (network_name, network_config) in &cfg_ref_2.network {
+        let network_name = network_name.clone();
+        let network_config = network_config.clone();
 
-    //     let cfg_ref_4 = cfg_ref_3.clone();
-    //     debug_json(json!({
-    //         "message": "Task for network",
-    //         "network_name": network_name,
-    //         "level": "debug"
-    //     }));
+        let cfg_ref_4 = cfg_ref_3.clone();
+        debug_json(json!({
+            "message": "Task for network",
+            "network_name": network_name,
+            "level": "debug"
+        }));
 
-    //     handles.push(tokio::spawn(async move {
-    //         debug(&format!("Spawning new task"));
+        handles.push(tokio::spawn(async move {
+            debug(&format!("Spawning new task"));
 
-    //         match monitor(network_config, cfg_ref_4).await {
-    //             Ok(_) => info(&format!("Monitor task completed successfully")),
-    //             Err(e) => error(&format!("Error running monitor task: {}", e)),
-    //         }
-    //     }));
-    // }
+            match monitor(network_config, cfg_ref_4).await {
+                Ok(_) => info(&format!("Monitor task completed successfully")),
+                Err(e) => error(&format!("Error running monitor task: {}", e)),
+            }
+        }));
+    }
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {

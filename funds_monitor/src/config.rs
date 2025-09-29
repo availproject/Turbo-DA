@@ -52,7 +52,6 @@ impl Default for Config {
 impl Config {
     pub fn load_config(&self) -> Result<Config, String> {
         dotenv().ok();
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
         if let Ok(config) = self.load_from_toml() {
             return Ok(config);
         }

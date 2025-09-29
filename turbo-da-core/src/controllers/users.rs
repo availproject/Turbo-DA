@@ -45,13 +45,14 @@ struct GetAllUsersParams {
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterUser {
     pub name: Option<String>,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 /// Request payload for user registration
 #[derive(Deserialize, Serialize, Validate)]
 pub(crate) struct RegisterAccount {
     pub avail_app_id: Option<i32>,
-    pub fallback_enabled: bool,
+    pub credit_selection: Option<i16>,
     pub app_name: Option<String>,
     pub app_description: Option<String>,
     pub app_logo: Option<String>,
@@ -62,7 +63,7 @@ pub(crate) struct RegisterAccount {
 pub(crate) struct EditAccount {
     pub app_id: Uuid,
     pub avail_app_id: Option<i32>,
-    pub fallback_enabled: Option<bool>,
+    pub credit_selection: Option<i16>,
     pub app_name: Option<String>,
     pub app_description: Option<String>,
     pub app_logo: Option<String>,
@@ -358,6 +359,7 @@ pub async fn register_new_user(
         UserCreate {
             id: user,
             name: username.clone(),
+            sumsub_timestamp: payload.sumsub_timestamp,
         },
     )
     .await;
@@ -457,7 +459,7 @@ pub async fn generate_app_account(
         app_id: avail_app_id,
         credit_balance: BigDecimal::from(0),
         credit_used: BigDecimal::from(0),
-        fallback_enabled: payload.fallback_enabled,
+        credit_selection: payload.credit_selection,
         app_name: payload.app_name.clone(),
         app_description: payload.app_description.clone(),
         app_logo: payload.app_logo.clone(),
@@ -545,12 +547,7 @@ pub async fn edit_app_account(
     account.app_name = payload.app_name.clone();
     account.app_description = payload.app_description.clone();
     account.app_logo = payload.app_logo.clone();
-
-    if let Some(fallback_enabled) = payload.fallback_enabled {
-        if fallback_enabled != account.fallback_enabled {
-            account.fallback_enabled = fallback_enabled;
-        }
-    }
+    account.credit_selection = payload.credit_selection.clone();
 
     let tx = db::controllers::apps::update_app_account(&mut connection, &account).await;
 

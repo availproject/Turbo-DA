@@ -11,6 +11,7 @@ pub struct User {
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
     pub allocated_credit_balance: BigDecimal,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize)]
@@ -18,6 +19,7 @@ pub struct User {
 pub struct UserCreate {
     pub id: String,
     pub name: String,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]
@@ -29,4 +31,5 @@ pub struct UserLogin {
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
     pub allocated_credit_balance: BigDecimal,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
