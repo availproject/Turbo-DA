@@ -6,7 +6,7 @@ use crate::redis::Redis;
 use super::common::Response;
 use actix_web::web;
 use avail_rust::Keypair;
-use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
+use avail_utils::submit_data::SubmitDataAvail;
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
