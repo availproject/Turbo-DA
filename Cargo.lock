@@ -1384,9 +1384,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "avail-rust-client"
-version = "0.4.0-rc.5"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dffd1c348de816f7af0676124ffd84952be628d8c3142f4cb6293c8fb9debec5"
+checksum = "ca07e8d66c0a213b285d8f6e35feccbe43fbdb2ef61616a9abec149872cdceeb"
 dependencies = [
  "avail-rust-core",
  "const-hex",
@@ -1404,9 +1404,9 @@ dependencies = [
 
 [[package]]
 name = "avail-rust-core"
-version = "0.4.0-rc.5"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb8704f28802164ad2a5390f874b55b062092f2ae954ce04d6c00af28ed584d7"
+checksum = "67cce092908f0beb9f570b20d150dc1ab5cc2f56ffe552642312b063bf4af1d5"
 dependencies = [
  "const-hex",
  "impl-serde",
