@@ -122,6 +122,7 @@ async fn process_failed_transactions(
                 );
                 return;
             }
+
             let Some(data) = customer_expenditure_details.payload else {
                 log_error(
                     &customer_expenditure_details.id.to_string(),

@@ -128,7 +128,6 @@ impl Consumer {
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         redis: Arc<Redis>,
-
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
     ) {
