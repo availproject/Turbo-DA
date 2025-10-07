@@ -1,27 +1,22 @@
-use crate::redis::Redis;
-
+use super::common::Response;
 /// A consumer that accepts response through a broadcast channel on the spawned threads.
 /// The thread in turn process the request: generate extrinsic and submit it to avail.
 /// Records any failure entry.
-use super::common::Response;
+use crate::redis::Redis;
 use actix_web::web;
 use avail_rust::Keypair;
-use avail_utils::submit_data::{SubmitDataAvail, TransactionInfo};
+use avail_utils::submit_data::SubmitDataAvail;
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
-        customer_expenditure::{
-            add_error_entry, get_did_fallback_resolved, update_customer_expenditure,
-        },
-        misc::{get_account_by_id, update_credit_balance, update_database_on_submission},
+        customer_expenditure::{add_error_entry, get_did_fallback_resolved},
+        misc::{get_account_by_id, update_database_on_submission},
         users::TxParams,
     },
     errors::*,
-    models::apps::Apps,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use observability::log_txn;
-use r2d2;
 use redis::Commands;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
@@ -94,7 +89,7 @@ impl Consumer {
                 active_threads.insert(i, false);
             }
             while let Ok(thread_id) = heartbeat_rx.try_recv() {
-                info(&format!("Received heartbeat for thread {}", thread_id));
+                debug(&format!("Received heartbeat for thread {}", thread_id));
                 active_threads.insert(thread_id, true);
             }
 
@@ -153,7 +148,7 @@ impl Consumer {
             let injected_dependency = injected_dependency.clone();
             let keygen = keypair.clone();
             let heartbeat_tx = heartbeat_tx.clone();
-            let redis = runtime.block_on(async move {
+            runtime.block_on(async move {
                 tokio::spawn(async move {
                     info(&format!("Sending heartbeat for thread {}", i));
                     let mut interval = tokio::time::interval(Duration::from_secs(120));
@@ -283,7 +278,7 @@ impl<'a> ProcessSubmitResponse<'a> {
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
         // blocking code for race condition
-        let mut queue = self.redis.redis_pool.get().unwrap();
+        let mut queue = self.redis.redis_pool.get().map_err(|e| e.to_string())?;
 
         let key = format!(
             "user:{}_main_balance:{}_app_balance:{}",
@@ -291,8 +286,10 @@ impl<'a> ProcessSubmitResponse<'a> {
         );
 
         let member = format!("{}:{}", self.response.submission_id, credits_used);
-        // blocking code to add to redis queue to check race condition
-        let _ = queue.rpush::<&str, &str, i64>(&key, &member).unwrap();
+
+        let _ = queue
+            .rpush::<&str, &str, i64>(&key, &member)
+            .map_err(|e| e.to_string())?;
 
         // error out if balance mismatch
         match account.credit_selection {
@@ -319,7 +316,7 @@ impl<'a> ProcessSubmitResponse<'a> {
         // Error out if in redis the ordering means this
 
         // Get all items from the list to check cumulative cost
-        let all_items: Vec<String> = queue.lrange(&key, 0, -1).unwrap();
+        let all_items: Vec<String> = queue.lrange(&key, 0, -1).map_err(|e| e.to_string())?;
 
         debug(&format!("All items: {:?}", all_items));
 
