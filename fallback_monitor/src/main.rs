@@ -1,4 +1,4 @@
-use avail_rust::SDK;
+use avail_rust::Client;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
@@ -93,7 +93,7 @@ async fn main() {
 /// 3. Continues until a successful connection is established
 ///
 /// The function cycles through the endpoints indefinitely until a connection succeeds.
-async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> Client {
     let mut attempts = 0;
 
     loop {
@@ -102,7 +102,7 @@ async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
         }
         let endpoint = &endpoints[attempts];
         info(&format!("Attempting to connect endpoint: {:?}", endpoint));
-        match SDK::new(endpoint).await {
+        match Client::new(endpoint).await {
             Ok(sdk) => {
                 info(&format!("Connected successfully to endpoint: {}", endpoint));
                 return sdk;
