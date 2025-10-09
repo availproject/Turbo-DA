@@ -308,9 +308,9 @@ lazy_static! {
 const WAIT_TIME: u64 = 5;
 pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
     let mut attempts = 0;
-
+    println!("Endpoints: {:?}", endpoints);
     loop {
-        if attempts < endpoints.len() {
+        if attempts == endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];

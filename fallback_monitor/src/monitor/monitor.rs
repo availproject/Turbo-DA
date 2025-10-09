@@ -1,19 +1,18 @@
 use avail_rust::{Client, Keypair};
 use avail_utils::submit_data::SubmitDataAvail;
-use bigdecimal::BigDecimal;
+use db::{
+    controllers::users::TxParams,
+    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
+};
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
 use db::{
     controllers::{
         customer_expenditure::increase_retry_count,
-        misc::{get_unresolved_transactions, update_credit_balance, update_database_on_submission},
+        misc::{get_unresolved_transactions, update_database_on_submission},
     },
     models::apps::Apps,
-};
-use db::{
-    controllers::{customer_expenditure::update_customer_expenditure, users::TxParams},
-    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
 };
 
 use diesel_async::{
