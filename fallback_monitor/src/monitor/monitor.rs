@@ -11,7 +11,6 @@ use db::{
     controllers::{
         customer_expenditure::increase_retry_count,
         misc::{get_unresolved_transactions, update_database_on_submission},
-        misc::{get_unresolved_transactions, update_database_on_submission},
     },
     models::apps::Apps,
 };
