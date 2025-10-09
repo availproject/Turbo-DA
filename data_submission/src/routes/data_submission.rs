@@ -19,9 +19,9 @@ use redis::Commands;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
-use turbo_da_core::logger::error;
-use turbo_da_core::utils::{
-    format_size, generate_submission_id, get_connection, retrieve_user_id, Convertor,
+use turbo_da_core::{
+    logger::error,
+    utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
 };
 
 /// Request payload for submitting string data
@@ -161,13 +161,12 @@ pub async fn submit_raw_data(
         Err(response) => return response,
     };
 
-    let (avail_app_id, app_balance, user_balance) =
-        match validate_and_get_entries(&mut connection, &app_id).await {
-            Ok(app) => app,
-            Err(e) => {
-                return HttpResponse::InternalServerError().json(json!({ "error": e }));
-            }
-        };
+    let (avail_app_id, _, _) = match validate_and_get_entries(&mut connection, &app_id).await {
+        Ok(app) => app,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(json!({ "error": e }));
+        }
+    };
 
     drop(connection);
 

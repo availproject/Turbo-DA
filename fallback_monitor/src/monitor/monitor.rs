@@ -11,6 +11,7 @@ use db::{
     controllers::{
         customer_expenditure::increase_retry_count,
         misc::{get_unresolved_transactions, update_database_on_submission},
+        misc::{get_unresolved_transactions, update_database_on_submission},
     },
     models::apps::Apps,
 };
@@ -123,6 +124,7 @@ async fn process_failed_transactions(
                 );
                 return;
             }
+
             let Some(data) = customer_expenditure_details.payload else {
                 log_error(
                     &customer_expenditure_details.id.to_string(),
