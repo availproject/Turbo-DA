@@ -10,7 +10,7 @@ use actix_web::{
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use avail_rust::prelude::*;
+use avail_rust::constants::dev_accounts;
 use bigdecimal::BigDecimal;
 use db::controllers::fund::{create_credit_request, get_fund_status, update_inclusion_details};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -455,7 +455,7 @@ pub async fn purchase_cost(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = dev_accounts::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -503,7 +503,7 @@ pub async fn estimate_credits(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = dev_accounts::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -544,7 +544,7 @@ pub async fn estimate_credits_for_bytes(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = dev_accounts::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
@@ -592,7 +592,7 @@ pub async fn estimate_credits_against_size(
     config: web::Data<AppConfig>,
 ) -> impl Responder {
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
-    let account = account::alice();
+    let account = dev_accounts::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 

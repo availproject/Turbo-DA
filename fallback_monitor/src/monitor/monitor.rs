@@ -1,12 +1,12 @@
-/// This file contains logic to monitor the failing transactions.
-/// If there are failed transactions it picks them and tries to resubmit it
-/// If successful updates the state of the data to "Resolved".
-use avail_rust::{Keypair, SDK};
+use avail_rust::{Client, Keypair};
 use avail_utils::submit_data::SubmitDataAvail;
 use db::{
     controllers::users::TxParams,
     models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
 };
+/// This file contains logic to monitor the failing transactions.
+/// If there are failed transactions it picks them and tries to resubmit it
+/// If successful updates the state of the data to "Resolved".
 use db::{
     controllers::{
         customer_expenditure::increase_retry_count,
@@ -14,6 +14,7 @@ use db::{
     },
     models::apps::Apps,
 };
+
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncConnection, AsyncPgConnection,
@@ -35,7 +36,7 @@ use turbo_da_core::utils::{format_size, Convertor};
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
     connection: &String,
-    client: &SDK,
+    client: &Client,
     account: &Vec<Keypair>,
     retry_count: i32,
     limit: i64,
@@ -79,7 +80,7 @@ pub async fn monitor_failed_transactions(
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
     connection: &String,
-    client: &SDK,
+    client: &Client,
     account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
