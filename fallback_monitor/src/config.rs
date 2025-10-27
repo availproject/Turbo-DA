@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
     pub limit: i64,
+    pub enigma_url: String,
 }
 
 impl Default for AppConfig {
@@ -28,6 +29,7 @@ impl Default for AppConfig {
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
             limit: 10,
+            enigma_url: String::new(),
         }
     }
 }
@@ -96,6 +98,7 @@ impl AppConfig {
             private_keys.push(key);
             index += 1;
         }
+        let enigma_url = env::var("ENIGMA_URL")?;
 
         info(&format!("Config loaded from environment variables"));
 
@@ -107,6 +110,7 @@ impl AppConfig {
             coingecko_api_url,
             coingecko_api_key,
             limit,
+            enigma_url,
         })
     }
 }

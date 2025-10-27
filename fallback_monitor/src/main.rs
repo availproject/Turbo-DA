@@ -2,6 +2,7 @@ use avail_rust::Client;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
+use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
 use observability::{init_meter, init_tracer};
 use std::str::FromStr;
@@ -67,12 +68,15 @@ async fn main() {
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
 
+        let enigma = EnigmaEncryptionService::new(app_config.enigma_url.clone());
+
         monitor_failed_transactions(
             &app_config.database_url,
             &sdk,
             &keypair,
             app_config.retry_count,
             app_config.limit,
+            &enigma,
         )
         .await;
     }

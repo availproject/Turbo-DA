@@ -19,6 +19,7 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncConnection, AsyncPgConnection,
 };
+use enigma::{types::EncryptRequest, EnigmaEncryptionService};
 use observability::{log_fallback_txn_error, log_retry_count};
 use turbo_da_core::logger::{error, info};
 use turbo_da_core::utils::{format_size, Convertor};
@@ -40,6 +41,7 @@ pub async fn monitor_failed_transactions(
     account: &Vec<Keypair>,
     retry_count: i32,
     limit: i64,
+    enigma: &EnigmaEncryptionService,
 ) {
     let mut connection_client = AsyncPgConnection::establish(connection)
         .await
@@ -55,6 +57,7 @@ pub async fn monitor_failed_transactions(
                 account,
                 retry_count,
                 failed_transactions_list,
+                enigma,
             )
             .await;
         }
@@ -84,6 +87,7 @@ async fn process_failed_transactions(
     account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
+    enigma: &EnigmaEncryptionService,
 ) {
     let db_config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(connection);
 
@@ -176,6 +180,35 @@ async fn process_failed_transactions(
 
             let submit_data_class =
                 SubmitDataAvail::new(client, &account[index], account_details.app_id);
+
+            let encrypted_data = if account_details.encryption {
+                let encrypt_response = enigma
+                    .encrypt(EncryptRequest {
+                        plaintext: data.to_vec(),
+                        turbo_da_app_id: account_details.id,
+                    })
+                    .await;
+
+                match encrypt_response {
+                    Ok(response) => Some(response),
+                    Err(e) => {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            &format!("Encryption failed: {}", e),
+                        );
+                        return;
+                    }
+                }
+            } else {
+                None
+            };
+
+            let data = if let Some(encrypted_response) = &encrypted_data {
+                enigma.format_encrypt_response_to_data_submission(encrypted_response)
+            } else {
+                data.to_vec()
+            };
+
             let submission = submit_data_class.submit_data(&data).await;
 
             match submission {
@@ -192,6 +225,7 @@ async fn process_failed_transactions(
                         success,
                         &account_details,
                         tx_params,
+                        encrypted_data,
                     )
                     .await
                     {

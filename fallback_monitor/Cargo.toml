@@ -25,4 +25,4 @@ reqwest = "0.12.9"
 avail-utils = {path = "../avail"}
 observability = { path = "../observability" }
 turbo-da-core = {path= "../turbo-da-core"}
-
+enigma = {path="../enigma"}
