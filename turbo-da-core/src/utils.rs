@@ -6,7 +6,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{account, Keypair, Options, SDK};
+use avail_rust::{constants::dev_accounts, Client as AvailClient, Keypair, Options};
 
 use crate::logger::{debug_json, error, info};
 use bigdecimal::BigDecimal;
@@ -229,13 +229,13 @@ pub async fn get_prices(
 }
 
 pub struct Convertor<'a> {
-    pub sdk: &'a SDK,
+    pub sdk: &'a AvailClient,
     pub account: &'a Keypair,
     pub one_kb: Vec<u8>,
 }
 
 impl<'a> Convertor<'a> {
-    pub fn new(sdk: &'a SDK, account: &'a Keypair) -> Self {
+    pub fn new(sdk: &'a AvailClient, account: &'a Keypair) -> Self {
         Convertor {
             sdk,
             account,
@@ -243,11 +243,11 @@ impl<'a> Convertor<'a> {
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        let tx = self.sdk.tx.data_availability.submit_data(data);
+        let tx = self.sdk.tx().data_availability().submit_data(data);
 
-        let options = Options::new();
+        let options = Options::default();
         let query_info = match tx
-            .payment_query_fee_details(self.account, Some(options))
+            .estimate_extrinsic_fees(self.account, options, None)
             .await
         {
             Ok(info) => info,
@@ -306,16 +306,16 @@ lazy_static! {
 }
 
 const WAIT_TIME: u64 = 5;
-pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
     let mut attempts = 0;
-
+    println!("Endpoints: {:?}", endpoints);
     loop {
         if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
         info(&format!("Attempting to connect endpoint: {:?}", endpoint));
-        match SDK::new(endpoint).await {
+        match AvailClient::new(endpoint).await {
             Ok(sdk) => {
                 info(&format!("Connected successfully to endpoint: {}", endpoint));
                 return sdk;
@@ -472,11 +472,11 @@ pub async fn get_amount_to_be_credited(
     .await
     .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
 
-    let client = SDK::new(avail_rpc_url)
+    let client = AvailClient::new(avail_rpc_url)
         .await
         .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
 
-    let account = account::alice();
+    let account = dev_accounts::alice();
     let converter = Convertor::new(&client, &account);
     let price_per_kb = converter
         .get_gas_price_for_data(converter.one_kb.clone())

@@ -7,6 +7,7 @@ use db::controllers::customer_expenditure::{
 };
 use diesel::result::Error;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{types::DecryptRequest, EnigmaEncryptionService};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
@@ -97,6 +98,90 @@ pub async fn get_pre_image(
             match retrieve_data(sdk, H256::from(b_hash), sub.extrinsic_index.unwrap() as u32).await
             {
                 Ok(pre_image) => HttpResponse::Ok().body(pre_image),
+                Err(e) => HttpResponse::InternalServerError()
+                    .json(json!(format!("Failed to retrieve data. Error {:?}", e))),
+            }
+        }
+        Err(Error::NotFound) => HttpResponse::NotFound()
+            .json(json!({ "error": "Customer Expenditure entry not found" })),
+        Err(_) => HttpResponse::InternalServerError().json(json!({ "error": "Database error" })),
+    }
+}
+
+#[get("/get_pre_image_decrypted")]
+pub async fn get_pre_image_decrypted(
+    request_payload: web::Query<RetrievePreImage>,
+    config: web::Data<AppConfig>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    println!(
+        "Getting decrypted pre-image for submission ID: {:?}",
+        request_payload.submission_id
+    );
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+    let submission_id = match Uuid::from_str(&request_payload.submission_id) {
+        Ok(val) => val,
+        Err(e) => {
+            return HttpResponse::NotAcceptable().json(json!({ "error": e.to_string() }));
+        }
+    };
+
+    match get_customer_expenditure_by_submission_id(&mut connection, submission_id).await {
+        Ok(sub) => {
+            debug(&format!(
+                "Found expenditure for submission ID: {:?}",
+                submission_id
+            ));
+            if sub.payload.is_some() {
+                return HttpResponse::Ok().body(sub.payload.unwrap());
+            }
+
+            if sub.extrinsic_index.is_none() || sub.block_hash.is_none() {
+                return HttpResponse::NotImplemented()
+                    .body("Customer Expenditure found but tx isn't finalised yet.");
+            }
+            let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+            let b_hash = match hex_string_to_fixed_bytes(sub.block_hash.unwrap().as_str()) {
+                Ok(hash) => hash,
+                Err(e) => {
+                    return HttpResponse::NotImplemented().json(json!({ "error": e }));
+                }
+            };
+
+            match retrieve_data(sdk, H256::from(b_hash), sub.extrinsic_index.unwrap() as u32).await
+            {
+                Ok(pre_image) => {
+                    if sub.ephemeral_pub_key.is_none() {
+                        return HttpResponse::InternalServerError()
+                            .json(json!({ "error": "Encryption metadata missing" }));
+                    }
+                    let decrypted_pre_image = enigma
+                        .decrypt(DecryptRequest {
+                            turbo_da_app_id: sub.app_id,
+                            ciphertext: pre_image,
+                            ephemeral_pub_key: sub.ephemeral_pub_key.clone().unwrap(),
+                        })
+                        .await;
+                    match decrypted_pre_image {
+                        Ok(decrypted_pre_image) => {
+                            if decrypted_pre_image.decrypted_array.is_some() {
+                                HttpResponse::Ok()
+                                    .body(decrypted_pre_image.decrypted_array.unwrap())
+                            } else {
+                                HttpResponse::InternalServerError().json(json!(format!(
+                                    "Failed to decrypt data. Error {:?}",
+                                    decrypted_pre_image
+                                )))
+                            }
+                        }
+                        Err(e) => HttpResponse::InternalServerError()
+                            .json(json!(format!("Failed to decrypt data. Error {:?}", e))),
+                    }
+                }
                 Err(e) => HttpResponse::InternalServerError()
                     .json(json!(format!("Failed to retrieve data. Error {:?}", e))),
             }

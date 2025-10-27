@@ -9,6 +9,7 @@ pub mod types;
 /// # Arguments
 /// * `service_url` - The URL of the Enigma service
 /// * `service_version` - The version of the Enigma service
+#[derive(Clone)]
 pub struct EnigmaEncryptionService {
     pub(crate) service_url: String,
 }

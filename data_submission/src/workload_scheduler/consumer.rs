@@ -32,7 +32,7 @@ pub struct Consumer {
     keypair: Arc<web::Data<Vec<Keypair>>>,
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
-    enigma: Arc<EnigmaEncryptionService>,
+    enigma: Arc<web::Data<EnigmaEncryptionService>>,
     redis: Arc<Redis>,
     number_of_threads: i32,
 }
@@ -43,7 +43,7 @@ impl Consumer {
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
-        enigma: Arc<EnigmaEncryptionService>,
+        enigma: Arc<web::Data<EnigmaEncryptionService>>,
         redis: Arc<Redis>,
         number_of_threads: i32,
     ) -> Self {
@@ -135,7 +135,7 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
-        enigma: Arc<EnigmaEncryptionService>,
+        enigma: Arc<web::Data<EnigmaEncryptionService>>,
         redis: Arc<Redis>,
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
@@ -144,7 +144,7 @@ impl Consumer {
             info(&format!("Spawning thread number {}", i));
 
             let endpoints = endpoints.clone();
-            let enigma = enigma.clone();
+            let enigma = enigma.get_ref().clone();
             let runtime = match tokio::runtime::Runtime::new() {
                 Ok(runtime) => runtime,
                 Err(e) => {
@@ -201,7 +201,7 @@ async fn response_handler(
     injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
     endpoints: &Arc<Vec<String>>,
     keygen: &Vec<Keypair>,
-    enigma: &Arc<EnigmaEncryptionService>,
+    enigma: &EnigmaEncryptionService,
     redis: &Arc<Redis>,
     i: i32,
 ) -> Result<(), String> {
@@ -257,7 +257,7 @@ struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
-    enigma: &'a Arc<EnigmaEncryptionService>,
+    enigma: &'a EnigmaEncryptionService,
     redis: &'a Arc<Redis>,
 }
 
@@ -266,7 +266,7 @@ impl<'a> ProcessSubmitResponse<'a> {
         response: &'a Response,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
-        enigma: &'a Arc<EnigmaEncryptionService>,
+        enigma: &'a EnigmaEncryptionService,
         redis: &'a Arc<Redis>,
     ) -> Self {
         Self {
@@ -293,15 +293,17 @@ impl<'a> ProcessSubmitResponse<'a> {
                 })
                 .await
                 .map_err(|e| e.to_string())?;
-            Some(
-                self.enigma
-                    .format_encrypt_response_to_data_submission(&encrypt_response),
-            )
+            Some(encrypt_response)
         } else {
             None
         };
 
-        let data = encrypted_data.as_deref().unwrap_or(&data).to_vec();
+        let data = if let Some(encrypted_response) = &encrypted_data {
+            self.enigma
+                .format_encrypt_response_to_data_submission(encrypted_response)
+        } else {
+            self.response.raw_payload.to_vec()
+        };
 
         let convertor = Convertor::new(
             &self.submit_avail_class.client,
@@ -406,6 +408,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             result,
             &account,
             params,
+            encrypted_data,
         )
         .await?;
 

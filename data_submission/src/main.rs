@@ -1,4 +1,4 @@
-use crate::{auth::Auth, redis::Redis};
+use crate::{auth::Auth, redis::Redis, routes::data_retrieval::get_pre_image_decrypted};
 use actix_cors::Cors;
 
 use actix_web::{
@@ -57,14 +57,14 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_redis = Redis::new(app_config.redis_url.as_str());
 
-    let enigma = EnigmaEncryptionService::new(app_config.enigma_url.clone());
+    let enigma = web::Data::new(EnigmaEncryptionService::new(app_config.enigma_url.clone()));
 
     let consumer_server = Consumer::new(
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
-        Arc::new(enigma),
+        Arc::new(enigma.clone()),
         Arc::new(shared_redis.clone()),
         app_config.number_of_threads,
     );
@@ -95,9 +95,11 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
+                    .app_data(enigma.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
+                    .service(get_pre_image_decrypted)
                     .service(get_submission_info),
             )
     })

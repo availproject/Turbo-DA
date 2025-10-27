@@ -2,7 +2,7 @@
 import Button from "@/components/button";
 import { Text } from "@/components/text";
 import { turboDADocLink } from "@/lib/constant";
-import { SignInButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { useAuthState } from "@/providers/AuthProvider";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
