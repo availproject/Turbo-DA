@@ -12,6 +12,7 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use enigma::EnigmaEncryptionService;
 use observability::{init_meter, init_tracer};
 use routes::{
     data_retrieval::{get_pre_image, get_submission_info},
@@ -32,13 +33,12 @@ mod workload_scheduler;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info(&format!("Starting Data Submission server...."));
-
-    let app_config = AppConfig::default().load_config()?;
-
     init_meter("data_submission");
     init_tracer("data_submission");
 
+    let app_config = AppConfig::default().load_config()?;
+
+    info(&format!("Starting Data Submission server...."));
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
     let shared_keypair = web::Data::new(accounts);
@@ -57,11 +57,14 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_redis = Redis::new(app_config.redis_url.as_str());
 
+    let enigma = EnigmaEncryptionService::new(app_config.enigma_url.clone());
+
     let consumer_server = Consumer::new(
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
+        Arc::new(enigma),
         Arc::new(shared_redis.clone()),
         app_config.number_of_threads,
     );

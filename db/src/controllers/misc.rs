@@ -120,7 +120,7 @@ pub async fn get_unresolved_transactions(
             )),
         ))
         .filter(customer_expenditures::retry_count.lt(retry))
-        .order(customer_expenditures::created_at.asc())
+        .order(customer_expenditures::created_at.desc())
         .limit(limit)
         .select((
             CustomerExpenditureGetWithPayload::as_select(),

@@ -16,6 +16,7 @@ use db::{
     errors::*,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{types::EncryptRequest, EnigmaEncryptionService};
 use observability::log_txn;
 use redis::Commands;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
@@ -31,6 +32,7 @@ pub struct Consumer {
     keypair: Arc<web::Data<Vec<Keypair>>>,
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
+    enigma: Arc<EnigmaEncryptionService>,
     redis: Arc<Redis>,
     number_of_threads: i32,
 }
@@ -41,6 +43,7 @@ impl Consumer {
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
+        enigma: Arc<EnigmaEncryptionService>,
         redis: Arc<Redis>,
         number_of_threads: i32,
     ) -> Self {
@@ -49,6 +52,7 @@ impl Consumer {
             keypair,
             injected_dependency,
             endpoints,
+            enigma,
             redis,
             number_of_threads,
         }
@@ -65,6 +69,7 @@ impl Consumer {
             let sender = self.sender.clone();
             let arc_endpoints = self.endpoints.clone();
             let heartbeat_tx = heartbeat_tx.clone();
+            let enigma = self.enigma.clone();
             let redis = self.redis.clone();
 
             self.spawn_thread(
@@ -72,6 +77,7 @@ impl Consumer {
                 sender,
                 keygen,
                 injected_dependency,
+                enigma,
                 redis,
                 arc_endpoints,
                 heartbeat_tx,
@@ -105,12 +111,14 @@ impl Consumer {
                     let arc_endpoints = self.endpoints.clone();
                     let heartbeat_tx = heartbeat_tx.clone();
                     let redis = self.redis.clone();
+                    let enigma = self.enigma.clone();
 
                     self.spawn_thread(
                         thread_id,
                         sender,
                         keygen,
                         injected_dependency,
+                        enigma,
                         redis,
                         arc_endpoints,
                         heartbeat_tx,
@@ -127,6 +135,7 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
+        enigma: Arc<EnigmaEncryptionService>,
         redis: Arc<Redis>,
         endpoints: Arc<Vec<String>>,
         heartbeat_tx: tokio::sync::mpsc::Sender<i32>,
@@ -135,7 +144,7 @@ impl Consumer {
             info(&format!("Spawning thread number {}", i));
 
             let endpoints = endpoints.clone();
-
+            let enigma = enigma.clone();
             let runtime = match tokio::runtime::Runtime::new() {
                 Ok(runtime) => runtime,
                 Err(e) => {
@@ -147,6 +156,7 @@ impl Consumer {
             let injected_dependency = injected_dependency.clone();
             let keygen = keypair.clone();
             let heartbeat_tx = heartbeat_tx.clone();
+            let enigma = enigma.clone();
             runtime.block_on(async move {
                 tokio::spawn(async move {
                     info(&format!("Sending heartbeat for thread {}", i));
@@ -168,6 +178,7 @@ impl Consumer {
                         &injected_dependency,
                         &endpoints,
                         &keygen,
+                        &enigma,
                         &redis,
                         i,
                     )
@@ -190,6 +201,7 @@ async fn response_handler(
     injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
     endpoints: &Arc<Vec<String>>,
     keygen: &Vec<Keypair>,
+    enigma: &Arc<EnigmaEncryptionService>,
     redis: &Arc<Redis>,
     i: i32,
 ) -> Result<(), String> {
@@ -214,7 +226,7 @@ async fn response_handler(
     let submit_data_class = SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
     let mut process_response =
-        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class, redis);
+        ProcessSubmitResponse::new(&response, &mut connection, submit_data_class, enigma, redis);
 
     match timeout(
         Duration::from_secs(120),
@@ -245,6 +257,7 @@ struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
+    enigma: &'a Arc<EnigmaEncryptionService>,
     redis: &'a Arc<Redis>,
 }
 
@@ -253,12 +266,14 @@ impl<'a> ProcessSubmitResponse<'a> {
         response: &'a Response,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
+        enigma: &'a Arc<EnigmaEncryptionService>,
         redis: &'a Arc<Redis>,
     ) -> Self {
         Self {
             response,
             connection,
             submit_avail_class,
+            enigma,
             redis,
         }
     }
@@ -268,6 +283,25 @@ impl<'a> ProcessSubmitResponse<'a> {
             get_account_by_id(&mut self.connection, &self.response.app_id).await?;
 
         let data = self.response.raw_payload.clone();
+
+        let encrypted_data = if account.encryption {
+            let encrypt_response = self
+                .enigma
+                .encrypt(EncryptRequest {
+                    plaintext: data.to_vec(),
+                    turbo_da_app_id: self.response.app_id,
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+            Some(
+                self.enigma
+                    .format_encrypt_response_to_data_submission(&encrypt_response),
+            )
+        } else {
+            None
+        };
+
+        let data = encrypted_data.as_deref().unwrap_or(&data).to_vec();
 
         let convertor = Convertor::new(
             &self.submit_avail_class.client,

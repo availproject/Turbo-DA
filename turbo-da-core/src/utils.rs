@@ -310,7 +310,7 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
     let mut attempts = 0;
 
     loop {
-        if attempts < endpoints.len() {
+        if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
