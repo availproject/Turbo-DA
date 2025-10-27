@@ -13,19 +13,14 @@ export default function BlockPage() {
             {/* Description */}
             <div className="space-y-4 text-gray-300">
               <p className="text-lg">
-                We're sorry, but Turbo DA is not available in your country.
-              </p>
-
-              <p className="text-base">
-                Due to legal and regulatory restrictions, we cannot provide our
-                services to users from certain regions. This decision is made to
-                ensure compliance with international laws and regulations.
+                Unfortunately we are unable to offer you this service at this
+                time. We apologize for any inconvenience.
               </p>
 
               <div className="mt-8 p-4 bg-red-950/30 rounded-lg border border-red-500/30">
                 <p className="text-sm text-gray-400">
                   If you believe this is an error or have any questions, please
-                  contact our support team.
+                  reach out to us on discord.
                 </p>
               </div>
             </div>

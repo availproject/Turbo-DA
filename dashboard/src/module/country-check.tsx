@@ -171,8 +171,7 @@ export function CountrySelectionModal() {
                   Please Select Your Nationality
                 </DialogTitle>
                 <p className="text-sm text-gray-400 mt-1">
-                  This will help us personalize your experience for the app,
-                  this is just for the first time.
+                  You only need to do this once.
                 </p>
               </DialogHeader>
               <div className="mt-4">
