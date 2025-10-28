@@ -1,4 +1,6 @@
-use reqwest::Client;
+use std::fs;
+
+use reqwest::{Certificate, Client, Identity};
 use types::{DecryptRequest, DecryptRequestData, EncryptRequest, EncryptResponse};
 
 pub mod types;
@@ -11,6 +13,7 @@ pub mod types;
 #[derive(Clone)]
 pub struct EnigmaEncryptionService {
     pub(crate) service_url: String,
+    client: Client,
 }
 
 /// Enigma encryption service implementation
@@ -19,7 +22,44 @@ pub struct EnigmaEncryptionService {
 /// * `service_url` - The URL of the Enigma service
 impl EnigmaEncryptionService {
     pub fn new(service_url: String) -> Self {
-        Self { service_url }
+        let client = match Self::create_tls_client() {
+            Ok(client) => client,
+            Err(e) => {
+                panic!("Warning: Failed to create TLS client: {}", e);
+            }
+        };
+
+        Self {
+            service_url,
+            client,
+        }
+    }
+
+    fn create_tls_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
+        let cert_and_key = fs::read("client.crt")?;
+        let key = fs::read("client.key")?;
+        let mut pem = Vec::new();
+
+        pem.extend_from_slice(&cert_and_key);
+        pem.extend_from_slice(&key);
+
+        let identity = Identity::from_pem(&pem)?;
+
+        let ca_cert = fs::read("ca.crt")?;
+        let ca_certificate = Certificate::from_pem(&ca_cert)?;
+
+        let client = reqwest::Client::builder()
+            .add_root_certificate(ca_certificate)
+            .identity(identity)
+            .connection_verbose(true)
+            .https_only(true)
+            .danger_accept_invalid_certs(true) // para rustls
+            .max_tls_version(reqwest::tls::Version::TLS_1_2)
+            .use_rustls_tls()
+            .build()
+            .map_err(|e| format!("Failed to build reqwest client: {}", e))?;
+
+        Ok(client)
     }
 
     /// Encrypts the payload using the Enigma service
@@ -33,11 +73,17 @@ impl EnigmaEncryptionService {
         &self,
         payload: EncryptRequest,
     ) -> Result<EncryptResponse, reqwest::Error> {
-        let response = Client::new()
+        println!(
+            "{}",
+            format!("Service URL: {}", self.service_url.clone()).to_string()
+        );
+        let response = self
+            .client
             .post(format!("{}/v1/encrypt", self.service_url.clone()))
             .json(&payload)
             .send()
             .await?;
+        println!("{}", format!("Response: {:?}", response).to_string());
         let response = response.json::<EncryptResponse>().await?;
         Ok(response)
     }
@@ -53,7 +99,8 @@ impl EnigmaEncryptionService {
         &self,
         payload: DecryptRequest,
     ) -> Result<DecryptRequestData, reqwest::Error> {
-        let response = Client::new()
+        let response = self
+            .client
             .post(format!("{}/v1/decrypt", self.service_url.clone()))
             .json(&payload)
             .send()

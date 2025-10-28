@@ -31,3 +31,6 @@ Store
 target
 node_modules
 node_modules
+**/ca.crt
+**/client.crt
+**/client.key

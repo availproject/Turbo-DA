@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-reqwest = "0.12.9"
+reqwest = {version = "0.12.9", features = ["rustls-tls", "json"]}
 serde_json = "1.0"
 serde_bytes = "0.11.0"
 serde = { workspace = true }

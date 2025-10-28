@@ -189,12 +189,13 @@ impl Consumer {
                     let err = result.err().unwrap().to_string();
                     update_error_entry(response, &mut connection, err.clone()).await;
                     return Err(err);
+                } else {
+                    info(&format!(
+                        "Successfully submitted response for submission_id {}",
+                        response.submission_id
+                    ));
+                    Ok(())
                 }
-                info(&format!(
-                    "Successfully submitted response for submission_id {}",
-                    response.submission_id
-                ));
-                Ok(())
             }
             Err(_) => {
                 update_error_entry(response, &mut connection, TIMEOUT_ERROR.to_string()).await;

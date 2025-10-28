@@ -115,10 +115,6 @@ pub async fn get_pre_image_decrypted(
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     enigma: web::Data<EnigmaEncryptionService>,
 ) -> HttpResponse {
-    println!(
-        "Getting decrypted pre-image for submission ID: {:?}",
-        request_payload.submission_id
-    );
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -162,7 +158,7 @@ pub async fn get_pre_image_decrypted(
                     let decrypted_pre_image = enigma
                         .decrypt(DecryptRequest {
                             turbo_da_app_id: sub.app_id,
-                            ciphertext: pre_image,
+                            ciphertext: pre_image[65..].to_vec(),
                             ephemeral_pub_key: sub.ephemeral_pub_key.clone().unwrap(),
                         })
                         .await;
