@@ -26,3 +26,4 @@ avail-utils = {path = "../avail"}
 observability = { path = "../observability" }
 turbo-da-core = {path= "../turbo-da-core"}
 enigma = {path="../enigma"}
+data_submission = {path = "../data_submission"}

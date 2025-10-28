@@ -1,5 +1,4 @@
 use crate::config::AppConfig;
-use crate::redis::Redis;
 use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
 use actix_web::{
@@ -14,8 +13,7 @@ use db::{
     models::customer_expenditure::CreateCustomerExpenditure,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use r2d2;
-use redis::Commands;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
@@ -53,69 +51,15 @@ pub async fn submit_data(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let app_id = match retrieve_app_id(&http_request) {
-        Some(val) => val,
-        None => {
-            return HttpResponse::InternalServerError()
-                .json(json!({ "error": "App Id not retrieved" }))
-        }
-    };
 
-    let user_id = match retrieve_user_id(&http_request) {
-        Some(val) => val,
-        None => {
-            return HttpResponse::InternalServerError()
-                .json(json!({ "error": "User Id not retrieved" }))
-        }
-    };
-
-    let mut connection = match get_connection(&injected_dependency).await {
-        Ok(conn) => conn,
-        Err(response) => return response,
-    };
-
-    let (avail_app_id, _, _) = match validate_and_get_entries(&mut connection, &app_id).await {
-        Ok(app) => app,
-        Err(e) => {
-            return HttpResponse::InternalServerError().body(e);
-        }
-    };
-
-    drop(connection);
-
-    let submission_id = generate_submission_id();
-    let response = Response {
-        thread_id: map_user_id_to_thread(&config),
-        raw_payload: request_payload.data.as_bytes().to_vec().into(),
-        submission_id,
-        app_id,
-        avail_app_id,
-    };
-
-    let expenditure_entry = CreateCustomerExpenditure {
-        amount_data: format_size(request_payload.data.as_bytes().len()),
-        user_id: user_id.clone(),
-        app_id: app_id,
-        id: submission_id,
-        error: None,
-        payload: Some(request_payload.data.as_bytes().to_vec()),
-    };
-
-    tokio::spawn(async move {
-        let mut connection = match get_connection(&injected_dependency).await {
-            Ok(conn) => conn,
-            Err(_) => {
-                error(&format!("couldn't connect to db with error "));
-                return;
-            }
-        };
-
-        create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
-    });
-
-    let _ = sender.send(response);
-
-    HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
+    _submit_data(
+        request_payload.data.as_bytes().to_vec(),
+        sender,
+        injected_dependency,
+        config,
+        http_request,
+    )
+    .await
 }
 
 /// Handles submission of raw binary data
@@ -141,6 +85,24 @@ pub async fn submit_raw_data(
     if request_payload.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
+
+    _submit_data(
+        request_payload.to_vec(),
+        sender,
+        injected_dependency,
+        config,
+        http_request,
+    )
+    .await
+}
+
+async fn _submit_data(
+    request_payload: Vec<u8>,
+    sender: web::Data<Sender<Response>>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
+    http_request: HttpRequest,
+) -> HttpResponse {
     let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
         None => {
@@ -183,7 +145,7 @@ pub async fn submit_raw_data(
 
     let consumer_response = Response {
         thread_id: map_user_id_to_thread(&config),
-        raw_payload: request_payload,
+        raw_payload: request_payload.into(),
         submission_id,
         app_id,
         avail_app_id,

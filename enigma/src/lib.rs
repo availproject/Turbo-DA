@@ -1,6 +1,5 @@
 use reqwest::Client;
 use types::{DecryptRequest, DecryptRequestData, EncryptRequest, EncryptResponse};
-use uuid::Uuid;
 
 pub mod types;
 

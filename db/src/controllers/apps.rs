@@ -3,7 +3,7 @@ use crate::{
     schema::apps::dsl::*,
 };
 use bigdecimal::BigDecimal;
-use diesel::{dsl, BoolExpressionMethods, ExpressionMethods, QueryDsl, SelectableHelper};
+use diesel::{dsl, ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 

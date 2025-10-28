@@ -1,35 +1,35 @@
-use crate::{auth::Auth, redis::Redis, routes::data_retrieval::get_pre_image_decrypted};
-use actix_cors::Cors;
+pub mod auth;
+pub mod config;
+pub mod redis;
+pub mod routes;
+pub mod utils;
+pub mod workload_scheduler;
 
+use crate::{
+    auth::Auth, config::AppConfig, redis::Redis, routes::data_retrieval::get_pre_image_decrypted,
+};
+use actix_cors::Cors;
 use actix_web::{
     middleware::Logger,
     web::{self},
     App, HttpServer,
 };
 
-use config::AppConfig;
+use crate::routes::{
+    data_retrieval::{get_pre_image, get_submission_info},
+    data_submission::{submit_data, submit_raw_data},
+    health::health_check,
+};
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
 use observability::{init_meter, init_tracer};
-use routes::{
-    data_retrieval::{get_pre_image, get_submission_info},
-    data_submission::{submit_data, submit_raw_data},
-    health::health_check,
-};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use turbo_da_core::{logger::info, utils::generate_keygen_list};
 use workload_scheduler::consumer::Consumer;
-
-mod auth;
-mod config;
-mod redis;
-mod routes;
-mod utils;
-mod workload_scheduler;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
