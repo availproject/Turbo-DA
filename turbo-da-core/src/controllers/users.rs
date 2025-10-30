@@ -1119,3 +1119,74 @@ async fn update_app_id(
         })),
     }
 }
+
+#[derive(Deserialize, Serialize, Validate)]
+pub struct ToggleEncryption {
+    pub app_id: Uuid,
+}
+
+/// Toggle the encryption for a user account
+///
+/// # Description
+/// Toggles the encryption for the specified account.
+///
+/// # Route
+/// `PUT /v1/user/toggle_encryption`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "app_id": "uuid-string"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK with success message if toggle succeeds
+/// * 500 Internal Server Error if toggle fails
+///
+/// # Example Response
+/// ```json
+/// {
+///   "state": "SUCCESS",
+///   "message": "Encryption toggled successfully",
+///   "error": null
+/// }
+/// ```
+
+#[put("/toggle_encryption")]
+async fn toggle_encryption(
+    payload: web::Json<ToggleEncryption>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
+) -> HttpResponse {
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let query =
+        db::controllers::apps::toggle_encryption(&mut connection, &user, &payload.app_id).await;
+    match query {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Encryption toggled successfully",
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}

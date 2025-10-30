@@ -3,9 +3,9 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct Response {
-    pub(crate) raw_payload: Bytes,
-    pub(crate) submission_id: Uuid,
-    pub(crate) thread_id: i32,
-    pub(crate) app_id: Uuid,
-    pub(crate) avail_app_id: i32,
+    pub raw_payload: Bytes,
+    pub submission_id: Uuid,
+    pub thread_id: i32,
+    pub app_id: Uuid,
+    pub avail_app_id: i32,
 }

@@ -5,9 +5,9 @@ use crate::{
     schema::customer_expenditures::dsl::*,
 };
 use bigdecimal::BigDecimal;
-
 use diesel::{prelude::*, result::Error};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use enigma::types::EncryptResponse;
 use log::{error, info};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -90,6 +90,7 @@ pub async fn handle_submission_info(
 
 pub async fn update_customer_expenditure(
     result: TransactionInfo,
+    encrypted_data: Option<EncryptResponse>,
     fees_as_bigdecimal: &BigDecimal,
     fees_as_bigdecimal_in_avail: &BigDecimal,
     wallet_store: &Vec<u8>,
@@ -108,6 +109,16 @@ pub async fn update_customer_expenditure(
         wallet.eq(wallet_store),
         payload.eq(None::<Vec<u8>>),
         error.eq(None::<String>),
+        ciphertext_hash.eq(encrypted_data.as_ref().map(|r| r.ciphertext_hash.clone())),
+        plaintext_hash.eq(encrypted_data.as_ref().map(|r| r.plaintext_hash.clone())),
+        signature_ciphertext_hash.eq(encrypted_data
+            .as_ref()
+            .map(|r| r.signature_ciphertext_hash.as_bytes())),
+        signature_plaintext_hash.eq(encrypted_data
+            .as_ref()
+            .map(|r| r.signature_plaintext_hash.as_bytes())),
+        address.eq(encrypted_data.as_ref().map(|r| r.address.to_vec())),
+        ephemeral_pub_key.eq(encrypted_data.as_ref().map(|r| r.ephemeral_pub_key.clone())),
     );
 
     diesel::update(customer_expenditures.filter(id.eq(submission_id)))
@@ -117,7 +128,7 @@ pub async fn update_customer_expenditure(
         .map_err(|e| {
             format!(
                 "Couldn't insert customer expenditure entry {:?}. Error: {:?}",
-                update_values, e
+                submission_id, e
             )
         })?;
     Ok(())

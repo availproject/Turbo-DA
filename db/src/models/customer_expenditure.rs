@@ -62,6 +62,12 @@ pub struct CustomerExpenditureGetWithPayload {
     pub retry_count: i32,
     pub app_id: Uuid,
     pub wallet: Option<Vec<u8>>,
+    pub ephemeral_pub_key: Option<Vec<u8>>,
+    pub ciphertext_hash: Option<Vec<u8>>,
+    pub plaintext_hash: Option<Vec<u8>>,
+    pub signature_ciphertext_hash: Option<Vec<u8>>,
+    pub signature_plaintext_hash: Option<Vec<u8>>,
+    pub address: Option<Vec<u8>>,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize, Debug)]

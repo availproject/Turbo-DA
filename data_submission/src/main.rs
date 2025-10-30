@@ -1,44 +1,44 @@
-use crate::{auth::Auth, redis::Redis};
-use actix_cors::Cors;
+pub mod auth;
+pub mod config;
+pub mod redis;
+pub mod routes;
+pub mod utils;
+pub mod workload_scheduler;
 
+use crate::{
+    auth::Auth, config::AppConfig, redis::Redis, routes::data_retrieval::get_pre_image_decrypted,
+};
+use actix_cors::Cors;
 use actix_web::{
     middleware::Logger,
     web::{self},
     App, HttpServer,
 };
 
-use config::AppConfig;
-use diesel_async::{
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
-    AsyncPgConnection,
-};
-use observability::{init_meter, init_tracer};
-use routes::{
+use crate::routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
     health::health_check,
 };
+use diesel_async::{
+    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    AsyncPgConnection,
+};
+use enigma::EnigmaEncryptionService;
+use observability::{init_meter, init_tracer};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use turbo_da_core::{logger::info, utils::generate_keygen_list};
 use workload_scheduler::consumer::Consumer;
 
-mod auth;
-mod config;
-mod redis;
-mod routes;
-mod utils;
-mod workload_scheduler;
-
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info(&format!("Starting Data Submission server...."));
-
-    let app_config = AppConfig::default().load_config()?;
-
     init_meter("data_submission");
     init_tracer("data_submission");
 
+    let app_config = AppConfig::default().load_config()?;
+
+    info(&format!("Starting Data Submission server...."));
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
     let shared_keypair = web::Data::new(accounts);
@@ -57,11 +57,14 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_redis = Redis::new(app_config.redis_url.as_str());
 
+    let enigma = web::Data::new(EnigmaEncryptionService::new(app_config.enigma_url.clone()));
+
     let consumer_server = Consumer::new(
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
         Arc::new(app_config.avail_rpc_endpoint.clone()),
+        Arc::new(enigma.clone()),
         Arc::new(shared_redis.clone()),
         app_config.number_of_threads,
     );
@@ -92,9 +95,11 @@ async fn main() -> Result<(), std::io::Error> {
                     .app_data(shared_config.clone())
                     .app_data(shared_pool.clone())
                     .app_data(shared_keypair.clone())
+                    .app_data(enigma.clone())
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
+                    .service(get_pre_image_decrypted)
                     .service(get_submission_info),
             )
     })

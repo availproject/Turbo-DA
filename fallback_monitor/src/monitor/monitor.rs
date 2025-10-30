@@ -1,27 +1,25 @@
+use std::sync::Arc;
+
 use avail_rust::{Client, Keypair};
 use avail_utils::submit_data::SubmitDataAvail;
-use db::{
-    controllers::users::TxParams,
-    models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User},
-};
+use data_submission::{ProcessSubmitResponse, Response};
+use db::models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User};
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
 /// If successful updates the state of the data to "Resolved".
 use db::{
-    controllers::{
-        customer_expenditure::increase_retry_count,
-        misc::{get_unresolved_transactions, update_database_on_submission},
-    },
+    controllers::{customer_expenditure::increase_retry_count, misc::get_unresolved_transactions},
     models::apps::Apps,
 };
 
+use data_submission::redis::Redis;
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncConnection, AsyncPgConnection,
 };
+use enigma::EnigmaEncryptionService;
 use observability::{log_fallback_txn_error, log_retry_count};
 use turbo_da_core::logger::{error, info};
-use turbo_da_core::utils::{format_size, Convertor};
 
 /// Monitors and processes failed transactions from the database
 ///
@@ -38,8 +36,10 @@ pub async fn monitor_failed_transactions(
     connection: &String,
     client: &Client,
     account: &Vec<Keypair>,
+    redis: Arc<Redis>,
     retry_count: i32,
     limit: i64,
+    enigma: &EnigmaEncryptionService,
 ) {
     let mut connection_client = AsyncPgConnection::establish(connection)
         .await
@@ -49,17 +49,23 @@ pub async fn monitor_failed_transactions(
 
     match unresolved_transactions {
         Ok(failed_transactions_list) => {
+            if failed_transactions_list.is_empty() {
+                info(&format!("No unresolved transactions found"));
+                return;
+            }
             process_failed_transactions(
                 connection,
                 client,
+                redis,
                 account,
                 retry_count,
                 failed_transactions_list,
+                enigma,
             )
             .await;
         }
-        Err(_) => {
-            error(&format!("Couldn't fetch unresolved transactions from db"));
+        Err(e) => {
+            error(&format!("Couldn't fetch unresolved transactions from db: {}", e));
         }
     }
 }
@@ -81,9 +87,11 @@ pub async fn monitor_failed_transactions(
 async fn process_failed_transactions(
     connection: &String,
     client: &Client,
+    redis: Arc<Redis>,
     account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
+    enigma: &EnigmaEncryptionService,
 ) {
     let db_config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(connection);
 
@@ -95,119 +103,75 @@ async fn process_failed_transactions(
     let pool_ref = &pool;
 
     let futures = failed_transactions_list.into_iter().enumerate().map(
-        |(index, (customer_expenditure_details, account_details, user_details))| async move {
-            let mut connection = pool_ref.get().await.unwrap();
-            info(&format!(
-                "Processing failed transaction submission id: {:?} ",
-                customer_expenditure_details.id
-            ));
-            let result =
-                increase_retry_count(customer_expenditure_details.id, &mut connection).await;
-            if result.is_err() {
-                log_error(
-                    &customer_expenditure_details.id.to_string(),
-                    "Failed to increase retry count",
-                );
-                return;
-            }
-
-            log_retry_count(
-                &customer_expenditure_details.id.to_string(),
-                customer_expenditure_details.retry_count as usize,
-            );
-
-            if customer_expenditure_details.retry_count > retry_count {
-                log_error(
-                    &customer_expenditure_details.id.to_string(),
-                    "Retry count exceeded",
-                );
-                return;
-            }
-
-            let Some(data) = customer_expenditure_details.payload else {
-                log_error(
-                    &customer_expenditure_details.id.to_string(),
-                    "No payload found for transaction id",
-                );
-                return;
-            };
-
-            let convertor = Convertor::new(client, &account[index]);
-            let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
-
-            match account_details.credit_selection {
-                Some(0) => {
-                    if &credits_used >= &account_details.credit_balance {
-                        log_error(
-                            &customer_expenditure_details.id.to_string(),
-                            "Insufficient assigned credits for user id",
-                        );
-                        return;
-                    }
-                }
-                Some(1) => {
-                    if &credits_used >= &user_details.credit_balance {
-                        log_error(
-                            &customer_expenditure_details.id.to_string(),
-                            "Insufficient fallback credits for user id",
-                        );
-                        return;
-                    }
-                }
-                Some(2) => {
-                    if &(&credits_used - &account_details.credit_balance)
-                        >= &user_details.credit_balance
-                    {
-                        log_error(
-                            &customer_expenditure_details.id.to_string(),
-                            "Insufficient credits for user id",
-                        );
-                        return;
-                    }
-                }
-                _ => {
+        |(index, (customer_expenditure_details, account_details, _))| {
+            let redis = Arc::clone(&redis);
+            async move {
+                let mut connection = pool_ref.get().await.unwrap();
+                info(&format!(
+                    "Processing failed transaction submission id: {:?} ",
+                    customer_expenditure_details.id
+                ));
+                let result =
+                    increase_retry_count(customer_expenditure_details.id, &mut connection).await;
+                if result.is_err() {
                     log_error(
                         &customer_expenditure_details.id.to_string(),
-                        "Invalid credit selection",
+                        "Failed to increase retry count",
                     );
                     return;
                 }
-            }
 
-            let submit_data_class =
-                SubmitDataAvail::new(client, &account[index], account_details.app_id);
-            let submission = submit_data_class.submit_data(&data).await;
+                log_retry_count(
+                    &customer_expenditure_details.id.to_string(),
+                    customer_expenditure_details.retry_count as usize,
+                );
 
-            match submission {
-                Ok(success) => {
-                    let tx_params = TxParams {
-                        amount_data: format_size(data.len()),
-                        amount_data_billed: credits_used,
-                        fees: success.gas_fee,
-                    };
-
-                    match update_database_on_submission(
-                        customer_expenditure_details.id,
-                        &mut connection,
-                        success,
-                        &account_details,
-                        tx_params,
-                    )
-                    .await
-                    {
-                        Ok(_) => {
-                            info(&format!(
-                                "Successfully processed failed transaction submission id: {:?} ",
-                                customer_expenditure_details.id
-                            ));
-                        }
-                        Err(e) => {
-                            log_error(&customer_expenditure_details.id.to_string(), &e);
-                        }
-                    }
+                if customer_expenditure_details.retry_count > retry_count {
+                    log_error(
+                        &customer_expenditure_details.id.to_string(),
+                        "Retry count exceeded",
+                    );
+                    return;
                 }
-                Err(e) => {
-                    log_error(&customer_expenditure_details.id.to_string(), &e);
+
+                let Some(data) = customer_expenditure_details.payload else {
+                    log_error(
+                        &customer_expenditure_details.id.to_string(),
+                        "No payload found for transaction id",
+                    );
+                    return;
+                };
+
+                let submit_data_class =
+                    SubmitDataAvail::new(&client, &account[index], account_details.app_id);
+
+                let response = Response {
+                    raw_payload: data.into(),
+                    submission_id: customer_expenditure_details.id,
+                    thread_id: 0,
+                    app_id: account_details.id,
+                    avail_app_id: account_details.app_id,
+                };
+
+                let mut process_response = ProcessSubmitResponse::new(
+                    &response,
+                    &mut connection,
+                    submit_data_class,
+                    enigma,
+                    redis,
+                );
+
+                let result = process_response.process_response().await;
+                match result {
+                    Ok(_) => {
+                        info(&format!(
+                            "Successfully processed response for submission id: {:?}",
+                            customer_expenditure_details.id
+                        ));
+                    }
+                    Err(e) => {
+                        log_error(&customer_expenditure_details.id.to_string(), &e);
+                    }
                 }
             }
         },

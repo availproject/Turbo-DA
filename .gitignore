@@ -23,7 +23,7 @@
 /observability/config/.env
 .vscode
 .env
-.DS_Store
+Store
 .DS_Store
 ._.DS_Store
 **/.DS_Store
@@ -31,3 +31,6 @@
 target
 node_modules
 node_modules
+**/ca.crt
+**/client.crt
+**/client.key

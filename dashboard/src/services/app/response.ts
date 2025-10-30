@@ -16,4 +16,5 @@ export interface AppDetails {
   fallback_credit_used: string;
   id: string;
   user_id: string;
+  encryption: boolean;
 }

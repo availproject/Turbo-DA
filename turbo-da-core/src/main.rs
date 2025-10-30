@@ -16,7 +16,7 @@ use crate::controllers::{
         request_funds_status,
     },
     kyc::generate_access_token,
-    users::{get_all_users, get_user, register_new_user, update_app_id},
+    users::{get_all_users, get_user, register_new_user, toggle_encryption, update_app_id},
 };
 use actix_cors::Cors;
 use actix_web::{
@@ -169,7 +169,8 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(estimate_credits_against_token)
                             .service(add_inclusion_details)
                             .service(get_wallet_usage)
-                            .service(generate_access_token),
+                            .service(generate_access_token)
+                            .service(toggle_encryption),
                     )
                     .service(
                         web::scope("/admin")

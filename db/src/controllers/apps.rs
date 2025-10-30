@@ -3,7 +3,7 @@ use crate::{
     schema::apps::dsl::*,
 };
 use bigdecimal::BigDecimal;
-use diesel::{ExpressionMethods, QueryDsl, SelectableHelper};
+use diesel::{dsl, ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 
@@ -133,6 +133,19 @@ pub async fn update_app_account(
             app_logo.eq(&payload.app_logo),
             credit_selection.eq(&payload.credit_selection),
         ))
+        .execute(connection)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn toggle_encryption(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    app: &Uuid,
+) -> Result<(), String> {
+    diesel::update(apps.filter(id.eq(app)).filter(user_id.eq(user)))
+        .set(encryption.eq(dsl::not(encryption)))
         .execute(connection)
         .await
         .map_err(|e| e.to_string())?;

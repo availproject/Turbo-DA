@@ -42,6 +42,7 @@ import ReclaimCredits from "./reclaim-credits";
 import SwitchDescription from "./switch-description";
 import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import ViewKeys from "./view-keys";
+import useApp from "@/hooks/useApp";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
@@ -53,6 +54,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
   const { success } = useAppToast();
+  const { updateAppList } = useApp();
 
   const generateApiKey = async () => {
     if (!token) return;
@@ -64,6 +66,21 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       });
       setApiKey(response.data?.api_key);
       response.data?.api_key && updateAPIKeys();
+    } catch (error) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleEncryption = async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const response = await AppService.toggleEncryption({
+        token,
+        appId: app.id,
+      });
+      updateAppList();
     } catch (error) {
     } finally {
       setLoading(false);
@@ -178,7 +195,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     <div
       className={cn(
         "w-full p-4 rounded-lg border border-solid relative overflow-hidden",
-        isNearExhaustion ? "border-[#425C72]" : "border-border-blue"
+        isNearExhaustion ? "border-[#425C72]" : "border-border-blue",
       )}
       style={
         isNearExhaustion
@@ -238,6 +255,19 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               <MenubarContent className="w-52 border border-border-blue bg-[#112235] p-0 rounded-lg overflow-hidden">
                 <MenubarGroup>
                   <MenubarItem
+                    onClick={toggleEncryption}
+                    className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                  >
+                    <KeyRound
+                      className="text-[#B3B3B3] group-hover:text-white"
+                      strokeWidth={2}
+                      size={24}
+                    />
+                    <Text weight={"semibold"}>
+                      {app.encryption ? "Disable" : "Enable"} Encryption
+                    </Text>
+                  </MenubarItem>
+                  <MenubarItem
                     onClick={() => {
                       generateApiKey();
                       setDisplayAPIKey(true);
@@ -259,7 +289,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
                       apiKeys?.[app.id]?.length
                         ? "cursor-pointer"
-                        : "cursor-not-allowed"
+                        : "cursor-not-allowed",
                     )}
                   >
                     <Eye
@@ -267,7 +297,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                         "text-[#B3B3B3]",
                         apiKeys?.[app.id]?.length
                           ? "group-hover:text-white"
-                          : "opacity-40"
+                          : "opacity-40",
                       )}
                       strokeWidth={2}
                       size={24}
@@ -365,7 +395,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             <div
               className={cn(
                 "h-1.5 rounded-md transition-all duration-300 ease-in-out",
-                isFullyExhausted && app?.credit_selection === 0 && "opacity-40"
+                isFullyExhausted && app?.credit_selection === 0 && "opacity-40",
               )}
               style={{
                 width: `${progress}%`,
@@ -507,7 +537,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
       <div
         className={cn(
           "absolute transition-all duration-500 bg-[#13334F] w-full left-0 p-4 flex gap-y-1 flex-col border-t border-border-blue",
-          displayAPIKey ? "bottom-0" : "-bottom-32"
+          displayAPIKey ? "bottom-0" : "-bottom-32",
         )}
       >
         <div className="flex justify-between items-center">

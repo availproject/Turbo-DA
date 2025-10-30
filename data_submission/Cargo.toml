@@ -27,6 +27,7 @@ r2d2 = "*"
 r2d2_redis = "*"
 redis.workspace = true
 db = { path = "../db" }
+enigma = {path = "../enigma"}
 turbo-da-core = {path = "../turbo-da-core"}
 observability = { path = "../observability" }
 avail-utils = {path = "../avail"}

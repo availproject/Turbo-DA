@@ -14,3 +14,4 @@ diesel-async.workspace = true
 log.workspace = true
 serde_json.workspace = true
 avail-utils = { path = "../avail"}
+enigma = { path = "../enigma" }
