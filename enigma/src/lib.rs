@@ -48,6 +48,9 @@ impl EnigmaEncryptionService {
         let key = if let Ok(key) = env::var("CLIENT_KEY") {
             key.as_bytes().to_vec()
         } else {
+            println!(
+                "Warning: Failed to read CLIENT_KEY from environment variable, reading from file"
+            );
             fs::read("client.key")?
         };
 
@@ -65,18 +68,16 @@ impl EnigmaEncryptionService {
         let ca_cert = if let Ok(ca_cert) = env::var("CA_CRT") {
             ca_cert.as_bytes().to_vec()
         } else {
+            println!("Warning: Failed to read CA_CRT from environment variable, reading from file");
             fs::read("ca.crt")?
         };
         let ca_certificate = Certificate::from_pem(&ca_cert)?;
 
         let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .tls_built_in_root_certs(false)
             .add_root_certificate(ca_certificate)
             .identity(identity)
-            .connection_verbose(true)
-            .https_only(true)
-            .danger_accept_invalid_certs(true) // para rustls
-            .max_tls_version(reqwest::tls::Version::TLS_1_2)
-            .use_rustls_tls()
             .build()
             .map_err(|e| format!("Failed to build reqwest client: {}", e))?;
 
@@ -94,17 +95,10 @@ impl EnigmaEncryptionService {
         &self,
         payload: EncryptRequest,
     ) -> Result<EncryptResponse, reqwest::Error> {
-        println!(
-            "{}",
-            format!("Service URL: {}", self.service_url.clone()).to_string()
-        );
-        let response = self
-            .client
-            .post(format!("{}/v1/encrypt", self.service_url.clone()))
-            .json(&payload)
-            .send()
-            .await?;
-        println!("{}", format!("Response: {:?}", response).to_string());
+        let url = format!("{}/v1/encrypt", self.service_url.clone());
+
+        let response = self.client.post(&url).json(&payload).send().await?;
+
         let response = response.json::<EncryptResponse>().await?;
         Ok(response)
     }
