@@ -18,7 +18,37 @@ class AppService {
           Authorization: `Bearer ${token}`,
         },
         signal,
-      }
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  static async toggleEncryption({
+    token,
+    appId,
+  }: {
+    token: string;
+    appId: string;
+  }) {
+    const requestBody = { app_id: appId };
+
+    console.log("AppService.toggleEncryption payload:", requestBody);
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/toggle_encryption`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      },
     );
 
     if (!response.ok) {
@@ -50,9 +80,9 @@ class AppService {
       app_logo: avatar,
       credit_selection: creditSelection,
     };
-    
-    console.log('AppService.updateApp payload:', requestBody);
-    
+
+    console.log("AppService.updateApp payload:", requestBody);
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/edit_app_account`,
       {
@@ -62,7 +92,7 @@ class AppService {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestBody),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -97,7 +127,7 @@ class AppService {
           app_logo: avatar,
           credit_selection: 1, // Default to using main credit balance
         }),
-      }
+      },
     );
 
     console.log({
@@ -122,7 +152,7 @@ class AppService {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
-      }
+      },
     );
 
     if (!response.ok) {
@@ -144,7 +174,7 @@ class AppService {
         body: JSON.stringify({
           app_id: appId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -172,7 +202,7 @@ class AppService {
         body: JSON.stringify({
           identifier: identifier,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -191,7 +221,7 @@ class AppService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -219,7 +249,7 @@ class AppService {
         body: JSON.stringify({
           app_id: appId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -250,7 +280,7 @@ class AppService {
           app_id: appId,
           amount,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -281,7 +311,7 @@ class AppService {
           app_id: appId,
           amount,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -312,7 +342,7 @@ class AppService {
           app_id: appId,
           avail_app_id: availAppId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -331,7 +361,7 @@ class AppService {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
