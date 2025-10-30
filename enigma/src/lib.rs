@@ -1,4 +1,4 @@
-use std::fs;
+use std::{env, fs};
 
 use reqwest::{Certificate, Client, Identity};
 use types::{DecryptRequest, DecryptRequestData, EncryptRequest, EncryptResponse};
@@ -36,16 +36,37 @@ impl EnigmaEncryptionService {
     }
 
     fn create_tls_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
-        let cert_and_key = fs::read("client.crt")?;
-        let key = fs::read("client.key")?;
+        let cert_and_key = if let Ok(cert) = env::var("CLIENT_CRT") {
+            cert.as_bytes().to_vec()
+        } else {
+            println!(
+                "Warning: Failed to read CLIENT_CRT from environment variable, reading from file"
+            );
+            fs::read("client.crt")?
+        };
+
+        let key = if let Ok(key) = env::var("CLIENT_KEY") {
+            key.as_bytes().to_vec()
+        } else {
+            fs::read("client.key")?
+        };
+
         let mut pem = Vec::new();
 
         pem.extend_from_slice(&cert_and_key);
+
+        if !cert_and_key.ends_with(b"\n") {
+            pem.push(b'\n');
+        }
         pem.extend_from_slice(&key);
 
         let identity = Identity::from_pem(&pem)?;
 
-        let ca_cert = fs::read("ca.crt")?;
+        let ca_cert = if let Ok(ca_cert) = env::var("CA_CRT") {
+            ca_cert.as_bytes().to_vec()
+        } else {
+            fs::read("ca.crt")?
+        };
         let ca_certificate = Certificate::from_pem(&ca_cert)?;
 
         let client = reqwest::Client::builder()
