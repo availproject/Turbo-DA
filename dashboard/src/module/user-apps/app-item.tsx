@@ -254,7 +254,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               </MenubarTrigger>
               <MenubarContent className="w-52 border border-border-blue bg-[#112235] p-0 rounded-lg overflow-hidden">
                 <MenubarGroup>
-                  <MenubarItem
+                  {/*<MenubarItem
                     onClick={toggleEncryption}
                     className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
                   >
@@ -266,7 +266,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                     <Text weight={"semibold"}>
                       {app.encryption ? "Disable" : "Enable"} Encryption
                     </Text>
-                  </MenubarItem>
+                  </MenubarItem>*/}
                   <MenubarItem
                     onClick={() => {
                       generateApiKey();
