@@ -17,6 +17,7 @@ use avail_utils::submit_data::TransactionInfo;
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use enigma::types::EncryptResponse;
 use uuid::Uuid;
 
 pub async fn validate_and_get_entries(
@@ -120,7 +121,7 @@ pub async fn get_unresolved_transactions(
             )),
         ))
         .filter(customer_expenditures::retry_count.lt(retry))
-        .order(customer_expenditures::created_at.asc())
+        .order(customer_expenditures::created_at.desc())
         .limit(limit)
         .select((
             CustomerExpenditureGetWithPayload::as_select(),
@@ -234,6 +235,7 @@ pub async fn update_database_on_submission(
     result: TransactionInfo,
     account: &Apps,
     tx_params: TxParams,
+    encrypted_data: Option<EncryptResponse>,
 ) -> Result<(), String> {
     let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
     let (billed_from_credit, billed_from_fallback) = match account.credit_selection {
@@ -274,6 +276,7 @@ pub async fn update_database_on_submission(
 
     update_customer_expenditure(
         result,
+        encrypted_data,
         &fees_as_bigdecimal,
         &tx_params.amount_data_billed,
         &wallet_store,

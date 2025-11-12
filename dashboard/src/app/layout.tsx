@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { ReactNode } from "react";
 import "./globals.css";
 import { ClientProviders } from "./client-providers";
+import { CountrySelectionModal } from "@/module/country-check";
+import { CountryBlockCheck } from "@/components/country-block-check";
 
 export const metadata: Metadata = {
   title: "TurboDA | Dashboard",
@@ -21,7 +23,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       <html lang="en" className={`antialiased av-scroll`}>
         <body className="bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%]">
           <ClerkWrapper>
-            <ClientProviders>{children}</ClientProviders>
+            <ClientProviders>
+              <CountryBlockCheck />
+              <CountrySelectionModal />
+              {children}
+            </ClientProviders>
           </ClerkWrapper>
         </body>
       </html>

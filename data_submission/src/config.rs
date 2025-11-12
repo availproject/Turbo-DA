@@ -21,6 +21,7 @@ pub struct AppConfig {
     pub maximum_pending_requests: i64,
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
+    pub enigma_url: String,
 }
 
 impl Default for AppConfig {
@@ -38,6 +39,7 @@ impl Default for AppConfig {
             maximum_pending_requests: 50,
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
+            enigma_url: String::new(),
         }
     }
 }
@@ -224,6 +226,8 @@ impl AppConfig {
             index += 1;
         }
 
+        let enigma_url = env::var("ENIGMA_URL")?;
+
         Ok(AppConfig {
             port,
             database_url,
@@ -237,6 +241,7 @@ impl AppConfig {
             maximum_pending_requests,
             rate_limit_window_size,
             rate_limit_max_requests,
+            enigma_url,
         })
     }
 }

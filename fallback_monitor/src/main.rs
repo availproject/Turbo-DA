@@ -2,6 +2,8 @@ use avail_rust::Client;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
+use data_submission::redis::Redis;
+use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
 use observability::{init_meter, init_tracer};
 use std::str::FromStr;
@@ -34,6 +36,9 @@ const WAIT_TIME: u64 = 5;
 /// and attempt to process them using the Avail network.
 #[tokio::main]
 async fn main() {
+    init_meter("fallback_service");
+    init_tracer("fallback_service");
+
     let app_config: AppConfig = match AppConfig::default().load_config() {
         Ok(conf) => conf,
         Err(e) => {
@@ -41,8 +46,6 @@ async fn main() {
             return;
         }
     };
-    init_meter("fallback_service");
-    init_tracer("fallback_service");
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
@@ -67,12 +70,18 @@ async fn main() {
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
 
+        let enigma = EnigmaEncryptionService::new(app_config.enigma_url.clone());
+
+        let redis = Arc::new(Redis::new(app_config.redis_url.as_str()));
+
         monitor_failed_transactions(
             &app_config.database_url,
             &sdk,
             &keypair,
+            redis,
             app_config.retry_count,
             app_config.limit,
+            &enigma,
         )
         .await;
     }
@@ -97,7 +106,7 @@ async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> Client {
     let mut attempts = 0;
 
     loop {
-        if attempts < endpoints.len() {
+        if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];

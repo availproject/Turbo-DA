@@ -8,7 +8,7 @@ use actix_web::{
 use alloy::primitives::Address;
 use avail_rust::{constants::dev_accounts, Client as AvailClient, Keypair, Options};
 
-use crate::logger::{debug_json, error, info};
+use crate::logger::{debug_json, error, info, warn};
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
 use diesel_async::{
@@ -308,9 +308,9 @@ lazy_static! {
 const WAIT_TIME: u64 = 5;
 pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
     let mut attempts = 0;
-    println!("Endpoints: {:?}", endpoints);
+
     loop {
-        if attempts == endpoints.len() {
+        if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
@@ -329,7 +329,7 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
             }
         }
 
-        info(&format!(
+        warn(&format!(
             "All endpoints failed. Waiting 5 seconds before next retry...."
         ));
         sleep(Duration::from_secs(WAIT_TIME)).await;
