@@ -5,7 +5,14 @@ import { NextResponse } from "next/server";
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
 const isBlockRoute = createRouteMatcher(["/block(.*)"]);
 
-const deniedCountries = ["US"];
+export const deniedCountries = [
+  "US", // United States
+  "CA", // Canada
+  "NL", // Netherlands
+  "CU", // Cuba
+  "KP", // North Korea
+  "IR", // Iran
+];
 
 export default clerkMiddleware(async (auth, req) => {
   if (isBlockRoute(req)) {
