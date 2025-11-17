@@ -28,7 +28,9 @@ diesel::table! {
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         credit_selection -> Nullable<Int2>,
+        encrypted_data -> Bool,
         encryption -> Bool,
+        barred -> Bool,
     }
 }
 

@@ -18,6 +18,7 @@ pub struct Apps {
     pub credit_selection: Option<i16>,
     pub fallback_credit_used: BigDecimal,
     pub encryption: bool,
+    pub barred: bool,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]

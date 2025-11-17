@@ -121,6 +121,7 @@ pub async fn get_unresolved_transactions(
             )),
         ))
         .filter(customer_expenditures::retry_count.lt(retry))
+        .filter(apps::barred.eq(false))
         .order(customer_expenditures::created_at.desc())
         .limit(limit)
         .select((
