@@ -1,5 +1,5 @@
 /// Logging utilities
-use crate::logger::{error, info};
+
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
@@ -1028,10 +1028,10 @@ async fn delete_api_key(
             match redis::Client::open(config.redis_url.clone().as_str()) {
                 Ok(mut client) => {
                     let _result: Result<(), redis::RedisError> = client.del(hashed_key);
-                    info(&format!("Deleted API key from Redis: {}", hashed_key));
+                    tracing::info!(hashed_key = %hashed_key, "deleted api key from redis");
                 }
                 Err(e) => {
-                    error(&format!("Error connecting to Redis: {}", e));
+                    tracing::error!(error = %e, "error connecting to redis");
                 }
             }
             return HttpResponse::Ok().json(json!({
