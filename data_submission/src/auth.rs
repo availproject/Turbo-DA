@@ -17,7 +17,7 @@ use std::{
     fmt::Display,
     future::{ready, Ready},
 };
-use turbo_da_core::logger::{debug, error, info, warn};
+use turbo_da_core::sanitize::Sanitized;
 
 pub struct Auth {
     redis: Redis,
@@ -92,6 +92,13 @@ where
                 let user = value.split(":").next().unwrap();
                 let account = value.split(":").nth(1).unwrap();
 
+                tracing::debug!(
+                    user_id = user,
+                    app_id = account,
+                    api_key_prefix = %Sanitized::api_key(&api_key_hash),
+                    "api key authenticated from cache"
+                );
+
                 if let Err(e) = insert_headers(&mut headers, "user_id", &user) {
                     return e;
                 }
@@ -103,7 +110,7 @@ where
                 let mut conn = match PgConnection::establish(&self.database_url) {
                     Ok(conn) => conn,
                     Err(e) => {
-                        error(&format!("Failed to connect to database: {}", e));
+                        tracing::error!(error = %e, "failed to connect to database for auth");
                         return Box::pin(async move {
                             Err(actix_error::ErrorInternalServerError(
                                 "Internal error. Contact admin",
@@ -119,7 +126,12 @@ where
                     .first::<ApiKey>(&mut conn);
 
                 match api_key_info {
-                    Err(_) => {
+                    Err(e) => {
+                        tracing::warn!(
+                            api_key_prefix = %Sanitized::api_key(&api_key_hash),
+                            error = %e,
+                            "invalid api key authentication attempt"
+                        );
                         return Box::pin(async move {
                             Err(actix_error::ErrorUnauthorized(
                                 "Invalid API key: API Key does not exist",
@@ -134,23 +146,32 @@ where
                             return e;
                         }
 
-                        println!(
-                            "Setting API key in redis for user {}:{}",
-                            key.user_id, key.app_id
+                        tracing::info!(
+                            user_id = %key.user_id,
+                            app_id = %key.app_id,
+                            api_key_prefix = %Sanitized::api_key(&api_key_hash),
+                            "api key authenticated from database"
                         );
+
                         match self.redis.set(
                             api_key_hash.as_str(),
                             format!("{}:{}", key.user_id.to_string(), key.app_id.to_string())
                                 .as_str(),
                         ) {
                             Ok(_) => {
-                                info(&format!(
-                                    "API key set in redis for user {}:{}",
-                                    key.user_id, key.app_id
-                                ));
+                                tracing::debug!(
+                                    user_id = %key.user_id,
+                                    app_id = %key.app_id,
+                                    "api key cached in redis"
+                                );
                             }
                             Err(e) => {
-                                error(&format!("Failed to set API key in redis: {}", e));
+                                tracing::warn!(
+                                    error = %e,
+                                    user_id = %key.user_id,
+                                    app_id = %key.app_id,
+                                    "failed to cache api key in redis"
+                                );
                             }
                         }
                     }
@@ -162,8 +183,6 @@ where
 
         Box::pin(async move {
             let res = fut.await?;
-
-            debug(&format!("API key {} is valid", api_key_hash));
             Ok(res)
         })
     }
@@ -184,7 +203,7 @@ fn insert_headers<B, T: Display>(
         Ok(())
     } else {
         let error_message = format!("Failed to parse {} or its value", key);
-        warn(&error_message);
+        tracing::warn!(header_key = key, "failed to parse header");
         Err(Box::pin(async move {
             Err(actix_error::ErrorInternalServerError(error_message))
         }))

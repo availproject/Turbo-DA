@@ -28,7 +28,6 @@ use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
-use turbo_da_core::logger::{debug, error, info};
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
@@ -73,24 +72,19 @@ impl Consumer {
 
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-            info(&format!(
-                "Checking for any threads that are not responding..."
-            ));
+            tracing::info!("checking for unresponsive threads");
             let mut active_threads = HashMap::<i32, bool>::new();
             for i in 0..number_of_threads {
                 active_threads.insert(i, false);
             }
             while let Ok(thread_id) = heartbeat_rx.try_recv() {
-                debug(&format!("Received heartbeat for thread {}", thread_id));
+                tracing::debug!(thread_id, "received heartbeat");
                 active_threads.insert(thread_id, true);
             }
 
             for (thread_id, is_active) in active_threads {
                 if !is_active {
-                    error(&format!(
-                        "Thread {} not responding, restarting...",
-                        thread_id
-                    ));
+                    tracing::error!(thread_id, "thread not responding, restarting");
                     self.spawn_thread(thread_id, heartbeat_tx.clone()).await;
                 }
             }
@@ -106,7 +100,7 @@ impl Consumer {
         let redis = self.redis.clone();
 
         tokio::spawn(async move {
-            info(&format!("Spawning thread number {}", i));
+            tracing::info!(thread_id = i, "spawning consumer thread");
 
             let mut receiver = sender.subscribe();
 
@@ -137,7 +131,12 @@ impl Consumer {
 
                 if let Err(e) = result {
                     log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                    error(&format!("Failed to process response: {}", e));
+                    tracing::error!(
+                        error = %e,
+                        submission_id = %response.submission_id,
+                        thread_id = response.thread_id,
+                        "failed to process response"
+                    );
                 }
 
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -145,6 +144,14 @@ impl Consumer {
         });
     }
 
+    #[tracing::instrument(
+        skip(response, injected_dependency, endpoints, keygen, enigma, redis),
+        fields(
+            submission_id = %response.submission_id,
+            thread_id = i,
+            app_id = %response.app_id
+        )
+    )]
     async fn response_handler(
         response: &Response,
         injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
@@ -190,10 +197,10 @@ impl Consumer {
                     update_error_entry(response, &mut connection, err.clone()).await;
                     return Err(err);
                 } else {
-                    info(&format!(
-                        "Successfully submitted response for submission_id {}",
-                        response.submission_id
-                    ));
+                    tracing::info!(
+                        submission_id = %response.submission_id,
+                        "successfully submitted response"
+                    );
                     Ok(())
                 }
             }
@@ -358,7 +365,10 @@ impl<'a> ProcessSubmitResponse<'a> {
         // Get all items from the list to check cumulative cost
         let all_items: Vec<String> = queue.lrange(&key, 0, -1).map_err(|e| e.to_string())?;
 
-        debug(&format!("All items: {:?}", all_items));
+        tracing::debug!(
+            items_count = all_items.len(),
+            "checking race condition queue items"
+        );
 
         let mut cumulative_cost = BigDecimal::from(0);
         for (_, item) in all_items.iter().enumerate() {
@@ -370,7 +380,7 @@ impl<'a> ProcessSubmitResponse<'a> {
                 cumulative_cost += cost;
             }
 
-            debug(&format!("Cumulative cost: {:?}", cumulative_cost));
+            tracing::debug!(cumulative_cost = %cumulative_cost, "calculated cumulative cost");
 
             // Check if this is our submission - if so, validate the cumulative cost
             if submission_id == self.response.submission_id.to_string() {

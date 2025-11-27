@@ -1,4 +1,3 @@
-use fmt::Layer;
 use opentelemetry::{
     global,
     trace::{SamplingDecision, SamplingResult, TraceContextExt},
@@ -10,17 +9,9 @@ use opentelemetry_sdk::{
     trace::{BatchConfigBuilder, Config, ShouldSample},
     Resource,
 };
-use std::{env, io::stdout, time::Duration};
+use std::{env, time::Duration};
 use tracing::Level;
-use tracing_subscriber::{
-    fmt::{
-        self,
-        format::{Format, Json, JsonFields},
-        writer::MakeWriterExt,
-    },
-    prelude::*,
-    EnvFilter, Registry,
-};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
 
 #[derive(Debug, Clone, Copy)]
 struct TurboDASampler;
@@ -55,37 +46,84 @@ fn otel_exporter() -> TonicExporterBuilder {
     new_exporter().tonic().with_endpoint(&endpoint)
 }
 
-pub fn init_tracer<T: Into<Value>>(service_name: T) {
-    let stdout_layer = boolean_env("ENABLE_STDOUT_LOGGING")
-        .then(|| Layer::default().with_writer(stdout.with_max_level(log_level_env("LOG_LEVEL"))));
-    let env_filter = EnvFilter::from_default_env().add_directive(log_level_env("LOG_LEVEL").into());
-    let fmt_layer: Layer<Registry, JsonFields, Format<Json>> = fmt::Layer::default().json();
-    let otel_layer = if boolean_env("ENABLE_OTEL_TRACING") {
-        let batch_config = BatchConfigBuilder::default()
-            .with_max_queue_size(1000000)
-            .with_max_export_batch_size(256)
-            .with_scheduled_delay(Duration::from_millis(2500))
-            .build();
-        let config = Config::default()
-            .with_resource(resource(service_name))
-            .with_sampler(TurboDASampler);
-        let pipeline = new_pipeline()
-            .tracing()
-            .with_exporter(otel_exporter())
-            .with_trace_config(config)
-            .with_batch_config(batch_config);
-        let tracer = pipeline.install_batch(Tokio).unwrap();
-        Some(tracing_opentelemetry::layer().with_tracer(tracer))
-    } else {
-        None
-    };
+use tracing_appender::non_blocking::WorkerGuard;
 
-    let subscriber = Registry::default()
-        .with(fmt_layer)
-        .with(otel_layer)
-        .with(env_filter)
-        .with(stdout_layer);
-    tracing::subscriber::set_global_default(subscriber).expect("Сould not set default for tracer");
+pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
+    let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
+
+    let env_filter = EnvFilter::from_default_env().add_directive(log_level_env("LOG_LEVEL").into());
+
+    if !cfg!(debug_assertions) {
+        let fmt_layer = fmt::Layer::default()
+            .json()
+            .with_span_list(false)
+            .with_writer(non_blocking);
+
+        let subscriber = Registry::default().with(fmt_layer).with(env_filter);
+
+        // Add OTLP layer if enabled
+        if boolean_env("ENABLE_OTEL_TRACING") {
+            let batch_config = BatchConfigBuilder::default()
+                .with_max_queue_size(1000000)
+                .with_max_export_batch_size(256)
+                .with_scheduled_delay(Duration::from_millis(2500))
+                .build();
+            let config = Config::default()
+                .with_resource(resource(service_name))
+                .with_sampler(TurboDASampler);
+            let pipeline = new_pipeline()
+                .tracing()
+                .with_exporter(otel_exporter())
+                .with_trace_config(config)
+                .with_batch_config(batch_config);
+            let tracer = pipeline.install_batch(Tokio).unwrap();
+            let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+            let subscriber = subscriber.with(otel_layer);
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        } else {
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        }
+    } else {
+        // Local environment - Compact printing
+        let fmt_layer = fmt::Layer::default()
+            .compact()
+            .with_file(false)
+            .with_line_number(false)
+            .with_writer(non_blocking);
+
+        let subscriber = Registry::default().with(fmt_layer).with(env_filter);
+
+        // Add OTLP layer if enabled (same logic as above, could be deduplicated but keeping simple for now)
+        if boolean_env("ENABLE_OTEL_TRACING") {
+            let batch_config = BatchConfigBuilder::default()
+                .with_max_queue_size(1000000)
+                .with_max_export_batch_size(256)
+                .with_scheduled_delay(Duration::from_millis(2500))
+                .build();
+            let config = Config::default()
+                .with_resource(resource(service_name))
+                .with_sampler(TurboDASampler);
+            let pipeline = new_pipeline()
+                .tracing()
+                .with_exporter(otel_exporter())
+                .with_trace_config(config)
+                .with_batch_config(batch_config);
+            let tracer = pipeline.install_batch(Tokio).unwrap();
+            let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+            let subscriber = subscriber.with(otel_layer);
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        } else {
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        }
+    }
+
+    guard
 }
 
 pub fn init_meter<T: Into<Value>>(service_name: T) {

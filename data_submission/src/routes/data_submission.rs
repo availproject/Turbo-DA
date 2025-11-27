@@ -17,10 +17,7 @@ use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
-use turbo_da_core::{
-    logger::error,
-    utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
-};
+use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
 
 /// Request payload for submitting string data
 #[derive(Deserialize, Serialize, Clone)]
@@ -40,6 +37,15 @@ pub struct SubmitData {
 /// # Returns
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
+#[tracing::instrument(
+    skip(request_payload, sender, injected_dependency, config, http_request),
+    fields(
+        submission_id = tracing::field::Empty,
+        user_id = tracing::field::Empty,
+        app_id = tracing::field::Empty,
+        data_size = request_payload.data.len()
+    )
+)]
 #[post("/submit_data")]
 pub async fn submit_data(
     request_payload: web::Json<SubmitData>,
@@ -51,6 +57,8 @@ pub async fn submit_data(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
+
+    tracing::info!("data submission request received");
 
     _submit_data(
         request_payload.data.as_bytes().to_vec(),
@@ -74,6 +82,15 @@ pub async fn submit_data(
 /// # Returns
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
+#[tracing::instrument(
+    skip(request_payload, sender, injected_dependency, config, http_request),
+    fields(
+        submission_id = tracing::field::Empty,
+        user_id = tracing::field::Empty,
+        app_id = tracing::field::Empty,
+        data_size = request_payload.len()
+    )
+)]
 #[post("/submit_raw_data")]
 pub async fn submit_raw_data(
     request_payload: Bytes,
@@ -85,6 +102,8 @@ pub async fn submit_raw_data(
     if request_payload.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
+
+    tracing::info!("raw data submission request received");
 
     _submit_data(
         request_payload.to_vec(),
@@ -114,10 +133,14 @@ async fn _submit_data(
     let user_id = match retrieve_user_id(&http_request) {
         Some(val) => val,
         None => {
+            tracing::error!("user_id not found in request headers");
             return HttpResponse::InternalServerError()
-                .json(json!({ "error": "User Id not retrieved" }))
+                .json(json!({ "error": "User Id not retrieved" }));
         }
     };
+
+    // Record user_id in current span
+    tracing::Span::current().record("user_id", &user_id.to_string());
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -126,13 +149,22 @@ async fn _submit_data(
     let (avail_app_id, _, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
+            tracing::error!(error = %e, "app validation failed");
             return HttpResponse::InternalServerError().json(json!({ "error": e }));
         }
     };
 
+    // Record app_id in current span
+    tracing::Span::current().record("app_id", &app_id.to_string());
+
     drop(connection);
 
     let submission_id = generate_submission_id();
+
+    // Record submission_id in current span
+    tracing::Span::current().record("submission_id", &submission_id.to_string());
+
+    tracing::info!(data_size = request_payload.len(), "submission created");
 
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.len()),
@@ -155,7 +187,10 @@ async fn _submit_data(
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error(&format!("couldn't connect to db with error "));
+                tracing::error!(
+                    submission_id = %submission_id,
+                    "failed to connect to database for expenditure entry"
+                );
                 return;
             }
         };
@@ -164,6 +199,8 @@ async fn _submit_data(
     });
 
     let _ = sender.send(consumer_response);
+
+    tracing::info!("submission accepted and queued for processing");
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
 }
