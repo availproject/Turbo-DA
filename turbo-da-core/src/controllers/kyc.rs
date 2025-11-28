@@ -1,10 +1,6 @@
-use crate::{
-    config::AppConfig,
-    logger::{error, info},
-    utils::{get_connection, retrieve_user_id_from_jwt},
-};
+use crate::{config::AppConfig, utils::retrieve_user_id_from_jwt};
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
-use chrono::Utc;
+
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use hmac::{Hmac, Mac};
 use reqwest::Client;
@@ -87,12 +83,12 @@ pub async fn generate_access_token(
     config: web::Data<AppConfig>,
     _pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> impl Responder {
-    info(&"Generating KYC access token".to_string());
+    tracing::info!("generating kyc access token");
 
     let user_id = match retrieve_user_id_from_jwt(&http_request) {
         Some(id) => id,
         None => {
-            error(&"Failed to retrieve user ID from JWT".to_string());
+            tracing::error!("failed to retrieve user id from jwt");
             return HttpResponse::Unauthorized().json(json!({
                 "state": "ERROR",
                 "error": "Invalid or missing authentication token"
@@ -119,7 +115,7 @@ pub async fn generate_access_token(
         match generate_sumsub_signature(&config.sumsub_secret_key, ts, method, &path, body) {
             Ok(sig) => sig,
             Err(e) => {
-                error(&format!("Failed to generate signature: {}", e));
+                tracing::error!(error = ?e, "failed to generate signature");
                 return HttpResponse::InternalServerError().json(json!({
                     "state": "ERROR",
                     "error": "Failed to generate authentication signature"
@@ -131,7 +127,7 @@ pub async fn generate_access_token(
     let client = Client::new();
     let url = format!("{}{}", config.sumsub_base_url, path);
 
-    info(&format!("Making request to Sumsub: {}", url));
+    tracing::info!(url = %url, "making request to sumsub");
 
     let response = match client
         .post(&url)
@@ -144,7 +140,7 @@ pub async fn generate_access_token(
     {
         Ok(resp) => resp,
         Err(e) => {
-            error(&format!("Failed to make request to Sumsub: {}", e));
+            tracing::error!(error = ?e, "failed to make request to sumsub");
             return HttpResponse::InternalServerError().json(json!({
                 "state": "ERROR",
                 "error": "Failed to communicate with KYC service"
@@ -156,7 +152,7 @@ pub async fn generate_access_token(
     let response_text = match response.text().await {
         Ok(text) => text,
         Err(e) => {
-            error(&format!("Failed to read response from Sumsub: {}", e));
+            tracing::error!(error = ?e, "failed to read response from sumsub");
             return HttpResponse::InternalServerError().json(json!({
                 "state": "ERROR",
                 "error": "Failed to read KYC service response"
@@ -165,10 +161,11 @@ pub async fn generate_access_token(
     };
 
     if !status.is_success() {
-        error(&format!(
-            "Sumsub API error: Status {}, Response: {}",
-            status, response_text
-        ));
+        tracing::error!(
+            status = %status,
+            response = %response_text,
+            "sumsub api error"
+        );
         return HttpResponse::BadRequest().json(json!({
             "state": "ERROR",
             "error": "KYC service returned an error",
@@ -180,10 +177,11 @@ pub async fn generate_access_token(
     let sumsub_response: SumsubAccessTokenResponse = match serde_json::from_str(&response_text) {
         Ok(resp) => resp,
         Err(e) => {
-            error(&format!(
-                "Failed to parse Sumsub response: {}. Response: {}",
-                e, response_text
-            ));
+            tracing::error!(
+                error = ?e,
+                response = %response_text,
+                "failed to parse sumsub response"
+            );
             return HttpResponse::InternalServerError().json(json!({
                 "state": "ERROR",
                 "error": "Invalid response from KYC service"
@@ -191,10 +189,7 @@ pub async fn generate_access_token(
         }
     };
 
-    info(&format!(
-        "Successfully generated access token for user: {}",
-        user_id
-    ));
+    tracing::info!(user_id = %user_id, "successfully generated access token");
 
     HttpResponse::Ok().json(json!({
         "state": "SUCCESS",

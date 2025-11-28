@@ -6,8 +6,7 @@ use db::{
     schema::{credit_requests, indexer_block_numbers::dsl::*, users},
 };
 use diesel::prelude::*;
-use serde_json::json;
-use turbo_da_core::logger::{debug_json, error, error_json, info};
+
 use turbo_da_core::utils::get_amount_to_be_credited;
 
 pub struct Deposit {
@@ -62,14 +61,8 @@ impl Utils {
         let parsed_id = i32::from_str_radix(order_id.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse order ID: {}", e))?;
 
-        debug_json(json!({
-            "order_id": order_id,
-            "level": "debug"
-        }));
-        debug_json(json!({
-            "parsed_id": parsed_id,
-            "level": "debug"
-        }));
+        tracing::debug!(order_id = %order_id, level = "debug");
+        tracing::debug!(parsed_id = %parsed_id, level = "debug");
 
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
@@ -88,7 +81,7 @@ impl Utils {
             .get_result::<CreditRequestsGet>(&mut *connection)
             .map_err(|e| format!("Failed to store fund request: {}", e))?;
 
-        info(&format!("Success: {} status: {}", order_id, status));
+        tracing::info!(order_id = %order_id, status = %status, "success");
         self.update_token_information_on_deposit(&amount, &row.user_id, connection)
             .await;
 
@@ -106,23 +99,23 @@ impl Utils {
             .execute(connection);
 
         let updated_rows = updated_rows_query.unwrap_or_else(|_| {
-            error(&format!("Update token balances query failed"));
+            tracing::error!("update token balances query failed");
             0
         });
 
         if updated_rows > 0 {
-            debug_json(json!({
-                "message": "Successfully updated token balances",
-                "user_id": user_id,
-                "amount": amount,
-                "level": "debug"
-            }));
+            tracing::debug!(
+                message = "successfully updated token balances",
+                user_id = %user_id,
+                amount = %amount,
+                level = "debug"
+            );
         } else {
-            error_json(json!({
-                "message": "No rows updated for user ID",
-                "user_id": user_id,
-                "level": "error"
-            }));
+            tracing::error!(
+                message = "no rows updated for user id",
+                user_id = %user_id,
+                level = "error"
+            );
         }
     }
 
@@ -141,11 +134,11 @@ impl Utils {
         match row {
             Ok(row) => {
                 if row > 0 {
-                    debug_json(json!({
-                        "message": "Updated finalised block number",
-                        "row": row,
-                        "level": "debug"
-                    }));
+                    tracing::debug!(
+                        message = "updated finalised block number",
+                        row = row,
+                        level = "debug"
+                    );
                     Ok(())
                 } else {
                     Err(format!("No rows updated for finalised block number"))

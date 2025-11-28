@@ -3,14 +3,13 @@ use avail_rust::avail::RuntimeCall;
 use avail_rust::prelude::*;
 use diesel::PgConnection;
 use std::sync::Arc;
-use turbo_da_core::logger::{debug, error, info};
 
 use crate::config::Config;
 use crate::query_finalised_block_number;
 use crate::utils::{Deposit, Utils};
 // Remark is the user id in hex format
 pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
-    debug(&format!("Starting Avail Chain Monitor"));
+    tracing::debug!("starting avail chain monitor");
     let sdk = Client::new(cfg.avail_rpc_url.as_str()).await;
     let sdk = sdk.map_err(|e| e.to_string())?;
     let utils = Utils::new(
@@ -20,12 +19,12 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
         cfg.avail_rpc_url.clone(),
     );
 
-    debug(&format!("SDK initialized with local endpoint"));
+    tracing::debug!("sdk initialized with local endpoint");
 
     let mut connection = utils.establish_connection()?;
 
     if let Err(e) = sync_database(&mut connection, &sdk, &utils, &cfg.avail_deposit_address).await {
-        error(&format!("Failed to sync database: {}", e.to_string()));
+        tracing::error!(error = %e, "failed to sync database");
     }
 
     let mut sub = Sub::new(sdk.clone());
@@ -34,12 +33,12 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
         let b_info = match b_info {
             Ok(x) => x,
             Err(err) => {
-                error(&std::format!("Failed to stream next block. Error: {}", err));
+                tracing::error!(error = %err, "failed to stream next block");
                 continue;
             }
         };
 
-        info(&std::format!("Fetched block height: {}", b_info.height));
+        tracing::info!(height = b_info.height, "fetched block height");
         if let Err(e) = process_block(
             &sdk,
             b_info.hash,
@@ -49,7 +48,7 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
         )
         .await
         {
-            error(&format!("Failed to process block: {}", e.to_string()));
+            tracing::error!(error = %e, "failed to process block");
         }
     }
 }
@@ -82,7 +81,7 @@ async fn process_block(
     utils: &Utils,
     avail_deposit_address: &String,
 ) -> Result<(), String> {
-    debug(&format!("Filtering batch calls from block"));
+    tracing::debug!("filtering batch calls from block");
 
     let block = BlockWithTx::new(client.clone(), block_hash);
     let all = block.all::<BatchAll>(Default::default()).await;
@@ -91,51 +90,62 @@ async fn process_block(
     for tx in all {
         let tx_hash = tx.ext_hash();
 
-        info(&format!(
-            "Found Some Batch call, tx hash: {}, account: {:?}, block height: {}, block hash: {}",
-            tx_hash, tx.signature.address, block_height, block_hash
-        ));
+        tracing::info!(
+            tx_hash = %tx_hash,
+            account = ?tx.signature.address,
+            block_height = block_height,
+            block_hash = %block_hash,
+            "found some batch call"
+        );
 
         let calls = tx.call.decode_calls();
         let calls = match calls {
             Ok(x) => x,
             Err(_) => {
-                info(&std::format!("Failed to decode Batch-All calls. Most likely it does not matter as this probably is not our extrinsic that we are looking for. Block Hash: {}, Tx Index: {}", block_hash, tx.ext_index()));
+                tracing::info!(
+                    block_hash = %block_hash,
+                    tx_index = tx.ext_index(),
+                    "failed to decode batch-all calls, skipping"
+                );
                 continue;
             }
         };
 
         // We know that our batch calls needs to have exactly 2 transactions.
         if tx.call.len() != 2 {
-            info(&format!(
-                "Skipping batch with {} calls (expected 2)",
-                calls.len()
-            ));
+            tracing::info!(
+                call_count = calls.len(),
+                "skipping batch with unexpected number of calls (expected 2)"
+            );
             continue;
         }
 
         let MultiAddress::Id(account_id) = tx.signature.address else {
-            info(&std::format!("MultiAddress is not of variant MultiAddress::Id. Most likely it does not matter as this probably is not our extrinsic that we are looking for. Block Hash: {}, Tx Index: {}", block_hash, tx.ext_index()));
+            tracing::info!(
+                block_hash = %block_hash,
+                tx_index = tx.ext_index(),
+                "multiaddress is not of variant multiaddress::id, skipping"
+            );
             continue;
         };
 
         // Balance/Transfer Call
         let RuntimeCall::BalancesTransferKeepAlive(balances_call) = &calls[0] else {
-            info(&format!("First call is not a Balances call, skipping"));
+            tracing::info!("first call is not a balances call, skipping");
             continue;
         };
 
         // System/Remark call
         let RuntimeCall::SystemRemark(remark_call) = &calls[1] else {
-            info(&format!("Second call is not a System call, skipping"));
+            tracing::info!("second call is not a system call, skipping");
             continue;
         };
 
         if account_id.to_string() != avail_deposit_address.to_string() {
-            error(&format!(
-                "Destination is not the deposit address, skipping: {}",
-                account_id.to_string()
-            ));
+            tracing::error!(
+                destination = %account_id,
+                "destination is not the deposit address, skipping"
+            );
             continue;
         }
 
@@ -144,10 +154,14 @@ async fn process_block(
         let block_hash_hex = hex::encode(block_hash.0);
 
         let ascii_remark = hex::encode(remark_call.remark.clone());
-        info(&format!(
-            "Found matching batch call, tx hash: {}, (hex) account: {}, block height: {}, block hash: {:?}, ascii_remark: {}",
-            tx_hash, account_id_hex, block_height, block_hash, ascii_remark
-        ));
+        tracing::info!(
+            tx_hash = %tx_hash,
+            account = %account_id_hex,
+            block_height = block_height,
+            block_hash = ?block_hash,
+            ascii_remark = %ascii_remark,
+            "found matching batch call"
+        );
 
         let mut connection = utils.establish_connection()?;
 
@@ -173,7 +187,7 @@ async fn process_block(
             )
             .await
             .map_err(|e| {
-                error(&format!("Failed to update database on deposit: {}", e));
+                tracing::error!(error = %e, "failed to update database on deposit");
                 format!("Failed to update database on deposit: {}", e)
             })?;
     }

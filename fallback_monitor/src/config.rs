@@ -5,7 +5,6 @@ use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io};
 use toml;
-use turbo_da_core::logger::{error, info, warn};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
@@ -43,15 +42,15 @@ impl AppConfig {
             return Ok(config);
         }
 
-        info(&format!("Trying to read from environment variables"));
+        tracing::info!("trying to read from environment variables");
 
         match self.load_from_env() {
             Ok(config) => Ok(config),
             Err(env_error) => {
-                error(&format!(
-                    "Couldn't load configuration: TOML error, and ENVIRONMENT error: {:?}",
-                    env_error
-                ));
+                tracing::error!(
+                    error = ?env_error,
+                    "couldn't load configuration: toml error and environment error"
+                );
                 Err(io::Error::new(
                     io::ErrorKind::Other,
                     "Couldn't fetch configuration from either TOML file or environment variables",
@@ -66,7 +65,7 @@ impl AppConfig {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn(&format!("Failed to read file: {:?}", e));
+            tracing::warn!(error = ?e, "failed to read file");
             e.to_string()
         })?;
 
@@ -75,7 +74,7 @@ impl AppConfig {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                warn(&format!("Coudln't read from TOML File"));
+                tracing::warn!("couldn't read from toml file");
                 Err(e.into())
             }
         }
@@ -102,7 +101,7 @@ impl AppConfig {
         }
         let enigma_url = env::var("ENIGMA_URL")?;
         let redis_url = env::var("REDIS_URL")?;
-        info(&format!("Config loaded from environment variables"));
+        tracing::info!("config loaded from environment variables");
 
         Ok(AppConfig {
             database_url,

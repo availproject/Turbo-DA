@@ -14,7 +14,10 @@ impl Redis {
                 let pool = r2d2::Pool::builder().build(client).unwrap();
                 Redis { redis_pool: pool }
             }
-            Err(e) => panic!("Failed to connect to Redis: {}", e),
+            Err(e) => {
+                tracing::error!(error = %e, "failed to connect to Redis");
+                panic!("Failed to connect to Redis: {}", e)
+            }
         }
     }
 

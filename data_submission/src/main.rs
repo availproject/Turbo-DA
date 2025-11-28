@@ -25,20 +25,26 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
-use observability::{init_meter, init_tracer};
+use observability::init_tracer;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use turbo_da_core::{logger::info, utils::generate_keygen_list};
+use turbo_da_core::utils::generate_keygen_list;
 use workload_scheduler::consumer::Consumer;
 
-#[actix_web::main]
+#[tokio::main]
+#[tracing::instrument(name = "data_submission_service")]
 async fn main() -> Result<(), std::io::Error> {
-    init_meter("data_submission");
-    init_tracer("data_submission");
+    let _guard = init_tracer("data_submission");
 
     let app_config = AppConfig::default().load_config()?;
 
-    info(&format!("Starting Data Submission server...."));
+    tracing::info!(
+        port = app_config.port,
+        threads = app_config.number_of_threads,
+        pool_size = app_config.max_pool_size,
+        endpoints = app_config.avail_rpc_endpoint.len(),
+        "data submission service starting"
+    );
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
     let shared_keypair = web::Data::new(accounts);
