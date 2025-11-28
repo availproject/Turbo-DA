@@ -12,6 +12,7 @@ use opentelemetry_sdk::{
 use std::{env, time::Duration};
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
+use url::Url;
 
 #[derive(Debug, Clone, Copy)]
 struct TurboDASampler;
@@ -49,6 +50,7 @@ fn otel_exporter() -> TonicExporterBuilder {
 use tracing_appender::non_blocking::WorkerGuard;
 
 pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
+    let service_name = service_name.into();
     let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
 
     let env_filter = EnvFilter::from_default_env().add_directive(log_level_env("LOG_LEVEL").into());
@@ -60,32 +62,7 @@ pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
             .with_writer(non_blocking);
 
         let subscriber = Registry::default().with(fmt_layer).with(env_filter);
-
-        // Add OTLP layer if enabled
-        if boolean_env("ENABLE_OTEL_TRACING") {
-            let batch_config = BatchConfigBuilder::default()
-                .with_max_queue_size(1000000)
-                .with_max_export_batch_size(256)
-                .with_scheduled_delay(Duration::from_millis(2500))
-                .build();
-            let config = Config::default()
-                .with_resource(resource(service_name))
-                .with_sampler(TurboDASampler);
-            let pipeline = new_pipeline()
-                .tracing()
-                .with_exporter(otel_exporter())
-                .with_trace_config(config)
-                .with_batch_config(batch_config);
-            let tracer = pipeline.install_batch(Tokio).unwrap();
-            let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
-
-            let subscriber = subscriber.with(otel_layer);
-            tracing::subscriber::set_global_default(subscriber)
-                .expect("Could not set default for tracer");
-        } else {
-            tracing::subscriber::set_global_default(subscriber)
-                .expect("Could not set default for tracer");
-        }
+        configure_subscriber(subscriber, service_name);
     } else {
         // Local environment - Compact printing
         let fmt_layer = fmt::Layer::default()
@@ -95,35 +72,77 @@ pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
             .with_writer(non_blocking);
 
         let subscriber = Registry::default().with(fmt_layer).with(env_filter);
+        configure_subscriber(subscriber, service_name);
+    }
 
-        // Add OTLP layer if enabled (same logic as above, could be deduplicated but keeping simple for now)
-        if boolean_env("ENABLE_OTEL_TRACING") {
-            let batch_config = BatchConfigBuilder::default()
-                .with_max_queue_size(1000000)
-                .with_max_export_batch_size(256)
-                .with_scheduled_delay(Duration::from_millis(2500))
-                .build();
-            let config = Config::default()
-                .with_resource(resource(service_name))
-                .with_sampler(TurboDASampler);
-            let pipeline = new_pipeline()
-                .tracing()
-                .with_exporter(otel_exporter())
-                .with_trace_config(config)
-                .with_batch_config(batch_config);
-            let tracer = pipeline.install_batch(Tokio).unwrap();
-            let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+    guard
+}
 
-            let subscriber = subscriber.with(otel_layer);
+fn configure_subscriber<S>(subscriber: S, service_name: Value)
+where
+    S: tracing::Subscriber
+        + Send
+        + Sync
+        + 'static
+        + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    if boolean_env("ENABLE_OTEL_TRACING") {
+        let batch_config = BatchConfigBuilder::default()
+            .with_max_queue_size(1000000)
+            .with_max_export_batch_size(256)
+            .with_scheduled_delay(Duration::from_millis(2500))
+            .build();
+        let config = Config::default()
+            .with_resource(resource(service_name.clone()))
+            .with_sampler(TurboDASampler);
+        let pipeline = new_pipeline()
+            .tracing()
+            .with_exporter(otel_exporter())
+            .with_trace_config(config)
+            .with_batch_config(batch_config);
+        let tracer = pipeline.install_batch(Tokio).unwrap();
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let subscriber = subscriber.with(otel_layer);
+
+        if boolean_env("ENABLE_LOKI_LOGGING") {
+            let (layer, task) = tracing_loki::builder()
+                .label("service_name", service_name.to_string())
+                .expect("Failed to set service_name label")
+                .build_url(
+                    Url::parse(
+                        &env::var("LOKI_URL").unwrap_or("http://localhost:3100".to_string()),
+                    )
+                    .expect("Failed to parse LOKI_URL"),
+                )
+                .expect("Failed to build Loki layer");
+
+            tokio::spawn(task);
+            let subscriber = subscriber.with(layer);
             tracing::subscriber::set_global_default(subscriber)
                 .expect("Could not set default for tracer");
         } else {
             tracing::subscriber::set_global_default(subscriber)
                 .expect("Could not set default for tracer");
         }
-    }
+    } else if boolean_env("ENABLE_LOKI_LOGGING") {
+        let (layer, task) = tracing_loki::builder()
+            .label("service_name", service_name.to_string())
+            .expect("Failed to set service_name label")
+            .build_url(
+                Url::parse(&env::var("LOKI_URL").unwrap_or("http://localhost:3100".to_string()))
+                    .expect("Failed to parse LOKI_URL"),
+            )
+            .expect("Failed to build Loki layer");
 
-    guard
+        tokio::spawn(task);
+        let subscriber = subscriber.with(layer);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Could not set default for tracer");
+    } else {
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Could not set default for tracer");
+    }
 }
 
 pub fn init_meter<T: Into<Value>>(service_name: T) {
