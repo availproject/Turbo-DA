@@ -10,23 +10,20 @@ use db::{models::indexer::IndexerBlockNumbers, schema::indexer_block_numbers::ds
 use diesel::prelude::*;
 use diesel::PgConnection;
 use evm::EVM;
-use observability::{init_meter, init_tracer};
-use serde_json::json;
+use observability::init_tracer;
+
 use std::sync::Arc;
-use turbo_da_core::logger::{debug, debug_json, error, info};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let _guard = init_tracer("funds_monitor");
     let cfg = match Config::default().load_config() {
         Ok(c) => c,
         Err(e) => {
-            info(&format!("Error loading config: {}", e));
+            tracing::info!(error = %e, "error loading config");
             return;
         }
     };
-
-    init_tracer("funds_monitor");
-    init_meter("funds_monitor");
 
     let cfg_ref = Arc::new(cfg);
     let cfg_ref_2 = cfg_ref.clone();
@@ -34,11 +31,11 @@ async fn main() {
 
     let mut handles = Vec::new();
     handles.push(tokio::spawn(async move {
-        info(&format!("Starting Avail Chain Monitor"));
+        tracing::info!("starting avail chain monitor");
 
         let result = run(cfg_ref.clone()).await;
         if let Err(e) = result {
-            error(&format!("Error running Avail Chain Monitor: {:?}", e));
+            tracing::error!(error = ?e, "error running avail chain monitor");
         }
     }));
 
@@ -47,25 +44,25 @@ async fn main() {
         let network_config = network_config.clone();
 
         let cfg_ref_4 = cfg_ref_3.clone();
-        debug_json(json!({
-            "message": "Task for network",
-            "network_name": network_name,
-            "level": "debug"
-        }));
+        tracing::debug!(
+            message = "task for network",
+            network_name = %network_name,
+            level = "debug"
+        );
 
         handles.push(tokio::spawn(async move {
-            debug(&format!("Spawning new task"));
+            tracing::debug!("spawning new task");
 
             match monitor(network_config, cfg_ref_4).await {
-                Ok(_) => info(&format!("Monitor task completed successfully")),
-                Err(e) => error(&format!("Error running monitor task: {}", e)),
+                Ok(_) => tracing::info!("monitor task completed successfully"),
+                Err(e) => tracing::error!(error = %e, "error running monitor task"),
             }
         }));
     }
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
-            info(&format!("Ctrl+C pressed, shutting down..."));
+            tracing::info!("ctrl+c pressed, shutting down...");
         }
         _ = futures::future::join_all(handles) => {}
     }
@@ -77,10 +74,11 @@ async fn monitor(network_config: Network, cfg: Arc<Config>) -> Result<(), String
 
     let finalised_block_number =
         query_finalised_block_number(network_config.chain_id, &mut connection);
-    info(&format!(
-        "Finalised block number: {}, chain id: {}",
-        finalised_block_number.block_number, network_config.chain_id
-    ));
+    tracing::info!(
+        finalised_block_number = finalised_block_number.block_number,
+        chain_id = network_config.chain_id,
+        "finalised block number"
+    );
     drop(connection);
 
     let mut evm = EVM::new(
@@ -111,7 +109,7 @@ fn query_finalised_block_number(
     match row {
         Ok(row) => row,
         Err(e) => {
-            error(&format!("Failed to query finalised block number: {}", e));
+            tracing::error!(error = %e, "failed to query finalised block number");
             return IndexerBlockNumbers {
                 id: 0,
                 chain_id: 0,

@@ -3329,6 +3329,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml 0.8.19",
+ "tracing",
+ "tracing-subscriber",
  "turbo-da-core",
  "uuid",
 ]
@@ -3518,6 +3520,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml 0.8.19",
+ "tracing",
+ "tracing-subscriber",
  "turbo-da-core",
 ]
 
