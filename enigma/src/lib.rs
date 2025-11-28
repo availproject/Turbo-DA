@@ -39,8 +39,8 @@ impl EnigmaEncryptionService {
         let cert_and_key = if let Ok(cert) = env::var("CLIENT_CRT") {
             cert.as_bytes().to_vec()
         } else {
-            println!(
-                "Warning: Failed to read CLIENT_CRT from environment variable, reading from file"
+            tracing::warn!(
+                "failed to read CLIENT_CRT from environment variable, reading from file"
             );
             fs::read("client.crt")?
         };
@@ -48,8 +48,8 @@ impl EnigmaEncryptionService {
         let key = if let Ok(key) = env::var("CLIENT_KEY") {
             key.as_bytes().to_vec()
         } else {
-            println!(
-                "Warning: Failed to read CLIENT_KEY from environment variable, reading from file"
+            tracing::warn!(
+                "failed to read CLIENT_KEY from environment variable, reading from file"
             );
             fs::read("client.key")?
         };
@@ -68,7 +68,7 @@ impl EnigmaEncryptionService {
         let ca_cert = if let Ok(ca_cert) = env::var("CA_CRT") {
             ca_cert.as_bytes().to_vec()
         } else {
-            println!("Warning: Failed to read CA_CRT from environment variable, reading from file");
+            tracing::warn!("failed to read CA_CRT from environment variable, reading from file");
             fs::read("ca.crt")?
         };
         let ca_certificate = Certificate::from_pem(&ca_cert)?;
