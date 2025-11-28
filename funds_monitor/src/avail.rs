@@ -1,5 +1,6 @@
 use avail_rust::avail::utility::tx::BatchAll;
 use avail_rust::avail::RuntimeCall;
+use avail_rust::block::BlockExtrinsicsQuery;
 use avail_rust::prelude::*;
 use diesel::PgConnection;
 use std::sync::Arc;
@@ -83,16 +84,20 @@ async fn process_block(
 ) -> Result<(), String> {
     tracing::debug!("filtering batch calls from block");
 
-    let block = BlockWithTx::new(client.clone(), block_hash);
+    let block = BlockExtrinsicsQuery::new(client.clone(), block_hash.into());
     let all = block.all::<BatchAll>(Default::default()).await;
     let all = all.map_err(|e| e.to_string())?;
 
     for tx in all {
         let tx_hash = tx.ext_hash();
 
+        let Some(signature) = &tx.signature else {
+            continue;
+        };
+
         tracing::info!(
             tx_hash = %tx_hash,
-            account = ?tx.signature.address,
+            account = ?signature.address,
             block_height = block_height,
             block_hash = %block_hash,
             "found some batch call"
@@ -120,7 +125,7 @@ async fn process_block(
             continue;
         }
 
-        let MultiAddress::Id(account_id) = tx.signature.address else {
+        let MultiAddress::Id(account_id) = &signature.address else {
             tracing::info!(
                 block_hash = %block_hash,
                 tx_index = tx.ext_index(),
