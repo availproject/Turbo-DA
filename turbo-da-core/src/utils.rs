@@ -6,7 +6,9 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{constants::dev_accounts, Client as AvailClient, Keypair, Options};
+use avail_rust::{
+    avail_rust_core::rpc::chain, constants::dev_accounts, Client as AvailClient, Keypair, Options,
+};
 
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
@@ -298,8 +300,20 @@ lazy_static! {
                 token_decimals: 18,
             },
         );
+
         m.insert(11155111, chain_map.clone());
         m.insert(84532, chain_map.clone());
+        chain_map.clear();
+
+        chain_map.insert(
+            "base".to_string(),
+            Token {
+                token_address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_string(),
+                token_decimals: 18,
+            },
+        );
+
+        m.insert(8453, chain_map.clone());
         m
     };
 }
