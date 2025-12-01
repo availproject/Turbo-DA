@@ -1,5 +1,4 @@
 use avail::data_availability::events::DataSubmitted;
-/// Core logic of generating extrinsic and submitting to Avail DA.
 use avail_rust::prelude::*;
 use hex::{self, ToHex};
 

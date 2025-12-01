@@ -7985,6 +7985,7 @@ dependencies = [
  "actix-web",
  "alloy",
  "avail-rust-client",
+ "avail-utils",
  "aws-config",
  "aws-sdk-s3",
  "bcrypt",
