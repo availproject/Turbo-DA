@@ -1,5 +1,4 @@
 use avail::data_availability::events::DataSubmitted;
-/// Core logic of generating extrinsic and submitting to Avail DA.
 use avail_rust::prelude::*;
 use hex::{self, ToHex};
 
@@ -61,10 +60,10 @@ impl<'a> SubmitDataAvail<'a> {
         };
 
         Ok(TransactionInfo {
-            block_number: receipt.block_ref.height,
-            tx_hash: hex::encode(receipt.tx_ref.hash.0),
-            block_hash: hex::encode(receipt.block_ref.hash.0),
-            extrinsic_index: receipt.tx_ref.index,
+            block_number: receipt.block_height,
+            tx_hash: hex::encode(receipt.ext_hash.0),
+            block_hash: hex::encode(receipt.block_hash.0),
+            extrinsic_index: receipt.ext_index,
             gas_fee: estimated_fees.final_fee(),
             to_address: self.account.public_key().encode_hex(),
             data_hash: hex::encode(event.data_hash.0),

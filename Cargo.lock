@@ -1476,9 +1476,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "avail-rust-client"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca07e8d66c0a213b285d8f6e35feccbe43fbdb2ef61616a9abec149872cdceeb"
+checksum = "e220c1235278a8a2f3161addc8b510c586caacfde7dd7a1da1810452e2bf0add"
 dependencies = [
  "avail-rust-core",
  "const-hex",
@@ -1496,9 +1496,9 @@ dependencies = [
 
 [[package]]
 name = "avail-rust-core"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67cce092908f0beb9f570b20d150dc1ab5cc2f56ffe552642312b063bf4af1d5"
+checksum = "bfb1b3bb68aec2f37e19554fbb225a45b48539296f744198c5d9888b3b083be3"
 dependencies = [
  "const-hex",
  "impl-serde",
@@ -1507,6 +1507,7 @@ dependencies = [
  "scale-decode",
  "scale-encode",
  "scale-info",
+ "schnorrkel",
  "serde",
  "serde_json",
  "sp-crypto-hashing",
@@ -3207,6 +3208,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "tracing",
  "uuid",
 ]
 
@@ -3328,6 +3330,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml 0.8.19",
+ "tracing",
+ "tracing-subscriber",
  "turbo-da-core",
  "uuid",
 ]
@@ -3517,6 +3521,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml 0.8.19",
+ "tracing",
+ "tracing-subscriber",
  "turbo-da-core",
 ]
 
@@ -4713,6 +4719,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
+name = "loki-api"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdc38a304f59a03e6efa3876766a48c70a766a93f88341c3fff4212834b8e327"
+dependencies = [
+ "prost 0.13.5",
+ "prost-types 0.13.5",
+]
+
+[[package]]
 name = "lru"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5005,13 +5021,16 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "prost-types 0.12.6",
  "serde",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
  "tracing-appender",
+ "tracing-loki",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -5098,7 +5117,7 @@ dependencies = [
  "opentelemetry-proto",
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
- "prost",
+ "prost 0.12.6",
  "thiserror 1.0.69",
  "tokio",
  "tonic",
@@ -5112,7 +5131,7 @@ checksum = "3a8fddc9b68f5b80dae9d6f510b88e02396f006ad48cac349411fbecc80caae4"
 dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
- "prost",
+ "prost 0.12.6",
  "tonic",
 ]
 
@@ -5582,7 +5601,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deb1435c188b76130da55f17a466d252ff7b1418b2ad3e037d127b94e3411f29"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.12.6",
+]
+
+[[package]]
+name = "prost"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
+dependencies = [
+ "bytes",
+ "prost-derive 0.13.5",
 ]
 
 [[package]]
@@ -5596,6 +5625,37 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.90",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
+dependencies = [
+ "anyhow",
+ "itertools 0.13.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9091c90b0a32608e984ff2fa4091273cbdd755d54935c51d520887f4a1dbd5b0"
+dependencies = [
+ "prost 0.12.6",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
+dependencies = [
+ "prost 0.13.5",
 ]
 
 [[package]]
@@ -6451,9 +6511,9 @@ dependencies = [
 
 [[package]]
 name = "schnorrkel"
-version = "0.11.4"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8de18f6d8ba0aad7045f5feae07ec29899c1112584a38509a84ad7b04451eaa0"
+checksum = "6e9fcb6c2e176e86ec703e22560d99d65a5ee9056ae45a08e13e84ebf796296f"
 dependencies = [
  "aead",
  "arrayref",
@@ -7015,6 +7075,12 @@ dependencies = [
  "smoldot",
  "zeroize",
 ]
+
+[[package]]
+name = "snap"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
 
 [[package]]
 name = "socket2"
@@ -7702,7 +7768,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
+ "prost 0.12.6",
  "tokio",
  "tokio-stream",
  "tower 0.4.13",
@@ -7814,6 +7880,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-loki"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3beec919fbdf99d719de8eda6adae3281f8a5b71ae40431f44dc7423053d34"
+dependencies = [
+ "loki-api",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "snap",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+ "tracing-serde",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
 name = "tracing-opentelemetry"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7899,6 +7986,7 @@ dependencies = [
  "actix-web",
  "alloy",
  "avail-rust-client",
+ "avail-utils",
  "aws-config",
  "aws-sdk-s3",
  "bcrypt",

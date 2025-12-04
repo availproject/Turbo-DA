@@ -6,6 +6,7 @@ use uuid::Uuid;
 ///
 /// # Arguments
 /// * `config` - Application configuration containing number of threads
+#[tracing::instrument(skip(config))]
 pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
     rand::thread_rng().gen_range(0..config.number_of_threads)
 }
@@ -14,6 +15,7 @@ pub fn map_user_id_to_thread(config: &AppConfig) -> i32 {
 ///
 /// # Arguments
 /// * `http_request` - HTTP request to extract user ID from
+#[tracing::instrument(skip(http_request))]
 pub fn retrieve_app_id(http_request: &HttpRequest) -> Option<Uuid> {
     let headers = http_request.headers();
 
