@@ -5,17 +5,14 @@ use cron::Schedule;
 use data_submission::redis::Redis;
 use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
-use observability::{init_meter, init_tracer};
+use observability::init_tracer;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::{
     self,
     time::{self, sleep, Duration},
 };
-use turbo_da_core::{
-    logger::{error, info},
-    utils::generate_keygen_list,
-};
+use turbo_da_core::utils::generate_keygen_list;
 
 mod config;
 mod monitor;
@@ -36,20 +33,19 @@ const WAIT_TIME: u64 = 5;
 /// and attempt to process them using the Avail network.
 #[tokio::main]
 async fn main() {
-    init_meter("fallback_service");
-    init_tracer("fallback_service");
+    let _guard = init_tracer("fallback_service");
 
     let app_config: AppConfig = match AppConfig::default().load_config() {
         Ok(conf) => conf,
         Err(e) => {
-            error(&format!("Couldn't load the config. Error: {:?}", e));
+            tracing::error!(error = ?e, "couldn't load the config");
             return;
         }
     };
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
-    info(&format!("Cron is starting..."));
+    tracing::info!("cron is starting...");
 
     let mut interval = schedule.upcoming(Utc);
 
@@ -63,10 +59,7 @@ async fn main() {
             time::sleep(Duration::from_secs(duration.num_seconds() as u64)).await
         }
 
-        info(&format!(
-            "Checking Failed Transactions at {} .....",
-            Utc::now()
-        ));
+        tracing::info!(time = %Utc::now(), "checking failed transactions");
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
 
@@ -110,24 +103,23 @@ async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> Client {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info(&format!("Attempting to connect endpoint: {:?}", endpoint));
+        tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
         match Client::new(endpoint).await {
             Ok(sdk) => {
-                info(&format!("Connected successfully to endpoint: {}", endpoint));
+                tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
             }
             Err(e) => {
-                error(&format!(
-                    "Failed to connect to endpoint {}: {:?}",
-                    endpoint, e
-                ));
+                tracing::error!(
+                    endpoint = %endpoint,
+                    error = ?e,
+                    "failed to connect to endpoint"
+                );
                 attempts += 1;
             }
         }
 
-        info(&format!(
-            "All endpoints failed. Waiting 5 seconds before next retry...."
-        ));
+        tracing::info!("all endpoints failed, waiting 5 seconds before next retry");
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
 }

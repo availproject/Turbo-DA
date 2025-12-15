@@ -53,6 +53,7 @@ toml = { workspace = true }
 confy = {version = "0.3.1"}
 db = {path = "../db" }
 observability = { path = "../observability" }
+avail-utils = {path = "../avail"}
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
 tracing = {workspace=true}

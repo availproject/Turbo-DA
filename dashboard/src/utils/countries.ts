@@ -1,12 +1,16 @@
 import countries from "world-countries";
 
 const DENIED_COUNTRY_CODES = [
-  "US", // United States
-  "CA", // Canada
-  "NL", // Netherlands
   "CU", // Cuba
   "KP", // North Korea
   "IR", // Iran
+  "SY", // Syria
+  "SD", // Sudan
+  "SS", // South Sudan
+  // Regions
+  "UA-43", // Crimea (using ISO 3166-2 code)
+  "UA-14", // Donetsk (using ISO 3166-2 code)
+  "UA-09", // Luhansk (using ISO 3166-2 code)
 ];
 
 export const isDeniedCountry = (countryCode: string) => {

@@ -6,9 +6,10 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{constants::dev_accounts, Client as AvailClient, Keypair, Options};
+use avail_rust::{
+    avail_rust_core::rpc::chain, constants::dev_accounts, Client as AvailClient, Keypair, Options,
+};
 
-use crate::logger::{debug_json, error, info, warn};
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
 use diesel_async::{
@@ -109,7 +110,7 @@ pub async fn get_connection(
     match pool.get().await {
         Ok(conn) => Ok(conn),
         Err(err) => {
-            error(&format!("Failed to get a database connection: {}", err));
+            tracing::error!("Failed to get a database connection: {}", err);
             return Err(HttpResponse::InternalServerError().json(json!({
                 "state": "ERROR",
                 "error": "Database connection error"
@@ -252,7 +253,7 @@ impl<'a> Convertor<'a> {
         {
             Ok(info) => info,
             Err(e) => {
-                error(&format!("Failed to get payment query info: {:?}", e));
+                tracing::error!(error = ?e, "failed to get payment query info");
                 return BigDecimal::from(u128::MAX);
             }
         };
@@ -299,8 +300,20 @@ lazy_static! {
                 token_decimals: 18,
             },
         );
+
         m.insert(11155111, chain_map.clone());
         m.insert(84532, chain_map.clone());
+        chain_map.clear();
+
+        chain_map.insert(
+            "base".to_string(),
+            Token {
+                token_address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_string(),
+                token_decimals: 18,
+            },
+        );
+
+        m.insert(8453, chain_map.clone());
         m
     };
 }
@@ -314,24 +327,23 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info(&format!("Attempting to connect endpoint: {:?}", endpoint));
+        tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
         match AvailClient::new(endpoint).await {
             Ok(sdk) => {
-                info(&format!("Connected successfully to endpoint: {}", endpoint));
+                tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
             }
             Err(e) => {
-                error(&format!(
-                    "Failed to connect to endpoint {}: {:?}",
-                    endpoint, e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    endpoint = %endpoint,
+                    "failed to connect to endpoint"
+                );
                 attempts += 1;
             }
         }
 
-        warn(&format!(
-            "All endpoints failed. Waiting 5 seconds before next retry...."
-        ));
+        tracing::warn!("all endpoints failed, waiting 5 seconds before next retry");
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
 }
@@ -366,11 +378,7 @@ pub async fn calculate_avail_token_equivalent(
 ) -> Result<BigDecimal, String> {
     let http_client = Client::new();
 
-    debug_json(json!({
-        "message": "Token Address",
-        "token_address": token_address,
-        "level": "debug"
-    }));
+    tracing::debug!(token_address = %token_address, "token address");
 
     let equivalent_amount;
     if token_address == "0x0000000000000000000000000000000000000000".to_string() {
@@ -417,16 +425,8 @@ pub async fn calculate_avail_token_equivalent(
         .await
         .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
 
-        debug_json(json!({
-            "message": "Current Token USD price",
-            "token_usd_price": token_usd_price,
-            "level": "debug"
-        }));
-        debug_json(json!({
-            "message": "Current AVAIL USD price",
-            "avail_usd_price": avail_usd_price,
-            "level": "debug"
-        }));
+        tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
+        tracing::debug!(avail_usd_price = %avail_usd_price, "current avail usd price");
 
         let token_avail_ratio = token_usd_price / avail_usd_price;
         let source_token_decimals = TOKEN_MAP

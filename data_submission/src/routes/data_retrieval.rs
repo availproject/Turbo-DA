@@ -11,13 +11,10 @@ use enigma::{types::DecryptRequest, EnigmaEncryptionService};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
-use turbo_da_core::{
-    logger::debug,
-    utils::{generate_avail_sdk, get_connection},
-};
+use turbo_da_core::utils::{generate_avail_sdk, get_connection};
 use uuid::Uuid;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct RetrievePreImage {
     submission_id: String,
 }
@@ -56,6 +53,13 @@ struct RetrievePreImage {
 /// }
 /// ```
 
+#[tracing::instrument(
+    skip(config, injected_dependency),
+    fields(
+        submission_id = %request_payload.submission_id,
+        endpoint = "get_pre_image"
+    )
+)]
 #[get("/get_pre_image")]
 pub async fn get_pre_image(
     request_payload: web::Query<RetrievePreImage>,
@@ -75,10 +79,10 @@ pub async fn get_pre_image(
 
     match get_customer_expenditure_by_submission_id(&mut connection, submission_id).await {
         Ok(sub) => {
-            debug(&format!(
-                "Found expenditure for submission ID: {:?}",
-                submission_id
-            ));
+            tracing::debug!(
+                submission_id = %submission_id,
+                "found expenditure for submission"
+            );
             if sub.payload.is_some() {
                 return HttpResponse::Ok().body(sub.payload.unwrap());
             }
@@ -108,6 +112,13 @@ pub async fn get_pre_image(
     }
 }
 
+#[tracing::instrument(
+    skip(config, injected_dependency, enigma),
+    fields(
+        submission_id = %request_payload.submission_id,
+        endpoint = "get_pre_image_decrypted"
+    )
+)]
 #[get("/get_pre_image_decrypted")]
 pub async fn get_pre_image_decrypted(
     request_payload: web::Query<RetrievePreImage>,
@@ -128,10 +139,10 @@ pub async fn get_pre_image_decrypted(
 
     match get_customer_expenditure_by_submission_id(&mut connection, submission_id).await {
         Ok(sub) => {
-            debug(&format!(
-                "Found expenditure for submission ID: {:?}",
-                submission_id
-            ));
+            tracing::debug!(
+                submission_id = %submission_id,
+                "found expenditure for decrypted submission"
+            );
             if sub.payload.is_some() {
                 return HttpResponse::Ok().body(sub.payload.unwrap());
             }
@@ -189,7 +200,7 @@ pub async fn get_pre_image_decrypted(
 }
 
 /// Query parameters for retrieving submission information
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct GetSubmissionInfo {
     submission_id: String,
 }
@@ -206,6 +217,13 @@ struct GetSubmissionInfo {
 /// # Description
 /// Validates the submission ID as a UUID and retrieves associated information
 /// from the database. Returns error responses for invalid UUIDs or failed queries.
+#[tracing::instrument(
+    skip(injected_dependency),
+    fields(
+        submission_id = %request_payload.submission_id,
+        endpoint = "get_submission_info"
+    )
+)]
 #[get("/get_submission_info")]
 pub async fn get_submission_info(
     request_payload: web::Query<GetSubmissionInfo>,

@@ -1,5 +1,5 @@
 /// Logging utilities
-use crate::logger::{error, info};
+
 /// Core dependencies for user management functionality
 use crate::{
     config::AppConfig,
@@ -20,6 +20,8 @@ use db::{
     },
     models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
 };
+
+use avail_utils::utils::check_app_id_validity;
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 /// Redis caching functionality
@@ -427,6 +429,7 @@ pub async fn register_new_user(
 pub async fn generate_app_account(
     payload: web::Json<RegisterAccount>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
     http_request: HttpRequest,
 ) -> impl Responder {
     if let Err(errors) = payload.validate() {
@@ -436,6 +439,25 @@ pub async fn generate_app_account(
         }));
     }
 
+    if let Some(app_id) = payload.avail_app_id {
+        let result = check_app_id_validity(config.avail_rpc_endpoint[0].as_str(), app_id).await;
+        match result {
+            Ok(status) => {
+                if !status {
+                    return HttpResponse::NotAcceptable().json(json!({
+                        "state": "ERROR",
+                        "error": "Invalid App ID",
+                    }));
+                }
+            }
+            Err(e) => {
+                return HttpResponse::NotAcceptable().json(json!({
+                    "state": "ERROR",
+                    "error": e,
+                }));
+            }
+        }
+    }
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -1028,10 +1050,10 @@ async fn delete_api_key(
             match redis::Client::open(config.redis_url.clone().as_str()) {
                 Ok(mut client) => {
                     let _result: Result<(), redis::RedisError> = client.del(hashed_key);
-                    info(&format!("Deleted API key from Redis: {}", hashed_key));
+                    tracing::info!(hashed_key = %hashed_key, "deleted api key from redis");
                 }
                 Err(e) => {
-                    error(&format!("Error connecting to Redis: {}", e));
+                    tracing::error!(error = %e, "error connecting to redis");
                 }
             }
             return HttpResponse::Ok().json(json!({

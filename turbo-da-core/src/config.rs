@@ -1,4 +1,3 @@
-use crate::logger::{error, info, warn};
 /// Configuration setup
 /// Checks presence of `config.toml`
 /// Else checks environment variables to populate Application Configurations
@@ -63,7 +62,7 @@ impl AppConfig {
             return Ok(config);
         }
 
-        info(&"Trying to read from environment variables".to_string());
+        tracing::info!("trying to read from environment variables");
 
         match self.load_from_env() {
             Ok(config) => Ok(config),
@@ -85,7 +84,7 @@ impl AppConfig {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn(&format!("Failed to read file: {:?}", e));
+            tracing::warn!(error = ?e, "failed to read file");
             e.to_string()
         })?;
 
@@ -94,7 +93,7 @@ impl AppConfig {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                warn(&format!("Coudln't read from TOML File: {:?}", e));
+                tracing::warn!(error = ?e, "couldn't read from TOML file");
                 Err(e.into())
             }
         }
@@ -103,12 +102,12 @@ impl AppConfig {
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let port = env::var("PORT")
             .map_err(|e| {
-                error(&format!("Failed to get PORT environment variable: {:?}", e));
+                tracing::error!(error = ?e, "failed to get PORT environment variable");
                 e
             })?
             .parse::<u16>()
             .map_err(|e| {
-                error(&format!("Invalid PORT value. Error: {:?}", e));
+                tracing::error!(error = ?e, "invalid PORT value");
                 e.to_string()
             })?;
 
@@ -117,67 +116,67 @@ impl AppConfig {
 
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
-                error(&format!(
-                    "Failed to get MAX_POOL_SIZE environment variable: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "failed to get MAX_POOL_SIZE environment variable"
+                );
                 e
             })?
             .parse::<usize>()
             .map_err(|e| {
-                error(&format!("Invalid MAX_POOL_SIZE value. Error: {:?}", e));
+                tracing::error!(error = ?e, "invalid MAX_POOL_SIZE value");
                 e.to_string()
             })?;
 
         let clerk_secret_key = env::var("CLERK_SECRET_KEY")?;
         let total_users_query_limit = env::var("TOTAL_USERS_QUERY_LIMIT")
             .map_err(|e| {
-                error(&format!(
-                    "Failed to get TOTAL_USERS_QUERY_LIMIT environment variable: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "failed to get TOTAL_USERS_QUERY_LIMIT environment variable"
+                );
                 e
             })?
             .parse::<i64>()
             .map_err(|e| {
-                error(&format!(
-                    "Invalid TOTAL_USERS_QUERY_LIMIT value. Error: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "invalid TOTAL_USERS_QUERY_LIMIT value"
+                );
                 e.to_string()
             })?;
 
         let rate_limit_window_size = env::var("RATE_LIMIT_WINDOW_SIZE")
             .map_err(|e| {
-                error(&format!(
-                    "Failed to get RATE_LIMIT_WINDOW_SIZE environment variable: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "failed to get RATE_LIMIT_WINDOW_SIZE environment variable"
+                );
                 e
             })?
             .parse::<u64>()
             .map_err(|e| {
-                error(&format!(
-                    "Invalid RATE_LIMIT_WINDOW_SIZE value. Error: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "invalid RATE_LIMIT_WINDOW_SIZE value"
+                );
                 e.to_string()
             })?;
 
         let rate_limit_max_requests = env::var("RATE_LIMIT_MAX_REQUESTS")
             .map_err(|e| {
-                error(&format!(
-                    "Failed to get RATE_LIMIT_MAX_REQUESTS environment variable: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "failed to get RATE_LIMIT_MAX_REQUESTS environment variable"
+                );
                 e
             })?
             .parse::<u64>()
             .map_err(|e| {
-                error(&format!(
-                    "Invalid RATE_LIMIT_MAX_REQUESTS value. Error: {:?}",
-                    e
-                ));
+                tracing::error!(
+                    error = ?e,
+                    "invalid RATE_LIMIT_MAX_REQUESTS value"
+                );
                 e.to_string()
             })?;
 
