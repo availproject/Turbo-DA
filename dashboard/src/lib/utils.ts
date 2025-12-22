@@ -1,9 +1,12 @@
-import { type ClassValue, clsx } from "clsx";
+import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { TOKEN_MAP } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+export function absoluteUrl(path: string) {
+  return `${process.env.NEXT_PUBLIC_BASE_URL}${path}`;
 }
 
 export enum APP_TABS {
@@ -88,7 +91,7 @@ export const template = "turbo";
 
 export const getTokenNameByAddress = (address: string): string => {
   const tokenEntry = Object.entries(TOKEN_MAP).find(
-    ([_, info]) => info.token_address.toLowerCase() === address.toLowerCase()
+    ([_, info]) => info.token_address.toLowerCase() === address.toLowerCase(),
   );
   return tokenEntry ? tokenEntry[0] : "Unknown Token";
 };
@@ -100,7 +103,7 @@ export const getTokenDecimals = (tokenName: string): number => {
 export const formatTokenAmount = (
   weiAmount: string | number,
   decimals: number = 18,
-  precision: number = 6
+  precision: number = 6,
 ): string => {
   if (!weiAmount) return "0";
   const amount = parseFloat(weiAmount.toString()) / Math.pow(10, decimals);

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@avail-project/nexus-core": "1.0.0-beta.56",
     "@clerk/nextjs": "^6.17.0",
     "@clerk/themes": "^2.2.43",
     "@datadog/browser-logs": "^6.6.3",
@@ -16,11 +17,14 @@
     "@phosphor-icons/react": "^2.1.7",
     "@polkadot/api": "^15.10.2",
     "@polkadot/types-codec": "^16.4.3",
+    "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-checkbox": "^1.2.3",
+    "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.11",
     "@radix-ui/react-dropdown-menu": "^2.1.14",
     "@radix-ui/react-label": "^2.1.4",
     "@radix-ui/react-menubar": "^1.1.15",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-progress": "^1.1.4",
     "@radix-ui/react-scroll-area": "^1.2.6",
     "@radix-ui/react-select": "^2.2.2",

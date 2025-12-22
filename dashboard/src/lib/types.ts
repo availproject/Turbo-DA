@@ -52,7 +52,7 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
       {
         name: "MTK",
         icon: "/currency/mtk.png",
-        address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
+        address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44",
         decimals: 18,
         ticker: "MTK",
       },
@@ -68,7 +68,7 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
   base: {
     name: "Base",
     icon: "/currency/base.png",
-    id: 84532, // Base Sepolia testnet
+    id: 84532,
     tokens: [
       {
         name: "ETH",
@@ -78,12 +78,48 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
         ticker: "ETH",
         isNative: true,
       },
+      {
+        name: "MTK",
+        icon: "/currency/mtk.png",
+        address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44",
+        decimals: 18,
+        ticker: "MTK",
+      },
+      {
+        name: "AVAIL",
+        icon: "/avail-icon.svg",
+        address: "0x99a907545815c289fb6de86d55fe61d996063a94",
+        decimals: 18,
+        ticker: "AVAIL",
+      },
+    ],
+  },
+  baseMainnet: {
+    name: "Base Mainnet",
+    icon: "/currency/base.png",
+    id: 8453,
+    tokens: [
+      {
+        name: "ETH",
+        icon: "/currency/eth.png",
+        address: "0x0000000000000000000000000000000000000000",
+        decimals: 18,
+        ticker: "ETH",
+        isNative: true,
+      },
+      {
+        name: "AVAIL",
+        icon: "/avail-icon.svg",
+        address: "0xd89d90d26b48940fa8f58385fe84625d468e057a",
+        decimals: 18,
+        ticker: "AVAIL",
+      },
     ],
   },
   avail: {
     name: "Avail",
     icon: "/avail-icon.svg",
-    id: 0, // Special ID for Avail (non-EVM)
+    id: 0,
     tokens: [
       {
         name: "AVAIL",
@@ -97,7 +133,6 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
   },
 };
 
-// Legacy TOKEN_MAP for backward compatibility (will be deprecated)
 interface TokenInfo_Legacy {
   token_address: string;
   token_decimals: number;

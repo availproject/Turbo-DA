@@ -1,31 +1,13 @@
-import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { cn } from "@/lib/utils"
 
-function Skeleton({
-  className,
-  sheen = true,
-  ...props
-}: React.ComponentProps<"div"> & { sheen?: boolean }) {
+function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn(
-        "bg-[#13334F] rounded-lg overflow-hidden w-full h-14",
-        className
-      )}
+      className={cn("bg-accent animate-pulse rounded-md", className)}
       {...props}
-    >
-      {sheen && (
-        <Image
-          src="/sheen-effect.svg"
-          alt="sheen-effect"
-          width={40}
-          height={56}
-          className="animate-toright h-full relative"
-        />
-      )}
-    </div>
-  );
+    />
+  )
 }
 
-export { Skeleton };
+export { Skeleton }
