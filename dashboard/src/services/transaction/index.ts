@@ -1,4 +1,4 @@
-import { config } from "@/config/walletConfig";
+import { config } from "@/config/evm-config";
 import { waitForTransactionReceipt } from "@wagmi/core";
 import { ErrorHandlingUtils } from "@/utils/errorHandling";
 
@@ -33,7 +33,7 @@ export class TransactionService {
             order_id: orderId,
             tx_hash: txnHash,
           }),
-        }
+        },
       );
 
       if (!response.ok) {

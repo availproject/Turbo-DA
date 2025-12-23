@@ -1,5 +1,4 @@
-import { appConfig } from "@/config/default";
-import { LegacySignerOptions } from "@/utils/web3-services";
+import { LegacySignerOptions } from "@/config/default";
 import {
   getWalletBySource,
   WalletAccount,
@@ -11,7 +10,7 @@ import { Chain } from "./types";
 import { erc20Abi, isAddress } from "viem";
 import { parseAmount, parseAvailAmount } from "./parsers";
 import { readContract } from "@wagmi/core";
-import { config } from "@/config/walletConfig";
+import { config } from "@/config/evm-config";
 import BigNumber from "bignumber.js";
 
 export const postOrder = async ({
@@ -32,7 +31,7 @@ export const postOrder = async ({
       body: JSON.stringify({
         chain: chainId,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -49,7 +48,7 @@ export async function batchTransferAndRemark(
   remarkMessage: string,
   onInBlock?: (txHash: string, blockHash: string) => void,
   onFinalized?: (txHash: string) => void,
-  onBroadcast?: (txHash: string) => void
+  onBroadcast?: (txHash: string) => void,
 ): Promise<Result<any, Error>> {
   try {
     const wallets = getWallets();
@@ -62,7 +61,7 @@ export async function batchTransferAndRemark(
       wallets.map((w) => ({
         title: w?.title,
         source: (w as any)?.extensionName || (w as any)?.metadata?.source,
-      }))
+      })),
     );
 
     // Enable wallet matching the selected account source
@@ -94,7 +93,7 @@ export async function batchTransferAndRemark(
 
     const transfer = api.tx.balances.transferKeepAlive(
       process.env.NEXT_PUBLIC_AVAIL_ADDRESS,
-      atomicAmount
+      atomicAmount,
     );
     const remark = api.tx.system.remark(remarkMessage);
     const batchCall = api.tx.utility.batchAll([transfer, remark]);
@@ -137,7 +136,7 @@ export async function batchTransferAndRemark(
               }
               resolve(result);
             }
-          }
+          },
         )
         .catch((error) => {
           clearTimeout(timeout);
@@ -172,7 +171,7 @@ export async function batchTransferAndRemark(
     return err(
       error instanceof Error
         ? error
-        : new Error("Failed to batch transfer and remark")
+        : new Error("Failed to batch transfer and remark"),
     );
   }
 }
@@ -189,7 +188,7 @@ export async function getTokenBalance(
   address: `0x${string}`,
   api?: ApiPromise,
   tokenAddress?: string,
-  chainId?: number
+  chainId?: number,
 ) {
   if (!validAddress(address, chain))
     throw new Error("Invalid Recipient on base");

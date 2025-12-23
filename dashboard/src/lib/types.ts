@@ -35,6 +35,17 @@ export interface SupportedTokensAndChains {
   [chainKey: string]: ChainInfo;
 }
 
+export interface TokenMap {
+  [key: string]: TokenInfo_Legacy;
+}
+
+// Legacy TOKEN_MAP for backward compatibility (will be deprecated)
+interface TokenInfo_Legacy {
+  token_address: string;
+  token_decimals: number;
+  token_ticker?: string;
+}
+
 export const supportedTokensAndChains: SupportedTokensAndChains = {
   ethereum: {
     name: "Ethereum",
@@ -50,13 +61,6 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
         isNative: true,
       },
       {
-        name: "MTK",
-        icon: "/currency/mtk.png",
-        address: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
-        decimals: 18,
-        ticker: "MTK",
-      },
-      {
         name: "AVAIL",
         icon: "/avail-icon.svg",
         address: "0x99a907545815c289fb6de86d55fe61d996063a94",
@@ -68,7 +72,7 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
   base: {
     name: "Base",
     icon: "/currency/base.png",
-    id: 84532, // Base Sepolia testnet
+    id: 84532,
     tokens: [
       {
         name: "ETH",
@@ -78,12 +82,41 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
         ticker: "ETH",
         isNative: true,
       },
+      {
+        name: "AVAIL",
+        icon: "/avail-icon.svg",
+        address: "0x99a907545815c289fb6de86d55fe61d996063a94",
+        decimals: 18,
+        ticker: "AVAIL",
+      },
+    ],
+  },
+  basemainnet: {
+    name: "Base Mainnet",
+    icon: "/currency/base.png",
+    id: 8453,
+    tokens: [
+      {
+        name: "ETH",
+        icon: "/currency/eth.png",
+        address: "0x0000000000000000000000000000000000000000",
+        decimals: 18,
+        ticker: "ETH",
+        isNative: true,
+      },
+      {
+        name: "AVAIL",
+        icon: "/avail-icon.svg",
+        address: "0xd89d90d26b48940fa8f58385fe84625d468e057a",
+        decimals: 18,
+        ticker: "AVAIL",
+      },
     ],
   },
   avail: {
     name: "Avail",
     icon: "/avail-icon.svg",
-    id: 0, // Special ID for Avail (non-EVM)
+    id: 0,
     tokens: [
       {
         name: "AVAIL",
@@ -96,17 +129,6 @@ export const supportedTokensAndChains: SupportedTokensAndChains = {
     ],
   },
 };
-
-// Legacy TOKEN_MAP for backward compatibility (will be deprecated)
-interface TokenInfo_Legacy {
-  token_address: string;
-  token_decimals: number;
-  token_ticker?: string;
-}
-
-export interface TokenMap {
-  [key: string]: TokenInfo_Legacy;
-}
 
 // Generate TOKEN_MAP from supportedTokensAndChains for backward compatibility
 export const TOKEN_MAP: TokenMap = Object.values(
@@ -128,3 +150,20 @@ export enum SupportedChains {
   Sepolia = 11155111,
   BaseSepolia = 84532,
 }
+
+export const getAvailableChains = (): SupportedTokensAndChains => {
+  const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
+
+  if (isMainnet) {
+    return {
+      basemainnet: supportedTokensAndChains.basemainnet,
+      avail: supportedTokensAndChains.avail,
+    };
+  } else {
+    return {
+      ethereum: supportedTokensAndChains.ethereum,
+      base: supportedTokensAndChains.base,
+      avail: supportedTokensAndChains.avail,
+    };
+  }
+};
