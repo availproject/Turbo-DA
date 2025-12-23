@@ -9,7 +9,7 @@ contract DeployMockERC20 is Script {
         MockERC20 mockERC20 = new MockERC20(
             "MockToken",
             "MTK",
-            address(this),
+            msg.sender, 
             1000000 ether
         );
         vm.stopBroadcast();
