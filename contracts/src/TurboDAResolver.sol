@@ -88,6 +88,7 @@ contract TurboDAResolver is
     error InvalidTokenAddress();
     error InvalidSignature();
     error InsufficientDeposit();
+    error NativeTokenDisabled();
     error ETHTransferFailed();
     error NonceAlreadyUsed();
 
@@ -110,6 +111,9 @@ contract TurboDAResolver is
     function deposit(bytes32 orderId) external payable whenNotPaused {
         if (msg.value == 0) {
             revert InvalidAmount();
+        }
+        if (!acceptNative) {
+            revert NativeTokenDisabled();
         }
         emit Deposit(orderId, address(0), msg.value, msg.sender);
     }
