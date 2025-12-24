@@ -1,0 +1,10 @@
+{
+  "transactions": [
+    {
+      "rpc": "https://base.public.blockpi.network/v1/rpc/public"
+    },
+    {
+      "rpc": "https://base.public.blockpi.network/v1/rpc/public"
+    }
+  ]
+}

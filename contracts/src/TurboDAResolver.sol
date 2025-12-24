@@ -40,6 +40,9 @@ contract TurboDAResolver is
     /// @notice Role for operators
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
+    ///@notice Tracks if native token enabled
+    bool acceptNative;
+
     /// @notice Address where admin withdrawals are sent
     address public withdrawalAddress;
 
@@ -85,6 +88,7 @@ contract TurboDAResolver is
     error InvalidTokenAddress();
     error InvalidSignature();
     error InsufficientDeposit();
+    error NativeTokenDisabled();
     error ETHTransferFailed();
     error NonceAlreadyUsed();
 
@@ -97,6 +101,7 @@ contract TurboDAResolver is
         __Pausable_init();
         __ReentrancyGuardTransient_init();
         withdrawalAddress = _owner;
+        acceptNative = false;
     }
 
     /**
@@ -106,6 +111,9 @@ contract TurboDAResolver is
     function deposit(bytes32 orderId) external payable whenNotPaused {
         if (msg.value == 0) {
             revert InvalidAmount();
+        }
+        if (!acceptNative) {
+            revert NativeTokenDisabled();
         }
         emit Deposit(orderId, address(0), msg.value, msg.sender);
     }
@@ -258,5 +266,15 @@ contract TurboDAResolver is
         bool validity
     ) external onlyRole(OPERATOR_ROLE) {
         validTokenAddresses[tokenAddress] = validity;
+    }
+
+    /**
+     * @dev Configures the validity of the native token.
+     *      When `validity` is true, the contract will accept native tokens.
+     *      When `validity` is false, the contract will not accept native tokens.
+     * @param validity A boolean indicating whether native tokens should be accepted.
+     */
+    function configureNativeTokenValidity(bool validity) external onlyRole(OPERATOR_ROLE) {
+        acceptNative = validity;
     }
 }
