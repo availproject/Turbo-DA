@@ -12,6 +12,7 @@ use avail_rust::{
 
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
+use db::schema::credit_requests::chain_id;
 use diesel_async::{
     pooled_connection::deadpool::{Object, Pool},
     AsyncPgConnection,
@@ -71,22 +72,6 @@ pub fn format_size(bytes: usize) -> String {
 /// Generates a new UUID v4 for submission identification
 pub fn generate_submission_id() -> Uuid {
     Uuid::new_v4()
-}
-
-/// Finds a token address by its key in the token map
-///
-/// # Arguments
-/// * `key` - Token key to look up
-pub fn find_key_by_value<'a>(chain: &'a u64, key: &'a String) -> Option<&'a String> {
-    if let Some(token) = TOKEN_MAP.get(chain) {
-        if let Some(token) = token.get(key) {
-            Some(&token.token_address)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
 }
 
 /// Validates if a string is a valid Ethereum address
@@ -278,42 +263,66 @@ impl<'a> Convertor<'a> {
 /// Token information structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
-    pub token_address: String,
-    pub token_decimals: u32,
+    pub name : String,
+    pub symbol: String,
+    pub address: String,
+    pub decimals: u32,
+    pub coin_gecho_id: String
 }
 
 lazy_static! {
-    pub static ref TOKEN_MAP: HashMap<u64, HashMap<String, Token>> = {
+    pub static ref TOKEN_MAP: HashMap<u32, HashMap<String,Token>> = {
         let mut m = HashMap::new();
         let mut chain_map = HashMap::new();
         chain_map.insert(
-            "ethereum".to_string(),
+            "0x0000000000000000000000000000000000000000".to_string(),
             Token {
-                token_address: "0x8b42845d23c68b845e262dc3e5caa1c9ce9edb44".to_string(),
-                token_decimals: 18,
+                address: "0x0000000000000000000000000000000000000000".to_string(),
+                decimals: 18,
+                name:"Ether".to_string(),
+                symbol:"ETH".to_string(),
+                coin_gecho_id:"ethereum".to_string()
             },
         );
         chain_map.insert(
-            "avail".to_string(),
+            "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58".to_string(),
             Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
-                token_decimals: 18,
+                address: "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58 ".to_string(),
+                decimals: 18,
+               name:"Avail".to_string(),
+                symbol:"AVAIL".to_string(),
+                coin_gecho_id:"avail".to_string()
             },
         );
 
-        m.insert(11155111, chain_map.clone());
+
         m.insert(84532, chain_map.clone());
         chain_map.clear();
 
         chain_map.insert(
-            "base".to_string(),
+            "0xd89d90d26b48940fa8f58385fe84625d468e057a ".to_string(),
             Token {
-                token_address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_string(),
-                token_decimals: 18,
+                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a ".to_string(),
+                decimals: 18,
+                name:"Avail".to_string(),
+                symbol:"AVAIL".to_string(),
+                coin_gecho_id:"avail".to_string()
             },
         );
 
         m.insert(8453, chain_map.clone());
+
+        chain_map.clear();
+        chain_map.insert("0x0000000000000000000000000000000000000000".to_string(),
+        Token {
+            address:"0x0000000000000000000000000000000000000000".to_string(),
+            decimals: 18,
+            name:"Avail".to_string(),
+            symbol:"AVAIL".to_string(),
+            coin_gecho_id: "avail".to_string(),
+            });
+
+        m.insert(0, chain_map);
         m
     };
 }
@@ -369,86 +378,55 @@ fn price_not_found_error(token: &str) -> String {
     format!("{:?} price not found from coingecho", token)
 }
 
+const AVAIL_TOKEN_DECIMALS: usize = 18_usize;
+
 pub async fn calculate_avail_token_equivalent(
     coingecko_api_url: &str,
     coingecko_api_key: &str,
     token_amount: &BigDecimal,
-    chain: &u64,
+    chain: &u32,
     token_address: &str,
 ) -> Result<BigDecimal, String> {
     let http_client = Client::new();
 
     tracing::debug!(token_address = %token_address, "token address");
 
-    let equivalent_amount;
-    if token_address == "0x0000000000000000000000000000000000000000".to_string() {
-        let token_symbol = "avail".to_string();
-        let (token_usd_price, avail_usd_price) = get_prices(
+    let token_info = TOKEN_MAP.get(chain).ok_or("Invalid Chainid")?.get(token_address).ok_or("Invalid Token Address")?; 
+
+           let (token_usd_price, avail_usd_price) = get_prices(
             &http_client,
             &coingecko_api_url,
             &coingecko_api_key,
-            token_symbol.as_str(),
+            token_info.coin_gecho_id.as_str(),
+        
         )
         .await
-        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
+        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_info.symbol, e))?;
 
-        let token_avail_ratio = token_usd_price / avail_usd_price;
+    let token_avail_ratio  = token_usd_price / avail_usd_price;
+
+    let equivalent_amount;
+    if token_info.name == "Avail" {
+
         let token_avail_ratio_decimal =
             BigDecimal::from_str(token_avail_ratio.to_string().as_str())
                 .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 
         equivalent_amount = token_amount * token_avail_ratio_decimal;
+
     } else {
-        let token_symbol = TOKEN_MAP
-            .iter()
-            .find_map(|(chain_id, tokens)| {
-                if chain_id == chain {
-                    tokens.iter().find_map(|(key, token)| {
-                        if token.token_address == token_address {
-                            Some(key.clone())
-                        } else {
-                            None
-                        }
-                    })
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| String::from("Token address not found in token mapping"))?;
 
-        let (token_usd_price, avail_usd_price) = get_prices(
-            &http_client,
-            &coingecko_api_url,
-            &coingecko_api_key,
-            token_symbol.as_str(),
-        )
-        .await
-        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_symbol, e))?;
-
-        tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
+    tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
         tracing::debug!(avail_usd_price = %avail_usd_price, "current avail usd price");
 
-        let token_avail_ratio = token_usd_price / avail_usd_price;
-        let source_token_decimals = TOKEN_MAP
-            .get(chain)
-            .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
-            .get(token_symbol.as_str())
-            .ok_or_else(|| String::from("Source Token address not found in token mapping"))?
-            .token_decimals;
-        let avail_token_decimals = TOKEN_MAP
-            .get(chain)
-            .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
-            .get("avail")
-            .ok_or_else(|| String::from("Avail Token address not found in token mapping"))?
-            .token_decimals;
-        let token_avail_ratio_decimal =
+       let token_avail_ratio_decimal =
             BigDecimal::from_str(token_avail_ratio.to_string().as_str())
                 .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 
         equivalent_amount = token_avail_ratio_decimal
             * token_amount
-            * BigDecimal::from(10_u64.pow(avail_token_decimals as u32))
-            / BigDecimal::from(10_u64.pow(source_token_decimals as u32));
+            * BigDecimal::from(10_u64.pow(AVAIL_TOKEN_DECIMALS as u32))
+            / BigDecimal::from(10_u64.pow(token_info.decimals as u32));
     };
 
     Ok(equivalent_amount.round(0))
@@ -458,7 +436,7 @@ pub async fn get_amount_to_be_credited(
     coin_gecho_api_url: &String,
     coin_gecho_api_key: &String,
     avail_rpc_url: &String,
-    chain: &u64,
+    chain: &u32,
     address: &String,
     amount: &BigDecimal,
 ) -> Result<BigDecimal, String> {

@@ -79,6 +79,7 @@ contract TurboDAResolverTest is Test {
         uint256 depositAmount = 1 ether;
 
         vm.prank(user1);
+        depositContract.configureNativeTokenValidity(true);
         uint256 balanceBefore = address(depositContract).balance;
         depositContract.deposit{value: depositAmount}(ORDER_ID_1);
         uint256 balanceAfter = address(depositContract).balance;

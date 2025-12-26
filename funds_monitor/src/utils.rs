@@ -51,7 +51,7 @@ impl Utils {
             &self.coin_gecho_api_url,
             &self.coin_gecho_api_key,
             &self.avail_rpc_url,
-            &(chain_identifier as u64),
+            &(chain_identifier as u32) ,
             &address,
             &BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
         )

@@ -645,7 +645,7 @@ pub async fn estimate_credits_against_token(
         &config.coingecko_api_url,
         &config.coingecko_api_key,
         &config.avail_rpc_endpoint.first().unwrap(),
-        &query.0.chain_id,
+        &(query.0.chain_id as u32),
         &query.0.token_address,
         &query.0.amount,
     )
