@@ -1,5 +1,3 @@
-
-import { Logger } from "@/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
 
 interface TokenPrice {
@@ -32,17 +30,17 @@ async function getTokenPrices({
         headers: {
           "X-CG-Pro-API-Key": process.env.COINGECKO_API_KEY || "",
         },
-      }
+      },
     );
     if (response.status !== 200) {
       throw new Error(
-        `Failed to fetch token price ${response.status} ${response.statusText}`
+        `Failed to fetch token price ${response.status} ${response.statusText}`,
       );
     }
-    const data:TokenPrice = await response.json();
+    const data: TokenPrice = await response.json();
     return data;
   } catch (error) {
-    Logger.error(`Error fetching token price: ${error}`)
+    console.error(`Error fetching token price: ${error}`);
     throw error;
   }
 }

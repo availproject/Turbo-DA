@@ -12,8 +12,23 @@ import { useConfig } from "@/providers/ConfigProvider";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { supportedTokensAndChains } from "@/lib/types";
+import { useMemo, useState } from "react";
+import { getAvailableChains } from "@/lib/types";
+
+// Helper to get the correct key for a chain name
+const getChainKey = (chainName: string): string => {
+  const nameMap: Record<string, string> = {
+    ethereum: "ethereum",
+    base: "base",
+    "base mainnet": "basemainnet",
+    basemainnet: "basemainnet",
+    avail: "avail",
+  };
+  return (
+    nameMap[chainName.toLowerCase()] ||
+    chainName.toLowerCase().replace(/\s+/g, "")
+  );
+};
 
 const SelectChainToken = () => {
   const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
@@ -21,6 +36,9 @@ const SelectChainToken = () => {
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
+
+  // Get chains filtered by environment (mainnet/testnet)
+  const availableChains = useMemo(() => getAvailableChains(), []);
 
   return (
     <Dialog
@@ -50,7 +68,7 @@ const SelectChainToken = () => {
                 </div>
               </div>
               <div className="flex gap-y-2 flex-col my-6 px-3">
-                {Object.values(supportedTokensAndChains)
+                {Object.values(availableChains)
                   .filter((chain) => chain.name !== "Avail")
                   .map((chain) => {
                     return (
@@ -86,7 +104,7 @@ const SelectChainToken = () => {
               <div className="flex gap-y-2 flex-col mt-6 px-3">
                 {/* Avail Chain */}
                 {(() => {
-                  const availChain = supportedTokensAndChains.avail;
+                  const availChain = availableChains.avail;
                   return (
                     <Button
                       variant={"outline"}
@@ -143,10 +161,40 @@ const SelectChainToken = () => {
                 />
               </div>
               <div className="flex flex-col gap-y-3 mt-2">
-                {selectedChain &&
-                  supportedTokensAndChains[
-                    selectedChain.name.toLowerCase()
-                  ]?.tokens.map((token) => (
+                {(() => {
+                  if (!selectedChain) {
+                    console.log("No chain selected");
+                    return (
+                      <Text className="text-center py-4 text-secondary-grey">
+                        Please select a chain
+                      </Text>
+                    );
+                  }
+
+                  const chainKey = getChainKey(selectedChain.name);
+                  const tokens = availableChains[chainKey]?.tokens;
+
+                  console.log("=== TOKEN LOOKUP DEBUG ===");
+                  console.log("Selected chain name:", selectedChain.name);
+                  console.log("Selected chain object:", selectedChain);
+                  console.log("Chain key:", chainKey);
+                  console.log(
+                    "Available chains keys:",
+                    Object.keys(availableChains),
+                  );
+                  console.log("Tokens found:", tokens);
+                  console.log("Tokens length:", tokens?.length);
+
+                  if (!tokens || tokens.length === 0) {
+                    console.log("No tokens found for chain:", chainKey);
+                    return (
+                      <Text className="text-center py-4 text-secondary-grey">
+                        No tokens available for this chain
+                      </Text>
+                    );
+                  }
+
+                  return tokens.map((token) => (
                     <Button
                       variant={"outline"}
                       key={`token-${token.name}`}
@@ -172,7 +220,8 @@ const SelectChainToken = () => {
                         <Text weight={"semibold"}>{token.name}</Text>
                       </div>
                     </Button>
-                  ))}
+                  ));
+                })()}
               </div>
             </div>
           </div>

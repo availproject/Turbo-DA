@@ -22,7 +22,7 @@ import { useTransactionProgress } from "@/hooks/useTransactionProgress";
 
 // Helper function to get token info from supportedTokensAndChains
 const getTokenInfo = (chainName: string, tokenName: string) => {
-  const chainKey = chainName.toLowerCase();
+  const chainKey = chainName.toLowerCase().replace(/\s+/g, "");
   const chain = supportedTokensAndChains[chainKey];
   return chain?.tokens.find((token) => token.name === tokenName);
 };
@@ -78,7 +78,7 @@ const BuyCreditsCard = () => {
         getERC20AvailBalance(
           account.address,
           tokenInfo.address as `0x${string}`,
-          selectedChain.id
+          selectedChain.id,
         );
       }
 
@@ -162,7 +162,7 @@ const BuyCreditsCard = () => {
           amount: amount,
           tokenAddress: tokenAddress.toLowerCase(),
           chainId: selectedChain.id,
-        }
+        },
       );
 
       if (currentRequestId === requestIdRef.current) {
@@ -284,7 +284,7 @@ const BuyCreditsCard = () => {
                           setTokenAmount(value);
                           if (+value === 0) {
                             setTokenAmountError(
-                              "Please enter a valid amount greater than 0"
+                              "Please enter a valid amount greater than 0",
                             );
                             setShowBalanceError(false);
                             return;

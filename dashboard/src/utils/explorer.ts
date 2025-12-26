@@ -15,7 +15,6 @@ export const getAvailNetwork = (): "mainnet" | "turing" | "hex" => {
     return "hex";
   }
 
-  // Default to turing
   return "turing";
 };
 
@@ -24,7 +23,7 @@ export const getAvailNetwork = (): "mainnet" | "turing" | "hex" => {
  */
 export const getExplorerUrl = (
   transaction: TransactionStatus | undefined,
-  evmChainUrl?: string
+  evmChainUrl?: string,
 ): string => {
   if (!transaction || !transaction.txnHash) {
     return "#";
@@ -45,7 +44,6 @@ export const getExplorerUrl = (
         return `https://avail-turing.subscan.io/extrinsic/${transaction.txnHash}`;
     }
   } else {
-    // EVM chains (ethereum, base) use standard format
     return `${evmChainUrl}/tx/${transaction.txnHash}`;
   }
 };

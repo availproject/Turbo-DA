@@ -1,7 +1,7 @@
 "use client";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
 import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
-import { supportedTokensAndChains } from "@/lib/types";
+import { getAvailableChains } from "@/lib/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import { useAuth } from "./AuthProvider";
 import React, {
@@ -19,16 +19,24 @@ const STORAGE_KEYS = {
   SELECTED_TOKEN: "turbo-da-selected-token",
 } as const;
 
-const getDefaultChain = (): ChainType => ({
-  name: supportedTokensAndChains.ethereum.name,
-  icon: supportedTokensAndChains.ethereum.icon,
-  id: supportedTokensAndChains.ethereum.id,
-});
+const getDefaultChain = (): ChainType => {
+  const availableChains = getAvailableChains();
+  const defaultChain = availableChains.ethereum || availableChains.basemainnet;
+  return {
+    name: defaultChain.name,
+    icon: defaultChain.icon,
+    id: defaultChain.id,
+  };
+};
 
-const getDefaultToken = (): Token => ({
-  name: supportedTokensAndChains.ethereum.tokens[0].name,
-  icon: supportedTokensAndChains.ethereum.tokens[0].icon,
-});
+const getDefaultToken = (): Token => {
+  const availableChains = getAvailableChains();
+  const defaultChain = availableChains.ethereum || availableChains.basemainnet;
+  return {
+    name: defaultChain.tokens[0].name,
+    icon: defaultChain.tokens[0].icon,
+  };
+};
 
 interface ConfigContextType {
   token?: string;
@@ -78,7 +86,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const { token } = useAuth();
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
-  
+
   const [selectedChain, setSelectedChain] =
     useState<ChainType>(getDefaultChain);
   const [selectedToken, setSelectedToken] = useState<Token | undefined>(
