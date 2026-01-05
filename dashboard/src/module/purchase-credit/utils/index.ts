@@ -211,6 +211,6 @@ export async function getTokenBalance(
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address],
-    chainId: chainId || 11155111, // Use provided chainId or fallback to Sepolia
+    chainId: chainId || 84532, // Use provided chainId or fallback to Base Sepolia
   }).then((balance) => parseAmount(balance.toString(), 18));
 }

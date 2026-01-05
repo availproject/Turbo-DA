@@ -17,15 +17,6 @@ export const numberToBytes32 = (num: number): `0x${string}` => {
   return `0x${paddedHex}` as `0x${string}`;
 };
 
-export const tokenMap = {
-  ethereum: {
-    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
-  },
-  avail: {
-    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
-  },
-};
-
 export const baseImageUrl = (path?: string) => {
   return process.env.NEXT_PUBLIC_IMAGES_URL! + path;
 };

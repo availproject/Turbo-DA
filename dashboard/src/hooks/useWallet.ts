@@ -52,10 +52,9 @@ export default function useWallet() {
   );
 
   const getERC20AvailBalance = useCallback(
-    async (address: `0x${string}`, tokenAddress?: string, chainId?: number) => {
+    async (address: `0x${string}`, tokenAddress: string, chainId?: number) => {
       await readContract(config, {
-        address: (tokenAddress ||
-          "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44") as `0x${string}`,
+        address: tokenAddress as `0x${string}`,
         abi: erc20Abi,
         functionName: "balanceOf",
         args: [address],

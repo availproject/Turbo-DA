@@ -1,5 +1,5 @@
 import { Signer } from "@polkadot/api/types";
-import { base, baseSepolia, mainnet, sepolia } from "@wagmi/core/chains";
+import { base, baseSepolia } from "@wagmi/core/chains";
 import { Chain } from "viem";
 
 export interface LegacySignerOptions {
@@ -11,7 +11,6 @@ type AppConfig = {
   assetId: string;
   config: string;
   networks: {
-    ethereum: Chain;
     base: Chain;
   };
   rpcUrl: string;
@@ -23,8 +22,6 @@ export const appConfig: AppConfig = {
   assetId: "0x0000000000000000000000000000000000000000000000000000000000000000",
   config: process.env.NEXT_PUBLIC_ETH_NETWORK || "testnet",
   networks: {
-    ethereum:
-      process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet" ? mainnet : sepolia,
     base:
       process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet" ? base : baseSepolia,
   },

@@ -27,6 +27,7 @@ interface TokenInfo {
 interface ChainInfo {
   name: string;
   icon: string;
+  isTestnet: boolean | "both";
   id: number;
   tokens: TokenInfo[];
 }
@@ -39,98 +40,91 @@ export interface TokenMap {
   [key: string]: TokenInfo_Legacy;
 }
 
-// Legacy TOKEN_MAP for backward compatibility (will be deprecated)
 interface TokenInfo_Legacy {
   token_address: string;
   token_decimals: number;
   token_ticker?: string;
 }
 
-export const supportedTokensAndChains: SupportedTokensAndChains = {
-  ethereum: {
-    name: "Ethereum",
-    icon: "/currency/eth.png",
-    id: 11155111,
-    tokens: [
-      {
-        name: "ETH",
-        icon: "/currency/eth.png",
-        address: "0x0000000000000000000000000000000000000000",
-        decimals: 18,
-        ticker: "ETH",
-        isNative: true,
-      },
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-        address: "0x99a907545815c289fb6de86d55fe61d996063a94",
-        decimals: 18,
-        ticker: "AVAIL",
-      },
-    ],
+const RAW_TOKEN_MAP = {
+  "0": {
+    "0x0000000000000000000000000000000000000000": {
+      address: "0x0000000000000000000000000000000000000000",
+      coin_gecho_id: "avail",
+      decimals: 18,
+      name: "Avail",
+      symbol: "AVAIL",
+    },
   },
-  base: {
-    name: "Base",
-    icon: "/currency/base.png",
-    id: 84532,
-    tokens: [
-      {
-        name: "ETH",
-        icon: "/currency/eth.png",
-        address: "0x0000000000000000000000000000000000000000",
-        decimals: 18,
-        ticker: "ETH",
-        isNative: true,
-      },
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-        address: "0x99a907545815c289fb6de86d55fe61d996063a94",
-        decimals: 18,
-        ticker: "AVAIL",
-      },
-    ],
+  "8453": {
+    "0xd89d90d26b48940fa8f58385fe84625d468e057a": {
+      address: "0xd89d90d26b48940fa8f58385fe84625d468e057a",
+      coin_gecho_id: "avail",
+      decimals: 18,
+      name: "Avail",
+      symbol: "AVAIL",
+    },
   },
-  basemainnet: {
-    name: "Base Mainnet",
-    icon: "/currency/base.png",
-    id: 8453,
-    tokens: [
-      {
-        name: "ETH",
-        icon: "/currency/eth.png",
-        address: "0x0000000000000000000000000000000000000000",
-        decimals: 18,
-        ticker: "ETH",
-        isNative: true,
-      },
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-        address: "0xd89d90d26b48940fa8f58385fe84625d468e057a",
-        decimals: 18,
-        ticker: "AVAIL",
-      },
-    ],
+  "84532": {
+    "0x0000000000000000000000000000000000000000": {
+      address: "0x0000000000000000000000000000000000000000",
+      coin_gecho_id: "ethereum",
+      decimals: 18,
+      name: "Ether",
+      symbol: "ETH",
+    },
+    "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58": {
+      address: "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58",
+      coin_gecho_id: "avail",
+      decimals: 18,
+      name: "Avail",
+      symbol: "AVAIL",
+    },
   },
-  avail: {
-    name: "Avail",
-    icon: "/avail-icon.svg",
-    id: 0,
-    tokens: [
-      {
-        name: "AVAIL",
-        icon: "/avail-icon.svg",
-        address: "0x0000000000000000000000000000000000000000",
-        decimals: 18,
-        ticker: "AVAIL",
-        isNative: true,
-      },
-    ],
-  },
+} as const;
+
+const CHAIN_METADATA: Record<
+  number,
+  { name: string; icon: string; isTestnet: boolean | "both" }
+> = {
+  0: { name: "Avail", icon: "/avail-icon.svg", isTestnet: "both" },
+  8453: { name: "Base", icon: "/currency/base.png", isTestnet: false },
+  84532: { name: "Base Sepolia", icon: "/currency/eth.png", isTestnet: true },
 };
 
-// Generate TOKEN_MAP from supportedTokensAndChains for backward compatibility
+const TOKEN_ICONS: Record<string, string> = {
+  AVAIL: "/avail-icon.svg",
+  ETH: "/currency/eth.png",
+};
+
+export const supportedTokensAndChains: SupportedTokensAndChains =
+  Object.entries(RAW_TOKEN_MAP).reduce((acc, [chainId, tokens]) => {
+    const id = parseInt(chainId);
+    const metadata = CHAIN_METADATA[id];
+
+    if (!metadata) {
+      console.warn(`No metadata found for chain ID ${id}`);
+      return acc;
+    }
+
+    acc[id] = {
+      ...metadata,
+      id,
+      tokens: Object.values(tokens).map((token) => ({
+        name: token.symbol,
+        icon: TOKEN_ICONS[token.symbol] || "/avail-icon.svg",
+        address: token.address.trim(),
+        decimals: token.decimals,
+        ticker: token.symbol,
+        isNative:
+          token.address.trim().toLowerCase() ===
+          "0x0000000000000000000000000000000000000000",
+      })),
+    };
+
+    return acc;
+  }, {} as SupportedTokensAndChains);
+
 export const TOKEN_MAP: TokenMap = Object.values(
   supportedTokensAndChains,
 ).reduce((acc, chain) => {
@@ -145,25 +139,13 @@ export const TOKEN_MAP: TokenMap = Object.values(
   return acc;
 }, {} as TokenMap);
 
-export enum SupportedChains {
-  Mainnet = 1,
-  Sepolia = 11155111,
-  BaseSepolia = 84532,
-}
-
 export const getAvailableChains = (): SupportedTokensAndChains => {
   const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
 
-  if (isMainnet) {
-    return {
-      basemainnet: supportedTokensAndChains.basemainnet,
-      avail: supportedTokensAndChains.avail,
-    };
-  } else {
-    return {
-      ethereum: supportedTokensAndChains.ethereum,
-      base: supportedTokensAndChains.base,
-      avail: supportedTokensAndChains.avail,
-    };
-  }
+  return Object.fromEntries(
+    Object.entries(supportedTokensAndChains).filter(
+      ([_, chain]) =>
+        chain.isTestnet === "both" || chain.isTestnet === !isMainnet,
+    ),
+  );
 };

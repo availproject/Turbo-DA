@@ -28,15 +28,6 @@ import { ClickHandler } from "../utils/types";
 import { ErrorHandlingUtils } from "@/utils/errorHandling";
 import { TransactionService } from "@/services/transaction";
 
-// Remove hardcoded chain - now using dynamic chain from user selection
-
-// Helper function to get token info from supportedTokensAndChains
-const getTokenInfo = (chainName: string, tokenName: string) => {
-  const chainKey = chainName.toLowerCase().replace(/\s+/g, "");
-  const chain = supportedTokensAndChains[chainKey];
-  return chain?.tokens.find((token) => token.name === tokenName);
-};
-
 interface BuyButtonProps {
   tokenAmount: string;
   tokenAmountError: string;
@@ -158,13 +149,11 @@ const BuyButton = ({
 
     intervalIdRef.current = setInterval(checkBalanceUpdate, 5000);
 
-    // Initial check after 2 seconds
     setTimeout(() => {
       console.log("BALANCE POLLING: Running initial balance check");
       checkBalanceUpdate();
     }, 2000);
 
-    // Safety stop after 2 minutes
     setTimeout(() => {
       console.log("BALANCE POLLING: Timeout reached, clearing interval");
       if (intervalIdRef.current) {
@@ -236,7 +225,9 @@ const BuyButton = ({
       // Get token information
       const tokenInfo =
         selectedToken && selectedChain
-          ? getTokenInfo(selectedChain.name, selectedToken.name)
+          ? supportedTokensAndChains[selectedChain.id]?.tokens.find(
+              (token) => token.name === selectedToken.name,
+            )
           : undefined;
       const tokenAddress = tokenInfo?.address;
 
@@ -732,7 +723,7 @@ const BuyButton = ({
             address: process.env.NEXT_PUBLIC_ADDRESS,
             orderId: orderResponse?.data?.id,
             amount: parseUnits(tokenAmount, 18),
-            tokenAddress: tokenAddress?.toLowerCase(),
+            tokenAddress: tokenAddress,
             chainId: selectedChain.id,
           });
 
@@ -743,7 +734,7 @@ const BuyButton = ({
             args: [
               numberToBytes32(+orderResponse?.data?.id),
               parseUnits(tokenAmount, 18),
-              tokenAddress?.toLowerCase(),
+              tokenAddress,
             ],
             chainId: selectedChain.id,
           });
@@ -986,7 +977,7 @@ const BuyButton = ({
   if (
     (selectedChain?.name === "Ethereum" ||
       selectedChain?.name === "Base" ||
-      selectedChain?.name === "Base Mainnet") &&
+      selectedChain?.name === "Base Sepolia") &&
     selectedToken
   ) {
     return (

@@ -244,10 +244,11 @@ const CreditHistory = () => {
               labelStatus = "complete";
               break;
             case "PENDING":
-              labelStatus = "cancelled";
-              break;
             case "INCLUDED":
               labelStatus = "pending";
+              break;
+            case "FAILED":
+              labelStatus = "cancelled";
               break;
             default:
               return "-";

@@ -21,7 +21,8 @@ const STORAGE_KEYS = {
 
 const getDefaultChain = (): ChainType => {
   const availableChains = getAvailableChains();
-  const defaultChain = availableChains.ethereum || availableChains.basemainnet;
+  // Get first available chain (sepolia for testnet, base for mainnet)
+  const defaultChain = Object.values(availableChains)[0];
   return {
     name: defaultChain.name,
     icon: defaultChain.icon,
@@ -31,7 +32,8 @@ const getDefaultChain = (): ChainType => {
 
 const getDefaultToken = (): Token => {
   const availableChains = getAvailableChains();
-  const defaultChain = availableChains.ethereum || availableChains.basemainnet;
+  // Get first token from first available chain
+  const defaultChain = Object.values(availableChains)[0];
   return {
     name: defaultChain.tokens[0].name,
     icon: defaultChain.tokens[0].icon,

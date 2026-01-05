@@ -6,11 +6,8 @@ import { appConfig } from "./default";
 
 export const config = createConfig(
   getDefaultConfig({
-    chains: [appConfig.networks.ethereum, appConfig.networks.base],
+    chains: [appConfig.networks.base],
     transports: {
-      [appConfig.networks.ethereum.id]: http(
-        process.env.NEXT_PUBLIC_ETH_RPC_URL || "",
-      ),
       [appConfig.networks.base.id]: http(
         process.env.NEXT_PUBLIC_BASE_RPC_URL || "",
       ),

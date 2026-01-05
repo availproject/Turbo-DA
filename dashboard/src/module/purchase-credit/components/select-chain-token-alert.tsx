@@ -13,22 +13,7 @@ import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { getAvailableChains } from "@/lib/types";
-
-// Helper to get the correct key for a chain name
-const getChainKey = (chainName: string): string => {
-  const nameMap: Record<string, string> = {
-    ethereum: "ethereum",
-    base: "base",
-    "base mainnet": "basemainnet",
-    basemainnet: "basemainnet",
-    avail: "avail",
-  };
-  return (
-    nameMap[chainName.toLowerCase()] ||
-    chainName.toLowerCase().replace(/\s+/g, "")
-  );
-};
+import { getAvailableChains, supportedTokensAndChains } from "@/lib/types";
 
 const SelectChainToken = () => {
   const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
@@ -104,7 +89,7 @@ const SelectChainToken = () => {
               <div className="flex gap-y-2 flex-col mt-6 px-3">
                 {/* Avail Chain */}
                 {(() => {
-                  const availChain = availableChains.avail;
+                  const availChain = availableChains[0];
                   return (
                     <Button
                       variant={"outline"}
@@ -163,7 +148,6 @@ const SelectChainToken = () => {
               <div className="flex flex-col gap-y-3 mt-2">
                 {(() => {
                   if (!selectedChain) {
-                    console.log("No chain selected");
                     return (
                       <Text className="text-center py-4 text-secondary-grey">
                         Please select a chain
@@ -171,22 +155,10 @@ const SelectChainToken = () => {
                     );
                   }
 
-                  const chainKey = getChainKey(selectedChain.name);
-                  const tokens = availableChains[chainKey]?.tokens;
-
-                  console.log("=== TOKEN LOOKUP DEBUG ===");
-                  console.log("Selected chain name:", selectedChain.name);
-                  console.log("Selected chain object:", selectedChain);
-                  console.log("Chain key:", chainKey);
-                  console.log(
-                    "Available chains keys:",
-                    Object.keys(availableChains),
-                  );
-                  console.log("Tokens found:", tokens);
-                  console.log("Tokens length:", tokens?.length);
+                  const tokens =
+                    supportedTokensAndChains[selectedChain.id]?.tokens;
 
                   if (!tokens || tokens.length === 0) {
-                    console.log("No tokens found for chain:", chainKey);
                     return (
                       <Text className="text-center py-4 text-secondary-grey">
                         No tokens available for this chain
