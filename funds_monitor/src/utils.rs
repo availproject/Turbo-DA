@@ -66,6 +66,7 @@ impl Utils {
 
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
+            .filter(credit_requests::amount_credit.is_null())
             .set((
                 credit_requests::amount_credit.eq(Some(amount.clone())),
                 credit_requests::request_status.eq(status.to_string()),

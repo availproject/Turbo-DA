@@ -88,6 +88,9 @@ async fn process_block(
     let all = block.all::<BatchAll>(Default::default()).await;
     let all = all.map_err(|e| e.to_string())?;
 
+    let block_hash_hex = hex::encode(block_hash.0);
+    let mut connection = utils.establish_connection()?;
+
     for tx in all {
         let tx_hash = tx.ext_hash();
 
@@ -145,35 +148,33 @@ async fn process_block(
             tracing::info!("second call is not a system call, skipping");
             continue;
         };
+        let MultiAddress::Id(dest) = &balances_call.dest else {
+            tracing::error!(
+                destination = %account_id,
+                "destination is not a valid account id, skipping"
+            );
+            continue;
+        };
 
-        if account_id.to_string() != avail_deposit_address.to_string() {
+        if dest.to_string() != avail_deposit_address.to_string() {
             tracing::error!(
                 destination = %account_id,
                 "destination is not the deposit address, skipping"
             );
             continue;
         }
-
         let account_id_hex = hex::encode(account_id.0);
         let tx_hash_hex = hex::encode(tx_hash.0);
-        let block_hash_hex = hex::encode(block_hash.0);
 
         let ascii_remark = hex::encode(remark_call.remark.clone());
         tracing::info!(
-            tx_hash = %tx_hash,
+            tx_hash = %tx_hash_hex,
             account = %account_id_hex,
             block_height = block_height,
             block_hash = ?block_hash,
             ascii_remark = %ascii_remark,
             "found matching batch call"
         );
-
-        let mut connection = utils.establish_connection()?;
-
-        utils
-            .update_finalised_block_number(block_height as i32, block_hash_hex, &mut connection, 0)
-            .await
-            .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
         let receipt = Deposit {
             token_address: "0x0000000000000000000000000000000000000000".to_string(),
@@ -188,7 +189,7 @@ async fn process_block(
                 &tx_hash_hex,
                 &mut connection,
                 0,
-                &"Processed".to_string(),
+                &"PROCESSED".to_string(),
             )
             .await
             .map_err(|e| {
@@ -196,6 +197,11 @@ async fn process_block(
                 format!("Failed to update database on deposit: {}", e)
             })?;
     }
+
+    utils
+        .update_finalised_block_number(block_height as i32, block_hash_hex, &mut connection, 0)
+        .await
+        .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
     Ok(())
 }
