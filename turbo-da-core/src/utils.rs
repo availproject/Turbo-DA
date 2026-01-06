@@ -7,7 +7,9 @@ use actix_web::{
 };
 use alloy::primitives::Address;
 use avail_rust::{
-    avail_rust_core::rpc::chain, constants::dev_accounts, Client as AvailClient, Keypair, Options,
+    avail_rust_core::rpc::{chain, system::chain},
+    constants::dev_accounts,
+    Client as AvailClient, Keypair, Options,
 };
 
 use bigdecimal::BigDecimal;
@@ -276,9 +278,9 @@ lazy_static! {
         let mut chain_map = HashMap::new();
 
         chain_map.insert(
-            "0x0000000000000000000000000000000000000000".to_string(),
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                address: "0x0000000000000000000000000000000000000000".to_string(),
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
                 decimals: 18,
                 name: "Ether".to_string(),
                 symbol: "ETH".to_string(),
@@ -286,22 +288,66 @@ lazy_static! {
             },
         );
         chain_map.insert(
-            "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_string(),
+            "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
             Token {
-                address: "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_string(),
+                address: "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
                 decimals: 18,
                 name: "Avail".to_string(),
                 symbol: "AVAIL".to_string(),
                 coin_gecho_id: "avail".to_string(),
             },
         );
+        chain_map.insert(
+            "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+            Token {
+                address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
         m.insert(84532, chain_map.clone());
 
         chain_map.clear();
+
         chain_map.insert(
-            "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_string(),
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_string(),
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
+                decimals: 18,
+                name: "Ether".to_string(),
+                symbol: "ETH".to_string(),
+                coin_gecho_id: "ethereum".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+            Token {
+                address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+                decimals: 6,
+                name: "USDT".to_string(),
+                symbol: "USDT".to_string(),
+                coin_gecho_id: "tether".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+            Token {
+                address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
+            Token {
+                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
                 decimals: 18,
                 name: "Avail".to_string(),
                 symbol: "AVAIL".to_string(),
@@ -312,9 +358,9 @@ lazy_static! {
 
         chain_map.clear();
         chain_map.insert(
-            "0x0000000000000000000000000000000000000000".to_string(),
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                address: "0x0000000000000000000000000000000000000000".to_string(),
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
                 decimals: 18,
                 name: "Avail".to_string(),
                 symbol: "AVAIL".to_string(),
