@@ -46,73 +46,121 @@ interface TokenInfo_Legacy {
   token_ticker?: string;
 }
 
-const RAW_TOKEN_MAP = {
-  "0": {
-    "0x0000000000000000000000000000000000000000": {
-      address: "0x0000000000000000000000000000000000000000",
-      coin_gecho_id: "avail",
-      decimals: 18,
-      name: "Avail",
-      symbol: "AVAIL",
-    },
-  },
-  "8453": {
-    "0xd89d90d26b48940fa8f58385fe84625d468e057a": {
-      address: "0xd89d90d26b48940fa8f58385fe84625d468e057a",
-      coin_gecho_id: "avail",
-      decimals: 18,
-      name: "Avail",
-      symbol: "AVAIL",
-    },
-  },
-  "84532": {
-    "0x0000000000000000000000000000000000000000": {
-      address: "0x0000000000000000000000000000000000000000",
-      coin_gecho_id: "ethereum",
-      decimals: 18,
-      name: "Ether",
-      symbol: "ETH",
-    },
-    "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58": {
-      address: "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58",
-      coin_gecho_id: "avail",
-      decimals: 18,
-      name: "Avail",
-      symbol: "AVAIL",
-    },
-  },
-} as const;
-
 const CHAIN_METADATA: Record<
   number,
-  { name: string; icon: string; isTestnet: boolean | "both" }
+  { name: string; isTestnet: boolean | "both"; coinGeckoId?: string }
 > = {
-  0: { name: "Avail", icon: "/avail-icon.svg", isTestnet: "both" },
-  8453: { name: "Base", icon: "/currency/base.png", isTestnet: false },
-  84532: { name: "Base Sepolia", icon: "/currency/eth.png", isTestnet: true },
+  0: { name: "Avail", isTestnet: "both", coinGeckoId: "avail" },
+  8453: { name: "Base", isTestnet: false },
+  84532: { name: "Base Sepolia", isTestnet: true },
 };
 
-const TOKEN_ICONS: Record<string, string> = {
-  AVAIL: "/avail-icon.svg",
-  ETH: "/currency/eth.png",
-};
+const LOGO_CACHE_KEY = "turbo-da-token-logos-v1";
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
-export const supportedTokensAndChains: SupportedTokensAndChains =
-  Object.entries(RAW_TOKEN_MAP).reduce((acc, [chainId, tokens]) => {
+let cachedTokenMap: SupportedTokensAndChains | null = null;
+
+interface LogoCacheData {
+  timestamp: number;
+  logos: Record<string, string>;
+}
+
+function getLogoCache(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const cached = localStorage.getItem(LOGO_CACHE_KEY);
+    if (!cached) return {};
+    const data: LogoCacheData = JSON.parse(cached);
+    if (Date.now() - data.timestamp > CACHE_DURATION) {
+      localStorage.removeItem(LOGO_CACHE_KEY);
+      return {};
+    }
+    return data.logos;
+  } catch {
+    return {};
+  }
+}
+
+function saveLogoCache(logos: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  try {
+    const data: LogoCacheData = {
+      timestamp: Date.now(),
+      logos,
+    };
+    localStorage.setItem(LOGO_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+async function fetchTokenMap() {
+  const response = await fetch(
+    "https://hex.turbo-api.availproject.org/core-api/v1/token_map"
+  );
+  const data = await response.json();
+  return data.data;
+}
+
+async function fetchCoinGeckoLogos(coinIds: string[]): Promise<Record<string, string>> {
+  const logoCache = getLogoCache();
+  const results: Record<string, string> = { ...logoCache };
+  const missingIds = coinIds.filter((id) => !logoCache[id]);
+
+  if (missingIds.length === 0) return results;
+
+  await Promise.all(
+    missingIds.map(async (coinId) => {
+      try {
+        const response = await fetch(
+          `https://api.coingecko.com/api/v3/coins/${coinId}`
+        );
+        const data = await response.json();
+        results[coinId] = data.image?.small || data.image?.thumb || "/currency/base.png";
+      } catch {
+        results[coinId] = "/currency/base.png";
+      }
+    })
+  );
+
+  saveLogoCache(results);
+  return results;
+}
+
+async function buildSupportedTokensAndChains(rawTokenMap: any): Promise<SupportedTokensAndChains> {
+  const chains: SupportedTokensAndChains = {};
+  const allCoinIds = new Set<string>();
+
+  Object.values(rawTokenMap).forEach((tokens) => {
+    Object.values(tokens as Record<string, any>).forEach((token) => {
+      allCoinIds.add(token.coin_gecho_id);
+    });
+  });
+
+  Object.values(CHAIN_METADATA).forEach((metadata) => {
+    if (metadata.coinGeckoId) allCoinIds.add(metadata.coinGeckoId);
+  });
+
+  const logoMap = await fetchCoinGeckoLogos(Array.from(allCoinIds));
+
+  for (const [chainId, tokens] of Object.entries(rawTokenMap)) {
     const id = parseInt(chainId);
     const metadata = CHAIN_METADATA[id];
 
-    if (!metadata) {
-      console.warn(`No metadata found for chain ID ${id}`);
-      return acc;
-    }
+    if (!metadata) continue;
 
-    acc[id] = {
-      ...metadata,
+    const chainIcon = metadata.coinGeckoId
+      ? logoMap[metadata.coinGeckoId]
+      : id === 8453
+      ? "/currency/base.png"
+      : "/currency/eth.png";
+
+    chains[id] = {
+      name: metadata.name,
+      icon: chainIcon,
+      isTestnet: metadata.isTestnet,
       id,
-      tokens: Object.values(tokens).map((token) => ({
+      tokens: Object.values(tokens as Record<string, any>).map((token) => ({
         name: token.symbol,
-        icon: TOKEN_ICONS[token.symbol] || "/avail-icon.svg",
+        icon: logoMap[token.coin_gecho_id] || "/currency/base.png",
         address: token.address.trim(),
         decimals: token.decimals,
         ticker: token.symbol,
@@ -121,31 +169,29 @@ export const supportedTokensAndChains: SupportedTokensAndChains =
           "0x0000000000000000000000000000000000000000",
       })),
     };
+  }
 
-    return acc;
-  }, {} as SupportedTokensAndChains);
+  return chains;
+}
 
-export const TOKEN_MAP: TokenMap = Object.values(
-  supportedTokensAndChains,
-).reduce((acc, chain) => {
-  chain.tokens.forEach((token) => {
-    const key = token.name.toLowerCase();
-    acc[key] = {
-      token_address: token.address,
-      token_decimals: token.decimals,
-      token_ticker: token.ticker,
-    };
-  });
-  return acc;
-}, {} as TokenMap);
+export async function getSupportedTokensAndChains(): Promise<SupportedTokensAndChains> {
+  if (cachedTokenMap) return cachedTokenMap;
+  const rawTokenMap = await fetchTokenMap();
+  cachedTokenMap = await buildSupportedTokensAndChains(rawTokenMap);
+  return cachedTokenMap;
+}
 
-export const getAvailableChains = (): SupportedTokensAndChains => {
+export const supportedTokensAndChains: SupportedTokensAndChains = {} as SupportedTokensAndChains;
+
+export const TOKEN_MAP: TokenMap = {} as TokenMap;
+
+export async function getAvailableChains(): Promise<SupportedTokensAndChains> {
   const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
+  const chains = await getSupportedTokensAndChains();
 
   return Object.fromEntries(
-    Object.entries(supportedTokensAndChains).filter(
-      ([_, chain]) =>
-        chain.isTestnet === "both" || chain.isTestnet === !isMainnet,
-    ),
+    Object.entries(chains).filter(
+      ([_, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+    )
   );
-};
+}

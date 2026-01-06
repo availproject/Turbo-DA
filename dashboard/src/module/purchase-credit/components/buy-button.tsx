@@ -3,7 +3,6 @@ import Button from "@/components/button";
 import { useDialog } from "@/components/dialog/provider";
 import { useAppToast } from "@/components/toast";
 import { config } from "@/config/evm-config";
-import { supportedTokensAndChains } from "@/lib/types";
 import { numberToBytes32 } from "@/lib/utils";
 import { TransactionStatus, useConfig } from "@/providers/ConfigProvider";
 import { useSwitchChain } from "wagmi";
@@ -58,6 +57,7 @@ const BuyButton = ({
     selectedToken,
     setTransactionStatusList,
     setShowTransaction,
+    supportedTokensAndChains,
   } = useConfig();
   const { switchChainAsync } = useSwitchChain();
   const { creditBalance, setIsAwaitingCreditUpdate } = useOverview();

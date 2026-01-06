@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/useDebounce";
 import useWallet from "@/hooks/useWallet";
-import { supportedTokensAndChains } from "@/lib/types";
 import { formatDataBytes } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { useConfig } from "@/providers/ConfigProvider";
@@ -38,7 +37,12 @@ const BuyCreditsCard = () => {
   const [error, setError] = useState("");
   const [showBalanceError, setShowBalanceError] = useState(false);
   const account = useAccount();
-  const { selectedChain, selectedToken, availNativeBalance } = useConfig();
+  const {
+    selectedChain,
+    selectedToken,
+    availNativeBalance,
+    supportedTokensAndChains,
+  } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
     chainId: selectedChain?.id !== 0 ? selectedChain?.id : undefined,
