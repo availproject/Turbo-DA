@@ -2,7 +2,6 @@
 /// Checks presence of `config.toml`
 /// Else checks environment variables to populate Application Configurations
 use dotenv::dotenv;
-use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io};
 use toml;
@@ -10,22 +9,28 @@ use toml;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
-    pub private_key: String,
+    pub private_keys: Vec<String>,
     pub retry_count: i32,
     pub avail_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
+    pub limit: i64,
+    pub enigma_url: String,
+    pub redis_url: String,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             database_url: String::new(),
-            private_key: String::new(),
+            private_keys: Vec::new(),
             retry_count: 0,
             avail_rpc_endpoint: vec![],
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
+            limit: 10,
+            enigma_url: String::new(),
+            redis_url: String::new(),
         }
     }
 }
@@ -33,19 +38,18 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn load_config(&self) -> Result<AppConfig, std::io::Error> {
         dotenv().ok();
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
         if let Ok(config) = self.load_from_toml() {
             return Ok(config);
         }
 
-        info!("Trying to read from environment variables");
+        tracing::info!("trying to read from environment variables");
 
         match self.load_from_env() {
             Ok(config) => Ok(config),
             Err(env_error) => {
-                error!(
-                    "Couldn't load configuration: TOML error, and ENVIRONMENT error: {:?}",
-                    env_error
+                tracing::error!(
+                    error = ?env_error,
+                    "couldn't load configuration: toml error and environment error"
                 );
                 Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -61,7 +65,7 @@ impl AppConfig {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn!("Failed to read file: {:?}", e);
+            tracing::warn!(error = ?e, "failed to read file");
             e.to_string()
         })?;
 
@@ -70,7 +74,7 @@ impl AppConfig {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                warn!("Coudln't read from TOML File");
+                tracing::warn!("couldn't read from toml file");
                 Err(e.into())
             }
         }
@@ -78,9 +82,9 @@ impl AppConfig {
 
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let database_url = env::var("DATABASE_URL")?;
-        let private_key = env::var("PRIVATE_KEY")?;
         let mut avail_rpc_endpoint = Vec::new();
         let mut index = 1;
+
         while let Ok(endpoint) = env::var(format!("AVAIL_RPC_ENDPOINT_{}", index)) {
             avail_rpc_endpoint.push(endpoint);
             index += 1;
@@ -88,13 +92,27 @@ impl AppConfig {
         let retry_count = env::var("RETRY_COUNT")?;
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
+        let limit = env::var("LIMIT")?.parse::<i64>()?;
+        let mut private_keys = Vec::new();
+        let mut index = 0;
+        while let Ok(key) = env::var(format!("PRIVATE_KEY_{}", index)) {
+            private_keys.push(key);
+            index += 1;
+        }
+        let enigma_url = env::var("ENIGMA_URL")?;
+        let redis_url = env::var("REDIS_URL")?;
+        tracing::info!("config loaded from environment variables");
+
         Ok(AppConfig {
             database_url,
-            private_key,
+            private_keys,
             retry_count: retry_count.parse::<i32>().unwrap(),
             avail_rpc_endpoint,
             coingecko_api_url,
             coingecko_api_key,
+            limit,
+            enigma_url,
+            redis_url,
         })
     }
 }

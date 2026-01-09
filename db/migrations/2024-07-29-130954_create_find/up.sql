@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE credit_requests (
+CREATE TABLE IF NOT EXISTS credit_requests (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR NOT NULL,
     amount_credit DECIMAL NOT NULL,

@@ -1,0 +1,105 @@
+name: TURBO DA Release
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [funds_monitor, fallback_monitor, turbo-da-core, data_submission]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      
+      - name: Get release tag
+        id: get_tag
+        run: echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extract metadata and set version
+        id: meta
+        run: |
+          DOCKERHUB_ORG="availj"
+          DOCKERHUB_REPO="turboda"
+          IMAGE_TAG="${{ steps.get_tag.outputs.tag }}"
+          
+          echo "image=$DOCKERHUB_ORG/$DOCKERHUB_REPO" >> $GITHUB_OUTPUT
+          echo "version=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "service=${{ matrix.service }}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: ${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.version }}
+      
+      - name: Output build information
+        run: |
+          echo "Built and pushed: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.version }}"
+          echo "Service: ${{ matrix.service }}"
+
+  update-release:
+    name: Update Release with Build Information
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+      - name: Get release tag
+        id: get_tag
+        run: echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+      
+      - name: Update release with build information
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const services = ['funds_monitor', 'fallback_monitor', 'turbo-da-core', 'data_submission'];
+            const tag = '${{ steps.get_tag.outputs.tag }}';
+            
+            let buildInfo = '##  Docker Images Built\n\n';
+            buildInfo += 'The following Docker images have been built and pushed to Docker Hub:\n\n';
+            
+            services.forEach(service => {
+              const imageTag = `availj/turboda:${service}-${tag}`;
+              buildInfo += `- **${service}**: \`${imageTag}\`\n`;
+            });
+            
+            buildInfo += '\n## 📋 Deployment Information\n\n';
+            buildInfo += `- **Release Tag**: ${tag}\n`;
+            buildInfo += `- **Build Date**: ${new Date().toISOString()}\n`;
+            
+            // Get current release
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+            
+            // Update release body
+            const updatedBody = release.data.body + '\n\n' + buildInfo;
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: updatedBody
+            });
+            
+            console.log('Release updated with build information');

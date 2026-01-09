@@ -1,149 +1,207 @@
-use std::sync::Arc;
-
-use avail::runtime_types::da_runtime::RuntimeCall;
-use avail::runtime_types::frame_system::pallet::Call::remark_with_event as RemarkWithEvent;
-use avail::runtime_types::pallet_balances::pallet::Call::transfer_keep_alive as TransferKeepAlive;
-use avail::utility::calls::types::BatchAll;
+use avail_rust::avail::utility::tx::BatchAll;
+use avail_rust::avail::RuntimeCall;
+use avail_rust::block::BlockExtrinsicsQuery;
 use avail_rust::prelude::*;
-use avail_rust::{avail, block, error::ClientError, subxt, Block, Filter, SDK};
 use diesel::PgConnection;
-use log::{error, info};
-use subxt::utils::MultiAddress;
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::query_finalised_block_number;
 use crate::utils::{Deposit, Utils};
 // Remark is the user id in hex format
-pub async fn run(cfg: Arc<Config>) -> Result<(), ClientError> {
-    info!("Starting Avail Chain Monitor");
-    let sdk = SDK::new(cfg.avail_rpc_url.as_str()).await?;
+pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
+    tracing::debug!("starting avail chain monitor");
+    let sdk = Client::new(cfg.avail_rpc_url.as_str()).await;
+    let sdk = sdk.map_err(|e| e.to_string())?;
     let utils = Utils::new(
         cfg.coin_gecho_api_url.clone(),
         cfg.coin_gecho_api_key.clone(),
         cfg.database_url.clone(),
         cfg.avail_rpc_url.clone(),
     );
-    info!("SDK initialized with local endpoint");
+
+    tracing::debug!("sdk initialized with local endpoint");
 
     let mut connection = utils.establish_connection()?;
 
-    sync_database(&mut connection, &sdk, &utils).await?;
-
-    let mut stream = sdk.client.blocks().subscribe_finalized().await?;
-    while let Some(avail_block) = stream.next().await {
-        match avail_block {
-            Ok(avail_block) => {
-                let block: Block = Block::from_block(avail_block).await?;
-                process_block(block, &utils).await?;
-            }
-            Err(e) => {
-                error!("Error fetching block: {}", e);
-            }
-        }
+    if let Err(e) = sync_database(&mut connection, &sdk, &utils, &cfg.avail_deposit_address).await {
+        tracing::error!(error = %e, "failed to sync database");
     }
 
-    info!("Avail run completed successfully");
-    Ok(())
+    let mut sub = Sub::new(sdk.clone());
+    loop {
+        let b_info = sub.next().await;
+        let b_info = match b_info {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::error!(error = %err, "failed to stream next block");
+                continue;
+            }
+        };
+
+        tracing::info!(height = b_info.height, "fetched block height");
+        if let Err(e) = process_block(
+            &sdk,
+            b_info.hash,
+            b_info.height,
+            &utils,
+            &cfg.avail_deposit_address,
+        )
+        .await
+        {
+            tracing::error!(error = %e, "failed to process block");
+        }
+    }
 }
 
 async fn sync_database(
     connection: &mut PgConnection,
-    client: &SDK,
+    client: &Client,
     utils: &Utils,
-) -> Result<(), ClientError> {
-    let finalised_block_number = query_finalised_block_number(0, connection);
-    let block = Block::new(
-        &client.client,
-        new_h256_from_hex(&finalised_block_number.block_hash)?,
+    avail_deposit_address: &String,
+) -> Result<(), String> {
+    let finalized_info = query_finalised_block_number(0, connection);
+
+    let block_hash = H256::from_str(&finalized_info.block_hash).map_err(|e| e.to_string())?;
+    let block_height = finalized_info.block_number as u32;
+    process_block(
+        client,
+        block_hash,
+        block_height,
+        utils,
+        avail_deposit_address,
     )
     .await?;
-    process_block(block, utils).await?;
     Ok(())
 }
 
-async fn process_block(block: Block, utils: &Utils) -> Result<(), ClientError> {
-    info!("Filtering batch calls from block");
+async fn process_block(
+    client: &Client,
+    block_hash: H256,
+    block_height: u32,
+    utils: &Utils,
+    avail_deposit_address: &String,
+) -> Result<(), String> {
+    tracing::debug!("filtering batch calls from block");
 
-    let all_batch_calls = block.transactions_static::<BatchAll>(Filter::new());
-    info!("Filtering batch calls from block");
+    let block = BlockExtrinsicsQuery::new(client.clone(), block_hash.into());
+    let all = block.all::<BatchAll>(Default::default()).await;
+    let all = all.map_err(|e| e.to_string())?;
 
-    // Filtering
-    for batch_all in all_batch_calls {
-        let number = block.block.number();
-        let hash = block.block.hash().to_string();
-        let account = hex::encode(batch_all.account_id().unwrap().0);
-        let tx_hash = batch_all.tx_hash().to_string();
-        let calls = batch_all.value.calls;
+    let block_hash_hex = hex::encode(block_hash.0);
+    let mut connection = utils.establish_connection()?;
+
+    for tx in all {
+        let tx_hash = tx.ext_hash();
+
+        let Some(signature) = &tx.signature else {
+            continue;
+        };
+
+        tracing::info!(
+            tx_hash = %tx_hash,
+            account = ?signature.address,
+            block_height = block_height,
+            block_hash = %block_hash,
+            "found some batch call"
+        );
+
+        let calls = tx.call.decode_calls();
+        let calls = match calls {
+            Ok(x) => x,
+            Err(_) => {
+                tracing::info!(
+                    block_hash = %block_hash,
+                    tx_index = tx.ext_index(),
+                    "failed to decode batch-all calls, skipping"
+                );
+                continue;
+            }
+        };
+
         // We know that our batch calls needs to have exactly 2 transactions.
-        if calls.len() != 2 {
-            info!("Skipping batch with {} calls (expected 2)", calls.len());
+        if tx.call.len() != 2 {
+            tracing::info!(
+                call_count = calls.len(),
+                "skipping batch with unexpected number of calls (expected 2)"
+            );
             continue;
         }
 
-        // Balance/Transfer Call
-        let RuntimeCall::Balances(balances_call) = &calls[0] else {
-            info!("First call is not a Balances call, skipping");
+        let MultiAddress::Id(account_id) = &signature.address else {
+            tracing::info!(
+                block_hash = %block_hash,
+                tx_index = tx.ext_index(),
+                "multiaddress is not of variant multiaddress::id, skipping"
+            );
             continue;
         };
-        let TransferKeepAlive { dest, value } = balances_call else {
-            info!("Balances call is not TransferKeepAlive, skipping");
+
+        // Balance/Transfer Call
+        let RuntimeCall::BalancesTransferKeepAlive(balances_call) = &calls[0] else {
+            tracing::info!("first call is not a balances call, skipping");
             continue;
         };
 
         // System/Remark call
-        let RuntimeCall::System(system_call) = &calls[1] else {
-            info!("Second call is not a System call, skipping");
+        let RuntimeCall::SystemRemark(remark_call) = &calls[1] else {
+            tracing::info!("second call is not a system call, skipping");
+            continue;
+        };
+        let MultiAddress::Id(dest) = &balances_call.dest else {
+            tracing::error!(
+                destination = %account_id,
+                "destination is not a valid account id, skipping"
+            );
             continue;
         };
 
-        let RemarkWithEvent { remark } = system_call else {
-            info!("System call is not RemarkWithEvent, skipping");
+        if dest.to_string() != avail_deposit_address.to_string() {
+            tracing::error!(
+                destination = %account_id,
+                "destination is not the deposit address, skipping"
+            );
             continue;
-        };
+        }
+        let account_id_hex = hex::encode(account_id.0);
+        let tx_hash_hex = hex::encode(tx_hash.0);
 
-        let MultiAddress::Id(acc) = dest else {
-            info!("Destination is not an Id address, skipping");
-            continue;
-        };
-
-        let acc_string = std::format!("{}", acc);
-        let ascii_remark = block::to_ascii(remark.clone()).unwrap();
-        info!(
-            "Found matching batch call - Destination: {}, Value: {}, Remark: {:?}",
-            acc_string, value, ascii_remark
+        let ascii_remark = hex::encode(remark_call.remark.clone());
+        tracing::info!(
+            tx_hash = %tx_hash_hex,
+            account = %account_id_hex,
+            block_height = block_height,
+            block_hash = ?block_hash,
+            ascii_remark = %ascii_remark,
+            "found matching batch call"
         );
 
-        let mut connection = utils.establish_connection()?;
-
-        match utils
-            .update_finalised_block_number(number as i32, hash, &mut connection, 0)
-            .await
-        {
-            Ok(_) => {
-                info!("Updated finalised block number: {}", number);
-            }
-            Err(e) => {
-                error!("Failed to update finalised block number: {}", e);
-            }
-        }
-
         let receipt = Deposit {
-            user_id: ascii_remark,
             token_address: "0x0000000000000000000000000000000000000000".to_string(),
-            amount: value.to_string(),
-            from: account,
+            amount: balances_call.value.to_string(),
+            _from: account_id_hex,
         };
 
         utils
             .update_database_on_deposit(
+                &ascii_remark,
                 &receipt,
-                &tx_hash,
+                &tx_hash_hex,
                 &mut connection,
                 0,
-                &"Processed".to_string(),
+                &"PROCESSED".to_string(),
             )
             .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "failed to update database on deposit");
+                format!("Failed to update database on deposit: {}", e)
+            })?;
     }
+
+    utils
+        .update_finalised_block_number(block_height as i32, block_hash_hex, &mut connection, 0)
+        .await
+        .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
     Ok(())
 }

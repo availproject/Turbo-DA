@@ -1,0 +1,10 @@
+{
+  "transactions": [
+    {
+      "rpc": "https://base-sepolia.gateway.tenderly.co"
+    },
+    {
+      "rpc": "https://base-sepolia.gateway.tenderly.co"
+    }
+  ]
+}

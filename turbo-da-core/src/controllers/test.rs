@@ -80,9 +80,10 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
 
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
+            sumsub_timestamp: Some(sumsub_timestamp),
             name: Some("Jane Doe".to_string()),
-            app_id: 20,
         };
 
         let app = test::init_service(
@@ -110,9 +111,10 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
 
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
             name: Some("Jane Doe".to_string()),
-            app_id: 20,
+            sumsub_timestamp: Some(sumsub_timestamp),
         };
 
         let app = test::init_service(
@@ -157,9 +159,10 @@ pub mod test {
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
 
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
             name: Some("Jane Doe".to_string()),
-            app_id: 20,
+            sumsub_timestamp: Some(sumsub_timestamp),
         };
 
         let app = test::init_service(
@@ -188,9 +191,10 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
             name: Some("Jane Doe".to_string()),
-            app_id: 20,
+            sumsub_timestamp: Some(sumsub_timestamp),
         };
 
         let app = test::init_service(
@@ -223,7 +227,6 @@ pub mod test {
         let body_str = String::from_utf8(body.to_vec()).unwrap();
         let user: User = serde_json::from_str(&body_str).expect("Failed to parse JSON");
         assert_eq!(user.name, "Jane Doe");
-        assert_eq!(user.app_id, 20);
         assert!(!user.id.is_empty());
     }
     #[test]
@@ -231,9 +234,10 @@ pub mod test {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();
         app_config.database_url = db.db_url.clone();
+        let sumsub_timestamp = chrono::Utc::now().naive_utc();
         let payload = RegisterUser {
             name: Some("Jane Doe".to_string()),
-            app_id: 20,
+            sumsub_timestamp: Some(sumsub_timestamp),
         };
 
         let app = test::init_service(
@@ -269,7 +273,6 @@ pub mod test {
         }
         let user: Response = serde_json::from_str(&body_str).expect("Failed to parse JSON");
         assert_eq!(user.results[0].name, "Jane Doe");
-        assert_eq!(user.results[0].app_id, 20);
         assert!(!user.results[0].id.is_empty());
     }
 

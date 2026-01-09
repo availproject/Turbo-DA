@@ -1,21 +1,23 @@
-use crate::utils::map_user_id_to_thread;
+use crate::config::AppConfig;
+use crate::utils::{map_user_id_to_thread, retrieve_app_id};
 use crate::workload_scheduler::common::Response;
-use crate::{config::AppConfig, db::customer_expenditure::create_customer_expenditure_entry};
 use actix_web::{
     post,
     web::{self, Bytes},
     HttpRequest, HttpResponse, Responder,
 };
-use db::models::customer_expenditure::CreateCustomerExpenditure;
+use db::{
+    controllers::{
+        customer_expenditure::create_customer_expenditure_entry, misc::validate_and_get_entries,
+    },
+    models::customer_expenditure::CreateCustomerExpenditure,
+};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use log::error;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
-use turbo_da_core::{
-    db::users::validate_and_get_entries,
-    utils::{format_size, generate_submission_id, get_connection, retrieve_user_id},
-};
+use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
 
 /// Request payload for submitting string data
 #[derive(Deserialize, Serialize, Clone)]
@@ -35,6 +37,15 @@ pub struct SubmitData {
 /// # Returns
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
+#[tracing::instrument(
+    skip(request_payload, sender, injected_dependency, config, http_request),
+    fields(
+        submission_id = tracing::field::Empty,
+        user_id = tracing::field::Empty,
+        app_id = tracing::field::Empty,
+        data_size = request_payload.data.len()
+    )
+)]
 #[post("/submit_data")]
 pub async fn submit_data(
     request_payload: web::Json<SubmitData>,
@@ -46,57 +57,17 @@ pub async fn submit_data(
     if request_payload.data.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let user = match retrieve_user_id(http_request) {
-        Some(val) => val,
-        None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
-    };
 
-    let mut connection = match get_connection(&injected_dependency).await {
-        Ok(conn) => conn,
-        Err(response) => return response,
-    };
+    tracing::info!("data submission request received");
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
-        Ok(app) => app,
-        Err(e) => {
-            return HttpResponse::InternalServerError().body(e);
-        }
-    };
-
-    drop(connection);
-
-    let submission_id = generate_submission_id();
-    let response = Response {
-        thread_id: map_user_id_to_thread(&config),
-        raw_payload: request_payload.data.as_bytes().to_vec().into(),
-        submission_id,
-        user_id: user.clone(),
-        app_id: avail_app_id,
-    };
-
-    let expenditure_entry = CreateCustomerExpenditure {
-        amount_data: format_size(request_payload.data.as_bytes().len()),
-        user_id: user,
-        id: submission_id,
-        error: None,
-        payload: Some(request_payload.data.as_bytes().to_vec()),
-    };
-
-    tokio::spawn(async move {
-        let mut connection = match get_connection(&injected_dependency).await {
-            Ok(conn) => conn,
-            Err(_) => {
-                error!("couldn't connect to db with error ");
-                return;
-            }
-        };
-
-        create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
-    });
-
-    let _ = sender.send(response);
-
-    HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
+    _submit_data(
+        request_payload.data.as_bytes().to_vec(),
+        sender,
+        injected_dependency,
+        config,
+        http_request,
+    )
+    .await
 }
 
 /// Handles submission of raw binary data
@@ -111,6 +82,15 @@ pub async fn submit_data(
 /// # Returns
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
+#[tracing::instrument(
+    skip(request_payload, sender, injected_dependency, config, http_request),
+    fields(
+        submission_id = tracing::field::Empty,
+        user_id = tracing::field::Empty,
+        app_id = tracing::field::Empty,
+        data_size = request_payload.len()
+    )
+)]
 #[post("/submit_raw_data")]
 pub async fn submit_raw_data(
     request_payload: Bytes,
@@ -122,33 +102,74 @@ pub async fn submit_raw_data(
     if request_payload.len() == 0 {
         return HttpResponse::BadRequest().json(json!({ "error": "Data is empty"}));
     }
-    let user = match retrieve_user_id(http_request) {
+
+    tracing::info!("raw data submission request received");
+
+    _submit_data(
+        request_payload.to_vec(),
+        sender,
+        injected_dependency,
+        config,
+        http_request,
+    )
+    .await
+}
+
+async fn _submit_data(
+    request_payload: Vec<u8>,
+    sender: web::Data<Sender<Response>>,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    config: web::Data<AppConfig>,
+    http_request: HttpRequest,
+) -> HttpResponse {
+    let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
         None => {
             return HttpResponse::InternalServerError()
-                .json(json!({ "error": "User Id not retrieved" }))
+                .json(json!({ "error": "App Id not retrieved" }))
         }
     };
 
+    let user_id = match retrieve_user_id(&http_request) {
+        Some(val) => val,
+        None => {
+            tracing::error!("user_id not found in request headers");
+            return HttpResponse::InternalServerError()
+                .json(json!({ "error": "User Id not retrieved" }));
+        }
+    };
+
+    // Record user_id in current span
+    tracing::Span::current().record("user_id", &user_id.to_string());
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
     };
 
-    let (avail_app_id, _) = match validate_and_get_entries(&mut connection, &user).await {
+    let (avail_app_id, _, _) = match validate_and_get_entries(&mut connection, &app_id).await {
         Ok(app) => app,
         Err(e) => {
+            tracing::error!(error = %e, "app validation failed");
             return HttpResponse::InternalServerError().json(json!({ "error": e }));
         }
     };
+
+    // Record app_id in current span
+    tracing::Span::current().record("app_id", &app_id.to_string());
 
     drop(connection);
 
     let submission_id = generate_submission_id();
 
+    // Record submission_id in current span
+    tracing::Span::current().record("submission_id", &submission_id.to_string());
+
+    tracing::info!(data_size = request_payload.len(), "submission created");
+
     let expenditure_entry = CreateCustomerExpenditure {
         amount_data: format_size(request_payload.len()),
-        user_id: user.clone(),
+        user_id: user_id.clone(),
+        app_id: app_id,
         id: submission_id,
         error: None,
         payload: Some(request_payload.to_vec()),
@@ -156,17 +177,20 @@ pub async fn submit_raw_data(
 
     let consumer_response = Response {
         thread_id: map_user_id_to_thread(&config),
-        raw_payload: request_payload,
+        raw_payload: request_payload.into(),
         submission_id,
-        user_id: user,
-        app_id: avail_app_id,
+        app_id,
+        avail_app_id,
     };
 
     tokio::spawn(async move {
         let mut connection = match get_connection(&injected_dependency).await {
             Ok(conn) => conn,
             Err(_) => {
-                error!("couldn't connect to db with error ");
+                tracing::error!(
+                    submission_id = %submission_id,
+                    "failed to connect to database for expenditure entry"
+                );
                 return;
             }
         };
@@ -175,6 +199,8 @@ pub async fn submit_raw_data(
     });
 
     let _ = sender.send(consumer_response);
+
+    tracing::info!("submission accepted and queued for processing");
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
 }

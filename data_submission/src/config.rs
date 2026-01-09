@@ -2,7 +2,6 @@
 /// Checks presence of `config.toml`
 /// Else checks environment variables to populate Application Configurations
 use dotenv::dotenv;
-use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io, vec::Vec};
 use toml;
@@ -21,6 +20,7 @@ pub struct AppConfig {
     pub maximum_pending_requests: i64,
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
+    pub enigma_url: String,
 }
 
 impl Default for AppConfig {
@@ -38,6 +38,7 @@ impl Default for AppConfig {
             maximum_pending_requests: 50,
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
+            enigma_url: String::new(),
         }
     }
 }
@@ -45,19 +46,18 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn load_config(&self) -> Result<AppConfig, std::io::Error> {
         dotenv().ok();
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
         if let Ok(config) = self.load_from_toml() {
             return Ok(config);
         }
 
-        info!("Trying to read from environment variables");
+        tracing::info!("trying to read from environment variables");
 
         match self.load_from_env() {
             Ok(config) => Ok(config),
             Err(env_error) => {
-                error!(
-                    "Couldn't load configuration: TOML error, and ENVIRONMENT error: {:?}",
-                    env_error
+                tracing::error!(
+                    error = ?env_error,
+                    "couldn't load configuration: TOML error and ENVIRONMENT error"
                 );
                 Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -73,7 +73,7 @@ impl AppConfig {
         config_path.push("config.toml");
 
         let config_str = fs::read_to_string(&config_path).map_err(|e| {
-            warn!("Failed to read file: {:?}", e);
+            tracing::warn!(error = ?e, "failed to read file");
             e.to_string()
         })?;
 
@@ -82,7 +82,7 @@ impl AppConfig {
         match config {
             Ok(conf) => Ok(conf),
             Err(e) => {
-                warn!("Coudln't read from TOML File");
+                tracing::warn!("couldn't read from TOML file");
                 Err(e.into())
             }
         }
@@ -91,105 +91,123 @@ impl AppConfig {
     fn load_from_env(&self) -> Result<AppConfig, Box<dyn Error>> {
         let port = env::var("PORT")
             .map_err(|e| {
-                error!("Failed to get PORT environment variable: {:?}", e);
+                tracing::error!(error = ?e, "failed to get PORT environment variable");
                 e
             })?
             .parse::<u16>()
             .map_err(|e| {
-                error!("Invalid PORT value. Error: {:?}", e);
+                tracing::error!(error = ?e, "invalid PORT value");
                 e.to_string()
             })?;
         let database_url = env::var("DATABASE_URL")?;
         let redis_url = env::var("REDIS_URL")?;
         let number_of_threads = env::var("NUMBER_OF_THREADS")
             .map_err(|e| {
-                error!(
-                    "Failed to get NUMBER_OF_THREADS environment variable: {:?}",
-                    e
+                tracing::error!(
+                    error = ?e,
+                    "failed to get NUMBER_OF_THREADS environment variable"
                 );
                 e
             })?
             .parse::<i32>()
             .map_err(|e| {
-                error!("Invalid NUMBER_OF_THREADS value. Error: {:?}", e);
+                tracing::error!(error = ?e, "invalid NUMBER_OF_THREADS value");
                 e.to_string()
             })?;
 
         let max_pool_size = env::var("MAX_POOL_SIZE")
             .map_err(|e| {
-                error!("Failed to get MAX_POOL_SIZE environment variable: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "failed to get MAX_POOL_SIZE environment variable"
+                );
                 e
             })?
             .parse::<usize>()
             .map_err(|e| {
-                error!("Invalid MAX_POOL_SIZE value. Error: {:?}", e);
+                tracing::error!(error = ?e, "invalid MAX_POOL_SIZE value");
                 e.to_string()
             })?;
 
         let broadcast_channel_size = env::var("BROADCAST_CHANNEL_SIZE")
             .map_err(|e| {
-                error!(
-                    "Failed to get BROADCAST_CHANNEL_SIZE environment variable: {:?}",
-                    e
+                tracing::error!(
+                    error = ?e,
+                    "failed to get BROADCAST_CHANNEL_SIZE environment variable"
                 );
                 e
             })?
             .parse::<usize>()
             .map_err(|e| {
-                error!("Invalid BROADCAST_CHANNEL_SIZE value. Error: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "invalid BROADCAST_CHANNEL_SIZE value"
+                );
                 e.to_string()
             })?;
 
         let payload_size = env::var("PAYLOAD_SIZE")
             .map_err(|e| {
-                error!("Failed to get PAYLOAD_SIZE environment variable: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "failed to get PAYLOAD_SIZE environment variable"
+                );
                 e
             })?
             .parse::<usize>()
             .map_err(|e| {
-                error!("Invalid PAYLOAD_SIZE value. Error: {:?}", e);
+                tracing::error!(error = ?e, "invalid PAYLOAD_SIZE value");
                 e.to_string()
             })?;
 
         let maximum_pending_requests = env::var("MAXIMUM_PENDING_REQUESTS")
             .map_err(|e| {
-                error!(
-                    "Failed to get MAXIMUM_PENDING_REQUESTS environment variable: {:?}",
-                    e
+                tracing::error!(
+                    error = ?e,
+                    "failed to get MAXIMUM_PENDING_REQUESTS environment variable"
                 );
                 e
             })?
             .parse::<i64>()
             .map_err(|e| {
-                error!("Invalid MAXIMUM_PENDING_REQUESTS value. Error: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "invalid MAXIMUM_PENDING_REQUESTS value"
+                );
                 e.to_string()
             })?;
 
         let rate_limit_window_size = env::var("RATE_LIMIT_WINDOW_SIZE")
             .map_err(|e| {
-                error!(
-                    "Failed to get RATE_LIMIT_WINDOW_SIZE environment variable: {:?}",
-                    e
+                tracing::error!(
+                    error = ?e,
+                    "failed to get RATE_LIMIT_WINDOW_SIZE environment variable"
                 );
                 e
             })?
             .parse::<u64>()
             .map_err(|e| {
-                error!("Invalid RATE_LIMIT_WINDOW_SIZE value. Error: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "invalid RATE_LIMIT_WINDOW_SIZE value"
+                );
                 e.to_string()
             })?;
 
         let rate_limit_max_requests = env::var("RATE_LIMIT_MAX_REQUESTS")
             .map_err(|e| {
-                error!(
-                    "Failed to get RATE_LIMIT_MAX_REQUESTS environment variable: {:?}",
-                    e
+                tracing::error!(
+                    error = ?e,
+                    "failed to get RATE_LIMIT_MAX_REQUESTS environment variable"
                 );
                 e
             })?
             .parse::<u64>()
             .map_err(|e| {
-                error!("Invalid RATE_LIMIT_MAX_REQUESTS value. Error: {:?}", e);
+                tracing::error!(
+                    error = ?e,
+                    "invalid RATE_LIMIT_MAX_REQUESTS value"
+                );
                 e.to_string()
             })?;
 
@@ -207,6 +225,8 @@ impl AppConfig {
             index += 1;
         }
 
+        let enigma_url = env::var("ENIGMA_URL")?;
+
         Ok(AppConfig {
             port,
             database_url,
@@ -220,6 +240,7 @@ impl AppConfig {
             maximum_pending_requests,
             rate_limit_window_size,
             rate_limit_max_requests,
+            enigma_url,
         })
     }
 }

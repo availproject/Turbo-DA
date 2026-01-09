@@ -1,17 +1,6 @@
-FROM docker.io/library/rust:1.82.0-bookworm AS foundry-builder
+FROM docker.io/library/rust:1.85.1-bookworm AS foundry-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y git curl cmake
-RUN curl -L https://foundry.paradigm.xyz | bash
-ENV PATH="/root/.foundry/bin:${PATH}"
-RUN bash -c "source /root/.bashrc && foundryup"
-COPY . .
-WORKDIR ./contracts
-RUN git init . && \
-    git config --global user.email "docker@example.com" && \
-    git config --global user.name "Docker Build"
-RUN forge install
-RUN forge build
-WORKDIR /build
 
 FROM docker.io/library/debian:bookworm-slim AS runtime
 RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
@@ -20,40 +9,42 @@ FROM foundry-builder AS chef
 RUN cargo install --locked cargo-chef
 
 FROM chef AS planner
+COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS cacher
 COPY --from=planner /build/recipe.json recipe.json
-RUN cargo chef cook --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=cacher /build/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
+COPY . .
 
 FROM builder AS funds_monitor-builder
-RUN cargo build --bin funds_monitor
+RUN cargo build --bin funds_monitor --release
 
 FROM runtime AS funds_monitor
-COPY --from=funds_monitor-builder /build/target/debug/funds_monitor /
+COPY --from=funds_monitor-builder /build/target/release/funds_monitor /
 ENTRYPOINT ["/funds_monitor"]
 
 FROM builder AS fallback_monitor-builder
-RUN cargo build --bin fallback_monitor
+RUN cargo build --bin fallback_monitor --release
 
 FROM runtime AS fallback_monitor
-COPY --from=fallback_monitor-builder /build/target/debug/fallback_monitor /
+COPY --from=fallback_monitor-builder /build/target/release/fallback_monitor /
 ENTRYPOINT ["/fallback_monitor"]
 
 FROM builder AS turbo-da-core-builder
-RUN cargo build --features permissioned --bin turbo-da-core
+RUN cargo build --features permissioned --bin turbo-da-core --release
 
 FROM runtime AS turbo-da-core
-COPY --from=turbo-da-core-builder /build/target/debug/turbo-da-core /
+COPY --from=turbo-da-core-builder /build/target/release/turbo-da-core /
 ENTRYPOINT ["/turbo-da-core"]
 
 FROM builder AS data_submission-builder
-RUN cargo build --bin data_submission
+RUN cargo build --bin data_submission --release
 
 FROM runtime AS data_submission
-COPY --from=data_submission-builder /build/target/debug/data_submission /
+COPY --from=data_submission-builder /build/target/release/data_submission /
 ENTRYPOINT ["/data_submission"]

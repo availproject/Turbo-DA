@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub id: String,
     pub name: String,
-    pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
+    pub allocated_credit_balance: BigDecimal,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize)]
@@ -18,7 +19,7 @@ pub struct User {
 pub struct UserCreate {
     pub id: String,
     pub name: String,
-    pub app_id: i32,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Queryable, Selectable, Identifiable, Serialize, Deserialize)]
@@ -27,7 +28,8 @@ pub struct UserCreate {
 pub struct UserLogin {
     pub id: String,
     pub name: String,
-    pub app_id: i32,
     pub credit_balance: BigDecimal,
     pub credit_used: BigDecimal,
+    pub allocated_credit_balance: BigDecimal,
+    pub sumsub_timestamp: Option<chrono::NaiveDateTime>,
 }

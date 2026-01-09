@@ -9,6 +9,28 @@ diesel::table! {
         user_id -> Varchar,
         #[max_length = 255]
         identifier -> Varchar,
+        app_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    apps (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        app_id -> Int4,
+        app_name -> Nullable<Varchar>,
+        app_description -> Nullable<Varchar>,
+        app_logo -> Nullable<Varchar>,
+        credit_balance -> Numeric,
+        credit_used -> Numeric,
+        fallback_credit_used -> Numeric,
+        metadata_path -> Nullable<Varchar>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        credit_selection -> Nullable<Int2>,
+        encrypted_data -> Bool,
+        encryption -> Bool,
+        barred -> Bool,
     }
 }
 
@@ -16,7 +38,7 @@ diesel::table! {
     credit_requests (id) {
         id -> Int4,
         user_id -> Varchar,
-        amount_credit -> Numeric,
+        amount_credit -> Nullable<Numeric>,
         chain_id -> Nullable<Int4>,
         #[max_length = 50]
         request_status -> Varchar,
@@ -24,6 +46,11 @@ diesel::table! {
         tx_hash -> Nullable<Varchar>,
         #[max_length = 50]
         request_type -> Varchar,
+        app_id -> Nullable<Uuid>,
+        updated_at -> Timestamp,
+        #[max_length = 255]
+        token_address -> Nullable<Varchar>,
+        amount_paid -> Nullable<Numeric>,
     }
 }
 
@@ -44,6 +71,15 @@ diesel::table! {
         retry_count -> Int4,
         error -> Nullable<Varchar>,
         payload -> Nullable<Bytea>,
+        updated_at -> Timestamp,
+        app_id -> Uuid,
+        wallet -> Nullable<Bytea>,
+        ciphertext_hash -> Nullable<Bytea>,
+        plaintext_hash -> Nullable<Bytea>,
+        signature_ciphertext_hash -> Nullable<Bytea>,
+        signature_plaintext_hash -> Nullable<Bytea>,
+        address -> Nullable<Bytea>,
+        ephemeral_pub_key -> Nullable<Bytea>,
     }
 }
 
@@ -61,18 +97,24 @@ diesel::table! {
     users (id) {
         id -> Varchar,
         name -> Varchar,
-        app_id -> Int4,
         credit_balance -> Numeric,
         credit_used -> Numeric,
+        allocated_credit_balance -> Numeric,
+        sumsub_timestamp -> Nullable<Timestamp>,
     }
 }
 
+diesel::joinable!(api_keys -> apps (app_id));
 diesel::joinable!(api_keys -> users (user_id));
+diesel::joinable!(apps -> users (user_id));
+diesel::joinable!(credit_requests -> apps (app_id));
 diesel::joinable!(credit_requests -> users (user_id));
+diesel::joinable!(customer_expenditures -> apps (app_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     api_keys,
+    apps,
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,

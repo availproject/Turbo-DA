@@ -28,6 +28,9 @@ pub struct CustomerExpenditureGet {
     pub error: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub converted_fees: Option<BigDecimal>,
+    pub updated_at: chrono::NaiveDateTime,
+    pub app_id: Uuid,
+    pub wallet: Option<Vec<u8>>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
@@ -57,6 +60,14 @@ pub struct CustomerExpenditureGetWithPayload {
     pub converted_fees: Option<BigDecimal>,
     pub payload: Option<Vec<u8>>,
     pub retry_count: i32,
+    pub app_id: Uuid,
+    pub wallet: Option<Vec<u8>>,
+    pub ephemeral_pub_key: Option<Vec<u8>>,
+    pub ciphertext_hash: Option<Vec<u8>>,
+    pub plaintext_hash: Option<Vec<u8>>,
+    pub signature_ciphertext_hash: Option<Vec<u8>>,
+    pub signature_plaintext_hash: Option<Vec<u8>>,
+    pub address: Option<Vec<u8>>,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize, Debug)]
@@ -68,4 +79,5 @@ pub struct CreateCustomerExpenditure {
     pub amount_data: String,
     pub error: Option<String>,
     pub payload: Option<Vec<u8>>,
+    pub app_id: Uuid,
 }

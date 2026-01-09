@@ -1,47 +1,53 @@
+use super::common::Response;
 /// A consumer that accepts response through a broadcast channel on the spawned threads.
 /// The thread in turn process the request: generate extrinsic and submit it to avail.
 /// Records any failure entry.
-use super::common::Response;
+use crate::redis::Redis;
 use actix_web::web;
 use avail_rust::Keypair;
+use avail_utils::submit_data::SubmitDataAvail;
 use bigdecimal::BigDecimal;
-use db::{errors::*, models::user_model::User, schema::users::dsl::*};
-use diesel::prelude::*;
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
-use log::{error, info};
+use db::{
+    controllers::{
+        customer_expenditure::{add_error_entry, get_did_fallback_resolved},
+        misc::{get_account_by_id, update_database_on_submission},
+        users::TxParams,
+    },
+    errors::*,
+    models::apps::Apps,
+};
+use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{
+    types::{EncryptRequest, EncryptResponse},
+    EnigmaEncryptionService,
+};
 use observability::log_txn;
-use std::sync::Arc;
+use redis::Commands;
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
-use turbo_da_core::{
-    db::customer_expenditure::add_error_entry,
-    utils::{format_size, generate_avail_sdk, get_connection, Convertor},
-};
-
-use crate::{
-    avail::submit_data::{SubmitDataAvail, TransactionInfo},
-    db::{
-        customer_expenditure::update_customer_expenditure, users::update_credit_balance,
-        users::TxParams,
-    },
-};
+use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
-    sender: Sender<Response>,
-    keypair: web::Data<Vec<Keypair>>,
-    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    sender: Arc<Sender<Response>>,
+    keypair: Arc<web::Data<Vec<Keypair>>>,
+    injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
     endpoints: Arc<Vec<String>>,
+    enigma: Arc<web::Data<EnigmaEncryptionService>>,
+    redis: Arc<Redis>,
     number_of_threads: i32,
 }
 
 impl Consumer {
     pub fn new(
-        sender: Sender<Response>,
-        keypair: web::Data<Vec<Keypair>>,
-        injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+        sender: Arc<Sender<Response>>,
+        keypair: Arc<web::Data<Vec<Keypair>>>,
+        injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
         endpoints: Arc<Vec<String>>,
+        enigma: Arc<web::Data<EnigmaEncryptionService>>,
+        redis: Arc<Redis>,
         number_of_threads: i32,
     ) -> Self {
         Consumer {
@@ -49,111 +55,169 @@ impl Consumer {
             keypair,
             injected_dependency,
             endpoints,
+            enigma,
+            redis,
             number_of_threads,
         }
     }
 
     pub async fn start_workers(&self) {
         let number_of_threads = self.number_of_threads;
+        let (heartbeat_tx, mut heartbeat_rx) =
+            tokio::sync::mpsc::channel::<i32>(number_of_threads as usize * 3);
 
         for i in 0..number_of_threads {
-            let injected_dependency = self.injected_dependency.clone();
-            let keygen = self.keypair.clone();
-            let mut receiver = self.sender.subscribe();
+            self.spawn_thread(i, heartbeat_tx.clone()).await;
+        }
 
-            info!("Spawning thread number {}", i);
-            let arc_endpoints = self.endpoints.clone();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            tracing::info!("checking for unresponsive threads");
+            let mut active_threads = HashMap::<i32, bool>::new();
+            for i in 0..number_of_threads {
+                active_threads.insert(i, false);
+            }
+            while let Ok(thread_id) = heartbeat_rx.try_recv() {
+                tracing::debug!(thread_id, "received heartbeat");
+                active_threads.insert(thread_id, true);
+            }
 
-            std::thread::spawn(move || {
-                let runtime = match tokio::runtime::Runtime::new() {
-                    Ok(runtime) => runtime,
-                    Err(e) => {
-                        error!("Failed to create runtime: {}", e);
-                        return;
-                    }
-                };
+            for (thread_id, is_active) in active_threads {
+                if !is_active {
+                    tracing::error!(thread_id, "thread not responding, restarting");
+                    self.spawn_thread(thread_id, heartbeat_tx.clone()).await;
+                }
+            }
+        }
+    }
 
-                let endpoints = arc_endpoints.clone();
+    pub async fn spawn_thread(&self, i: i32, heartbeat_tx: tokio::sync::mpsc::Sender<i32>) {
+        let injected_dependency = self.injected_dependency.clone();
+        let keygen = self.keypair.clone();
+        let sender = self.sender.clone();
+        let endpoints = self.endpoints.clone();
+        let enigma = self.enigma.clone();
+        let redis = self.redis.clone();
 
-                runtime.block_on(async move {
-                    while let Ok(response) = receiver.recv().await {
-                        if response.thread_id != i {
-                            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-                            continue;
-                        }
+        tokio::spawn(async move {
+            tracing::info!(thread_id = i, "spawning consumer thread");
 
-                        let mut connection = match get_connection(&injected_dependency).await {
-                            Ok(conn) => conn,
-                            Err(e) => {
-                                error!(
-                                    "Couldn't establish db connection while processing response: {:?}",
-                                    e
-                                );
-                                return;
-                            }
-                        };
+            let mut receiver = sender.subscribe();
 
-                        let sdk = generate_avail_sdk(&endpoints).await;
-
-                        info!(
-                            "Submission Id: {:?} picked up by thread id {:?}",
-                            response.submission_id, response.thread_id
-                        );
-
-                        let submit_data_class =
-                            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.app_id);
-
-                        let mut process_response = ProcessSubmitResponse::new(
-                            &response,
-                            &mut connection,
-                            submit_data_class,
-                        );
-
-                        match timeout(
-                            Duration::from_secs(120),
-                            process_response.process_response(),
-                        )
-                        .await
-                        {
-                            Ok(result) => match result {
-                                Ok(response) => {
-                                    log_txn(&response.submission_id.to_string(), response.thread_id, "success");
-                                    info!(
-                                        "Successfully submitted response for submission_id {}",
-                                        response.submission_id
-                                    );
-                                }
-                                Err(e) => {
-                                    log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                                    update_error_entry(response, &mut connection, e.to_string())
-                                        .await;
-                                    error!("Failed to process the request with error: {:?}", e);
-                                }
-                            },
-                            Err(_) => {
-                                log_txn(&response.submission_id.to_string(), response.thread_id, "timeout");
-                                update_error_entry(
-                                    response,
-                                    &mut connection,
-                                    TIMEOUT_ERROR.to_string(),
-                                )
-                                .await;
-
-                                error!("Request processing timed out after 2 minutes");
-                            }
-                        }
-                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                    }
-                });
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(120));
+                loop {
+                    interval.tick().await;
+                    let _ = heartbeat_tx.send(i).await;
+                }
             });
+
+            while let Ok(response) = receiver.recv().await {
+                if &response.thread_id != &i {
+                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                    continue;
+                }
+
+                let result = Self::response_handler(
+                    &response,
+                    &injected_dependency,
+                    &endpoints,
+                    &keygen,
+                    &enigma,
+                    Arc::clone(&redis),
+                    i,
+                )
+                .await;
+
+                if let Err(e) = result {
+                    log_txn(&response.submission_id.to_string(), response.thread_id, &e);
+                    tracing::error!(
+                        error = %e,
+                        submission_id = %response.submission_id,
+                        thread_id = response.thread_id,
+                        "failed to process response"
+                    );
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        });
+    }
+
+    #[tracing::instrument(
+        skip(response, injected_dependency, endpoints, keygen, enigma, redis),
+        fields(
+            submission_id = %response.submission_id,
+            thread_id = i,
+            app_id = %response.app_id
+        )
+    )]
+    async fn response_handler(
+        response: &Response,
+        injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
+        endpoints: &Arc<Vec<String>>,
+        keygen: &Vec<Keypair>,
+        enigma: &EnigmaEncryptionService,
+        redis: Arc<Redis>,
+        i: i32,
+    ) -> Result<(), String> {
+        let mut connection = get_connection(&injected_dependency)
+            .await
+            .map_err(|_| format!("Failed to get connection"))?;
+
+        let did_fallback_resolved =
+            get_did_fallback_resolved(&mut connection, &response.submission_id).await;
+
+        if did_fallback_resolved {
+            return Err("Fallback resolved transaction".to_string());
+        }
+
+        let sdk = generate_avail_sdk(&endpoints).await;
+
+        let submit_data_class =
+            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
+
+        let mut process_response = ProcessSubmitResponse::new(
+            &response,
+            &mut connection,
+            submit_data_class,
+            enigma,
+            redis,
+        );
+
+        match timeout(
+            Duration::from_secs(120),
+            process_response.process_response(),
+        )
+        .await
+        {
+            Ok(result) => {
+                if result.is_err() {
+                    let err = result.err().unwrap().to_string();
+                    update_error_entry(response, &mut connection, err.clone()).await;
+                    return Err(err);
+                } else {
+                    tracing::info!(
+                        submission_id = %response.submission_id,
+                        "successfully submitted response"
+                    );
+                    Ok(())
+                }
+            }
+            Err(_) => {
+                update_error_entry(response, &mut connection, TIMEOUT_ERROR.to_string()).await;
+                Err(TIMEOUT_ERROR.to_string())
+            }
         }
     }
 }
 
-struct ProcessSubmitResponse<'a> {
+pub struct ProcessSubmitResponse<'a> {
     response: &'a Response,
     connection: &'a mut AsyncPgConnection,
     submit_avail_class: SubmitDataAvail<'a>,
+    enigma: &'a EnigmaEncryptionService,
+    redis: Arc<Redis>,
 }
 
 impl<'a> ProcessSubmitResponse<'a> {
@@ -161,32 +225,23 @@ impl<'a> ProcessSubmitResponse<'a> {
         response: &'a Response,
         connection: &'a mut AsyncPgConnection,
         submit_avail_class: SubmitDataAvail<'a>,
+        enigma: &'a EnigmaEncryptionService,
+        redis: Arc<Redis>,
     ) -> Self {
         Self {
             response,
             connection,
             submit_avail_class,
+            enigma,
+            redis,
         }
     }
 
-    pub async fn process_response(&mut self) -> Result<&'a Response, String> {
-        let credit_details = match users
-            .filter(db::schema::users::id.eq(&self.response.user_id))
-            .select(User::as_select())
-            .first::<User>(&mut self.connection)
-            .await
-        {
-            Ok(details) => details,
-            Err(e) => {
-                error!(
-                    "Failed to get user information: {:?} {:?}",
-                    self.response.user_id, e
-                );
-                return Err("INVALID USER".to_string());
-            }
-        };
+    pub async fn process_response(&mut self) -> Result<(), String> {
+        let (account, user) =
+            get_account_by_id(&mut self.connection, &self.response.app_id).await?;
 
-        let data = self.response.raw_payload.clone();
+        let (data, encrypted_data) = self.process_data(account.encryption).await?;
 
         let convertor = Convertor::new(
             &self.submit_avail_class.client,
@@ -195,46 +250,158 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
 
-        if credits_used > credit_details.credit_balance {
-            return Err("Insufficient credits".to_string());
-        }
+        self.validate_balance(
+            account.credit_selection,
+            &credits_used,
+            &account.credit_balance,
+            &user.credit_balance,
+        )
+        .await?;
 
-        match self.submit_avail_class.submit_data(&data).await {
-            Ok(result) => {
-                let params = TxParams {
-                    amount_data: format_size(data.len()),
-                    amount_data_billed: credits_used,
-                    fees: result.gas_fee,
-                };
+        self.validate_race_condition(&account, &credits_used, &user.credit_balance)
+            .await?;
 
-                self.update_database(result, params).await;
+        let result = self.submit_avail_class.submit_data(&data).await?;
 
-                Ok(self.response)
-            }
-            Err(submit_err) => {
-                error!("Failed to submit data to avail: {:?}", submit_err);
-                Err(format!("Failed to submit data to avail: {:?}", submit_err))
-            }
-        }
+        let params = TxParams {
+            amount_data: format_size(data.len()),
+            amount_data_billed: credits_used,
+            fees: result.gas_fee,
+        };
+
+        update_database_on_submission(
+            self.response.submission_id,
+            &mut self.connection,
+            result,
+            &account,
+            params,
+            encrypted_data,
+        )
+        .await?;
+
+        Ok(())
     }
 
-    pub async fn update_database(&mut self, result: TransactionInfo, tx_params: TxParams) {
-        let fees_as_bigdecimal = BigDecimal::from(&tx_params.fees);
+    async fn process_data(
+        &self,
+        encryption: bool,
+    ) -> Result<(Vec<u8>, Option<EncryptResponse>), String> {
+        let data = self.response.raw_payload.clone();
 
-        update_customer_expenditure(
-            result,
-            &fees_as_bigdecimal,
-            &tx_params.amount_data_billed,
-            self.response.submission_id,
-            self.connection,
-        )
-        .await;
-        update_credit_balance(self.connection, &self.response.user_id, &tx_params).await;
+        let encrypted_data = if encryption {
+            let encrypt_response = self
+                .enigma
+                .encrypt(EncryptRequest {
+                    plaintext: data.to_vec(),
+                    turbo_da_app_id: self.response.app_id,
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+            Some(encrypt_response)
+        } else {
+            None
+        };
+
+        let data = if let Some(encrypted_response) = &encrypted_data {
+            self.enigma
+                .format_encrypt_response_to_data_submission(encrypted_response)
+        } else {
+            self.response.raw_payload.to_vec()
+        };
+
+        Ok((data, encrypted_data))
+    }
+
+    async fn validate_balance(
+        &self,
+        credit_selection: Option<i16>,
+        credit_used: &BigDecimal,
+        account_credit_balance: &BigDecimal,
+        user_credit_balance: &BigDecimal,
+    ) -> Result<(), String> {
+        match credit_selection {
+            Some(0) => {
+                if &credit_used >= &account_credit_balance {
+                    return Err("Insufficient assigned credits for user id".to_string());
+                }
+            }
+            Some(1) => {
+                if &credit_used >= &user_credit_balance {
+                    return Err("Insufficient fallback credits for user id".to_string());
+                }
+            }
+            Some(2) => {
+                if &(credit_used - account_credit_balance) >= user_credit_balance {
+                    return Err("Insufficient credits for user id".to_string());
+                }
+            }
+            _ => {
+                return Err("Invalid credit selection".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn validate_race_condition(
+        &self,
+        account: &Apps,
+        credits_used: &BigDecimal,
+        user_credit_balance: &BigDecimal,
+    ) -> Result<(), String> {
+        let mut queue = self.redis.redis_pool.get().map_err(|e| e.to_string())?;
+
+        let key = format!(
+            "user:{}_main_balance:{}_app_balance:{}",
+            account.user_id, account.credit_balance, user_credit_balance
+        );
+
+        let member = format!("{}:{}", self.response.submission_id, credits_used);
+
+        let _ = queue
+            .rpush::<&str, &str, i64>(&key, &member)
+            .map_err(|e| e.to_string())?;
+
+        // Get all items from the list to check cumulative cost
+        let all_items: Vec<String> = queue.lrange(&key, 0, -1).map_err(|e| e.to_string())?;
+
+        tracing::debug!(
+            items_count = all_items.len(),
+            "checking race condition queue items"
+        );
+
+        let mut cumulative_cost = BigDecimal::from(0);
+        for (_, item) in all_items.iter().enumerate() {
+            // Parse the cost from "submission_id-cost" format
+            let parts: Vec<&str> = item.split(':').collect();
+
+            let submission_id = parts[0];
+            if let Ok(cost) = BigDecimal::from_str(parts[1]) {
+                cumulative_cost += cost;
+            }
+
+            tracing::debug!(cumulative_cost = %cumulative_cost, "calculated cumulative cost");
+
+            // Check if this is our submission - if so, validate the cumulative cost
+            if submission_id == self.response.submission_id.to_string() {
+                self.validate_balance(
+                    account.credit_selection,
+                    &cumulative_cost,
+                    &account.credit_balance,
+                    &user_credit_balance,
+                )
+                .await?;
+
+                break;
+            }
+        }
+
+        Ok(())
     }
 }
 
 async fn update_error_entry(
-    response_clone: Response,
+    response_clone: &Response,
     injected_dependency: &mut AsyncPgConnection,
     err: String,
 ) {

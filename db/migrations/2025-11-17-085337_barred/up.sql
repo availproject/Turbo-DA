@@ -1,0 +1,9 @@
+-- Your SQL goes here
+ALTER TABLE apps
+ADD COLUMN barred BOOLEAN DEFAULT FALSE;
+
+UPDATE apps
+SET barred = FALSE;
+
+ALTER TABLE apps
+ALTER COLUMN barred SET NOT NULL;

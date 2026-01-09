@@ -4,21 +4,20 @@
 /// The service generates the extrinsic and published it to Avail network.
 pub mod config;
 pub mod controllers;
-pub mod db;
 pub mod routes;
+pub mod s3;
 pub mod utils;
 
 use crate::controllers::{
     customer_expenditure::get_all_expenditure,
-    fund::{estimate_credits, estimate_credits_for_bytes, get_token_map, request_funds_status},
-    users::{get_all_users, get_user, register_new_user, update_app_id},
+    fund::{
+        estimate_credits, estimate_credits_for_bytes, get_all_fund_requests, get_token_map,
+        request_funds_status,
+    },
+    kyc::generate_access_token,
+    users::{get_all_users, get_user, register_new_user, toggle_encryption, update_app_id},
 };
-
 use actix_cors::Cors;
-use actix_extensible_rate_limit::{
-    backend::{memory::InMemoryBackend, SimpleInputFunctionBuilder},
-    RateLimiter,
-};
 use actix_web::{
     dev::Service,
     middleware::Logger,
@@ -27,10 +26,18 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
-    fund::purchase_cost,
-    users::{delete_api_key, generate_api_key, get_api_key},
+    customer_expenditure::{get_expenditure_by_time_range, get_wallet_usage, reset_retry_count},
+    file::{download_file, upload_file},
+    fund::{
+        add_inclusion_details, estimate_credits_against_size, estimate_credits_against_token,
+        fund_user, get_fund_list, purchase_cost, register_credit_request,
+    },
+    misc::indexer_status,
+    users::{
+        allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
+        generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
+    },
 };
-use tokio::time::Duration;
 
 use clerk_rs::{
     clerk::Clerk,
@@ -41,14 +48,15 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
-use log::info;
+use observability::init_tracer;
 use routes::health::health_check;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    info!("Starting API server....");
-
     let app_config = AppConfig::default().load_config()?;
+    let _guard = init_tracer("turbo-da-core");
+
+    tracing::info!("Starting api server");
     let port = app_config.port;
     let db_config =
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
@@ -71,17 +79,6 @@ async fn main() -> Result<(), std::io::Error> {
         );
         let clerk = Clerk::new(config);
 
-        let backend = InMemoryBackend::builder().build();
-        let input = SimpleInputFunctionBuilder::new(
-            Duration::from_secs(shared_config.rate_limit_window_size),
-            shared_config.rate_limit_max_requests,
-        )
-        .custom_key("authorization")
-        .build();
-        let rate_limiter = RateLimiter::builder(backend.clone(), input)
-            .add_headers()
-            .build();
-
         App::new()
             .service(health_check)
             .wrap_fn(|req, srv| {
@@ -95,7 +92,7 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert CSP headers");
+                        tracing::warn!("failed to insert CSP headers");
                     }
 
                     if let (Ok(name), Ok(value)) = (
@@ -104,24 +101,18 @@ async fn main() -> Result<(), std::io::Error> {
                     ) {
                         res.headers_mut().insert(name, value);
                     } else {
-                        log::warn!("Failed to insert X-Content-Type-Options");
+                        tracing::warn!("failed to insert X-Content-Type-Options");
                     }
 
                     Ok(res)
                 }
             })
-            .wrap(rate_limiter)
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
             .wrap(Logger::default())
             .service(
                 web::scope("/v1")
-                    .wrap(ClerkMiddleware::new(
-                        MemoryCacheJwksProvider::new(clerk.clone()),
-                        None,
-                        true,
-                    ))
                     .service(get_token_map)
                     .service(
                         web::scope("/user")
@@ -141,21 +132,42 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })
+                            .wrap(ClerkMiddleware::new(
+                                MemoryCacheJwksProvider::new(clerk.clone()),
+                                None,
+                                true,
+                            ))
                             .service(get_user)
                             .service(get_all_expenditure)
                             .service(request_funds_status)
                             .service(register_new_user)
                             .service(generate_api_key)
                             .service(delete_api_key)
-                            .service(get_api_key)
+                            .service(get_api_keys)
                             .service(update_app_id)
                             .service(purchase_cost)
                             .service(estimate_credits_for_bytes)
-                            .service(estimate_credits),
+                            .service(estimate_credits)
+                            .service(estimate_credits_against_size)
+                            .service(allocate_credit)
+                            .service(delete_account)
+                            .service(generate_app_account)
+                            .service(edit_app_account)
+                            .service(register_credit_request)
+                            .service(upload_file)
+                            .service(download_file)
+                            .service(get_expenditure_by_time_range)
+                            .service(get_apps)
+                            .service(get_fund_list)
+                            .service(reclaim_credits)
+                            .service(estimate_credits_against_token)
+                            .service(add_inclusion_details)
+                            .service(get_wallet_usage)
+                            .service(generate_access_token)
+                            .service(toggle_encryption),
                     )
                     .service(
                         web::scope("/admin")
@@ -175,11 +187,20 @@ async fn main() -> Result<(), std::io::Error> {
                                             "Invalid Authorization header",
                                         ));
                                     }
-
                                     Ok(res)
                                 }
                             })
-                            .service(get_all_users),
+                            .wrap(ClerkMiddleware::new(
+                                MemoryCacheJwksProvider::new(clerk.clone()),
+                                None,
+                                true,
+                            ))
+                            .service(get_all_users)
+                            .service(get_all_apps)
+                            .service(get_all_fund_requests)
+                            .service(fund_user)
+                            .service(indexer_status)
+                            .service(reset_retry_count),
                     ),
             )
     })

@@ -1,4 +1,3 @@
-use fmt::Layer;
 use opentelemetry::{
     global,
     trace::{SamplingDecision, SamplingResult, TraceContextExt},
@@ -10,13 +9,10 @@ use opentelemetry_sdk::{
     trace::{BatchConfigBuilder, Config, ShouldSample},
     Resource,
 };
-use std::{env, io::stdout, time::Duration};
+use std::{env, time::Duration};
 use tracing::Level;
-use tracing_subscriber::{
-    fmt::{self, writer::MakeWriterExt},
-    prelude::*,
-    Registry,
-};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
+use url::Url;
 
 #[derive(Debug, Clone, Copy)]
 struct TurboDASampler;
@@ -51,18 +47,53 @@ fn otel_exporter() -> TonicExporterBuilder {
     new_exporter().tonic().with_endpoint(&endpoint)
 }
 
-pub fn init_tracer<T: Into<Value>>(service_name: T) {
-    let stdout_layer = boolean_env("ENABLE_STDOUT_LOGGING")
-        .then(|| Layer::default().with_writer(stdout.with_max_level(log_level_env("LOG_LEVEL"))));
+use tracing_appender::non_blocking::WorkerGuard;
 
-    let otel_layer = if boolean_env("ENABLE_OTEL_TRACING") {
+pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
+    let service_name = service_name.into();
+    let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
+
+    let env_filter = EnvFilter::from_default_env().add_directive(log_level_env("LOG_LEVEL").into());
+
+    if !cfg!(debug_assertions) {
+        let fmt_layer = fmt::Layer::default()
+            .json()
+            .with_span_list(false)
+            .with_writer(non_blocking);
+
+        let subscriber = Registry::default().with(fmt_layer).with(env_filter);
+        configure_subscriber(subscriber, service_name);
+    } else {
+        // Local environment - Compact printing
+        let fmt_layer = fmt::Layer::default()
+            .compact()
+            .with_file(false)
+            .with_line_number(false)
+            .with_writer(non_blocking);
+
+        let subscriber = Registry::default().with(fmt_layer).with(env_filter);
+        configure_subscriber(subscriber, service_name);
+    }
+
+    guard
+}
+
+fn configure_subscriber<S>(subscriber: S, service_name: Value)
+where
+    S: tracing::Subscriber
+        + Send
+        + Sync
+        + 'static
+        + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    if boolean_env("ENABLE_OTEL_TRACING") {
         let batch_config = BatchConfigBuilder::default()
             .with_max_queue_size(1000000)
             .with_max_export_batch_size(256)
             .with_scheduled_delay(Duration::from_millis(2500))
             .build();
         let config = Config::default()
-            .with_resource(resource(service_name))
+            .with_resource(resource(service_name.clone()))
             .with_sampler(TurboDASampler);
         let pipeline = new_pipeline()
             .tracing()
@@ -70,13 +101,48 @@ pub fn init_tracer<T: Into<Value>>(service_name: T) {
             .with_trace_config(config)
             .with_batch_config(batch_config);
         let tracer = pipeline.install_batch(Tokio).unwrap();
-        Some(tracing_opentelemetry::layer().with_tracer(tracer))
-    } else {
-        None
-    };
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
-    let subscriber = Registry::default().with(otel_layer).with(stdout_layer);
-    tracing::subscriber::set_global_default(subscriber).expect("Сould not set default for tracer");
+        let subscriber = subscriber.with(otel_layer);
+
+        if boolean_env("ENABLE_LOKI_LOGGING") {
+            let (layer, task) = tracing_loki::builder()
+                .label("service_name", service_name.to_string())
+                .expect("Failed to set service_name label")
+                .build_url(
+                    Url::parse(
+                        &env::var("LOKI_URL").unwrap_or("http://localhost:3100".to_string()),
+                    )
+                    .expect("Failed to parse LOKI_URL"),
+                )
+                .expect("Failed to build Loki layer");
+
+            tokio::spawn(task);
+            let subscriber = subscriber.with(layer);
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        } else {
+            tracing::subscriber::set_global_default(subscriber)
+                .expect("Could not set default for tracer");
+        }
+    } else if boolean_env("ENABLE_LOKI_LOGGING") {
+        let (layer, task) = tracing_loki::builder()
+            .label("service_name", service_name.to_string())
+            .expect("Failed to set service_name label")
+            .build_url(
+                Url::parse(&env::var("LOKI_URL").unwrap_or("http://localhost:3100".to_string()))
+                    .expect("Failed to parse LOKI_URL"),
+            )
+            .expect("Failed to build Loki layer");
+
+        tokio::spawn(task);
+        let subscriber = subscriber.with(layer);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Could not set default for tracer");
+    } else {
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Could not set default for tracer");
+    }
 }
 
 pub fn init_meter<T: Into<Value>>(service_name: T) {

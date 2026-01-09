@@ -6,16 +6,20 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use alloy::primitives::Address;
-use avail_rust::{Keypair, Options, SDK};
+use avail_rust::{
+    avail_rust_core::rpc::{chain, system::chain},
+    constants::dev_accounts,
+    Client as AvailClient, Keypair, Options,
+};
 
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
+use db::schema::credit_requests::chain_id;
 use diesel_async::{
     pooled_connection::deadpool::{Object, Pool},
     AsyncPgConnection,
 };
 use lazy_static::lazy_static;
-use log::{error, info};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -72,18 +76,6 @@ pub fn generate_submission_id() -> Uuid {
     Uuid::new_v4()
 }
 
-/// Finds a token address by its key in the token map
-///
-/// # Arguments
-/// * `key` - Token key to look up
-pub fn find_key_by_value(key: &String) -> Option<&String> {
-    if let Some(token) = TOKEN_MAP.get(key) {
-        Some(&token.token_address)
-    } else {
-        None
-    }
-}
-
 /// Validates if a string is a valid Ethereum address
 ///
 /// # Arguments
@@ -105,11 +97,11 @@ pub async fn get_connection(
     match pool.get().await {
         Ok(conn) => Ok(conn),
         Err(err) => {
-            error!("Failed to get a database connection: {}", err);
-            Err(HttpResponse::InternalServerError().json(json!({
-                "status": "error",
-                "message": "Database connection error"
-            })))
+            tracing::error!("Failed to get a database connection: {}", err);
+            return Err(HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "Database connection error"
+            })));
         }
     }
 }
@@ -118,7 +110,7 @@ pub async fn get_connection(
 ///
 /// # Arguments
 /// * `http_request` - HTTP request to extract user ID from
-pub fn retrieve_user_id(http_request: HttpRequest) -> Option<String> {
+pub fn retrieve_user_id(http_request: &HttpRequest) -> Option<String> {
     let headers = http_request.headers();
 
     for (name, value) in headers.iter() {
@@ -172,6 +164,7 @@ pub struct Price {
     pub eth: Option<f64>,
     pub usd: Option<f64>,
 }
+
 /// Gets current prices for Avail and specified token from CoinGecko API
 ///
 /// # Arguments
@@ -190,54 +183,32 @@ pub async fn get_prices(
         ("vs_currencies", "usd".to_string()),
     ];
 
-    let response = match client
+    let response = client
         .get(coingecko_api_url)
         .query(&params)
         .header("accept", "application/json")
         .header("x-cg-pro-api-key", coingecko_api_key)
         .send()
         .await
-    {
-        Ok(resp) => resp,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
+        .map_err(|e| e.to_string())?;
 
-    let json = match response.json::<HashMap<String, Price>>().await {
-        Ok(j) => j,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
+    let json = response
+        .json::<HashMap<String, Price>>()
+        .await
+        .map_err(|e| e.to_string())?;
 
     let coin_price = match json.get(token) {
-        Some(val) => match val.usd {
-            Some(coin_price) => coin_price,
-            None => {
-                let msg = format!("{:?} price not found from coingecho", token);
-
-                return Err(msg);
-            }
-        },
+        Some(val) => val.usd.ok_or_else(|| price_not_found_error(token))?,
         None => {
-            let msg = format!("{:?} price not found from coingecho", token);
+            let msg = price_not_found_error(token);
             return Err(msg);
         }
     };
 
     let avail_price = match json.get("avail") {
-        Some(val) => match val.usd {
-            Some(avail_price) => avail_price,
-            None => {
-                let msg = "Avail price not found from coingecho".to_string();
-
-                return Err(msg);
-            }
-        },
+        Some(val) => val.usd.ok_or_else(|| price_not_found_error("avail"))?,
         None => {
-            let msg = "Avail price not found from coingecho".to_string();
-
+            let msg = price_not_found_error("avail");
             return Err(msg);
         }
     };
@@ -246,13 +217,13 @@ pub async fn get_prices(
 }
 
 pub struct Convertor<'a> {
-    pub sdk: &'a SDK,
+    pub sdk: &'a AvailClient,
     pub account: &'a Keypair,
     pub one_kb: Vec<u8>,
 }
 
 impl<'a> Convertor<'a> {
-    pub fn new(sdk: &'a SDK, account: &'a Keypair) -> Self {
+    pub fn new(sdk: &'a AvailClient, account: &'a Keypair) -> Self {
         Convertor {
             sdk,
             account,
@@ -260,16 +231,16 @@ impl<'a> Convertor<'a> {
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        let tx = self.sdk.tx.data_availability.submit_data(data);
+        let tx = self.sdk.tx().data_availability().submit_data(data);
 
-        let options = Options::new();
+        let options = Options::default();
         let query_info = match tx
-            .payment_query_fee_details(self.account, Some(options))
+            .estimate_extrinsic_fees(self.account, options, None)
             .await
         {
             Ok(info) => info,
             Err(e) => {
-                error!("Failed to get payment query info: {:?}", e);
+                tracing::error!(error = ?e, "failed to get payment query info");
                 return BigDecimal::from(u128::MAX);
             }
         };
@@ -294,54 +265,245 @@ impl<'a> Convertor<'a> {
 /// Token information structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
-    pub token_address: String,
-    pub token_decimals: u32,
+    pub name: String,
+    pub symbol: String,
+    pub address: String,
+    pub decimals: u32,
+    pub coin_gecho_id: String,
 }
 
 lazy_static! {
-    pub static ref TOKEN_MAP: HashMap<String, Token> = {
+    pub static ref TOKEN_MAP: HashMap<u32, HashMap<String, Token>> = {
         let mut m = HashMap::new();
-        m.insert(
-            "ethereum".to_string(),
+        let mut chain_map = HashMap::new();
+
+        chain_map.insert(
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
-                token_decimals: 18,
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
+                decimals: 18,
+                name: "Ether".to_string(),
+                symbol: "ETH".to_string(),
+                coin_gecho_id: "ethereum".to_string(),
             },
         );
-        m.insert(
-            "avail".to_string(),
+        chain_map.insert(
+            "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
             Token {
-                token_address: "0x99a907545815c289fb6de86d55fe61d996063a94".to_string(),
-                token_decimals: 18,
+                address: "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
+                decimals: 18,
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
             },
         );
+        chain_map.insert(
+            "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+            Token {
+                address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
+        m.insert(84532, chain_map.clone());
+
+        chain_map.clear();
+
+        chain_map.insert(
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
+            Token {
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
+                decimals: 18,
+                name: "Ether".to_string(),
+                symbol: "ETH".to_string(),
+                coin_gecho_id: "ethereum".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+            Token {
+                address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+                decimals: 6,
+                name: "USDT".to_string(),
+                symbol: "USDT".to_string(),
+                coin_gecho_id: "tether".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+            Token {
+                address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
+            Token {
+                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
+                decimals: 18,
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
+            },
+        );
+        m.insert(8453, chain_map.clone());
+
+        chain_map.clear();
+        chain_map.insert(
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
+            Token {
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
+                decimals: 18,
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
+            },
+        );
+        m.insert(0, chain_map);
         m
     };
 }
 
 const WAIT_TIME: u64 = 5;
-pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
     let mut attempts = 0;
 
     loop {
-        if attempts < endpoints.len() {
+        if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
-        match SDK::new(endpoint).await {
+        tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
+        match AvailClient::new(endpoint).await {
             Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
-
+                tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
             }
             Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                tracing::error!(
+                    error = ?e,
+                    endpoint = %endpoint,
+                    "failed to connect to endpoint"
+                );
                 attempts += 1;
             }
         }
 
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        tracing::warn!("all endpoints failed, waiting 5 seconds before next retry");
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
+}
+
+/// Retrieves user ID from HTTP request headers
+///
+/// # Arguments
+/// * `http_request` - HTTP request to extract user ID from
+pub fn retrieve_account_id(http_request: &HttpRequest) -> Option<Uuid> {
+    let headers = http_request.headers();
+
+    for (name, value) in headers.iter() {
+        if name == "account_id" {
+            if let Ok(account_id) = value.to_str() {
+                return Uuid::parse_str(account_id).ok();
+            }
+        }
+    }
+    None
+}
+
+fn price_not_found_error(token: &str) -> String {
+    format!("{:?} price not found from coingecho", token)
+}
+
+const AVAIL_TOKEN_DECIMALS: usize = 18_usize;
+
+pub async fn calculate_avail_token_equivalent(
+    coingecko_api_url: &str,
+    coingecko_api_key: &str,
+    token_amount: &BigDecimal,
+    chain: &u32,
+    token_address: &str,
+) -> Result<BigDecimal, String> {
+    let http_client = Client::new();
+
+    tracing::debug!(token_address = %token_address, "token address");
+
+    let token_info = TOKEN_MAP
+        .get(chain)
+        .ok_or("Invalid Chainid")?
+        .get(token_address)
+        .ok_or("Invalid Token Address")?;
+
+    let (token_usd_price, avail_usd_price) = get_prices(
+        &http_client,
+        &coingecko_api_url,
+        &coingecko_api_key,
+        token_info.coin_gecho_id.as_str(),
+    )
+    .await
+    .map_err(|e| format!("Failed to fetch prices for {}: {}", token_info.symbol, e))?;
+
+    let token_avail_ratio = token_usd_price / avail_usd_price;
+
+    let equivalent_amount;
+    if token_info.name == "Avail" {
+        let token_avail_ratio_decimal =
+            BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+                .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
+
+        equivalent_amount = token_amount * token_avail_ratio_decimal;
+    } else {
+        tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
+        tracing::debug!(avail_usd_price = %avail_usd_price, "current avail usd price");
+
+        let token_avail_ratio_decimal =
+            BigDecimal::from_str(token_avail_ratio.to_string().as_str())
+                .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
+
+        equivalent_amount = token_avail_ratio_decimal
+            * token_amount
+            * BigDecimal::from(10_u64.pow(AVAIL_TOKEN_DECIMALS as u32))
+            / BigDecimal::from(10_u64.pow(token_info.decimals as u32));
+    };
+
+    Ok(equivalent_amount.round(0))
+}
+
+pub async fn get_amount_to_be_credited(
+    coin_gecho_api_url: &String,
+    coin_gecho_api_key: &String,
+    avail_rpc_url: &String,
+    chain: &u32,
+    address: &String,
+    amount: &BigDecimal,
+) -> Result<BigDecimal, String> {
+    let price = calculate_avail_token_equivalent(
+        &coin_gecho_api_url,
+        &coin_gecho_api_key,
+        &amount,
+        &chain,
+        &address,
+    )
+    .await
+    .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
+
+    let client = AvailClient::new(avail_rpc_url)
+        .await
+        .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
+
+    let account = dev_accounts::alice();
+    let converter = Convertor::new(&client, &account);
+    let price_per_kb = converter
+        .get_gas_price_for_data(converter.one_kb.clone())
+        .await;
+
+    Ok((price / price_per_kb * BigDecimal::from(converter.one_kb.len() as u128)).round(3))
 }

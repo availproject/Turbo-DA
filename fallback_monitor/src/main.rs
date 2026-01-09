@@ -1,21 +1,20 @@
-use avail_rust::SDK;
+use avail_rust::Client;
 use chrono::Utc;
 use config::AppConfig;
 use cron::Schedule;
-use diesel_async::{AsyncConnection, AsyncPgConnection};
-use log::{error, info};
+use data_submission::redis::Redis;
+use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
-use observability::init_meter;
+use observability::init_tracer;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::{
     self,
     time::{self, sleep, Duration},
 };
-use turbo_da_core::utils::create_keypair;
+use turbo_da_core::utils::generate_keygen_list;
 
 mod config;
-mod db;
 mod monitor;
 
 const WAIT_TIME: u64 = 5;
@@ -34,23 +33,23 @@ const WAIT_TIME: u64 = 5;
 /// and attempt to process them using the Avail network.
 #[tokio::main]
 async fn main() {
+    let _guard = init_tracer("fallback_service");
+
     let app_config: AppConfig = match AppConfig::default().load_config() {
         Ok(conf) => conf,
         Err(e) => {
-            error!("Couldn't load the config. Error: {:?}", e);
+            tracing::error!(error = ?e, "couldn't load the config");
             return;
         }
     };
-    init_meter("fallback_service");
-
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
-    info!("Cron is starting...");
+    tracing::info!("cron is starting...");
 
     let mut interval = schedule.upcoming(Utc);
 
-    let keypair = create_keypair(&app_config.private_key);
+    let keypair = generate_keygen_list(app_config.limit as i32, &app_config.private_keys).await;
 
     while let Some(next_time) = interval.next() {
         let now = Utc::now();
@@ -60,13 +59,24 @@ async fn main() {
             time::sleep(Duration::from_secs(duration.num_seconds() as u64)).await
         }
 
-        info!("Checking Failed Transactions at {} .....", Utc::now());
+        tracing::info!(time = %Utc::now(), "checking failed transactions");
 
         let sdk = generate_avail_sdk(&Arc::new(app_config.avail_rpc_endpoint.clone())).await;
-        let mut connection = AsyncPgConnection::establish(&app_config.database_url)
-            .await
-            .expect("Failed to connect to db");
-        monitor_failed_transactions(&mut connection, &sdk, &keypair, app_config.retry_count).await;
+
+        let enigma = EnigmaEncryptionService::new(app_config.enigma_url.clone());
+
+        let redis = Arc::new(Redis::new(app_config.redis_url.as_str()));
+
+        monitor_failed_transactions(
+            &app_config.database_url,
+            &sdk,
+            &keypair,
+            redis,
+            app_config.retry_count,
+            app_config.limit,
+            &enigma,
+        )
+        .await;
     }
 }
 
@@ -85,27 +95,31 @@ async fn main() {
 /// 3. Continues until a successful connection is established
 ///
 /// The function cycles through the endpoints indefinitely until a connection succeeds.
-async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> SDK {
+async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> Client {
     let mut attempts = 0;
 
     loop {
-        if attempts < endpoints.len() {
+        if attempts >= endpoints.len() {
             attempts = 0;
         }
         let endpoint = &endpoints[attempts];
-        info!("Attempting to connect endpoint: {:?}", endpoint);
-        match SDK::new(endpoint).await {
+        tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
+        match Client::new(endpoint).await {
             Ok(sdk) => {
-                info!("Connected successfully to endpoint: {}", endpoint);
+                tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
             }
             Err(e) => {
-                error!("Failed to connect to endpoint {}: {:?}", endpoint, e);
+                tracing::error!(
+                    endpoint = %endpoint,
+                    error = ?e,
+                    "failed to connect to endpoint"
+                );
                 attempts += 1;
             }
         }
 
-        info!("All endpoints failed. Waiting 5 seconds before next retry....");
+        tracing::info!("all endpoints failed, waiting 5 seconds before next retry");
         sleep(Duration::from_secs(WAIT_TIME)).await;
     }
 }
