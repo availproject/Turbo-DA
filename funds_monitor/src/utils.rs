@@ -51,7 +51,7 @@ impl Utils {
             &self.coin_gecho_api_url,
             &self.coin_gecho_api_key,
             &self.avail_rpc_url,
-            &(chain_identifier as u32) ,
+            &(chain_identifier as u32),
             &address,
             &BigDecimal::from_str(&receipt.amount.to_string().as_str()).unwrap(),
         )
@@ -66,6 +66,7 @@ impl Utils {
 
         let row = diesel::update(credit_requests::table)
             .filter(credit_requests::id.eq(parsed_id))
+            .filter(credit_requests::amount_credit.is_null())
             .set((
                 credit_requests::amount_credit.eq(Some(amount.clone())),
                 credit_requests::request_status.eq(status.to_string()),

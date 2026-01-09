@@ -2,33 +2,40 @@ import Button from "@/components/button";
 import { Text } from "@/components/text";
 import { useConfig } from "@/providers/ConfigProvider";
 import Image from "next/image";
-import { availChain } from "../utils/constant";
 
 const AvailChainConnect = () => {
-  const { selectedChain, setSelectedChain, setSelectedToken } = useConfig();
+  const {
+    selectedChain,
+    setSelectedChain,
+    setSelectedToken,
+    supportedTokensAndChains,
+  } = useConfig();
+  const availChain = supportedTokensAndChains[0];
+
+  if (!availChain) return null;
 
   return (
     <Button
       variant={"outline"}
       className="flex gap-x-1.5 justify-between"
       data-state={
-        selectedChain?.name === availChain.avail.name ? "active" : "inactive"
+        selectedChain?.name === availChain.name ? "active" : "inactive"
       }
       onClick={() => {
-        setSelectedChain(availChain.avail);
-        setSelectedToken(availChain.avail.tokens[0]);
+        setSelectedChain(availChain);
+        setSelectedToken(availChain.tokens[0]);
       }}
     >
       <div className="flex gap-x-2 items-center">
         <Image
-          src={availChain.avail.icon}
-          alt={availChain.avail.name}
+          src={availChain.icon}
+          alt={availChain.name}
           width={24}
           height={24}
           className="border border-border-blue rounded-full bg-black p-[3px]"
         />
         <div className="flex flex-col gap-y-0 justify-start items-start">
-          <Text weight={"semibold"}>{availChain.avail.name}</Text>
+          <Text weight={"semibold"}>{availChain.name}</Text>
           <Text weight={"semibold"} variant={"secondary-grey"} size={"xs"}>
             Requires Avail Wallet
           </Text>

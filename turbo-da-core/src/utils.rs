@@ -7,7 +7,9 @@ use actix_web::{
 };
 use alloy::primitives::Address;
 use avail_rust::{
-    avail_rust_core::rpc::chain, constants::dev_accounts, Client as AvailClient, Keypair, Options,
+    avail_rust_core::rpc::{chain, system::chain},
+    constants::dev_accounts,
+    Client as AvailClient, Keypair, Options,
 };
 
 use bigdecimal::BigDecimal;
@@ -263,65 +265,108 @@ impl<'a> Convertor<'a> {
 /// Token information structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
-    pub name : String,
+    pub name: String,
     pub symbol: String,
     pub address: String,
     pub decimals: u32,
-    pub coin_gecho_id: String
+    pub coin_gecho_id: String,
 }
 
 lazy_static! {
-    pub static ref TOKEN_MAP: HashMap<u32, HashMap<String,Token>> = {
+    pub static ref TOKEN_MAP: HashMap<u32, HashMap<String, Token>> = {
         let mut m = HashMap::new();
         let mut chain_map = HashMap::new();
+
         chain_map.insert(
-            "0x0000000000000000000000000000000000000000".to_string(),
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                address: "0x0000000000000000000000000000000000000000".to_string(),
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
                 decimals: 18,
-                name:"Ether".to_string(),
-                symbol:"ETH".to_string(),
-                coin_gecho_id:"ethereum".to_string()
+                name: "Ether".to_string(),
+                symbol: "ETH".to_string(),
+                coin_gecho_id: "ethereum".to_string(),
             },
         );
         chain_map.insert(
-            "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58".to_string(),
+            "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
             Token {
-                address: "0xf50F2B4D58ce2A24b62e480d795A974eD0f77A58 ".to_string(),
+                address: "0xf50f2b4d58ce2a24b62e480d795a974ed0f77a58".to_lowercase(),
                 decimals: 18,
-               name:"Avail".to_string(),
-                symbol:"AVAIL".to_string(),
-                coin_gecho_id:"avail".to_string()
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
             },
         );
-
-
+        chain_map.insert(
+            "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+            Token {
+                address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
         m.insert(84532, chain_map.clone());
+
         chain_map.clear();
 
         chain_map.insert(
-            "0xd89d90d26b48940fa8f58385fe84625d468e057a ".to_string(),
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
             Token {
-                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a ".to_string(),
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
                 decimals: 18,
-                name:"Avail".to_string(),
-                symbol:"AVAIL".to_string(),
-                coin_gecho_id:"avail".to_string()
+                name: "Ether".to_string(),
+                symbol: "ETH".to_string(),
+                coin_gecho_id: "ethereum".to_string(),
             },
         );
 
+        chain_map.insert(
+            "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+            Token {
+                address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2".to_lowercase(),
+                decimals: 6,
+                name: "USDT".to_string(),
+                symbol: "USDT".to_string(),
+                coin_gecho_id: "tether".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+            Token {
+                address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_lowercase(),
+                decimals: 6,
+                name: "USDC".to_string(),
+                symbol: "USDC".to_string(),
+                coin_gecho_id: "usd-coin".to_string(),
+            },
+        );
+
+        chain_map.insert(
+            "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
+            Token {
+                address: "0xd89d90d26b48940fa8f58385fe84625d468e057a".to_lowercase(),
+                decimals: 18,
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
+            },
+        );
         m.insert(8453, chain_map.clone());
 
         chain_map.clear();
-        chain_map.insert("0x0000000000000000000000000000000000000000".to_string(),
-        Token {
-            address:"0x0000000000000000000000000000000000000000".to_string(),
-            decimals: 18,
-            name:"Avail".to_string(),
-            symbol:"AVAIL".to_string(),
-            coin_gecho_id: "avail".to_string(),
-            });
-
+        chain_map.insert(
+            "0x0000000000000000000000000000000000000000".to_lowercase(),
+            Token {
+                address: "0x0000000000000000000000000000000000000000".to_lowercase(),
+                decimals: 18,
+                name: "Avail".to_string(),
+                symbol: "AVAIL".to_string(),
+                coin_gecho_id: "avail".to_string(),
+            },
+        );
         m.insert(0, chain_map);
         m
     };
@@ -391,35 +436,35 @@ pub async fn calculate_avail_token_equivalent(
 
     tracing::debug!(token_address = %token_address, "token address");
 
-    let token_info = TOKEN_MAP.get(chain).ok_or("Invalid Chainid")?.get(token_address).ok_or("Invalid Token Address")?; 
+    let token_info = TOKEN_MAP
+        .get(chain)
+        .ok_or("Invalid Chainid")?
+        .get(token_address)
+        .ok_or("Invalid Token Address")?;
 
-           let (token_usd_price, avail_usd_price) = get_prices(
-            &http_client,
-            &coingecko_api_url,
-            &coingecko_api_key,
-            token_info.coin_gecho_id.as_str(),
-        
-        )
-        .await
-        .map_err(|e| format!("Failed to fetch prices for {}: {}", token_info.symbol, e))?;
+    let (token_usd_price, avail_usd_price) = get_prices(
+        &http_client,
+        &coingecko_api_url,
+        &coingecko_api_key,
+        token_info.coin_gecho_id.as_str(),
+    )
+    .await
+    .map_err(|e| format!("Failed to fetch prices for {}: {}", token_info.symbol, e))?;
 
-    let token_avail_ratio  = token_usd_price / avail_usd_price;
+    let token_avail_ratio = token_usd_price / avail_usd_price;
 
     let equivalent_amount;
     if token_info.name == "Avail" {
-
         let token_avail_ratio_decimal =
             BigDecimal::from_str(token_avail_ratio.to_string().as_str())
                 .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 
         equivalent_amount = token_amount * token_avail_ratio_decimal;
-
     } else {
-
-    tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
+        tracing::debug!(token_usd_price = %token_usd_price, "current token usd price");
         tracing::debug!(avail_usd_price = %avail_usd_price, "current avail usd price");
 
-       let token_avail_ratio_decimal =
+        let token_avail_ratio_decimal =
             BigDecimal::from_str(token_avail_ratio.to_string().as_str())
                 .map_err(|e| format!("Failed to convert price ratio to decimal: {}", e))?;
 

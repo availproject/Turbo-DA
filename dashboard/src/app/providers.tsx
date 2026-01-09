@@ -1,7 +1,7 @@
 "use client";
 
 import { DialogProvider } from "@/components/dialog/provider";
-import { config } from "@/config/walletConfig";
+import { config } from "@/config/evm-config";
 import { appConfig } from "@/config/default";
 import { ConfigProvider } from "@/providers/ConfigProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

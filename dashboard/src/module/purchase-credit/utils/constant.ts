@@ -1,11 +1,4 @@
 import { Abi } from "viem";
-import { supportedTokensAndChains } from "@/lib/types";
-
-// Export the unified structure
-export const { ethereum, base, avail } = supportedTokensAndChains;
-
-export const chainList = { ethereum, base };
-export const availChain = { avail };
 
 export const abi: Abi = [
   {

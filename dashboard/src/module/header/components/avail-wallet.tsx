@@ -1,6 +1,6 @@
 import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
-import { chainList } from "@/module/purchase-credit/utils/constant";
+import { getAvailableChains } from "@/lib/types";
 import { useConfig } from "@/providers/ConfigProvider";
 import {
   AvailWalletConnect,
@@ -62,8 +62,14 @@ const AvailWallet = () => {
                     className="cursor-pointer"
                     onClick={() => {
                       if (selectedChain?.name === "Avail") {
-                        setSelectedChain(chainList.ethereum);
-                        setSelectedToken(chainList.ethereum.tokens[0]);
+                        const availableChains = getAvailableChains();
+                        const firstChain = Object.values(availableChains).find(
+                          (chain) => chain.id !== 0,
+                        );
+                        if (firstChain) {
+                          setSelectedChain(firstChain);
+                          setSelectedToken(firstChain.tokens[0]);
+                        }
                       }
                       clearWalletState();
                     }}

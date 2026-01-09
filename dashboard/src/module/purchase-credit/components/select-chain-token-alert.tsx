@@ -12,15 +12,28 @@ import { useConfig } from "@/providers/ConfigProvider";
 import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { supportedTokensAndChains } from "@/lib/types";
+import { useMemo, useState } from "react";
 
 const SelectChainToken = () => {
-  const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
-    useConfig();
+  const {
+    selectedChain,
+    selectedToken,
+    setSelectedChain,
+    setSelectedToken,
+    supportedTokensAndChains,
+  } = useConfig();
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
+
+  const availableChains = useMemo(() => {
+    const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
+    return Object.fromEntries(
+      Object.entries(supportedTokensAndChains).filter(
+        ([_, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+      )
+    );
+  }, [supportedTokensAndChains]);
 
   return (
     <Dialog
@@ -50,7 +63,7 @@ const SelectChainToken = () => {
                 </div>
               </div>
               <div className="flex gap-y-2 flex-col my-6 px-3">
-                {Object.values(supportedTokensAndChains)
+                {Object.values(availableChains)
                   .filter((chain) => chain.name !== "Avail")
                   .map((chain) => {
                     return (
@@ -84,9 +97,9 @@ const SelectChainToken = () => {
               </div>
               <div className="bg-border-blue h-px w-full" />
               <div className="flex gap-y-2 flex-col mt-6 px-3">
-                {/* Avail Chain */}
                 {(() => {
-                  const availChain = supportedTokensAndChains.avail;
+                  const availChain = supportedTokensAndChains[0];
+                  if (!availChain) return null;
                   return (
                     <Button
                       variant={"outline"}
@@ -143,10 +156,27 @@ const SelectChainToken = () => {
                 />
               </div>
               <div className="flex flex-col gap-y-3 mt-2">
-                {selectedChain &&
-                  supportedTokensAndChains[
-                    selectedChain.name.toLowerCase()
-                  ]?.tokens.map((token) => (
+                {(() => {
+                  if (!selectedChain) {
+                    return (
+                      <Text className="text-center py-4 text-secondary-grey">
+                        Please select a chain
+                      </Text>
+                    );
+                  }
+
+                  const tokens =
+                    supportedTokensAndChains[selectedChain.id]?.tokens;
+
+                  if (!tokens || tokens.length === 0) {
+                    return (
+                      <Text className="text-center py-4 text-secondary-grey">
+                        No tokens available for this chain
+                      </Text>
+                    );
+                  }
+
+                  return tokens.map((token) => (
                     <Button
                       variant={"outline"}
                       key={`token-${token.name}`}
@@ -172,7 +202,8 @@ const SelectChainToken = () => {
                         <Text weight={"semibold"}>{token.name}</Text>
                       </div>
                     </Button>
-                  ))}
+                  ));
+                })()}
               </div>
             </div>
           </div>

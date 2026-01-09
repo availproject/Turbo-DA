@@ -1,7 +1,7 @@
 "use client";
 import { Text } from "@/components/text";
 import { truncateAddress } from "@/lib/utils";
-import { chainList } from "@/module/purchase-credit/utils/constant";
+import { getAvailableChains } from "@/lib/types";
 import { useConfig } from "@/providers/ConfigProvider";
 import { ConnectKitButton } from "connectkit";
 import { Copy, LogOut } from "lucide-react";
@@ -85,9 +85,18 @@ const EVMWallet = () => {
                       className="cursor-pointer"
                       strokeWidth={2}
                       onClick={() => {
-                        if (selectedChain?.name === "Ethereum") {
-                          setSelectedChain(chainList.ethereum);
-                          setSelectedToken(chainList.ethereum.tokens[0]);
+                        if (
+                          selectedChain?.name === "Sepolia" ||
+                          selectedChain?.name === "Base"
+                        ) {
+                          const availableChains = getAvailableChains();
+                          const firstChain = Object.values(
+                            availableChains,
+                          ).find((chain) => chain.id !== 0);
+                          if (firstChain) {
+                            setSelectedChain(firstChain);
+                            setSelectedToken(firstChain.tokens[0]);
+                          }
                         }
                         disconnect();
                       }}

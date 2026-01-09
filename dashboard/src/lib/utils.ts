@@ -17,15 +17,6 @@ export const numberToBytes32 = (num: number): `0x${string}` => {
   return `0x${paddedHex}` as `0x${string}`;
 };
 
-export const tokenMap = {
-  ethereum: {
-    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
-  },
-  avail: {
-    tokenAddress: "0x8B42845d23C68B845e262dC3e5cAA1c9ce9eDB44",
-  },
-};
-
 export const baseImageUrl = (path?: string) => {
   return process.env.NEXT_PUBLIC_IMAGES_URL! + path;
 };
@@ -114,4 +105,13 @@ export const getTokenTicker = (tokenName: string): string => {
 export const capitalizeFirstLetter = (str: string): string => {
   if (!str) return str;
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
+export const formatSmartNumber = (value: string | number): string => {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
+
+  if (num >= 1000) return `${(num / 1000).toFixed(num >= 10000 ? 0 : 1)}k`;
+  if (num < 1) return num.toFixed(4);
+  return num.toFixed(num >= 10 ? 0 : 2);
 };

@@ -173,7 +173,7 @@ impl EVM {
                     &tx_hash,
                     &mut connection,
                     self.evm_chain_id,
-                    &"Processed".to_string(),
+                    &"PROCESSED".to_string(),
                 )
                 .await;
             if let Err(e) = result {

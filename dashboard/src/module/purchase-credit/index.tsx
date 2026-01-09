@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/useDebounce";
 import useWallet from "@/hooks/useWallet";
-import { supportedTokensAndChains } from "@/lib/types";
 import { formatDataBytes } from "@/lib/utils";
 import SelectTokenButton from "@/module/purchase-credit/select-token-button";
 import { useConfig } from "@/providers/ConfigProvider";
@@ -18,17 +17,7 @@ import { useAccount, useBalance as useWagmiBalance } from "wagmi";
 import BuySection from "./components/buy-section";
 import { useTransactionProgress } from "@/hooks/useTransactionProgress";
 
-// Removed hardcoded DESIRED_CHAIN - now using dynamic chain from user selection
-
-// Helper function to get token info from supportedTokensAndChains
-const getTokenInfo = (chainName: string, tokenName: string) => {
-  const chainKey = chainName.toLowerCase();
-  const chain = supportedTokensAndChains[chainKey];
-  return chain?.tokens.find((token) => token.name === tokenName);
-};
-
 const BuyCreditsCard = () => {
-  // Initialize global transaction processing
   useTransactionProgress();
 
   const { getERC20AvailBalance, showBalance } = useWallet();
@@ -48,29 +37,37 @@ const BuyCreditsCard = () => {
   const [error, setError] = useState("");
   const [showBalanceError, setShowBalanceError] = useState(false);
   const account = useAccount();
-  const { selectedChain, selectedToken, availNativeBalance } = useConfig();
+  const {
+    selectedChain,
+    selectedToken,
+    availNativeBalance,
+    supportedTokensAndChains,
+  } = useConfig();
   const balance = useWagmiBalance({
     address: account.address,
     chainId: selectedChain?.id !== 0 ? selectedChain?.id : undefined,
     token:
-      selectedToken &&
-      selectedChain &&
-      getTokenInfo(selectedChain.name, selectedToken.name)?.address ===
-        "0x0000000000000000000000000000000000000000"
-        ? undefined // Native token (zero address)
-        : selectedToken &&
-          selectedChain &&
-          (getTokenInfo(selectedChain.name, selectedToken.name)
-            ?.address as `0x${string}`),
+      selectedToken && selectedChain
+        ? (() => {
+            const tokenInfo = supportedTokensAndChains[
+              selectedChain.id
+            ]?.tokens.find((token) => token.name === selectedToken.name);
+            return tokenInfo?.address ===
+              "0x0000000000000000000000000000000000000000"
+              ? undefined
+              : (tokenInfo?.address as `0x${string}`);
+          })()
+        : undefined,
   });
   const debouncedValue = useDebounce(deferredTokenValue, 500);
 
   useEffect(() => {
     if (!account.address || !selectedChain || !selectedToken) return;
 
-    // Only fetch ERC20 balance for non-Avail chains and non-native tokens
     if (selectedChain.name !== "Avail") {
-      const tokenInfo = getTokenInfo(selectedChain.name, selectedToken.name);
+      const tokenInfo = supportedTokensAndChains[selectedChain.id]?.tokens.find(
+        (token) => token.name === selectedToken.name,
+      );
       const isNativeToken =
         tokenInfo?.address === "0x0000000000000000000000000000000000000000";
 
@@ -78,7 +75,7 @@ const BuyCreditsCard = () => {
         getERC20AvailBalance(
           account.address,
           tokenInfo.address as `0x${string}`,
-          selectedChain.id
+          selectedChain.id,
         );
       }
 
@@ -87,9 +84,7 @@ const BuyCreditsCard = () => {
           ? undefined
           : (tokenInfo?.address as `0x${string}`),
         chainId: selectedChain.id,
-      }).catch(() => {
-        // Silent fail for balance display
-      });
+      }).catch(() => {});
     }
   }, [
     account.address,
@@ -139,19 +134,16 @@ const BuyCreditsCard = () => {
   ]);
 
   const calculateEstimateCredits = async ({ amount }: { amount: number }) => {
-    if (!selectedToken || !token) {
+    if (!selectedToken || !token || !selectedChain) {
       return;
     }
-    let tokenAddress: string;
-    if (selectedChain.name === "AVAIL") {
-      tokenAddress = "0x0000000000000000000000000000000000000000";
-    } else if (selectedToken && selectedChain) {
-      tokenAddress =
-        getTokenInfo(selectedChain.name, selectedToken.name)?.address ||
-        "0x0000000000000000000000000000000000000000";
-    } else {
-      return;
-    }
+
+    const tokenInfo = supportedTokensAndChains[selectedChain.id]?.tokens.find(
+      (token) => token.name === selectedToken.name,
+    );
+    const tokenAddress =
+      tokenInfo?.address || "0x0000000000000000000000000000000000000000";
+
     const currentRequestId = ++requestIdRef.current;
     setEstimateDataLoading(true);
     setEstimateData(undefined);
@@ -160,9 +152,9 @@ const BuyCreditsCard = () => {
         {
           token,
           amount: amount,
-          tokenAddress: tokenAddress.toLowerCase(),
+          tokenAddress: tokenAddress,
           chainId: selectedChain.id,
-        }
+        },
       );
 
       if (currentRequestId === requestIdRef.current) {
@@ -284,7 +276,7 @@ const BuyCreditsCard = () => {
                           setTokenAmount(value);
                           if (+value === 0) {
                             setTokenAmountError(
-                              "Please enter a valid amount greater than 0"
+                              "Please enter a valid amount greater than 0",
                             );
                             setShowBalanceError(false);
                             return;
