@@ -18,6 +18,10 @@ use actix_web::{
 use crate::routes::{
     data_retrieval::{get_pre_image, get_submission_info},
     data_submission::{submit_data, submit_raw_data},
+    enigma_management::{
+        add_participant, create_decrypt_request, delete_participant, get_decrypt_request,
+        register, submit_signature,
+    },
     health::health_check,
 };
 use diesel_async::{
@@ -106,7 +110,13 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(submit_raw_data)
                     .service(get_pre_image)
                     .service(get_pre_image_decrypted)
-                    .service(get_submission_info),
+                    .service(get_submission_info)
+                    .service(register)
+                    .service(add_participant)
+                    .service(delete_participant)
+                    .service(create_decrypt_request)
+                    .service(get_decrypt_request)
+                    .service(submit_signature),
             )
     })
     .bind(format!("0.0.0.0:{}", port))?
