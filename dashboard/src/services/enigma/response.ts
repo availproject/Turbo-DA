@@ -9,7 +9,7 @@ export interface DeleteParticipantResponse {
 }
 
 export interface CreateDecryptRequestResponse {
-  request_id: string;
+  id: string;
   turbo_da_app_id: string;
   status: string;
   signers: string[];
@@ -17,15 +17,18 @@ export interface CreateDecryptRequestResponse {
 }
 
 export interface GetDecryptRequestResponse {
-  request_id: string;
+  id: string;
   turbo_da_app_id: string;
+  ciphertext: number[];
+  submitted_signatures: string;
+  decrypted_data: number[] | null;
   status: string;
-  signers: string[];
   created_at: number;
+  completed_at: number | null;
 }
 
 export interface SubmitSignatureResponse {
-  request_id: string;
+  id: string;
   status: string;
   signatures_submitted: number;
   threshold: number;

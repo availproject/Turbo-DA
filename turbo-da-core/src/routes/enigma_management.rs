@@ -229,7 +229,7 @@ pub async fn delete_participant(
     skip(enigma, pool),
     fields(
         turbo_da_app_id = %request.turbo_da_app_id,
-        submission_id = %request.submission_id,
+        id = %request.id,
         endpoint = "enigma_create_decrypt_request"
     )
 )]
@@ -245,10 +245,10 @@ pub async fn create_decrypt_request(
         Err(e) => return e,
     };
 
-    match get_customer_expenditure_by_submission_id(&mut connection, request.submission_id).await {
+    match get_customer_expenditure_by_submission_id(&mut connection, request.id).await {
         Ok(sub) => {
             tracing::debug!(
-                submission_id = %request.submission_id,
+                id = %request.id,
                 "found expenditure for submission"
             );
             if sub.payload.is_some() {
@@ -259,7 +259,7 @@ pub async fn create_decrypt_request(
                 {
                     Ok(response) => {
                         tracing::info!(
-                            request_id = %response.request_id,
+                            id = %response.id,
                             turbo_da_app_id = %response.turbo_da_app_id,
                             signer_count = response.signers.len(),
                             "successfully created decrypt request"
@@ -301,7 +301,7 @@ pub async fn create_decrypt_request(
                     {
                         Ok(response) => {
                             tracing::info!(
-                                request_id = %response.request_id,
+                                id = %response.id,
                                 turbo_da_app_id = %response.turbo_da_app_id,
                                 signer_count = response.signers.len(),
                                 "successfully created decrypt request"
@@ -325,9 +325,9 @@ pub async fn create_decrypt_request(
             }
         }
         Err(e) => {
-            tracing::error!(error = ?e, submission_id = %request.submission_id, "failed to get customer expenditure");
+            tracing::error!(error = ?e, id = %request.id, "failed to get customer expenditure");
             HttpResponse::NotFound().json(json!({
-                "error": format!("Customer expenditure not found for submission_id: {}", request.submission_id)
+                "error": format!("Customer expenditure not found for id: {}", request.id)
             }))
         }
     }
@@ -432,7 +432,7 @@ pub async fn get_decrypt_request(
 #[tracing::instrument(
     skip(enigma),
     fields(
-        request_id = %request.request_id,
+        id = %request.id,
         participant_address = %request.participant_address,
         endpoint = "enigma_submit_signature"
     )
@@ -443,7 +443,7 @@ pub async fn submit_signature(
     enigma: web::Data<EnigmaEncryptionService>,
 ) -> HttpResponse {
     tracing::info!(
-        request_id = %request.request_id,
+        id = %request.id,
         participant = %request.participant_address,
         "submitting signature"
     );
@@ -451,7 +451,7 @@ pub async fn submit_signature(
     match enigma.submit_signature(request.into_inner()).await {
         Ok(response) => {
             tracing::info!(
-                request_id = %response.request_id,
+                id = %response.id,
                 status = %response.status,
                 signatures_submitted = response.signatures_submitted,
                 ready_to_decrypt = response.ready_to_decrypt,

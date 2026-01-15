@@ -25,6 +25,7 @@ const DecryptRequest = () => {
   const [createAppId, setCreateAppId] = useState("");
   const [submissionId, setSubmissionId] = useState("");
   const [createdRequestId, setCreatedRequestId] = useState("");
+  const [savedAppId, setSavedAppId] = useState(""); // Store app ID for signing
 
   // Get Request State
   const [getLoading, setGetLoading] = useState(false);
@@ -53,13 +54,14 @@ const DecryptRequest = () => {
 
       success({
         label: "Decrypt Request Created",
-        description: `Request ID: ${response.request_id}`,
+        description: `Request ID: ${response.id}`,
       });
 
-      setCreatedRequestId(response.request_id);
+      setCreatedRequestId(response.id);
       // Auto-fill other fields for convenience
-      setGetRequestId(response.request_id);
-      setSubmitRequestId(response.request_id);
+      setGetRequestId(response.id);
+      setSubmitRequestId(response.id);
+      setSavedAppId(createAppId); // Save app ID for signing
 
       setCreateAppId("");
       setSubmissionId("");
@@ -85,6 +87,10 @@ const DecryptRequest = () => {
       });
 
       setRequestStatus(response);
+      // Save app ID for signing if not already saved
+      if (response.turbo_da_app_id && !savedAppId) {
+        setSavedAppId(response.turbo_da_app_id);
+      }
     } catch (err: any) {
       errorToast({ label: err.message || "Failed to get request" });
       setRequestStatus(null);
@@ -107,7 +113,16 @@ const DecryptRequest = () => {
     try {
       setSubmitLoading(true);
 
-      const message = `Approve decryption request: ${submitRequestId}`;
+      // Get the app ID from saved state or request status
+      const appId = savedAppId || requestStatus?.turbo_da_app_id;
+      if (!appId) {
+        errorToast({ label: "Please check request status first to get the App ID" });
+        setSubmitLoading(false);
+        return;
+      }
+
+      // Message format: {request_id}:{turbo_da_app_id}:{participant_address}
+      const message = `${submitRequestId}:${appId}`;
 
       const signature = await signMessageAsync({ message });
 
@@ -225,15 +240,13 @@ const DecryptRequest = () => {
               <Text size="sm" className="font-mono">{requestStatus.turbo_da_app_id}</Text>
             </div>
 
-            {requestStatus.signers && (
+            {requestStatus.submitted_signatures && (
               <div className="flex flex-col gap-1 mt-2">
-                <Text variant="light-grey" size="sm">Signers ({requestStatus.signers.length}):</Text>
+                <Text variant="light-grey" size="sm">Submitted Signatures:</Text>
                 <div className="flex flex-wrap gap-1">
-                  {requestStatus.signers.map((s: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 bg-blue/20 text-blue text-xs rounded-full">
-                      {s.slice(0, 6)}...{s.slice(-4)}
-                    </span>
-                  ))}
+                  <Text size="xs" className="break-all font-mono text-blue/80">
+                     {requestStatus.submitted_signatures}
+                  </Text>
                 </div>
               </div>
             )}

@@ -215,7 +215,7 @@ impl EnigmaEncryptionService {
         let response = self
             .client
             .post(&url)
-            .json(&json!({"turbo_da_app_id":request.turbo_da_app_id, "ciphertext": payload,"submission_id":request.submission_id}))
+            .json(&json!({"turbo_da_app_id":request.turbo_da_app_id, "ciphertext": payload,"id":request.id}))
             .send()
             .await?;
 
@@ -299,7 +299,7 @@ impl EnigmaEncryptionService {
         let url = format!(
             "{}/v1/decrypt_request/{}/signatures",
             self.service_url.clone(),
-            payload.request_id
+            payload.id
         );
 
         let data = SubmitSignatureRequestEnigma {

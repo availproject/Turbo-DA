@@ -75,18 +75,17 @@ pub struct DeleteParticipantResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DecryptRequest {
     pub turbo_da_app_id: Uuid,
-    pub submission_id: Uuid,
+    pub id: Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DecryptRequestResponse {
-    pub request_id: String,
+    pub id: String,
     pub turbo_da_app_id: String,
     pub status: String,
     pub signers: Vec<String>,
     pub created_at: i64,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecryptionRequestRecord {
@@ -103,25 +102,25 @@ pub struct DecryptionRequestRecord {
 // Submit signature
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SubmitSignatureRequest {
-    pub request_id: Uuid,
-    pub participant_address: String,
-    pub signature: String,
-}
-
-#[derive(Debug, Serialize,Deserialize)]
-pub struct SubmitSignatureRequestEnigma {
+    pub id: Uuid,
     pub participant_address: String,
     pub signature: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SubmitSignatureRequestEnigma {
+    pub participant_address: String,
+    pub signature: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct SubmitSignatureResponse {
-    pub request_id: String,
+    pub id: String,
     pub status: String,
     pub signatures_submitted: usize,
-    pub threshold: i32,
+    pub threshold: i64,
     pub ready_to_decrypt: bool,
-    pub tee_attestion: Option<String>,
+    pub tee_attestion: Option<GetQuoteResponse>,
 }
 
 // Legacy types - kept for backwards compatibility

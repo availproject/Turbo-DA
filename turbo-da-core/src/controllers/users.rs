@@ -1209,13 +1209,8 @@ async fn toggle_encryption(
         threshold: payload.threshold.map(|t| t as i32).unwrap_or(0),
     };
 
-    match enigma_service.register(register_request).await {
-        Ok(_) => {
-            tracing::info!("Registered user on enigma successfully");
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "failed to register app");
-        }
+    if let Err(e) = enigma_service.register(register_request).await {
+        tracing::error!(error = %e, "failed to register app");
     }
 
     let query =

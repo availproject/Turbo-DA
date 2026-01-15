@@ -91,7 +91,7 @@ class EnigmaService {
         },
         body: JSON.stringify({
           turbo_da_app_id,
-          submission_id,
+          id: submission_id,
         }),
       }
     );
@@ -115,8 +115,9 @@ class EnigmaService {
     // even though the backend macro seemed to miss the param.
     // If backend is strictly /get_decrypt_request without param, this might need changing.
     // But web::Path<String> strongly suggests it expects a path segment.
+    const params = new URLSearchParams({ submission_id: request_id });
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/get_decrypt_request/${request_id}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/get_decrypt_request?${params.toString()}`,
       {
         method: "GET",
         headers: {
@@ -155,7 +156,7 @@ class EnigmaService {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          request_id,
+          id: request_id,
           participant_address,
           signature,
         }),
