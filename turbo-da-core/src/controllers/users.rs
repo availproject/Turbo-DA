@@ -1211,6 +1211,18 @@ async fn toggle_encryption(
 
     if let Err(e) = enigma_service.register(register_request).await {
         tracing::error!(error = %e, "failed to register app");
+    } else if let Some(participants) = &payload.participants {
+        if !participants.is_empty() {
+            if let Err(e) = db::controllers::mpc_participants::add_participants(
+                &mut connection,
+                &payload.app_id,
+                participants.clone(),
+            )
+            .await
+            {
+                tracing::error!(error = %e, "failed to add participants to db");
+            }
+        }
     }
 
     let query =

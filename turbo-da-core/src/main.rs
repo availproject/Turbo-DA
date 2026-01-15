@@ -52,7 +52,7 @@ use enigma::EnigmaEncryptionService;
 use observability::init_tracer;
 use routes::enigma_management::{
     add_participant, create_decrypt_request, delete_participant, get_decrypt_request,
-    list_decrypt_requests, submit_signature,
+    get_participant_apps, list_decrypt_requests, submit_signature,
 };
 use routes::health::health_check;
 
@@ -184,7 +184,8 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(create_decrypt_request)
                             .service(get_decrypt_request)
                             .service(list_decrypt_requests)
-                            .service(submit_signature),
+                            .service(submit_signature)
+                            .service(get_participant_apps),
                     )
                     .service(
                         web::scope("/admin")

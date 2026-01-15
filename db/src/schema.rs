@@ -94,6 +94,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    mpc_participants (id) {
+        id -> Uuid,
+        app_id -> Uuid,
+        participant_address -> Varchar,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     users (id) {
         id -> Varchar,
         name -> Varchar,
@@ -111,6 +120,7 @@ diesel::joinable!(credit_requests -> apps (app_id));
 diesel::joinable!(credit_requests -> users (user_id));
 diesel::joinable!(customer_expenditures -> apps (app_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
+diesel::joinable!(mpc_participants -> apps (app_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     api_keys,
@@ -118,5 +128,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
+    mpc_participants,
     users,
 );
