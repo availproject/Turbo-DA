@@ -27,7 +27,6 @@ const DataPostingHistory = dynamic(
 const BuyCreditsCard = dynamic(() => import("@/module/purchase-credit"));
 const CreditBalance = dynamic(() => import("@/module/credit-balance"));
 const AppsCard = dynamic(() => import("@/module/user-apps"));
-const EnigmaWrapper = dynamic(() => import("@/module/enigma"));
 
 export default function Page() {
   const { isLoggedOut } = useAuthState();
@@ -81,12 +80,6 @@ export default function Page() {
             <DataPostingHistory />
           </TabsContent>
         </HistoryWrapper>
-      </TabsContent>
-      <TabsContent
-        value={APP_TABS.ENIGMA}
-        className="border-t border-[#2B4761] pt-4 w-full"
-      >
-        <EnigmaWrapper />
       </TabsContent>
     </DashboardWrapper>
   );

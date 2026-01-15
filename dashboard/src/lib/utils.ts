@@ -9,7 +9,6 @@ export function cn(...inputs: ClassValue[]) {
 export enum APP_TABS {
   OVERVIEW = "overview",
   HISTORY = "history",
-  ENIGMA = "enigma",
 }
 
 export const numberToBytes32 = (num: number): `0x${string}` => {

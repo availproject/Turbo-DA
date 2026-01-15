@@ -25,6 +25,7 @@ import {
   Copy,
   EllipsisVertical,
   Eye,
+  Key,
   KeyRound,
   Lock,
   LockOpen,
@@ -46,6 +47,7 @@ import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import ViewKeys from "./view-keys";
 import useApp from "@/hooks/useApp";
 import EnableEncryptionDialog from "./enable-encryption-dialog";
+import EnigmaModal from "./enigma-modal";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
@@ -290,6 +292,19 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                       {app.encryption ? "Disable" : "Enable"} Encryption
                     </Text>
                   </MenubarItem>
+                  {app.encryption && (
+                    <MenubarItem
+                      onClick={() => setOpen("enigma" + app.id)}
+                      className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                    >
+                      <Key
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                      <Text weight={"semibold"}>Enigma</Text>
+                    </MenubarItem>
+                  )}
                   <MenubarItem
                     onClick={() => {
                       generateApiKey();
@@ -650,6 +665,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
           id={"enable-encryption" + app.id}
           appData={app}
         />
+      )}
+      {open === "enigma" + app.id && app.encryption && (
+        <EnigmaModal id={"enigma" + app.id} appData={app} />
       )}
     </div>
   );
