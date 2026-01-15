@@ -25,7 +25,10 @@ import {
   Copy,
   EllipsisVertical,
   Eye,
+  Key,
   KeyRound,
+  Lock,
+  LockOpen,
   Pencil,
   ScrollText,
   Trash2,
@@ -43,6 +46,8 @@ import SwitchDescription from "./switch-description";
 import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import ViewKeys from "./view-keys";
 import useApp from "@/hooks/useApp";
+import EnableEncryptionDialog from "./enable-encryption-dialog";
+import EnigmaModal from "./enigma-modal";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
@@ -53,7 +58,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
-  const { success } = useAppToast();
+  const { success, error: errorToast } = useAppToast();
   const { updateAppList } = useApp();
 
   const generateApiKey = async () => {
@@ -72,16 +77,22 @@ const AppItem = ({ app }: { app: AppDetails }) => {
     }
   };
 
-  const toggleEncryption = async () => {
+  const disableEncryption = async () => {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await AppService.toggleEncryption({
+      await AppService.toggleEncryption({
         token,
         appId: app.id,
       });
+      success({
+        label: "Encryption disabled successfully",
+      });
       updateAppList();
-    } catch (error) {
+    } catch (error: any) {
+      errorToast({
+        label: error.message || "Failed to disable encryption",
+      });
     } finally {
       setLoading(false);
     }
@@ -254,19 +265,46 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               </MenubarTrigger>
               <MenubarContent className="w-52 border border-border-blue bg-[#112235] p-0 rounded-lg overflow-hidden">
                 <MenubarGroup>
-                  {/*<MenubarItem
-                    onClick={toggleEncryption}
+                  <MenubarItem
+                    onClick={() => {
+                      if (app.encryption) {
+                        disableEncryption();
+                      } else {
+                        setOpen("enable-encryption" + app.id);
+                      }
+                    }}
                     className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
                   >
-                    <KeyRound
-                      className="text-[#B3B3B3] group-hover:text-white"
-                      strokeWidth={2}
-                      size={24}
-                    />
+                    {app.encryption ? (
+                      <LockOpen
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                    ) : (
+                      <Lock
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                    )}
                     <Text weight={"semibold"}>
                       {app.encryption ? "Disable" : "Enable"} Encryption
                     </Text>
-                  </MenubarItem>*/}
+                  </MenubarItem>
+                  {app.encryption && (
+                    <MenubarItem
+                      onClick={() => setOpen("enigma" + app.id)}
+                      className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                    >
+                      <Key
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                      <Text weight={"semibold"}>Enigma</Text>
+                    </MenubarItem>
+                  )}
                   <MenubarItem
                     onClick={() => {
                       generateApiKey();
@@ -621,6 +659,15 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             setOpen("");
           }}
         />
+      )}
+      {open === "enable-encryption" + app.id && (
+        <EnableEncryptionDialog
+          id={"enable-encryption" + app.id}
+          appData={app}
+        />
+      )}
+      {open === "enigma" + app.id && app.encryption && (
+        <EnigmaModal id={"enigma" + app.id} appData={app} />
       )}
     </div>
   );

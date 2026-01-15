@@ -48,7 +48,12 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use enigma::EnigmaEncryptionService;
 use observability::init_tracer;
+use routes::enigma_management::{
+    add_participant, create_decrypt_request, delete_participant, get_decrypt_request,
+    list_decrypt_requests, submit_signature,
+};
 use routes::health::health_check;
 
 #[actix_web::main]
@@ -68,6 +73,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_pool = web::Data::new(pool);
 
+    let enigma_service =
+        web::Data::new(EnigmaEncryptionService::new(app_config.enigma_url.clone()));
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {
@@ -81,35 +88,36 @@ async fn main() -> Result<(), std::io::Error> {
 
         App::new()
             .service(health_check)
-            .wrap_fn(|req, srv| {
-                let fut = srv.call(req);
-                async move {
-                    let mut res = fut.await?;
-                    if let (Ok(name), Ok(value)) = (
-                        "Content-Security-Policy".parse::<actix_web::http::header::HeaderName>(),
-                        "default-src 'self'; script-src 'self'"
-                            .parse::<actix_web::http::header::HeaderValue>(),
-                    ) {
-                        res.headers_mut().insert(name, value);
-                    } else {
-                        tracing::warn!("failed to insert CSP headers");
-                    }
-
-                    if let (Ok(name), Ok(value)) = (
-                        "X-Content-Type-Options".parse::<actix_web::http::header::HeaderName>(),
-                        "nosniff".parse::<actix_web::http::header::HeaderValue>(),
-                    ) {
-                        res.headers_mut().insert(name, value);
-                    } else {
-                        tracing::warn!("failed to insert X-Content-Type-Options");
-                    }
-
-                    Ok(res)
-                }
-            })
+            // .wrap_fn(|req, srv| {
+            //     let fut = srv.call(req);
+            //     async move {
+            //         let mut res = fut.await?;
+            //         if let (Ok(name), Ok(value)) = (
+            //             "Content-Security-Policy".parse::<actix_web::http::header::HeaderName>(),
+            //             "default-src 'self'; script-src 'self'"
+            //                 .parse::<actix_web::http::header::HeaderValue>(),
+            //         ) {
+            //             res.headers_mut().insert(name, value);
+            //         } else {
+            //             tracing::warn!("failed to insert CSP headers");
+            //         }
+            //
+            //         if let (Ok(name), Ok(value)) = (
+            //             "X-Content-Type-Options".parse::<actix_web::http::header::HeaderName>(),
+            //             "nosniff".parse::<actix_web::http::header::HeaderValue>(),
+            //         ) {
+            //             res.headers_mut().insert(name, value);
+            //         } else {
+            //             tracing::warn!("failed to insert X-Content-Type-Options");
+            //         }
+            //
+            //         Ok(res)
+            //     }
+            // })
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
+            .app_data(enigma_service.clone())
             .wrap(Logger::default())
             .service(
                 web::scope("/v1")
@@ -168,6 +176,15 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(get_wallet_usage)
                             .service(generate_access_token)
                             .service(toggle_encryption),
+                    )
+                    .service(
+                        web::scope("/enigma")
+                            .service(add_participant)
+                            .service(delete_participant)
+                            .service(create_decrypt_request)
+                            .service(get_decrypt_request)
+                            .service(list_decrypt_requests)
+                            .service(submit_signature),
                     )
                     .service(
                         web::scope("/admin")
