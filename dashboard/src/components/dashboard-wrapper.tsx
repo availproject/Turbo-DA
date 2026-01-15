@@ -21,6 +21,11 @@ const DashboardWrapper = ({ children }: { children: ReactNode }) => {
       label: "History",
       link: "/history",
     },
+    {
+      value: APP_TABS.ENIGMA,
+      label: "Enigma",
+      link: "/enigma",
+    },
   ];
 
   return (

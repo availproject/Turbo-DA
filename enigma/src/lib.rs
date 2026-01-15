@@ -1,12 +1,45 @@
 use std::{env, fs};
 
 use reqwest::{Certificate, Client, Identity};
+use serde_json::json;
+
+/// Error type for Enigma service operations
+#[derive(Debug)]
+pub enum EnigmaError {
+    /// HTTP/network error from reqwest
+    Request(reqwest::Error),
+    /// API error returned by Enigma service (non-2xx response)
+    Api { status: u16, message: String },
+    /// Failed to parse response
+    Parse { body: String, error: String },
+}
+
+impl std::fmt::Display for EnigmaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnigmaError::Request(e) => write!(f, "Request error: {}", e),
+            EnigmaError::Api { status, message } => write!(f, "API error ({}): {}", status, message),
+            EnigmaError::Parse { body, error } => write!(f, "Parse error: {} (body: {})", error, body),
+        }
+    }
+}
+
+impl std::error::Error for EnigmaError {}
+
+impl From<reqwest::Error> for EnigmaError {
+    fn from(e: reqwest::Error) -> Self {
+        EnigmaError::Request(e)
+    }
+}
+
 use types::{
     AddParticipantRequest, AddParticipantResponse, DecryptRequest, DecryptRequestData,
     DecryptRequestResponse, DeleteParticipantRequest, DeleteParticipantResponse, EncryptRequest,
-    EncryptResponse, RegisterRequest, RegisterResponse, SubmitSignatureRequest,
-    SubmitSignatureResponse,
+    EncryptResponse, ListDecryptRequestsQuery, ListDecryptRequestsResponse, RegisterRequest,
+    RegisterResponse, SubmitSignatureRequest, SubmitSignatureResponse,
 };
+
+use crate::types::{DecryptionRequestRecord, SubmitSignatureRequestEnigma};
 
 pub mod types;
 
@@ -174,14 +207,39 @@ impl EnigmaEncryptionService {
     /// * `DecryptRequestResponse` - Response containing request_id, status, and signers list
     pub async fn create_decrypt_request(
         &self,
-        payload: DecryptRequest,
-    ) -> Result<DecryptRequestResponse, reqwest::Error> {
+        request: DecryptRequest,
+        payload: Vec<u8>,
+    ) -> Result<DecryptRequestResponse, EnigmaError> {
         let url = format!("{}/v1/create_decrypt_request", self.service_url.clone());
 
-        let response = self.client.post(&url).json(&payload).send().await?;
+        let response = self
+            .client
+            .post(&url)
+            .json(&json!({"turbo_da_app_id":request.turbo_da_app_id, "ciphertext": payload,"submission_id":request.submission_id}))
+            .send()
+            .await?;
 
-        let response = response.json::<DecryptRequestResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma create_decrypt_request response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: DecryptRequestResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Gets the status of a decryption request
@@ -194,7 +252,7 @@ impl EnigmaEncryptionService {
     pub async fn get_decrypt_request(
         &self,
         request_id: &str,
-    ) -> Result<DecryptRequestResponse, reqwest::Error> {
+    ) -> Result<DecryptionRequestRecord, EnigmaError> {
         let url = format!(
             "{}/v1/decrypt_request/{}",
             self.service_url.clone(),
@@ -203,8 +261,27 @@ impl EnigmaEncryptionService {
 
         let response = self.client.get(&url).send().await?;
 
-        let response = response.json::<DecryptRequestResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma get_decrypt_request response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: DecryptionRequestRecord = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Submits a signature for a decryption request
@@ -217,19 +294,87 @@ impl EnigmaEncryptionService {
     /// * `SubmitSignatureResponse` - Response indicating if threshold is met and decryption status
     pub async fn submit_signature(
         &self,
-        request_id: &str,
         payload: SubmitSignatureRequest,
-    ) -> Result<SubmitSignatureResponse, reqwest::Error> {
+    ) -> Result<SubmitSignatureResponse, EnigmaError> {
         let url = format!(
             "{}/v1/decrypt_request/{}/signatures",
             self.service_url.clone(),
-            request_id
+            payload.request_id
         );
 
-        let response = self.client.post(&url).json(&payload).send().await?;
+        let data = SubmitSignatureRequestEnigma {
+            participant_address: payload.participant_address,
+            signature: payload.signature,
+        };
+        let response = self.client.post(&url).json(&data).send().await?;
 
-        let response = response.json::<SubmitSignatureResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma submit_signature response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: SubmitSignatureResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
+    }
+
+    /// Lists decryption requests for a given turbo_da_app_id
+    ///
+    /// # Arguments
+    /// * `query` - ListDecryptRequestsQuery struct containing turbo_da_app_id and optional pagination
+    ///
+    /// # Returns
+    /// * `ListDecryptRequestsResponse` - Paginated list of decryption requests
+    pub async fn list_decrypt_requests(
+        &self,
+        query: ListDecryptRequestsQuery,
+    ) -> Result<ListDecryptRequestsResponse, EnigmaError> {
+        let url = format!("{}/v1/decrypt_requests", self.service_url);
+
+        let mut params = vec![("turbo_da_app_id", query.turbo_da_app_id)];
+        if let Some(offset) = query.offset {
+            params.push(("offset", offset.to_string()));
+        }
+        if let Some(limit) = query.limit {
+            params.push(("limit", limit.to_string()));
+        }
+
+        let response = self.client.get(&url).query(&params).send().await?;
+
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma list_decrypt_requests response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: ListDecryptRequestsResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Legacy decrypt method - use create_decrypt_request + submit_signature + get_decrypt_request instead

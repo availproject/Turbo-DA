@@ -75,7 +75,7 @@ pub struct DeleteParticipantResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DecryptRequest {
     pub turbo_da_app_id: Uuid,
-    pub ciphertext: Vec<u8>,
+    pub submission_id: Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,9 +87,29 @@ pub struct DecryptRequestResponse {
     pub created_at: i64,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecryptionRequestRecord {
+    pub id: String,
+    pub turbo_da_app_id: String,
+    pub ciphertext: Vec<u8>,
+    pub submitted_signatures: String,
+    pub decrypted_data: Option<Vec<u8>>,
+    pub status: String,
+    pub created_at: i64,
+    pub completed_at: Option<i64>,
+}
+
 // Submit signature
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SubmitSignatureRequest {
+    pub request_id: Uuid,
+    pub participant_address: String,
+    pub signature: String,
+}
+
+#[derive(Debug, Serialize,Deserialize)]
+pub struct SubmitSignatureRequestEnigma {
     pub participant_address: String,
     pub signature: String,
 }
@@ -111,4 +131,31 @@ pub struct DecryptRequestData {
     pub ciphertext_array: Vec<u8>,
     pub ephemeral_pub_key_array: Vec<u8>,
     pub decrypted_array: Option<Vec<u8>>,
+}
+
+// List decrypt requests
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListDecryptRequestsQuery {
+    pub turbo_da_app_id: String,
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DecryptionRequestListWithThreshold {
+    pub id: String,
+    pub turbo_da_app_id: String,
+    pub submitted_signatures: String,
+    pub status: String,
+    pub created_at: i64,
+    pub completed_at: Option<i64>,
+    pub threshold: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListDecryptRequestsResponse {
+    pub items: Vec<DecryptionRequestListWithThreshold>,
+    pub total: u32,
+    pub offset: u32,
+    pub limit: u32,
 }
