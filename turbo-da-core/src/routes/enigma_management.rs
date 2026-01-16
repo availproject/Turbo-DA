@@ -52,7 +52,7 @@ use crate::{config::AppConfig, utils::generate_avail_sdk};
 ///      -d '{"turbo_da_app_id":"app-123","participants":["0xAddr1","0xAddr2"],"threshold":2}'
 /// ```
 #[tracing::instrument(
-    skip(enigma),
+    skip(enigma, pool),
     fields(
         turbo_da_app_id = %request.turbo_da_app_id,
         participant_count = request.participants.len(),
@@ -64,6 +64,7 @@ use crate::{config::AppConfig, utils::generate_avail_sdk};
 pub async fn register(
     request: web::Json<RegisterRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
     tracing::info!(
         turbo_da_app_id = %request.turbo_da_app_id,
@@ -71,13 +72,31 @@ pub async fn register(
         "registering app with participants"
     );
 
-    match enigma.register(request.into_inner()).await {
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match enigma.register(request.clone()).await {
         Ok(response) => {
             tracing::info!(
                 turbo_da_app_id = %response.turbo_da_app_id,
                 participants_added = response.participants_added,
                 "successfully registered app"
             );
+            if let Ok(app_id) = Uuid::parse_str(&request.turbo_da_app_id) {
+                if !request.participants.is_empty() {
+                    if let Err(e) = db::controllers::mpc_participants::add_participants(
+                        &mut connection,
+                        &app_id,
+                        request.participants.clone(),
+                    )
+                    .await
+                    {
+                        tracing::error!(error = %e, "failed to add participants to db");
+                    }
+                }
+            }
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
@@ -110,7 +129,7 @@ pub async fn register(
 /// }
 /// ```
 #[tracing::instrument(
-    skip(enigma),
+    skip(enigma, pool),
     fields(
         turbo_da_app_id = %request.turbo_da_app_id,
         participant_count = request.participants.len(),
@@ -121,6 +140,7 @@ pub async fn register(
 pub async fn add_participant(
     request: web::Json<AddParticipantRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
     tracing::info!(
         turbo_da_app_id = %request.turbo_da_app_id,
@@ -128,13 +148,29 @@ pub async fn add_participant(
         "adding participants to app"
     );
 
-    match enigma.add_participant(request.into_inner()).await {
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match enigma.add_participant(request.clone()).await {
         Ok(response) => {
             tracing::info!(
                 turbo_da_app_id = %response.turbo_da_app_id,
                 participants_added = response.participants_added,
                 "successfully added participants"
             );
+            if let Ok(app_id) = Uuid::parse_str(&request.turbo_da_app_id) {
+                if let Err(e) = db::controllers::mpc_participants::add_participants(
+                    &mut connection,
+                    &app_id,
+                    request.participants.clone(),
+                )
+                .await
+                {
+                    tracing::error!(error = %e, "failed to add participants to db");
+                }
+            }
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
@@ -166,7 +202,7 @@ pub async fn add_participant(
 /// }
 /// ```
 #[tracing::instrument(
-    skip(enigma),
+    skip(enigma, pool),
     fields(
         turbo_da_app_id = %request.turbo_da_app_id,
         participant_count = request.participants.len(),
@@ -177,6 +213,7 @@ pub async fn add_participant(
 pub async fn delete_participant(
     request: web::Json<DeleteParticipantRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
     tracing::info!(
         turbo_da_app_id = %request.turbo_da_app_id,
@@ -184,13 +221,29 @@ pub async fn delete_participant(
         "deleting participants from app"
     );
 
-    match enigma.delete_participant(request.into_inner()).await {
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match enigma.delete_participant(request.clone()).await {
         Ok(response) => {
             tracing::info!(
                 turbo_da_app_id = %response.turbo_da_app_id,
                 participants_deleted = response.participants_deleted,
                 "successfully deleted participants"
             );
+            if let Ok(app_id) = Uuid::parse_str(&request.turbo_da_app_id) {
+                if let Err(e) = db::controllers::mpc_participants::delete_participants(
+                    &mut connection,
+                    &app_id,
+                    request.participants.clone(),
+                )
+                .await
+                {
+                    tracing::error!(error = %e, "failed to delete participants from db");
+                }
+            }
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
@@ -335,7 +388,7 @@ pub async fn create_decrypt_request(
 
 #[derive(Debug, Deserialize, Serialize)]
 struct GetDecryptRequest {
-    pub submission_id: Uuid
+    pub submission_id: Uuid,
 }
 /// Get the status of a decryption request
 ///
@@ -399,7 +452,7 @@ pub async fn get_decrypt_request(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to fetch decrypt request: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -483,7 +536,7 @@ pub async fn submit_signature(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to submit signature to TEE: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -553,7 +606,7 @@ pub async fn list_decrypt_requests(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to list decrypt requests: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -569,4 +622,55 @@ fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
     bytes
         .try_into()
         .map_err(|_| "Invalid length: expected 32 bytes".to_string())
+}
+
+/// Get list of apps a participant is eligible to sign to
+///
+/// # Description
+/// Returns a list of applications where the given address is a registered participant.
+///
+/// # Route
+/// `GET /v1/enigma/participant_apps/{address}`
+///
+/// # Path Parameters
+/// * `address` - The public address of the participant
+///
+/// # Returns
+/// JSON response with list of apps
+#[tracing::instrument(
+    skip(pool),
+    fields(
+        address = %address,
+        endpoint = "enigma_get_participant_apps"
+    )
+)]
+#[get("/participant_apps/{address}")]
+pub async fn get_participant_apps(
+    address: web::Path<String>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+) -> HttpResponse {
+    tracing::info!(
+        address = %address,
+        "fetching apps for participant"
+    );
+
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match db::controllers::mpc_participants::get_apps_by_participant(&mut connection, &address)
+        .await
+    {
+        Ok(apps) => {
+            tracing::info!(count = apps.len(), "successfully fetched participant apps");
+            HttpResponse::Ok().json(apps)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to fetch participant apps");
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to fetch participant apps: {}", e)
+            }))
+        }
+    }
 }
