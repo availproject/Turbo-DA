@@ -369,7 +369,7 @@ class AppService {
 
   static async getTokens({ token }: { token: string }) {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/token_map`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/token_map`,
       {
         method: "GET",
         headers: {

@@ -106,3 +106,12 @@ export const capitalizeFirstLetter = (str: string): string => {
   if (!str) return str;
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
+
+export const formatSmartNumber = (value: string | number): string => {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
+
+  if (num >= 1000) return `${(num / 1000).toFixed(num >= 10000 ? 0 : 1)}k`;
+  if (num < 1) return num.toFixed(4);
+  return num.toFixed(num >= 10 ? 0 : 2);
+};

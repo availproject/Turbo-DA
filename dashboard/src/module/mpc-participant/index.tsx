@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useModal } from "connectkit";
 import MpcAppList from "./app-list";
+import { useAuth } from "@/providers/AuthProvider";
 
 const MpcParticipantView = () => {
   const [addressInput, setAddressInput] = useState("");
@@ -19,17 +20,19 @@ const MpcParticipantView = () => {
   const [apps, setApps] = useState<AppDetails[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const { error: errorToast } = useAppToast();
-  
+  const { token } = useAuth();
+
   const { address, isConnected } = useAccount();
   const { setOpen: openConnectModal } = useModal();
 
-  const handleFetchApps = async (participantAddress: string) => {
-    if (!participantAddress) return;
-    
+  const handleFetchApps = async (participantAddress: string, authToken: string) => {
+    if (!participantAddress || !authToken) return;
+
     setLoading(true);
     setHasSearched(true);
     try {
       const response = await EnigmaService.getParticipantApps({
+        token: authToken,
         address: participantAddress,
       });
       setApps(response);
@@ -43,9 +46,9 @@ const MpcParticipantView = () => {
   };
 
   const handleUseConnectedWallet = () => {
-    if (isConnected && address) {
+    if (isConnected && address && token) {
       setAddressInput(address);
-      handleFetchApps(address);
+      handleFetchApps(address, token);
     } else {
       openConnectModal(true);
     }
@@ -89,8 +92,8 @@ const MpcParticipantView = () => {
               <div className="flex gap-3 w-full sm:w-auto">
                 <Button
                   className="flex-1 sm:flex-none mb-[2px] h-[52px] shadow-lg hover:shadow-primary-button/50 transition-all duration-300 flex items-center justify-center"
-                  onClick={() => handleFetchApps(addressInput)}
-                  disabled={loading || !addressInput}
+                  onClick={() => token && handleFetchApps(addressInput, token)}
+                  disabled={loading || !addressInput || !token}
                 >
                   {loading ? (
                     <LoaderCircle className="animate-spin flex-shrink-0" size={20} />

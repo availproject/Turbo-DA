@@ -18,7 +18,7 @@ class EnigmaService {
     participants: string[];
   }): Promise<AddParticipantResponse> {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/add_participant`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/add_participant`,
       {
         method: "POST",
         headers: {
@@ -50,7 +50,7 @@ class EnigmaService {
     participants: string[];
   }): Promise<DeleteParticipantResponse> {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/delete_participant`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/delete_participant`,
       {
         method: "DELETE",
         headers: {
@@ -89,7 +89,7 @@ class EnigmaService {
     }
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/create_decrypt_request`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/create_decrypt_request`,
       {
         method: "POST",
         headers,
@@ -128,7 +128,7 @@ class EnigmaService {
     // But web::Path<String> strongly suggests it expects a path segment.
     const params = new URLSearchParams({ submission_id: request_id });
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/get_decrypt_request?${params.toString()}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/get_decrypt_request?${params.toString()}`,
       {
         method: "GET",
         headers,
@@ -154,7 +154,7 @@ class EnigmaService {
     participant_address: string;
     signature: string;
   }): Promise<SubmitSignatureResponse> {
-    console.log(  `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/submit_signature`);
+    console.log(  `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/submit_signature`);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -163,7 +163,7 @@ class EnigmaService {
     }
     
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/submit_signature`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/submit_signature`,
       {
         method: "POST",
         headers,
@@ -206,7 +206,7 @@ class EnigmaService {
     if (limit !== undefined) params.append("limit", limit.toString());
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/decrypt_requests?${params.toString()}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/decrypt_requests?${params.toString()}`,
       {
         method: "GET",
         headers,
@@ -222,16 +222,19 @@ class EnigmaService {
   }
 
   static async getParticipantApps({
+    token,
     address,
   }: {
+    token: string;
     address: string;
   }): Promise<any[]> {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/participant_apps/${address}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/participant_apps/${address}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       }
     );

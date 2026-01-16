@@ -1,12 +1,18 @@
 import Button from "@/components/button";
 import { Text } from "@/components/text";
-import { supportedTokensAndChains } from "@/lib/types";
 import { useConfig } from "@/providers/ConfigProvider";
 import Image from "next/image";
 
 const AvailChainConnect = () => {
-  const { selectedChain, setSelectedChain, setSelectedToken } = useConfig();
+  const {
+    selectedChain,
+    setSelectedChain,
+    setSelectedToken,
+    supportedTokensAndChains,
+  } = useConfig();
   const availChain = supportedTokensAndChains[0];
+
+  if (!availChain) return null;
 
   return (
     <Button

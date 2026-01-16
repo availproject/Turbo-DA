@@ -4,6 +4,7 @@ import {
   cn,
   formatDataBytesWithPrecision,
   formatTokenAmount,
+  formatSmartNumber,
 } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { useConfig } from "@/providers/ConfigProvider";
@@ -13,7 +14,6 @@ import { SignInButton } from "@clerk/nextjs";
 import { useAuthState } from "@/providers/AuthProvider";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
-import { supportedTokensAndChains } from "@/lib/types";
 
 import Button from "@/components/button";
 import DynamicTable from "@/components/data-table";
@@ -27,7 +27,7 @@ const CreditHistory = () => {
   const [loading, setLoading] = useState(true);
   const { setMainTabSelected } = useOverview();
   const { isAuthenticated, isLoggedOut, token } = useAuthState();
-  const { transactionStatusList } = useConfig();
+  const { transactionStatusList, supportedTokensAndChains } = useConfig();
 
   const fetchHistory = useCallback(async () => {
     if (!token) return;
@@ -36,16 +36,10 @@ const CreditHistory = () => {
       const response = await HistoryService.getCreditHistory({
         token,
       });
-      // Sort by latest transactions first and add token information
-      const sortedData = (response?.data ?? [])
-        .sort(
-          (a: CreditRequest, b: CreditRequest) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
-        .map((item: CreditRequest) => ({
-          ...item,
-          token: item.chain_id, // Use chain_id to determine token
-        }));
+      const sortedData = (response?.data ?? []).sort(
+        (a: CreditRequest, b: CreditRequest) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
       setHistoryList(sortedData);
     } catch (error) {
       console.log(error);
@@ -114,27 +108,35 @@ const CreditHistory = () => {
     };
   }, [isAuthenticated, token, fetchHistory]);
 
-  // Helper function to get chain info from supportedTokensAndChains
-  const getChainInfo = useCallback((chainId: number) => {
-    // Find the chain by ID in supportedTokensAndChains
-    for (const [chainKey, chainData] of Object.entries(
-      supportedTokensAndChains
-    )) {
-      if (chainData.id === chainId) {
+  const getChainInfo = useCallback(
+    (chainId: number) => {
+      const chainData = supportedTokensAndChains[chainId];
+      if (chainData) {
         return {
           logo: chainData.icon,
           name: chainData.name,
           tokens: chainData.tokens,
         };
       }
-    }
-    // Fallback for unknown chains
-    return {
-      logo: "/favicon.ico",
-      name: "Unknown",
-      tokens: [],
-    };
-  }, []);
+      return {
+        logo: "/favicon.ico",
+        name: "Unknown",
+        tokens: [],
+      };
+    },
+    [supportedTokensAndChains]
+  );
+
+  const getTokenByAddress = useCallback(
+    (tokenAddress: string | null, chainId: number) => {
+      if (!tokenAddress) return null;
+      const chainInfo = getChainInfo(chainId);
+      return chainInfo.tokens.find(
+        (token) => token.address.toLowerCase() === tokenAddress.toLowerCase()
+      );
+    },
+    [getChainInfo]
+  );
 
   // Helper function to check if a transaction is currently in process
   const isTransactionInProcess = useCallback(
@@ -190,12 +192,18 @@ const CreditHistory = () => {
   const displayValues = useCallback(
     (heading: string, value: any, rowData?: any) => {
       switch (heading) {
+        case "id":
+          return value ?? "-";
         case "created_at":
           return new Date(value).toLocaleDateString().replaceAll("/", "-");
         case "amount_credit":
-          return value ? formatDataBytesWithPrecision(value, 2) : "-";
+          return value
+            ? `${formatSmartNumber(parseFloat(value) / 1024)} Credits`
+            : "-";
         case "amount_paid":
-          return value ? formatTokenAmount(value, 18, 2) : "-";
+          return value
+            ? formatSmartNumber(parseFloat(value) / Math.pow(10, 18))
+            : "-";
         case "chain_id":
           const chainInfo = getChainInfo(value);
           return (
@@ -212,20 +220,27 @@ const CreditHistory = () => {
             </div>
           );
         case "token":
-          // Get the default token for the chain (first token in the chain's token list)
-          const chainInfoForToken = getChainInfo(value);
-          const defaultToken = chainInfoForToken.tokens[0];
-          if (defaultToken) {
+          let tokenInfo =
+            rowData?.token_address && rowData?.chain_id
+              ? getTokenByAddress(rowData.token_address, rowData.chain_id)
+              : null;
+
+          if (!tokenInfo && rowData?.chain_id !== undefined) {
+            const chainInfo = getChainInfo(rowData.chain_id);
+            tokenInfo = chainInfo.tokens[0];
+          }
+
+          if (tokenInfo) {
             return (
               <div className="flex items-center gap-x-2">
                 <Image
-                  src={defaultToken.icon}
-                  alt={defaultToken.name}
+                  src={tokenInfo.icon}
+                  alt={tokenInfo.name}
                   width={20}
                   height={20}
                 />
                 <Text variant={"light-grey"} weight={"semibold"} size={"sm"}>
-                  {defaultToken.name}
+                  {tokenInfo.name}
                 </Text>
               </div>
             );
@@ -263,7 +278,7 @@ const CreditHistory = () => {
           return value ?? "-";
       }
     },
-    [getChainInfo, isTransactionInProcess]
+    [getChainInfo, getTokenByAddress, isTransactionInProcess]
   );
 
   return (
@@ -302,7 +317,7 @@ const CreditHistory = () => {
       ) : historyList?.length ? (
         <DynamicTable
           headings={[
-            { key: "created_at", label: "Purchasing Date" },
+            { key: "id", label: "ID" },
             { key: "request_status", label: "Status" },
             { key: "request_type", label: "Type" },
             { key: "chain_id", label: "Chain" },
@@ -320,7 +335,11 @@ const CreditHistory = () => {
             <div
               className={cn(
                 "flex",
-                last ? "w-[180px] justify-end" : "w-[150px]"
+                last
+                  ? "w-[180px] justify-end"
+                  : heading === "id"
+                  ? "w-[60px]"
+                  : "w-[150px]"
               )}
             >
               <Text

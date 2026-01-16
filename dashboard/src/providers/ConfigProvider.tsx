@@ -1,7 +1,7 @@
 "use client";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
 import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
-import { getAvailableChains } from "@/lib/types";
+import { getSupportedTokensAndChains, SupportedTokensAndChains } from "@/lib/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import { useAuth } from "./AuthProvider";
 import React, {
@@ -19,31 +19,10 @@ const STORAGE_KEYS = {
   SELECTED_TOKEN: "turbo-da-selected-token",
 } as const;
 
-const getDefaultChain = (): ChainType => {
-  const availableChains = getAvailableChains();
-  // Get first available chain (sepolia for testnet, base for mainnet)
-  const defaultChain = Object.values(availableChains)[0];
-  return {
-    name: defaultChain.name,
-    icon: defaultChain.icon,
-    id: defaultChain.id,
-  };
-};
-
-const getDefaultToken = (): Token => {
-  const availableChains = getAvailableChains();
-  // Get first token from first available chain
-  const defaultChain = Object.values(availableChains)[0];
-  return {
-    name: defaultChain.tokens[0].name,
-    icon: defaultChain.tokens[0].icon,
-  };
-};
-
 interface ConfigContextType {
   token?: string;
   selectedChain: ChainType;
-  setSelectedChain: Dispatch<SetStateAction<ChainType>>;
+  setSelectedChain: Dispatch<SetStateAction<ChainType | undefined>>;
   setSelectedToken: Dispatch<SetStateAction<Token | undefined>>;
   selectedToken?: Token;
   transactionStatusList: TransactionStatus[];
@@ -51,6 +30,7 @@ interface ConfigContextType {
   showTransaction?: TransactionStatus;
   setShowTransaction: Dispatch<SetStateAction<TransactionStatus | undefined>>;
   availNativeBalance: string;
+  supportedTokensAndChains: SupportedTokensAndChains;
 }
 
 export const ConfigContext = createContext<ConfigContextType | undefined>(
@@ -89,11 +69,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const { selected } = useAvailAccount();
   const { api } = useAvailWallet();
 
-  const [selectedChain, setSelectedChain] =
-    useState<ChainType>(getDefaultChain);
-  const [selectedToken, setSelectedToken] = useState<Token | undefined>(
-    getDefaultToken,
-  );
+  const [supportedTokensAndChains, setSupportedTokensAndChains] =
+    useState<SupportedTokensAndChains>({});
+  const [selectedChain, setSelectedChain] = useState<ChainType>();
+  const [selectedToken, setSelectedToken] = useState<Token | undefined>();
   const [transactionStatusList, setTransactionStatusList] = useState<
     TransactionStatus[]
   >([]);
@@ -103,26 +82,65 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const storedChain = localStorage.getItem(STORAGE_KEYS.SELECTED_CHAIN);
-        const storedToken = localStorage.getItem(STORAGE_KEYS.SELECTED_TOKEN);
+    getSupportedTokensAndChains().then((chains) => {
+      setSupportedTokensAndChains(chains);
+      const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
+      const availableChains = Object.values(chains).filter(
+        (chain) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+      );
+      const defaultChain = availableChains[0];
 
-        if (storedChain) {
-          const parsedChain = JSON.parse(storedChain);
-          setSelectedChain(parsedChain);
+      if (typeof window !== "undefined") {
+        try {
+          const storedChain = localStorage.getItem(STORAGE_KEYS.SELECTED_CHAIN);
+          const storedToken = localStorage.getItem(STORAGE_KEYS.SELECTED_TOKEN);
+
+          if (storedChain) {
+            setSelectedChain(JSON.parse(storedChain));
+          } else if (defaultChain) {
+            setSelectedChain({
+              name: defaultChain.name,
+              icon: defaultChain.icon,
+              id: defaultChain.id,
+            });
+          }
+
+          if (storedToken) {
+            setSelectedToken(JSON.parse(storedToken));
+          } else if (defaultChain) {
+            setSelectedToken({
+              name: defaultChain.tokens[0].name,
+              icon: defaultChain.tokens[0].icon,
+            });
+          }
+        } catch (error) {
+          console.warn("Failed to parse stored chain/token preferences:", error);
+          if (defaultChain) {
+            setSelectedChain({
+              name: defaultChain.name,
+              icon: defaultChain.icon,
+              id: defaultChain.id,
+            });
+            setSelectedToken({
+              name: defaultChain.tokens[0].name,
+              icon: defaultChain.tokens[0].icon,
+            });
+          }
         }
 
-        if (storedToken) {
-          const parsedToken = JSON.parse(storedToken);
-          setSelectedToken(parsedToken);
-        }
-      } catch (error) {
-        console.warn("Failed to parse stored chain/token preferences:", error);
+        setIsHydrated(true);
+      } else if (defaultChain) {
+        setSelectedChain({
+          name: defaultChain.name,
+          icon: defaultChain.icon,
+          id: defaultChain.id,
+        });
+        setSelectedToken({
+          name: defaultChain.tokens[0].name,
+          icon: defaultChain.tokens[0].icon,
+        });
       }
-
-      setIsHydrated(true);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -185,6 +203,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     }
   };
 
+  if (!selectedChain) {
+    return null;
+  }
+
   return (
     <ConfigContext.Provider
       value={{
@@ -198,6 +220,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
         showTransaction,
         setShowTransaction,
         availNativeBalance,
+        supportedTokensAndChains,
       }}
     >
       {children}

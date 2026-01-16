@@ -119,7 +119,6 @@ async fn main() -> Result<(), std::io::Error> {
             .app_data(shared_pool.clone())
             .app_data(enigma_service.clone())
             .wrap(Logger::default())
-            .service(get_participant_apps)
             .service(
                 web::scope("/v1")
                     .service(get_token_map)
@@ -184,6 +183,8 @@ async fn main() -> Result<(), std::io::Error> {
                                     .service(create_decrypt_request)
                                     .service(get_decrypt_request)
                                     .service(list_decrypt_requests)
+                                                .service(get_participant_apps)
+
                                     .service(submit_signature),
                             ),
                     )

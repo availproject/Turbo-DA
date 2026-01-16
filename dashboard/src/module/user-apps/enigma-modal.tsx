@@ -464,7 +464,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                 <>
                   {selectedRequest ? (
                     // Request Details View
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 h-full">
                       <button
                         onClick={() => {
                           setSelectedRequest(null);
@@ -477,7 +477,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                       </button>
 
                       {detailsLoading ? (
-                        <div className="flex justify-center items-center min-h-[200px]">
+                        <div className="flex flex-1 justify-center items-center">
                           <LoaderCircle
                             className="animate-spin text-[#3CA3FC]"
                             size={32}
@@ -671,7 +671,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                               <Button
                                 onClick={handleSignAndSubmit}
                                 disabled={submitLoading}
-                                className="w-full"
+                                className="w-full flex items-center justify-center"
                               >
                                 {submitLoading ? (
                                   <LoaderCircle className="animate-spin" size={20} />
@@ -694,7 +694,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                     </div>
                   ) : (
                     // Request List View
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 h-full">
                       <div className="flex justify-between items-center">
                         <Text weight="semibold">
                           Decryption Requests ({total})
@@ -715,7 +715,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                       </div>
 
                       {historyLoading && requests.length === 0 ? (
-                        <div className="flex justify-center items-center min-h-[300px]">
+                        <div className="flex flex-1 justify-center items-center">
                           <LoaderCircle
                             className="animate-spin text-[#3CA3FC]"
                             size={32}
@@ -868,7 +868,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                     />
 
                     <Button
-                      className="mt-6 w-full"
+                      className="mt-6 w-full flex items-center justify-center"
                       onClick={handleCreate}
                       disabled={createLoading || !submissionId}
                       variant={!submissionId ? "disabled" : "primary"}
@@ -903,7 +903,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                     />
 
                     <Button
-                      className="mt-6 w-full"
+                      className="mt-6 w-full flex items-center justify-center"
                       onClick={handleAddParticipants}
                       disabled={addLoading || !addParticipants}
                       variant={!addParticipants ? "disabled" : "primary"}
@@ -938,7 +938,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
 
                     <Button
                       variant={!deleteParticipants ? "disabled" : "danger"}
-                      className="mt-6 w-full"
+                      className="mt-6 w-full flex items-center justify-center"
                       onClick={handleDeleteParticipants}
                       disabled={deleteLoading || !deleteParticipants}
                     >

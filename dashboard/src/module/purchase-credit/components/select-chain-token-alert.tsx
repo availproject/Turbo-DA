@@ -13,17 +13,27 @@ import { Close, DialogTitle } from "@radix-ui/react-dialog";
 import { Search, X } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { getAvailableChains, supportedTokensAndChains } from "@/lib/types";
 
 const SelectChainToken = () => {
-  const { selectedChain, selectedToken, setSelectedChain, setSelectedToken } =
-    useConfig();
+  const {
+    selectedChain,
+    selectedToken,
+    setSelectedChain,
+    setSelectedToken,
+    supportedTokensAndChains,
+  } = useConfig();
   const [searchChain, setSearchChain] = useState<string>("");
   const [searchToken, setSearchToken] = useState<string>("");
   const { open, setOpen } = useDialog();
 
-  // Get chains filtered by environment (mainnet/testnet)
-  const availableChains = useMemo(() => getAvailableChains(), []);
+  const availableChains = useMemo(() => {
+    const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
+    return Object.fromEntries(
+      Object.entries(supportedTokensAndChains).filter(
+        ([_, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+      )
+    );
+  }, [supportedTokensAndChains]);
 
   return (
     <Dialog
@@ -87,9 +97,9 @@ const SelectChainToken = () => {
               </div>
               <div className="bg-border-blue h-px w-full" />
               <div className="flex gap-y-2 flex-col mt-6 px-3">
-                {/* Avail Chain */}
                 {(() => {
-                  const availChain = availableChains[0];
+                  const availChain = supportedTokensAndChains[0];
+                  if (!availChain) return null;
                   return (
                     <Button
                       variant={"outline"}

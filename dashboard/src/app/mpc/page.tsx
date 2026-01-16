@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useModal } from "connectkit";
 import MpcAppList from "@/module/mpc-participant/app-list";
+import { useAuth } from "@/providers/AuthProvider";
 
 const MpcStandalonePage = () => {
   const [addressInput, setAddressInput] = useState("");
@@ -17,17 +18,19 @@ const MpcStandalonePage = () => {
   const [apps, setApps] = useState<AppDetails[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const { error: errorToast } = useAppToast();
+  const { token } = useAuth();
   const { address, isConnected } = useAccount();
   const { setOpen: openConnectModal } = useModal();
   const prevAddressRef = useRef<string | undefined>();
 
-  const handleFetchApps = async (participantAddress: string) => {
-    if (!participantAddress) return;
+  const handleFetchApps = async (participantAddress: string, authToken: string) => {
+    if (!participantAddress || !authToken) return;
 
     setLoading(true);
     setHasSearched(true);
     try {
       const response = await EnigmaService.getParticipantApps({
+        token: authToken,
         address: participantAddress,
       });
       setApps(response);
@@ -40,20 +43,20 @@ const MpcStandalonePage = () => {
     }
   };
 
-  // Auto-fetch when wallet connects
+  // Auto-fetch when wallet connects and token is ready
   useEffect(() => {
-    if (isConnected && address && address !== prevAddressRef.current && !hasSearched) {
+    if (isConnected && address && token && address !== prevAddressRef.current && !hasSearched) {
       setAddressInput(address);
-      handleFetchApps(address);
+      handleFetchApps(address, token);
     }
     prevAddressRef.current = address;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, address, hasSearched]);
+  }, [isConnected, address, hasSearched, token]);
 
   const handleConnectWallet = () => {
-    if (isConnected && address) {
+    if (isConnected && address && token) {
       setAddressInput(address);
-      handleFetchApps(address);
+      handleFetchApps(address, token);
     } else {
       openConnectModal(true);
     }
@@ -120,8 +123,8 @@ const MpcStandalonePage = () => {
                   />
                   <button
                     className="h-11 px-4 rounded-xl bg-border-blue/40 hover:bg-border-blue/60 text-white text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
-                    onClick={() => handleFetchApps(addressInput)}
-                    disabled={loading || !addressInput}
+                    onClick={() => token && handleFetchApps(addressInput, token)}
+                    disabled={loading || !addressInput || !token}
                   >
                     {loading ? (
                       <LoaderCircle className="animate-spin" size={16} />
