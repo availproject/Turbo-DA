@@ -88,32 +88,32 @@ async fn main() -> Result<(), std::io::Error> {
 
         App::new()
             .service(health_check)
-            // .wrap_fn(|req, srv| {
-            //     let fut = srv.call(req);
-            //     async move {
-            //         let mut res = fut.await?;
-            //         if let (Ok(name), Ok(value)) = (
-            //             "Content-Security-Policy".parse::<actix_web::http::header::HeaderName>(),
-            //             "default-src 'self'; script-src 'self'"
-            //                 .parse::<actix_web::http::header::HeaderValue>(),
-            //         ) {
-            //             res.headers_mut().insert(name, value);
-            //         } else {
-            //             tracing::warn!("failed to insert CSP headers");
-            //         }
-            //
-            //         if let (Ok(name), Ok(value)) = (
-            //             "X-Content-Type-Options".parse::<actix_web::http::header::HeaderName>(),
-            //             "nosniff".parse::<actix_web::http::header::HeaderValue>(),
-            //         ) {
-            //             res.headers_mut().insert(name, value);
-            //         } else {
-            //             tracing::warn!("failed to insert X-Content-Type-Options");
-            //         }
-            //
-            //         Ok(res)
-            //     }
-            // })
+            .wrap_fn(|req, srv| {
+                let fut = srv.call(req);
+                async move {
+                    let mut res = fut.await?;
+                    if let (Ok(name), Ok(value)) = (
+                        "Content-Security-Policy".parse::<actix_web::http::header::HeaderName>(),
+                        "default-src 'self'; script-src 'self'"
+                            .parse::<actix_web::http::header::HeaderValue>(),
+                    ) {
+                        res.headers_mut().insert(name, value);
+                    } else {
+                        tracing::warn!("failed to insert CSP headers");
+                    }
+
+                    if let (Ok(name), Ok(value)) = (
+                        "X-Content-Type-Options".parse::<actix_web::http::header::HeaderName>(),
+                        "nosniff".parse::<actix_web::http::header::HeaderValue>(),
+                    ) {
+                        res.headers_mut().insert(name, value);
+                    } else {
+                        tracing::warn!("failed to insert X-Content-Type-Options");
+                    }
+
+                    Ok(res)
+                }
+            })
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
@@ -186,15 +186,6 @@ async fn main() -> Result<(), std::io::Error> {
                                     .service(get_participant_apps)
                                     .service(submit_signature),
                             ),
-                    )
-                    .service(
-                        web::scope("/enigma")
-                            .service(add_participant)
-                            .service(delete_participant)
-                            .service(create_decrypt_request)
-                            .service(get_decrypt_request)
-                            .service(list_decrypt_requests)
-                            .service(submit_signature),
                     )
                     .service(
                         web::scope("/admin")
