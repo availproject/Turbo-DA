@@ -388,7 +388,7 @@ pub async fn create_decrypt_request(
 
 #[derive(Debug, Deserialize, Serialize)]
 struct GetDecryptRequest {
-    pub submission_id: Uuid
+    pub submission_id: Uuid,
 }
 /// Get the status of a decryption request
 ///
@@ -452,7 +452,7 @@ pub async fn get_decrypt_request(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to fetch decrypt request: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -536,7 +536,7 @@ pub async fn submit_signature(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to submit signature to TEE: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -606,7 +606,7 @@ pub async fn list_decrypt_requests(
                 }
                 _ => HttpResponse::InternalServerError().json(json!({
                     "error": format!("Failed to list decrypt requests: {}", e)
-                }))
+                })),
             }
         }
     }
@@ -659,17 +659,11 @@ pub async fn get_participant_apps(
         Err(e) => return e,
     };
 
-    match db::controllers::mpc_participants::get_apps_by_participant(
-        &mut connection,
-        &address,
-    )
-    .await
+    match db::controllers::mpc_participants::get_apps_by_participant(&mut connection, &address)
+        .await
     {
         Ok(apps) => {
-            tracing::info!(
-                count = apps.len(),
-                "successfully fetched participant apps"
-            );
+            tracing::info!(count = apps.len(), "successfully fetched participant apps");
             HttpResponse::Ok().json(apps)
         }
         Err(e) => {
