@@ -65,9 +65,10 @@ const bytesToString = (bytes: number[] | null | undefined): string => {
 type EnigmaModalProps = {
   id: string;
   appData: AppDetails;
+  skipAuth?: boolean;
 };
 
-export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
+export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps) {
   const { open, setOpen } = useDialog();
   const { token } = useConfig();
   const { success, error: errorToast } = useAppToast();
@@ -112,12 +113,12 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
   // Fetch request history
   const fetchHistory = useCallback(
     async (newOffset = 0) => {
-      if (!token) return;
+      if (!token && !skipAuth) return;
 
       try {
         setHistoryLoading(true);
         const response = await EnigmaService.listDecryptRequests({
-          token,
+          token: token || undefined,
           turbo_da_app_id: turboAppId,
           offset: newOffset,
           limit: PAGE_SIZE,
@@ -137,12 +138,12 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, turboAppId]
+    [token, turboAppId, skipAuth]
   );
 
   // Load history when modal opens
   useEffect(() => {
-    if (open === id && token && !hasFetchedRef.current) {
+    if (open === id && (token || skipAuth) && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
       fetchHistory(0);
     }
@@ -150,16 +151,16 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
     if (open !== id) {
       hasFetchedRef.current = false;
     }
-  }, [open, id, token, fetchHistory]);
+  }, [open, id, token, fetchHistory, skipAuth]);
 
   // Fetch request details
   const fetchRequestDetails = async (requestId: string) => {
-    if (!token) return;
+    if (!token && !skipAuth) return;
 
     try {
       setDetailsLoading(true);
       const response = await EnigmaService.getDecryptRequest({
-        token,
+        token: token || undefined,
         request_id: requestId,
       });
       setRequestDetails(response);
@@ -179,7 +180,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
 
   // Handle sign and submit
   const handleSignAndSubmit = async () => {
-    if (!token || !selectedRequest) return;
+    if ((!token && !skipAuth) || !selectedRequest) return;
     if (!isConnected || !address) {
       openConnectModal(true);
       return;
@@ -192,7 +193,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
       const signature = await signMessageAsync({ message });
 
       const response = await EnigmaService.submitSignature({
-        token,
+        token: token || undefined,
         request_id: selectedRequest.id,
         participant_address: address,
         signature: signature,
@@ -223,7 +224,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
 
   // Handle create request
   const handleCreate = async () => {
-    if (!token) return;
+    if (!token && !skipAuth) return;
     if (!submissionId) {
       errorToast({ label: "Please enter submission ID" });
       return;
@@ -233,7 +234,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
       setCreateLoading(true);
 
       const response = await EnigmaService.createDecryptRequest({
-        token,
+        token: token || undefined,
         turbo_da_app_id: turboAppId,
         submission_id: submissionId,
       });
@@ -255,7 +256,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
 
   // Handle add participants
   const handleAddParticipants = async () => {
-    if (!token) return;
+    if (!token && !skipAuth) return;
     if (!addParticipants) {
       errorToast({ label: "Please enter participant addresses" });
       return;
@@ -269,7 +270,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
         .filter((p) => p);
 
       const response = await EnigmaService.addParticipant({
-        token,
+        token: token || undefined,
         turbo_da_app_id: turboAppId,
         participants: participantsList,
       });
@@ -289,7 +290,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
 
   // Handle delete participants
   const handleDeleteParticipants = async () => {
-    if (!token) return;
+    if (!token && !skipAuth) return;
     if (!deleteParticipants) {
       errorToast({ label: "Please enter participant addresses" });
       return;
@@ -303,7 +304,7 @@ export default function EnigmaModal({ id, appData }: EnigmaModalProps) {
         .filter((p) => p);
 
       const response = await EnigmaService.deleteParticipant({
-        token,
+        token: token || undefined,
         turbo_da_app_id: turboAppId,
         participants: participantsList,
       });

@@ -77,18 +77,22 @@ class EnigmaService {
     turbo_da_app_id,
     submission_id,
   }: {
-    token: string;
+    token?: string;
     turbo_da_app_id: string;
     submission_id: string;
   }): Promise<CreateDecryptRequestResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/create_decrypt_request`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           turbo_da_app_id,
           id: submission_id,
@@ -108,9 +112,16 @@ class EnigmaService {
     token,
     request_id,
   }: {
-    token: string;
+    token?: string;
     request_id: string;
   }): Promise<GetDecryptRequestResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     // Assuming the request_id is appended to the path as per standard REST conventions
     // even though the backend macro seemed to miss the param.
     // If backend is strictly /get_decrypt_request without param, this might need changing.
@@ -120,10 +131,7 @@ class EnigmaService {
       `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/get_decrypt_request?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       }
     );
 
@@ -141,20 +149,24 @@ class EnigmaService {
     participant_address,
     signature,
   }: {
-    token: string;
+    token?: string;
     request_id: string;
     participant_address: string;
     signature: string;
   }): Promise<SubmitSignatureResponse> {
     console.log(  `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/submit_signature`);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/submit_signature`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           id: request_id,
           participant_address,
@@ -177,11 +189,18 @@ class EnigmaService {
     offset,
     limit,
   }: {
-    token: string;
+    token?: string;
     turbo_da_app_id: string;
     offset?: number;
     limit?: number;
   }): Promise<ListDecryptRequestsResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const params = new URLSearchParams({ turbo_da_app_id });
     if (offset !== undefined) params.append("offset", offset.toString());
     if (limit !== undefined) params.append("limit", limit.toString());
@@ -190,9 +209,29 @@ class EnigmaService {
       `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/decrypt_requests?${params.toString()}`,
       {
         method: "GET",
+        headers,
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  static async getParticipantApps({
+    address,
+  }: {
+    address: string;
+  }): Promise<any[]> {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/enigma/participant_apps/${address}`,
+      {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
       }
     );

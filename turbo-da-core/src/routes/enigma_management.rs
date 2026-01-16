@@ -644,7 +644,7 @@ fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
         endpoint = "enigma_get_participant_apps"
     )
 )]
-#[get("/participant_apps/{address}")]
+#[get("/enigma/participant_apps/{address}")]
 pub async fn get_participant_apps(
     address: web::Path<String>,
     pool: web::Data<Pool<AsyncPgConnection>>,
