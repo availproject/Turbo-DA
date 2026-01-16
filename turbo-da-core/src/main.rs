@@ -188,15 +188,6 @@ async fn main() -> Result<(), std::io::Error> {
                             ),
                     )
                     .service(
-                        web::scope("/enigma")
-                            .service(add_participant)
-                            .service(delete_participant)
-                            .service(create_decrypt_request)
-                            .service(get_decrypt_request)
-                            .service(list_decrypt_requests)
-                            .service(submit_signature),
-                    )
-                    .service(
                         web::scope("/admin")
                             .wrap_fn(|req, srv| {
                                 let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
