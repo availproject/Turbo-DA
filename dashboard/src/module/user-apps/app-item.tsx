@@ -1,7 +1,6 @@
 "use client";
 import { useDialog } from "@/components/dialog/provider";
 import AvatarWrapper from "@/components/lottie-comp/avatar-container";
-import PrimaryProgress from "@/components/progress/primary-progress";
 import { Text } from "@/components/text";
 import { useAppToast } from "@/components/toast";
 import {
@@ -35,14 +34,13 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import AssignCredits from "./assign-credits";
 import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import ManageCredits from "./manage-credits";
 import ReclaimCredits from "./reclaim-credits";
-import SwitchDescription from "./switch-description";
 import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import ViewKeys from "./view-keys";
 import useApp from "@/hooks/useApp";
@@ -70,8 +68,10 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appId: `${app.id}`,
       });
       setApiKey(response.data?.api_key);
-      response.data?.api_key && updateAPIKeys();
-    } catch (error) {
+      if (response.data?.api_key) {
+        updateAPIKeys();
+      }
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   const updateFallbackHandler = async (creditSelection: number) => {
     try {
-      const response = await AppService.updateApp({
+      await AppService.updateApp({
         token: token!,
         appId: app.app_id,
         appName: app.app_name,
@@ -108,9 +108,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         id: app.id,
         creditSelection,
       });
-    } catch (error) {
+    } catch (err) {
       console.log({
-        error,
+        error: err,
       });
     }
   };
@@ -321,7 +321,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                   </MenubarItem>
                   <MenubarItem
                     onClick={() => {
-                      apiKeys?.[app.id]?.length && setOpen("view-key" + app.id);
+                      if (apiKeys?.[app.id]?.length) {
+                        setOpen("view-key" + app.id);
+                      }
                     }}
                     className={cn(
                       "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",

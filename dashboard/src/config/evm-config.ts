@@ -1,5 +1,3 @@
-/* eslint-disable import/no-anonymous-default-export */
-
 import { createConfig, http } from "@wagmi/core";
 import { getDefaultConfig } from "connectkit";
 import { appConfig } from "./default";

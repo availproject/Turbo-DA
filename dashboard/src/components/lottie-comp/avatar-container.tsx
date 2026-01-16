@@ -10,7 +10,7 @@ const AvatarWrapper = ({
   width: number;
   height: number;
 }) => {
-  let dotLottieRef = useRef<DotLottie | null>(null);
+  const dotLottieRef = useRef<DotLottie | null>(null);
 
   return (
     <DotLottieReact

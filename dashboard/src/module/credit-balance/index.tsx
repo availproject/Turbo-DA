@@ -7,12 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDataBytes } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
 import { useAuthState } from "@/providers/AuthProvider";
-import { AlertTriangle, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import DiscountEligibility from "./component/discount-eligibility";
 
 const CreditBalance = () => {
   const { setOpen } = useDialog();
-  const { creditBalance, isAwaitingCreditUpdate } = useOverview();
+  const { creditBalance } = useOverview();
   const { isAuthenticated, isLoading, isLoggedOut } = useAuthState();
 
   // Don't render anything if user is logged out

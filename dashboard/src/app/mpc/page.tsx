@@ -21,7 +21,7 @@ const MpcStandalonePage = () => {
   const { token } = useAuth();
   const { address, isConnected } = useAccount();
   const { setOpen: openConnectModal } = useModal();
-  const prevAddressRef = useRef<string | undefined>();
+  const prevAddressRef = useRef<string | undefined>(undefined);
 
   const handleFetchApps = async (participantAddress: string, authToken: string) => {
     if (!participantAddress || !authToken) return;

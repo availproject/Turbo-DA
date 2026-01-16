@@ -2,8 +2,6 @@
 import {
   APP_TABS,
   cn,
-  formatDataBytesWithPrecision,
-  formatTokenAmount,
   formatSmartNumber,
 } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";

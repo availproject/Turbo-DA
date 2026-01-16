@@ -269,8 +269,14 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
         .map((p) => p.trim())
         .filter((p) => p);
 
+      if (!token) {
+        errorToast({ label: "Authentication token not available" });
+        setAddLoading(false);
+        return;
+      }
+
       const response = await EnigmaService.addParticipant({
-        token: token || undefined,
+        token,
         turbo_da_app_id: turboAppId,
         participants: participantsList,
       });
@@ -303,8 +309,14 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
         .map((p) => p.trim())
         .filter((p) => p);
 
+      if (!token) {
+        errorToast({ label: "Authentication token not available" });
+        setDeleteLoading(false);
+        return;
+      }
+
       const response = await EnigmaService.deleteParticipant({
-        token: token || undefined,
+        token,
         turbo_da_app_id: turboAppId,
         participants: participantsList,
       });

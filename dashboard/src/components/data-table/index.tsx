@@ -17,8 +17,7 @@ const DynamicTable: FC<DynamicTableProps> = ({
 }) => {
   const defaultRenderCell = (
     heading: string,
-    value: any,
-    last: boolean
+    value: any
   ): ReactNode => {
     if (heading.toLowerCase() === "role") {
       return (
@@ -75,15 +74,14 @@ const DynamicTable: FC<DynamicTableProps> = ({
                       )}
                     >
                       {renderCell?.(
-                        heading.key,
-                        data[heading.key],
-                        array.length - 1 === index,
-                        data
-                      ) ??
+                         heading.key,
+                         data[heading.key],
+                         array.length - 1 === index,
+                         data
+                       ) ??
                         defaultRenderCell(
                           heading.key,
-                          data[heading.key],
-                          array.length - 1 === index
+                          data[heading.key]
                         )}
                     </div>
                   ))}

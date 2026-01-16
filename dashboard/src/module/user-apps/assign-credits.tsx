@@ -52,7 +52,7 @@ export default function AssignCredits({ id, appData }: AssignCreditsProps) {
         updateAppList();
         setOpen("");
       }
-    } catch (error) {
+    } catch {
     } finally {
       setLoading(false);
     }

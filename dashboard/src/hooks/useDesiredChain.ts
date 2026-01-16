@@ -4,7 +4,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 
 export const useDesiredChain = (desiredChain: number) => {
   const { chainId } = useAccount();
-  const { chains, error, switchChain, switchChainAsync } = useSwitchChain();
+  const { chains, switchChain, switchChainAsync } = useSwitchChain();
 
   const selectedChain = chains.find(
     (ch: { id: number }) => ch.id === desiredChain,
@@ -20,23 +20,26 @@ export const useDesiredChain = (desiredChain: number) => {
 
   const chainChanger = async () => {
     try {
-      switchChain?.({ chainId: selectedChain?.id! });
-    } catch (e) {
-      console.error(e, error);
+      if (selectedChain?.id) {
+        switchChain?.({ chainId: selectedChain.id });
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const chainChangerAsync = async (callback?: ClickHandler) => {
     try {
-      return switchChainAsync?.({ chainId: selectedChain?.id! })
+      if (!selectedChain?.id) return false;
+      return switchChainAsync?.({ chainId: selectedChain.id })
         .then(() => {
           callback?.();
           return true;
         })
-        .catch((error) => {
+        .catch(() => {
           return false;
         });
-    } catch (e) {
+    } catch {
       return false;
     }
   };

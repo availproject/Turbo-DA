@@ -33,7 +33,6 @@ const BuyCreditsCard = () => {
   const [estimateDataLoading, setEstimateDataLoading] = useState(false);
   const requestIdRef = useRef(0);
   const deferredTokenValue = useDeferredValue(tokenAmount);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showBalanceError, setShowBalanceError] = useState(false);
   const account = useAccount();
@@ -160,7 +159,7 @@ const BuyCreditsCard = () => {
       if (currentRequestId === requestIdRef.current) {
         setEstimateData(response?.data);
       }
-    } catch (error) {
+    } catch {
       // Silent fail for estimate calculation
     } finally {
       if (currentRequestId === requestIdRef.current) {
@@ -170,17 +169,13 @@ const BuyCreditsCard = () => {
   };
 
   const handleBuyStart = () => {
-    setLoading(true);
     setError("");
   };
 
-  const handleBuyComplete = () => {
-    setLoading(false);
-  };
+  const handleBuyComplete = () => {};
 
   const handleBuyError = (errorMessage: string) => {
     setError(errorMessage);
-    setLoading(false);
   };
 
   const handleTokenAmountClear = () => {
