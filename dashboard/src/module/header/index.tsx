@@ -4,7 +4,7 @@ import { Text } from "@/components/text";
 import { turboDADocLink } from "@/lib/constant";
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { useAuthState } from "@/providers/AuthProvider";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Settings } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import WalletsMenu from "./components/wallets-menu";
@@ -15,7 +15,9 @@ function Header() {
   return (
     <header className="sticky top-0 z-2 w-full h-18 bg-linear-[89deg] from-darker-blue from-[22.12%] to-dark-blue to-[99.08%] border-b border-b-border-grey shadow-primary px-6 flex items-center justify-between">
       <div className="flex gap-x-3 items-center">
-        <Image alt="Avail logo" src="/logo.svg" width={110} height={32} />
+        <Link href="/">
+          <Image alt="Avail logo" src="/logo.svg" width={110} height={32} />
+        </Link>
       </div>
       <div className="flex items-center justify-between gap-x-6 h-full">
         <Link
@@ -30,6 +32,13 @@ function Header() {
         </Link>
         {isAuthenticated && (
           <>
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 text-light-grey hover:text-white transition-colors"
+              title="Settings"
+            >
+              <Settings size={20} />
+            </Link>
             <WalletsMenu />
             <UserButton />
           </>
