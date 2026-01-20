@@ -132,13 +132,32 @@ impl EnigmaEncryptionService {
     pub async fn register(
         &self,
         payload: RegisterRequest,
-    ) -> Result<RegisterResponse, reqwest::Error> {
+    ) -> Result<RegisterResponse, EnigmaError> {
         let url = format!("{}/v1/register", self.service_url.clone());
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
-        let response = response.json::<RegisterResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma register response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: RegisterResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Adds participants to an existing app
@@ -151,13 +170,32 @@ impl EnigmaEncryptionService {
     pub async fn add_participant(
         &self,
         payload: AddParticipantRequest,
-    ) -> Result<AddParticipantResponse, reqwest::Error> {
+    ) -> Result<AddParticipantResponse, EnigmaError> {
         let url = format!("{}/v1/add_participant", self.service_url.clone());
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
-        let response = response.json::<AddParticipantResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma add_participant response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: AddParticipantResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Deletes participants from an existing app
@@ -170,13 +208,32 @@ impl EnigmaEncryptionService {
     pub async fn delete_participant(
         &self,
         payload: DeleteParticipantRequest,
-    ) -> Result<DeleteParticipantResponse, reqwest::Error> {
+    ) -> Result<DeleteParticipantResponse, EnigmaError> {
         let url = format!("{}/v1/delete_participant", self.service_url.clone());
 
         let response = self.client.delete(&url).json(&payload).send().await?;
 
-        let response = response.json::<DeleteParticipantResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma delete_participant response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: DeleteParticipantResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Encrypts the payload using the Enigma service
@@ -189,13 +246,32 @@ impl EnigmaEncryptionService {
     pub async fn encrypt(
         &self,
         payload: EncryptRequest,
-    ) -> Result<EncryptResponse, reqwest::Error> {
+    ) -> Result<EncryptResponse, EnigmaError> {
         let url = format!("{}/v1/encrypt", self.service_url.clone());
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
-        let response = response.json::<EncryptResponse>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma encrypt response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: EncryptResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Creates a decryption request that requires threshold signatures
@@ -391,7 +467,7 @@ impl EnigmaEncryptionService {
     pub async fn decrypt(
         &self,
         payload: DecryptRequest,
-    ) -> Result<DecryptRequestData, reqwest::Error> {
+    ) -> Result<DecryptRequestData, EnigmaError> {
         let response = self
             .client
             .post(format!("{}/v1/decrypt", self.service_url.clone()))
@@ -399,8 +475,27 @@ impl EnigmaEncryptionService {
             .send()
             .await?;
 
-        let response = response.json::<DecryptRequestData>().await?;
-        Ok(response)
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma decrypt response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: DecryptRequestData = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
     }
 
     /// Formats the encrypt response to the data submission format
