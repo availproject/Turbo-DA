@@ -153,6 +153,30 @@ pub async fn add_participant(
         Err(e) => return e,
     };
 
+    let app_id = match Uuid::parse_str(&request.turbo_da_app_id) {
+        Ok(id) => id,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(json!({
+                "error": format!("Invalid app UUID: {}", e)
+            }));
+        }
+    };
+
+    if !request.participants.is_empty() {
+        if let Err(e) = db::controllers::mpc_participants::add_participants(
+            &mut connection,
+            &app_id,
+            request.participants.clone(),
+        )
+        .await
+        {
+            tracing::error!(error = %e, "failed to add participants to db");
+            return HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to add participants to database: {}", e)
+            }));
+        }
+    }
+
     match enigma.add_participant(request.clone()).await {
         Ok(response) => {
             tracing::info!(
@@ -160,23 +184,24 @@ pub async fn add_participant(
                 participants_added = response.participants_added,
                 "successfully added participants"
             );
-            if let Ok(app_id) = Uuid::parse_str(&request.turbo_da_app_id) {
-                if let Err(e) = db::controllers::mpc_participants::add_participants(
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to add participants to enigma, rolling back db");
+            if !request.participants.is_empty() {
+                if let Err(rollback_err) = db::controllers::mpc_participants::delete_participants(
                     &mut connection,
                     &app_id,
                     request.participants.clone(),
                 )
                 .await
                 {
-                    tracing::error!(error = %e, "failed to add participants to db");
+                    tracing::error!(error = %rollback_err, "failed to rollback participants from db");
                 }
             }
-            HttpResponse::Ok().json(response)
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "failed to add participants");
+
             HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to add participants: {}", e)
+                "error": format!("Failed to add participants to Enigma: {}", e)
             }))
         }
     }
@@ -226,6 +251,29 @@ pub async fn delete_participant(
         Err(e) => return e,
     };
 
+    let app_id = match Uuid::parse_str(&request.turbo_da_app_id) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!(error = %e, "failed to parse app_id");
+            return HttpResponse::BadRequest().json(json!({
+                "error": format!("Invalid app_id: {}", e)
+            }));
+        }
+    };
+
+    if let Err(e) = db::controllers::mpc_participants::delete_participants(
+        &mut connection,
+        &app_id,
+        request.participants.clone(),
+    )
+    .await
+    {
+        tracing::error!(error = %e, "failed to delete participants from db");
+        return HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to delete participants from db: {}", e)
+        }));
+    }
+
     match enigma.delete_participant(request.clone()).await {
         Ok(response) => {
             tracing::info!(
@@ -233,23 +281,21 @@ pub async fn delete_participant(
                 participants_deleted = response.participants_deleted,
                 "successfully deleted participants"
             );
-            if let Ok(app_id) = Uuid::parse_str(&request.turbo_da_app_id) {
-                if let Err(e) = db::controllers::mpc_participants::delete_participants(
-                    &mut connection,
-                    &app_id,
-                    request.participants.clone(),
-                )
-                .await
-                {
-                    tracing::error!(error = %e, "failed to delete participants from db");
-                }
-            }
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
-            tracing::error!(error = %e, "failed to delete participants");
+            tracing::error!(error = %e, "failed to delete participants from enigma");
+            if let Err(rollback_err) = db::controllers::mpc_participants::add_participants(
+                &mut connection,
+                &app_id,
+                request.participants.clone(),
+            )
+            .await
+            {
+                tracing::error!(error = %rollback_err, "failed to rollback participants in db");
+            }
             HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to delete participants: {}", e)
+                "error": format!("Failed to delete participants from enigma: {}", e)
             }))
         }
     }
