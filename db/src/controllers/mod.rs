@@ -3,5 +3,6 @@ pub mod apps;
 pub mod customer_expenditure;
 pub mod fund;
 pub mod misc;
-pub mod users;
 pub mod mpc_participants;
+pub mod public_keys;
+pub mod users;

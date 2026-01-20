@@ -33,6 +33,7 @@ use controllers::{
         fund_user, get_fund_list, purchase_cost, register_credit_request,
     },
     misc::indexer_status,
+    public_keys::{add_public_key, delete_public_key, get_public_keys},
     users::{
         allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
         generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
@@ -176,6 +177,9 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(get_wallet_usage)
                             .service(generate_access_token)
                             .service(toggle_encryption)
+                            .service(add_public_key)
+                            .service(get_public_keys)
+                            .service(delete_public_key)
                             .service(
                                 web::scope("/enigma")
                                     .service(add_participant)
