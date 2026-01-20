@@ -340,7 +340,6 @@ const PublicKeysCard = () => {
       <div className={cn("relative w-full")}>
         <div className="w-full rounded-2xl bg-linear-[139.26deg] from-border-grey from-[-0.73%] to-border-secondary to-[100.78%] p-px overflow-hidden">
           <Card className="shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary rounded-2xl to-[100%] pt-0 gap-0 flex-1 pb-0 block relative">
-            <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute flex w-full h-full opacity-80" />
             <CardHeader className="p-4 border-b border-border-blue gap-0 z-1 relative">
               <div className="flex items-center justify-between">
                 <CardTitle>
@@ -360,7 +359,7 @@ const PublicKeysCard = () => {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="px-4 py-4 z-1 relative min-h-[200px]">
+            <CardContent className="px-4 py-4 min-h-[200px]">
               {loading ? (
                 <PublicKeysSkeleton />
               ) : publicKeys.length === 0 ? (

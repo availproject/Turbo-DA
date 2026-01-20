@@ -750,7 +750,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                           </Text>
                           <Button
                             variant="secondary"
-                            className="mt-2"
+                            className="mt-2 flex items-center justify-center"
                             onClick={() => setActiveTab("create")}
                           >
                             <Plus size={16} className="mr-2" />
