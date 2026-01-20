@@ -63,71 +63,32 @@ pub async fn delete_participant(
 }
 
 pub async fn delete_participants(
-
     conn: &mut AsyncPgConnection,
 
     target_app_id: &Uuid,
 
     participants_list: Vec<String>,
-
 ) -> Result<usize, diesel::result::Error> {
-
     diesel::delete(
-
         mpc_participants
-
             .filter(app_id.eq(target_app_id))
-
             .filter(participant_address.eq_any(participants_list)),
-
     )
-
     .execute(conn)
-
     .await
-
 }
 
-
-
 pub async fn get_apps_by_participant(
-
     conn: &mut AsyncPgConnection,
 
     target_participant_address: &str,
-
 ) -> Result<Vec<crate::models::apps::Apps>, diesel::result::Error> {
-
     use crate::schema::apps;
 
-
-
-        mpc_participants
-
-
-
-            .inner_join(apps::table)
-
-
-
-            .filter(participant_address.eq(target_participant_address))
-
-
-
-            .select(crate::models::apps::Apps::as_select())
-
-
-
-            .load::<crate::models::apps::Apps>(conn)
-
-
-
-            .await
-
-
-
-    }
-
-
-
-    
+    mpc_participants
+        .inner_join(apps::table)
+        .filter(participant_address.eq(target_participant_address))
+        .select(crate::models::apps::Apps::as_select())
+        .load::<crate::models::apps::Apps>(conn)
+        .await
+}
