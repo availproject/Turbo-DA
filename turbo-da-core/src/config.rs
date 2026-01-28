@@ -27,6 +27,7 @@ pub struct AppConfig {
     pub sumsub_app_token: String,
     pub sumsub_secret_key: String,
     pub sumsub_base_url: String,
+    pub enigma_url: String,
 }
 
 impl Default for AppConfig {
@@ -51,6 +52,7 @@ impl Default for AppConfig {
             sumsub_app_token: String::new(),
             sumsub_secret_key: String::new(),
             sumsub_base_url: String::new(),
+            enigma_url: String::new(),
         }
     }
 }
@@ -180,6 +182,8 @@ impl AppConfig {
                 e.to_string()
             })?;
 
+        let enigma_url = env::var("ENIGMA_ENCRYPTION_SERVICE_URL")?;
+
         let sumsub_app_token = env::var("SUMSUB_APP_TOKEN")?;
         let sumsub_secret_key = env::var("SUMSUB_SECRET_KEY")?;
         let sumsub_base_url = env::var("SUMSUB_BASE_URL")?;
@@ -220,6 +224,7 @@ impl AppConfig {
             sumsub_app_token,
             sumsub_secret_key,
             sumsub_base_url,
+            enigma_url,
         })
     }
 }

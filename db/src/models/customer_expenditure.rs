@@ -31,6 +31,7 @@ pub struct CustomerExpenditureGet {
     pub updated_at: chrono::NaiveDateTime,
     pub app_id: Uuid,
     pub wallet: Option<Vec<u8>>,
+    pub ciphertext_hash: Option<Vec<u8>>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]

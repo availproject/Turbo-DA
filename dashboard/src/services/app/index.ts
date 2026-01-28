@@ -31,11 +31,26 @@ class AppService {
   static async toggleEncryption({
     token,
     appId,
+    participants,
+    threshold,
   }: {
     token: string;
     appId: string;
+    participants?: string[];
+    threshold?: number;
   }) {
-    const requestBody = { app_id: appId };
+    const requestBody: {
+      app_id: string;
+      participants?: string[];
+      threshold?: number;
+    } = { app_id: appId };
+
+    if (participants && participants.length > 0) {
+      requestBody.participants = participants;
+    }
+    if (threshold !== undefined) {
+      requestBody.threshold = threshold;
+    }
 
     console.log("AppService.toggleEncryption payload:", requestBody);
 
@@ -354,7 +369,7 @@ class AppService {
 
   static async getTokens({ token }: { token: string }) {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/token_map`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/token_map`,
       {
         method: "GET",
         headers: {

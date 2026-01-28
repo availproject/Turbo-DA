@@ -30,7 +30,8 @@ const SelectChainToken = () => {
     const isMainnet = process.env.NEXT_PUBLIC_ETH_NETWORK === "mainnet";
     return Object.fromEntries(
       Object.entries(supportedTokensAndChains).filter(
-        ([_, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ([_chainId, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
       )
     );
   }, [supportedTokensAndChains]);

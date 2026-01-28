@@ -1,7 +1,6 @@
 "use client";
 import { useDialog } from "@/components/dialog/provider";
 import AvatarWrapper from "@/components/lottie-comp/avatar-container";
-import PrimaryProgress from "@/components/progress/primary-progress";
 import { Text } from "@/components/text";
 import { useAppToast } from "@/components/toast";
 import {
@@ -25,24 +24,28 @@ import {
   Copy,
   EllipsisVertical,
   Eye,
+  Key,
   KeyRound,
+  Lock,
+  LockOpen,
   Pencil,
   ScrollText,
   Trash2,
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import AssignCredits from "./assign-credits";
 import CreateApp from "./create-app";
 import DeleteAppAlert from "./delete-app-alert";
 import DeleteKeyAlert from "./delete-key-alert";
 import ManageCredits from "./manage-credits";
 import ReclaimCredits from "./reclaim-credits";
-import SwitchDescription from "./switch-description";
 import SwitchToMainBalanceAlert from "./switch-main-balance-alert";
 import ViewKeys from "./view-keys";
 import useApp from "@/hooks/useApp";
+import EnableEncryptionDialog from "./enable-encryption-dialog";
+import EnigmaModal from "./enigma-modal";
 
 const AppItem = ({ app }: { app: AppDetails }) => {
   const { apiKeys, creditBalance } = useOverview();
@@ -53,7 +56,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [openDeleteAlert, setOpenDeleteAlert] = useState<string>();
-  const { success } = useAppToast();
+  const { success, error: errorToast } = useAppToast();
   const { updateAppList } = useApp();
 
   const generateApiKey = async () => {
@@ -65,23 +68,31 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         appId: `${app.id}`,
       });
       setApiKey(response.data?.api_key);
-      response.data?.api_key && updateAPIKeys();
-    } catch (error) {
+      if (response.data?.api_key) {
+        updateAPIKeys();
+      }
+    } catch {
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleEncryption = async () => {
+  const disableEncryption = async () => {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await AppService.toggleEncryption({
+      await AppService.toggleEncryption({
         token,
         appId: app.id,
       });
+      success({
+        label: "Encryption disabled successfully",
+      });
       updateAppList();
-    } catch (error) {
+    } catch (error: any) {
+      errorToast({
+        label: error.message || "Failed to disable encryption",
+      });
     } finally {
       setLoading(false);
     }
@@ -89,7 +100,7 @@ const AppItem = ({ app }: { app: AppDetails }) => {
 
   const updateFallbackHandler = async (creditSelection: number) => {
     try {
-      const response = await AppService.updateApp({
+      await AppService.updateApp({
         token: token!,
         appId: app.app_id,
         appName: app.app_name,
@@ -97,9 +108,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
         id: app.id,
         creditSelection,
       });
-    } catch (error) {
+    } catch (err) {
       console.log({
-        error,
+        error: err,
       });
     }
   };
@@ -254,19 +265,46 @@ const AppItem = ({ app }: { app: AppDetails }) => {
               </MenubarTrigger>
               <MenubarContent className="w-52 border border-border-blue bg-[#112235] p-0 rounded-lg overflow-hidden">
                 <MenubarGroup>
-                  {/*<MenubarItem
-                    onClick={toggleEncryption}
+                  <MenubarItem
+                    onClick={() => {
+                      if (app.encryption) {
+                        disableEncryption();
+                      } else {
+                        setOpen("enable-encryption" + app.id);
+                      }
+                    }}
                     className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
                   >
-                    <KeyRound
-                      className="text-[#B3B3B3] group-hover:text-white"
-                      strokeWidth={2}
-                      size={24}
-                    />
+                    {app.encryption ? (
+                      <LockOpen
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                    ) : (
+                      <Lock
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                    )}
                     <Text weight={"semibold"}>
                       {app.encryption ? "Disable" : "Enable"} Encryption
                     </Text>
-                  </MenubarItem>*/}
+                  </MenubarItem>
+                  {app.encryption && (
+                    <MenubarItem
+                      onClick={() => setOpen("enigma" + app.id)}
+                      className="flex gap-x-1.5 group hover:bg-[#2b47613d] cursor-pointer rounded-none items-center p-2 border-b border-b-border-blue"
+                    >
+                      <Key
+                        className="text-[#B3B3B3] group-hover:text-white"
+                        strokeWidth={2}
+                        size={24}
+                      />
+                      <Text weight={"semibold"}>Enigma</Text>
+                    </MenubarItem>
+                  )}
                   <MenubarItem
                     onClick={() => {
                       generateApiKey();
@@ -283,7 +321,9 @@ const AppItem = ({ app }: { app: AppDetails }) => {
                   </MenubarItem>
                   <MenubarItem
                     onClick={() => {
-                      apiKeys?.[app.id]?.length && setOpen("view-key" + app.id);
+                      if (apiKeys?.[app.id]?.length) {
+                        setOpen("view-key" + app.id);
+                      }
                     }}
                     className={cn(
                       "flex gap-x-1.5 group hover:bg-[#2b47613d] rounded-none items-center p-2 border-b border-b-border-blue",
@@ -621,6 +661,15 @@ const AppItem = ({ app }: { app: AppDetails }) => {
             setOpen("");
           }}
         />
+      )}
+      {open === "enable-encryption" + app.id && (
+        <EnableEncryptionDialog
+          id={"enable-encryption" + app.id}
+          appData={app}
+        />
+      )}
+      {open === "enigma" + app.id && app.encryption && (
+        <EnigmaModal id={"enigma" + app.id} appData={app} />
       )}
     </div>
   );

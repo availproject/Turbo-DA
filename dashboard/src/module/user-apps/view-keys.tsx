@@ -24,7 +24,7 @@ export default function ViewKeys({
 
   const currentAppAPIKeys = useMemo(() => {
     return apiKeys?.[appId];
-  }, [apiKeys]);
+  }, [apiKeys, appId]);
 
   return (
     <Dialog

@@ -191,7 +191,7 @@ export async function getAvailableChains(): Promise<SupportedTokensAndChains> {
 
   return Object.fromEntries(
     Object.entries(chains).filter(
-      ([_, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
+      ([, chain]) => chain.isTestnet === "both" || chain.isTestnet === !isMainnet
     )
   );
 }

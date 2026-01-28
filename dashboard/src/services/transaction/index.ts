@@ -41,7 +41,7 @@ export class TransactionService {
         throw new Error(`API call failed: ${response.status} - ${errorText}`);
       }
 
-      const responseData = await response.json();
+      await response.json();
 
       return { success: true };
     } catch (error) {
@@ -71,7 +71,7 @@ export class TransactionService {
         return await this.postInclusionDetails({ orderId, txnHash, token });
       } else {
         // For EVM transactions, wait for receipt first
-        const receipt = await waitForTransactionReceipt(config, {
+        await waitForTransactionReceipt(config, {
           hash: txnHash,
         });
 

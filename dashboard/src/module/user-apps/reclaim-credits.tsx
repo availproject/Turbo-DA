@@ -52,7 +52,7 @@ const ReclaimCredits = ({
           )} successfully reclaimed from ${appData.app_name}`,
         });
       }
-    } catch (error) {
+    } catch {
     } finally {
       setLoading(false);
     }

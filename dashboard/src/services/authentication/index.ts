@@ -18,7 +18,7 @@ class AuthenticationService {
       }
 
       return await response.json();
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }
@@ -40,7 +40,7 @@ class AuthenticationService {
       }
 
       return await response.json();
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }

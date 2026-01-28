@@ -23,7 +23,7 @@ use enigma::{
 };
 use observability::log_txn;
 use redis::Commands;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, ops::Mul, str::FromStr, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -113,7 +113,7 @@ impl Consumer {
             });
 
             while let Ok(response) = receiver.recv().await {
-                if &response.thread_id != &i {
+                if response.thread_id != i {
                     tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                     continue;
                 }
@@ -156,14 +156,14 @@ impl Consumer {
         response: &Response,
         injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
         endpoints: &Arc<Vec<String>>,
-        keygen: &Vec<Keypair>,
+        keygen: &[Keypair],
         enigma: &EnigmaEncryptionService,
         redis: Arc<Redis>,
         i: i32,
     ) -> Result<(), String> {
-        let mut connection = get_connection(&injected_dependency)
+        let mut connection = get_connection(injected_dependency)
             .await
-            .map_err(|_| format!("Failed to get connection"))?;
+            .map_err(|_| "Failed to get connection".to_string())?;
 
         let did_fallback_resolved =
             get_did_fallback_resolved(&mut connection, &response.submission_id).await;
@@ -172,18 +172,13 @@ impl Consumer {
             return Err("Fallback resolved transaction".to_string());
         }
 
-        let sdk = generate_avail_sdk(&endpoints).await;
+        let sdk = generate_avail_sdk(endpoints).await;
 
         let submit_data_class =
             SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
-        let mut process_response = ProcessSubmitResponse::new(
-            &response,
-            &mut connection,
-            submit_data_class,
-            enigma,
-            redis,
-        );
+        let mut process_response =
+            ProcessSubmitResponse::new(response, &mut connection, submit_data_class, enigma, redis);
 
         match timeout(
             Duration::from_secs(120),
@@ -238,17 +233,17 @@ impl<'a> ProcessSubmitResponse<'a> {
     }
 
     pub async fn process_response(&mut self) -> Result<(), String> {
-        let (account, user) =
-            get_account_by_id(&mut self.connection, &self.response.app_id).await?;
+        let (account, user) = get_account_by_id(self.connection, &self.response.app_id).await?;
 
         let (data, encrypted_data) = self.process_data(account.encryption).await?;
 
         let convertor = Convertor::new(
-            &self.submit_avail_class.client,
-            &self.submit_avail_class.account,
+            self.submit_avail_class.client,
+            self.submit_avail_class.account,
         );
 
-        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await;
+        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await
+            * BigDecimal::from(1 + account.encryption as i32);
 
         self.validate_balance(
             account.credit_selection,
@@ -271,7 +266,7 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         update_database_on_submission(
             self.response.submission_id,
-            &mut self.connection,
+            self.connection,
             result,
             &account,
             params,
@@ -371,7 +366,7 @@ impl<'a> ProcessSubmitResponse<'a> {
         );
 
         let mut cumulative_cost = BigDecimal::from(0);
-        for (_, item) in all_items.iter().enumerate() {
+        for item in all_items.iter() {
             // Parse the cost from "submission_id-cost" format
             let parts: Vec<&str> = item.split(':').collect();
 
@@ -388,7 +383,7 @@ impl<'a> ProcessSubmitResponse<'a> {
                     account.credit_selection,
                     &cumulative_cost,
                     &account.credit_balance,
-                    &user_credit_balance,
+                    user_credit_balance,
                 )
                 .await?;
 

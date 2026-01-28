@@ -84,7 +84,7 @@ export async function batchTransferAndRemark(
     });
 
     const options: Partial<LegacySignerOptions> = {
-      signer: (injector as any)?.signer as {},
+      signer: (injector as any)?.signer,
       app_id: 0,
     };
     console.log("AVAIL_SIGN: Signer prepared", {

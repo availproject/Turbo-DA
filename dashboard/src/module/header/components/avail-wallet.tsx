@@ -5,14 +5,12 @@ import { useConfig } from "@/providers/ConfigProvider";
 import {
   AvailWalletConnect,
   useAvailAccount,
-  useAvailWallet,
 } from "avail-wallet-sdk";
 import { Copy, LogOut } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 
 const AvailWallet = () => {
-  const { selected, selectedWallet, clearWalletState } = useAvailAccount();
+  const { selected, clearWalletState } = useAvailAccount();
   const {
     selectedChain,
     setSelectedChain,

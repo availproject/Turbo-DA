@@ -5,5 +5,6 @@ pub mod file;
 pub mod fund;
 pub mod kyc;
 pub mod misc;
+pub mod public_keys;
 mod test;
 pub mod users;

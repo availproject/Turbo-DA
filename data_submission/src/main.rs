@@ -6,7 +6,7 @@ pub mod utils;
 pub mod workload_scheduler;
 
 use crate::{
-    auth::Auth, config::AppConfig, redis::Redis, routes::data_retrieval::get_pre_image_decrypted,
+    auth::Auth, config::AppConfig, redis::Redis, 
 };
 use actix_cors::Cors;
 use actix_web::{
@@ -105,9 +105,8 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
-                    .service(get_pre_image_decrypted)
-                    .service(get_submission_info),
-            )
+                    .service(get_submission_info)
+           )
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()

@@ -1,8 +1,3 @@
-interface CreditLog {
-  updated_at: string;
-  value: boolean;
-}
-
 export interface AppDetails {
   app_description: string | null;
   app_id: number;

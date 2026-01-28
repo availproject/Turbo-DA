@@ -79,7 +79,7 @@ export const template = "turbo";
 
 export const getTokenNameByAddress = (address: string): string => {
   const tokenEntry = Object.entries(TOKEN_MAP).find(
-    ([_, info]) => info.token_address.toLowerCase() === address.toLowerCase()
+    ([, info]) => info.token_address.toLowerCase() === address.toLowerCase()
   );
   return tokenEntry ? tokenEntry[0] : "Unknown Token";
 };

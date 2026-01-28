@@ -10,7 +10,6 @@ interface TransactionStatusDisplayProps {
 
 export const TransactionStatusDisplay = ({
   status,
-  tokenAmount,
   className,
 }: TransactionStatusDisplayProps) => {
   const getStatusMessage = () => {
