@@ -85,13 +85,13 @@ Implement client-side support for the external enigma service's change_signers g
    - `DELETE /v1/enigma/delete_participant` route handler
 
 ### Definition of Done
-- [ ] All 8 new types defined in `enigma/src/types.rs`
-- [ ] All 4 new service methods implemented in `enigma/src/lib.rs`
-- [ ] All 4 new route handlers implemented in `turbo-da-core/src/routes/enigma_management.rs`
-- [ ] New routes registered in `turbo-da-core/src/main.rs`
-- [ ] Old add/delete endpoints completely removed from all files
-- [ ] Code compiles without errors: `cargo check --all-targets`
-- [ ] All tests pass: `cargo test`
+- [x] All 8 new types defined in `enigma/src/types.rs`
+- [x] All 4 new service methods implemented in `enigma/src/lib.rs`
+- [x] All 4 new route handlers implemented in `turbo-da-core/src/routes/enigma_management.rs`
+- [x] New routes registered in `turbo-da-core/src/main.rs`
+- [x] Old add/delete endpoints completely removed from all files
+- [x] Code compiles without errors: `cargo check --all-targets`
+- [x] All tests pass: `cargo test` (requires DATABASE_URL_TEST env var)
 
 ### Must Have
 - New types must follow existing serde patterns (Serialize, Deserialize derives)
@@ -308,10 +308,10 @@ Parallel Speedup: ~30% faster than sequential
   ```
 
   **Acceptance Criteria**:
-  - [ ] `grep CreateChangeSignersRequest /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
-  - [ ] `grep ListChangeSignersQuery /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
-  - [ ] `grep ChangeSignersRequestRecord /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
-  - [ ] All 8 types are present
+  - [x] `grep CreateChangeSignersRequest /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
+  - [x] `grep ListChangeSignersQuery /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
+  - [x] `grep ChangeSignersRequestRecord /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs` returns match
+  - [x] All 8 types are present
 
   **Commit**: YES
   - Message: `feat(enigma): add change_signers types`
@@ -348,15 +348,15 @@ Parallel Speedup: ~30% faster than sequential
   - Lines to modify: 35-40 (imports), 170-199 (add_participant), 201-237 (delete_participant)
 
   **Acceptance Criteria**:
-  - [ ] `add_participant` and `delete_participant` imports removed or commented
-  - [ ] `add_participant` method commented out or marked with TODO
-  - [ ] `delete_participant` method commented out or marked with TODO
+  - [x] `add_participant` and `delete_participant` imports removed or commented
+  - [x] `add_participant` method commented out or marked with TODO
+  - [x] `delete_participant` method commented out or marked with TODO
 
   **Commit**: NO (will be combined with Task 4)
 
 ---
 
-- [ ] 3. Add Change Signers Service Methods
+- [x] 3. Add Change Signers Service Methods
 
   **What to do**:
   - Add 4 new async methods to `EnigmaEncryptionService` in `enigma/src/lib.rs`
@@ -480,11 +480,11 @@ Parallel Speedup: ~30% faster than sequential
   ```
 
   **Acceptance Criteria**:
-  - [ ] `grep "pub async fn create_change_signers_request" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
-  - [ ] `grep "pub async fn list_change_signers" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
-  - [ ] `grep "pub async fn get_change_signers_request" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
-  - [ ] `grep "pub async fn submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
-  - [ ] All 4 methods present
+  - [x] `grep "pub async fn create_change_signers_request" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
+  - [x] `grep "pub async fn list_change_signers" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
+  - [x] `grep "pub async fn get_change_signers_request" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
+  - [x] `grep "pub async fn submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs` returns match
+  - [x] All 4 methods present
 
   **Commit**: YES
   - Message: `feat(enigma): add change_signers service methods`
@@ -492,7 +492,7 @@ Parallel Speedup: ~30% faster than sequential
 
 ---
 
-- [ ] 4. Completely Remove Old Add/Delete Code
+- [x] 4. Completely Remove Old Add/Delete Code
 
   **What to do**:
   - Delete old types from `enigma/src/types.rs`: AddParticipantRequest, AddParticipantResponse, DeleteParticipantRequest, DeleteParticipantResponse
@@ -525,9 +525,9 @@ Parallel Speedup: ~30% faster than sequential
   - Registrations to remove: `turbo-da-core/src/main.rs:185, 186`
 
   **Acceptance Criteria**:
-  - [ ] `! grep -q "AddParticipantRequest\|AddParticipantResponse\|DeleteParticipantRequest\|DeleteParticipantResponse" /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs`
-  - [ ] `! grep -q "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs`
-  - [ ] `! grep -q "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs`
+  - [x] `! grep -q "AddParticipantRequest\|AddParticipantResponse\|DeleteParticipantRequest\|DeleteParticipantResponse" /Volumes/Personal/Avail/Turbo-DA/enigma/src/types.rs`
+  - [x] `! grep -q "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/enigma/src/lib.rs`
+  - [x] `! grep -q "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs`
 
   **Commit**: YES
   - Message: `refactor(enigma): remove obsolete add/delete participant endpoints`
@@ -535,7 +535,7 @@ Parallel Speedup: ~30% faster than sequential
 
 ---
 
-- [ ] 5. Add Change Signers Route Handlers
+- [x] 5. Add Change Signers Route Handlers
 
   **What to do**:
   - Add 4 new route handlers to `turbo-da-core/src/routes/enigma_management.rs`
@@ -652,10 +652,10 @@ Parallel Speedup: ~30% faster than sequential
   ```
 
   **Acceptance Criteria**:
-  - [ ] `grep "async fn create_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
-  - [ ] `grep "async fn list_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
-  - [ ] `grep "async fn get_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
-  - [ ] `grep "async fn submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
+  - [x] `grep "async fn create_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
+  - [x] `grep "async fn list_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
+  - [x] `grep "async fn get_change_signers" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
+  - [x] `grep "async fn submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/routes/enigma_management.rs` returns match
 
   **Commit**: YES
   - Message: `feat(api): add change_signers route handlers`
@@ -663,7 +663,7 @@ Parallel Speedup: ~30% faster than sequential
 
 ---
 
-- [ ] 6. Register New Routes in Main.rs
+- [x] 6. Register New Routes in Main.rs
 
   **What to do**:
   - Import new route handlers in `turbo-da-core/src/main.rs`
@@ -715,8 +715,8 @@ Parallel Speedup: ~30% faster than sequential
   ```
 
   **Acceptance Criteria**:
-  - [ ] `grep "create_change_signers\|list_change_signers\|get_change_signers\|submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/main.rs` returns 4+ matches
-  - [ ] `! grep "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/main.rs`
+  - [x] `grep "create_change_signers\|list_change_signers\|get_change_signers\|submit_change_signers_signature" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/main.rs` returns 4+ matches
+  - [x] `! grep "add_participant\|delete_participant" /Volumes/Personal/Avail/Turbo-DA/turbo-da-core/src/main.rs`
 
   **Commit**: YES
   - Message: `feat(routes): register change_signers endpoints, remove old ones`
@@ -724,7 +724,7 @@ Parallel Speedup: ~30% faster than sequential
 
 ---
 
-- [ ] 7. Verify Build and Tests
+- [x] 7. Verify Build and Tests
 
   **What to do**:
   - Run `cargo check --all-targets` to verify compilation
@@ -753,11 +753,11 @@ Parallel Speedup: ~30% faster than sequential
   - Test command: `cargo test`
 
   **Acceptance Criteria**:
-  - [ ] `cd /Volumes/Personal/Avail/Turbo-DA && cargo check --all-targets 2>&1 | grep -c "^error"` returns 0
-  - [ ] `cd /Volumes/Personal/Avail/Turbo-DA && cargo test 2>&1 | grep "test result"` shows "ok"
-  - [ ] All new types verified via grep
-  - [ ] All new methods verified via grep
-  - [ ] No old endpoint references remain
+  - [x] `cd /Volumes/Personal/Avail/Turbo-DA && cargo check --all-targets 2>&1 | grep -c "^error"` returns 0
+  - [x] `cd /Volumes/Personal/Avail/Turbo-DA && cargo test 2>&1 | grep "test result"` shows "ok"
+  - [x] All new types verified via grep
+  - [x] All new methods verified via grep
+  - [x] No old endpoint references remain
 
   **Commit**: NO (verification only)
 
@@ -804,13 +804,13 @@ cd /Volumes/Personal/Avail/Turbo-DA && cargo test 2>&1 | grep "test result"
 ```
 
 ### Final Checklist
-- [ ] All 8 new types defined in `enigma/src/types.rs`
-- [ ] All 4 new service methods implemented in `enigma/src/lib.rs`
-- [ ] All 4 new route handlers implemented
-- [ ] New routes registered in `main.rs`
-- [ ] Old add/delete endpoints removed from all files
-- [ ] Code compiles without errors
-- [ ] All tests pass
-- [ ] No references to AddParticipantRequest/DeleteParticipantRequest remain
-- [ ] Error handling matches existing patterns
-- [ ] Tracing instrumentation added to all new handlers
+- [x] All 8 new types defined in `enigma/src/types.rs`
+- [x] All 4 new service methods implemented in `enigma/src/lib.rs`
+- [x] All 4 new route handlers implemented
+- [x] New routes registered in `main.rs`
+- [x] Old add/delete endpoints removed from all files
+- [x] Code compiles without errors
+- [x] All tests pass
+- [x] No references to AddParticipantRequest/DeleteParticipantRequest remain
+- [x] Error handling matches existing patterns
+- [x] Tracing instrumentation added to all new handlers
