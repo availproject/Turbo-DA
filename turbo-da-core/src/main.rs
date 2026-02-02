@@ -52,7 +52,7 @@ use diesel_async::{
 use enigma::EnigmaEncryptionService;
 use observability::init_tracer;
 use routes::enigma_management::{
-    add_participant, create_decrypt_request, delete_participant, get_decrypt_request,
+    create_decrypt_request, get_decrypt_request,
     get_participant_apps, list_decrypt_requests, submit_signature,
 };
 use routes::health::health_check;
@@ -182,8 +182,6 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(delete_public_key)
                             .service(
                                 web::scope("/enigma")
-                                    .service(add_participant)
-                                    .service(delete_participant)
                                     .service(create_decrypt_request)
                                     .service(get_decrypt_request)
                                     .service(list_decrypt_requests)

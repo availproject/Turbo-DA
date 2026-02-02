@@ -45,32 +45,6 @@ pub struct RegisterResponse {
     pub participants_added: i32,
 }
 
-// Add participants
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddParticipantRequest {
-    pub turbo_da_app_id: String,
-    pub participants: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AddParticipantResponse {
-    pub turbo_da_app_id: String,
-    pub participants_added: i32,
-}
-
-// Delete participants
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DeleteParticipantRequest {
-    pub turbo_da_app_id: String,
-    pub participants: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DeleteParticipantResponse {
-    pub turbo_da_app_id: String,
-    pub participants_deleted: i32,
-}
-
 // Decryption request types
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DecryptRequest {
