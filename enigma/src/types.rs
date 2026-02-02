@@ -2,7 +2,7 @@ use alloy_primitives::{Address, Signature};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetQuoteResponse {
     pub quote: String,
     pub event_log: String,
@@ -157,4 +157,72 @@ pub struct ListDecryptRequestsResponse {
     pub total: u32,
     pub offset: u32,
     pub limit: u32,
+}
+
+// Change Signers Request types
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateChangeSignersRequest {
+    pub id: Uuid,
+    pub turbo_da_app_id: String,
+    pub new_participants: Vec<String>,
+    pub new_threshold: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateChangeSignersResponse {
+    pub success: bool,
+}
+
+// List Change Signers Query
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListChangeSignersQuery {
+    pub turbo_da_app_id: String,
+    pub status: Option<String>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+// Change Signers Request Record
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangeSignersRequestRecord {
+    pub id: String,
+    pub turbo_da_app_id: String,
+    pub new_participants: Vec<String>,
+    pub new_threshold: i32,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub completed_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListChangeSignersResponse {
+    pub items: Vec<ChangeSignersRequestRecord>,
+    pub total: u32,
+    pub offset: u32,
+    pub limit: u32,
+}
+
+// Get Single Change Signers Request
+#[derive(Debug, Deserialize)]
+pub struct GetChangeSignersRequest {
+    pub request_id: String,
+}
+
+// Submit Change Signers Signature
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubmitChangeSignersSignatureRequest {
+    pub request_id: String,
+    pub participant_address: String,
+    pub signature: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubmitChangeSignersSignatureResponse {
+    pub id: String,
+    pub status: String,
+    pub signatures_submitted: i32,
+    pub threshold: i32,
+    pub ready_to_execute: bool,
+    pub tee_attestion: Option<GetQuoteResponse>,
 }
