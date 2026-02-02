@@ -7,8 +7,9 @@ use db::controllers::customer_expenditure::get_customer_expenditure_by_submissio
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use enigma::{
     types::{
-        DecryptRequest, ListDecryptRequestsQuery,
-        RegisterRequest, SubmitSignatureRequest,
+        CreateChangeSignersRequest, DecryptRequest, ListChangeSignersQuery,
+        ListDecryptRequestsQuery, RegisterRequest, SubmitChangeSignersSignatureRequest,
+        SubmitSignatureRequest,
     },
     EnigmaEncryptionService, EnigmaError,
 };
@@ -461,6 +462,85 @@ pub async fn list_decrypt_requests(
                     "error": format!("Failed to list decrypt requests: {}", e)
                 })),
             }
+        }
+    }
+}
+
+/// Create a new change signers request
+#[post("/change_signers/create")]
+pub async fn create_change_signers(
+    request: web::Json<CreateChangeSignersRequest>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!("creating change signers request");
+    match enigma.create_change_signers_request(request.into_inner()).await {
+        Ok(_) => HttpResponse::Created().json(json!({"success": true})),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to create change signers request");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+        }
+    }
+}
+
+/// List change signers requests
+#[get("/change_signers/list")]
+pub async fn list_change_signers(
+    query: web::Query<ListChangeSignersQuery>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!("listing change signers requests");
+    match enigma.list_change_signers(query.into_inner()).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to list change signers requests");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+        }
+    }
+}
+
+/// Get a single change signers request
+#[get("/change_signers/{request_id}")]
+pub async fn get_change_signers(
+    request_id: web::Path<String>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!(request_id = %request_id, "getting change signers request");
+    match enigma.get_change_signers_request(&request_id).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to get change signers request");
+            match &e {
+                EnigmaError::Api { status, .. } if *status == 404 => {
+                    HttpResponse::NotFound().json(json!({"error": "Request not found"}))
+                }
+                _ => HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+            }
+        }
+    }
+}
+
+/// Submit a signature for a change signers request
+#[post("/change_signers/{request_id}/sign")]
+pub async fn submit_change_signers_signature(
+    request_id: web::Path<String>,
+    body: web::Json<serde_json::Value>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    let participant_address = body.get("participant_address").and_then(|v| v.as_str()).unwrap_or("");
+    let signature = body.get("signature").and_then(|v| v.as_str()).unwrap_or("");
+
+    let payload = SubmitChangeSignersSignatureRequest {
+        request_id: request_id.into_inner(),
+        participant_address: participant_address.to_string(),
+        signature: signature.to_string(),
+    };
+
+    tracing::info!("submitting change signers signature");
+    match enigma.submit_change_signers_signature(payload).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to submit change signers signature");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
         }
     }
 }
