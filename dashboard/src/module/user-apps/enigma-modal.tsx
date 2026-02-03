@@ -25,7 +25,6 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
-  Trash2,
   Wallet,
   X,
 } from "lucide-react";
@@ -79,9 +78,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
   const { signMessageAsync } = useSignMessage();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<
-    "history" | "create" | "participants"
-  >("history");
+  const [activeTab, setActiveTab] = useState<"history" | "create">("history");
 
   // Request History State
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -100,12 +97,6 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
   // Create Request State
   const [createLoading, setCreateLoading] = useState(false);
   const [submissionId, setSubmissionId] = useState("");
-
-  // Manage Participants State
-  const [addLoading, setAddLoading] = useState(false);
-  const [addParticipants, setAddParticipants] = useState("");
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteParticipants, setDeleteParticipants] = useState("");
 
   const turboAppId = appData.id;
   const hasFetchedRef = useRef(false);
@@ -254,86 +245,6 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
     }
   };
 
-  // Handle add participants
-  const handleAddParticipants = async () => {
-    if (!token && !skipAuth) return;
-    if (!addParticipants) {
-      errorToast({ label: "Please enter participant addresses" });
-      return;
-    }
-
-    try {
-      setAddLoading(true);
-      const participantsList = addParticipants
-        .split(",")
-        .map((p) => p.trim())
-        .filter((p) => p);
-
-      if (!token) {
-        errorToast({ label: "Authentication token not available" });
-        setAddLoading(false);
-        return;
-      }
-
-      const response = await EnigmaService.addParticipant({
-        token,
-        turbo_da_app_id: turboAppId,
-        participants: participantsList,
-      });
-
-      success({
-        label: "Participants Added",
-        description: `Added ${response.participants_added} participants`,
-      });
-
-      setAddParticipants("");
-    } catch (err: any) {
-      errorToast({ label: err.message || "Failed to add participants" });
-    } finally {
-      setAddLoading(false);
-    }
-  };
-
-  // Handle delete participants
-  const handleDeleteParticipants = async () => {
-    if (!token && !skipAuth) return;
-    if (!deleteParticipants) {
-      errorToast({ label: "Please enter participant addresses" });
-      return;
-    }
-
-    try {
-      setDeleteLoading(true);
-      const participantsList = deleteParticipants
-        .split(",")
-        .map((p) => p.trim())
-        .filter((p) => p);
-
-      if (!token) {
-        errorToast({ label: "Authentication token not available" });
-        setDeleteLoading(false);
-        return;
-      }
-
-      const response = await EnigmaService.deleteParticipant({
-        token,
-        turbo_da_app_id: turboAppId,
-        participants: participantsList,
-      });
-
-      success({
-        label: "Participants Removed",
-        description: `Removed ${response.participants_deleted} participants`,
-      });
-
-      setDeleteParticipants("");
-    } catch (err: any) {
-      errorToast({ label: err.message || "Failed to remove participants" });
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   };
@@ -455,17 +366,6 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                 onClick={() => setActiveTab("create")}
               >
                 Create Request
-              </button>
-              <button
-                className={cn(
-                  "px-6 py-3 text-sm font-medium transition-colors",
-                  activeTab === "participants"
-                    ? "border-b-2 border-[#3CA3FC] text-white"
-                    : "text-[#8B9DB6] hover:text-white"
-                )}
-                onClick={() => setActiveTab("participants")}
-              >
-                Manage Participants
               </button>
             </div>
 
@@ -895,77 +795,6 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                 </div>
               )}
 
-              {/* Manage Participants Tab */}
-              {activeTab === "participants" && (
-                <div className="flex flex-col gap-4">
-                  {/* Add Participants */}
-                  <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
-                    <Text size="lg" weight="semibold" className="mb-2">
-                      Add Participants
-                    </Text>
-                    <Text variant="light-grey" size="sm" className="mb-6">
-                      Add new participants who can sign decryption requests.
-                    </Text>
-
-                    <PrimaryInput
-                      label="Participants (Comma separated addresses)"
-                      placeholder="e.g. 0x123..., 0x456..."
-                      value={addParticipants}
-                      onChange={setAddParticipants}
-                    />
-
-                    <Button
-                      className="mt-6 w-full flex items-center justify-center"
-                      onClick={handleAddParticipants}
-                      disabled={addLoading || !addParticipants}
-                      variant={!addParticipants ? "disabled" : "primary"}
-                    >
-                      {addLoading ? (
-                        <LoaderCircle className="animate-spin" size={20} />
-                      ) : (
-                        <>
-                          <Plus size={16} className="mr-2" />
-                          Add Participants
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Remove Participants */}
-                  <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
-                    <Text size="lg" weight="semibold" className="mb-2">
-                      Remove Participants
-                    </Text>
-                    <Text variant="light-grey" size="sm" className="mb-6">
-                      Remove participants from this app&apos;s encryption
-                      scheme.
-                    </Text>
-
-                    <PrimaryInput
-                      label="Participants (Comma separated addresses)"
-                      placeholder="e.g. 0x123..., 0x456..."
-                      value={deleteParticipants}
-                      onChange={setDeleteParticipants}
-                    />
-
-                    <Button
-                      variant={!deleteParticipants ? "disabled" : "danger"}
-                      className="mt-6 w-full flex items-center justify-center"
-                      onClick={handleDeleteParticipants}
-                      disabled={deleteLoading || !deleteParticipants}
-                    >
-                      {deleteLoading ? (
-                        <LoaderCircle className="animate-spin" size={20} />
-                      ) : (
-                        <>
-                          <Trash2 size={16} className="mr-2" />
-                          Remove Participants
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
