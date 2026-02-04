@@ -360,7 +360,26 @@ class EnigmaService {
       throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    if (Array.isArray(data)) {
+      const participants = data.map((item: any) => item.participant_address).filter(Boolean);
+      return {
+        participants,
+        threshold: participants.length, // Default threshold to N (all signers) if not provided
+      };
+    }
+
+    if (data && typeof data.participants === "string") {
+      try {
+        data.participants = JSON.parse(data.participants);
+      } catch (e) {
+        console.error("Failed to parse participants", e);
+        data.participants = [];
+      }
+    }
+
+    return data;
   }
 }
 

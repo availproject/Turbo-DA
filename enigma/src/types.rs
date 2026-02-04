@@ -166,6 +166,17 @@ pub struct ListChangeSignersQuery {
 pub struct ChangeSignersRequestRecord {
     pub id: String,
     pub turbo_da_app_id: String,
+    pub status: String,
+    pub signers: Vec<String>,
+    pub new_participants: Vec<String>,
+    pub new_threshold: i64,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChangeSignersRequestListWithThreshold {
+    pub id: String,
+    pub turbo_da_app_id: String,
     pub new_participants: String,
     pub new_threshold: i64,
     pub submitted_signatures: String,
@@ -177,7 +188,7 @@ pub struct ChangeSignersRequestRecord {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListChangeSignersResponse {
-    pub items: Vec<ChangeSignersRequestRecord>,
+    pub items: Vec<ChangeSignersRequestListWithThreshold>,
     pub total: u32,
     pub offset: u32,
     pub limit: u32,

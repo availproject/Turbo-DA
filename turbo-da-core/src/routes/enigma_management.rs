@@ -567,15 +567,7 @@ pub async fn submit_change_signers_signature(
                     }
                 };
 
-                let parsed: Vec<String> =
-                    match serde_json::from_str(&request_details.new_participants) {
-                        Ok(v) => v,
-                        Err(_) => {
-                            return HttpResponse::BadRequest()
-                                .json(json!({ "error": "Invalid list of participants" }));
-                        }
-                    };
-
+              
                 let mut connection = match get_connection(&pool).await {
                     Ok(conn) => conn,
                     Err(e) => return e,
@@ -584,7 +576,7 @@ pub async fn submit_change_signers_signature(
                 match db::controllers::mpc_participants::change_signers(
                     &mut connection,
                     &app_uuid,
-                    parsed,
+                    request_details.new_participants,
                 )
                 .await
                 {

@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Key,
   LoaderCircle,
   Plus,
@@ -33,6 +34,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, useSignMessage } from "wagmi";
 import { useModal } from "connectkit";
+import { keccak256, toBytes } from "viem";
 
 const PAGE_SIZE = 10;
 
@@ -114,6 +116,11 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
   const [changeSignersRequestsTotal, setChangeSignersRequestsTotal] = useState(0);
   const [changeSignersRequestsOffset, setChangeSignersRequestsOffset] = useState(0);
   const [signRequestLoading, setSignRequestLoading] = useState(false);
+
+  // Change Signers Request Details State
+  const [selectedChangeSignersRequest, setSelectedChangeSignersRequest] = useState<ChangeSignersRequest | null>(null);
+  const [changeSignersRequestDetails, setChangeSignersRequestDetails] = useState<ChangeSignersRequest | null>(null);
+  const [changeSignersDetailsLoading, setChangeSignersDetailsLoading] = useState(false);
 
    const turboAppId = appData.id;
    const hasFetchedRef = useRef(false);
@@ -383,6 +390,29 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
     [token, turboAppId, skipAuth]
   );
 
+  const fetchChangeSignersRequestDetails = async (requestId: string) => {
+    if (!token && !skipAuth) return;
+
+    try {
+      setChangeSignersDetailsLoading(true);
+      const response = await EnigmaService.getChangeSignersRequest({
+        token: token || undefined,
+        request_id: requestId,
+      });
+      setChangeSignersRequestDetails(response);
+    } catch (err: any) {
+      errorToast({ label: err.message || "Failed to get request details" });
+      setChangeSignersRequestDetails(null);
+    } finally {
+      setChangeSignersDetailsLoading(false);
+    }
+  };
+
+  const handleChangeRequestClick = (request: ChangeSignersRequest) => {
+    setSelectedChangeSignersRequest(request);
+    fetchChangeSignersRequestDetails(request.id);
+  };
+
   const handleSignRequest = async (request: ChangeSignersRequest) => {
     if (!token && !skipAuth) return;
     if (!isConnected || !address) {
@@ -393,7 +423,13 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
     try {
       setSignRequestLoading(true);
 
-      const message = `${request.id}:${turboAppId}`;
+      // Hash the participants array
+      const participantsString = JSON.stringify(request.new_participants);
+      const hash = keccak256(toBytes(participantsString));
+      // Remove 0x prefix to match Rust's hex::encode
+      const hashWithout0x = hash.slice(2);
+
+      const message = `${request.id}:${turboAppId}:${hashWithout0x}:${request.new_threshold}`;
       const signature = await signMessageAsync({ message });
 
       const response = await EnigmaService.submitChangeSignersSignature({
@@ -1057,7 +1093,9 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                         {currentSignersError}
                       </Text>
                     </div>
-                  ) : currentSigners && currentSigners.participants.length > 0 ? (
+                  ) : currentSigners &&
+                  currentSigners.participants &&
+                  currentSigners.participants.length > 0 ? (
                     <div className="flex flex-col gap-4">
                       <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
                         <div className="flex items-center justify-between mb-4">
@@ -1079,14 +1117,26 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                           {currentSigners.participants.map((participant, idx) => (
                             <div
                               key={idx}
-                              className="p-3 rounded bg-black/20 flex items-center justify-between"
+                              className="p-3 rounded bg-black/20 flex items-center justify-between group"
                             >
-                              <Text
-                                size="xs"
-                                className="font-mono text-[#3CA3FC]"
-                              >
-                                {participant.slice(0, 6)}...{participant.slice(-4)}
-                              </Text>
+                              <div className="flex items-center gap-3">
+                                <Text
+                                  size="xs"
+                                  className="font-mono text-[#3CA3FC]"
+                                >
+                                  {participant}
+                                </Text>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(participant);
+                                    success({ label: "Address Copied" });
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded cursor-pointer"
+                                  title="Copy Address"
+                                >
+                                  <Copy size={12} className="text-[#8B9DB6]" />
+                                </button>
+                              </div>
                               <Text
                                 size="xs"
                                 variant="light-grey"
@@ -1162,190 +1212,378 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
 
               {/* Requests Tab */}
               {activeTab === "requests" && (
-                <div className="flex flex-col gap-4 h-full">
-                  <div className="flex justify-between items-center">
-                    <Text weight="semibold">
-                      Change Signers Requests ({changeSignersRequestsTotal})
-                    </Text>
-                    <button
-                      onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset)}
-                      disabled={changeSignersRequestsLoading}
-                      className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-50"
-                    >
-                      <RefreshCw
-                        size={16}
-                        className={cn(
-                          "text-[#8B9DB6]",
-                          changeSignersRequestsLoading && "animate-spin"
-                        )}
-                      />
-                    </button>
-                  </div>
+                <>
+                  {selectedChangeSignersRequest ? (
+                    // Request Details View
+                    <div className="flex flex-col gap-4 h-full">
+                      <button
+                        onClick={() => {
+                          setSelectedChangeSignersRequest(null);
+                          setChangeSignersRequestDetails(null);
+                        }}
+                        className="flex items-center gap-2 text-[#8B9DB6] hover:text-white transition-colors w-fit"
+                      >
+                        <ArrowLeft size={16} />
+                        <Text size="sm">Back to list</Text>
+                      </button>
 
-                  {changeSignersRequestsLoading && changeSignersRequests.length === 0 ? (
-                    <div className="flex flex-1 justify-center items-center">
-                      <LoaderCircle
-                        className="animate-spin text-[#3CA3FC]"
-                        size={32}
-                      />
-                    </div>
-                  ) : changeSignersRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
-                      <div className="w-16 h-16 rounded-full bg-[#2B4761]/40 flex items-center justify-center">
-                        <Key size={24} className="text-[#8B9DB6]" />
-                      </div>
-                      <Text variant="light-grey" size="lg">
-                        No change signers requests found
-                      </Text>
-                      <Text
-                        variant="light-grey"
-                        size="sm"
-                        className="text-center"
-                      >
-                        Create a new request to get started
-                      </Text>
-                      <Button
-                        variant="secondary"
-                        className="mt-2 flex items-center justify-center"
-                        onClick={() => setActiveTab("change-signers")}
-                      >
-                        <Plus size={16} className="mr-2" />
-                        Create Request
-                      </Button>
+                      {changeSignersDetailsLoading ? (
+                        <div className="flex flex-1 justify-center items-center">
+                          <LoaderCircle
+                            className="animate-spin text-[#3CA3FC]"
+                            size={32}
+                          />
+                        </div>
+                      ) : changeSignersRequestDetails ? (
+                        <div className="flex flex-col gap-4">
+                          {/* Status Card */}
+                          <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
+                            <div className="flex items-center justify-between mb-4">
+                              <Text weight="semibold" size="lg">
+                                Change Signers Request Details
+                              </Text>
+                              {getStatusBadge(changeSignersRequestDetails.status)}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Text
+                                  size="xs"
+                                  variant="light-grey"
+                                  className="mb-1"
+                                >
+                                  Request ID
+                                </Text>
+                                <Text
+                                  size="sm"
+                                  className="font-mono break-all"
+                                >
+                                  {changeSignersRequestDetails.id}
+                                </Text>
+                              </div>
+                              <div>
+                                <Text
+                                  size="xs"
+                                  variant="light-grey"
+                                  className="mb-1"
+                                >
+                                  Created At
+                                </Text>
+                                <Text size="sm">
+                                  {formatDate(changeSignersRequestDetails.created_at)}
+                                </Text>
+                              </div>
+                              {changeSignersRequestDetails.completed_at && (
+                                <div>
+                                  <Text
+                                    size="xs"
+                                    variant="light-grey"
+                                    className="mb-1"
+                                  >
+                                    Completed At
+                                  </Text>
+                                  <Text size="sm">
+                                    {formatDate(changeSignersRequestDetails.completed_at)}
+                                  </Text>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-[#2B4761]">
+                              <div className="flex items-center justify-between mb-2">
+                                <Text size="sm" variant="light-grey">
+                                  New Threshold
+                                </Text>
+                                <Text size="sm" weight="semibold">
+                                  {changeSignersRequestDetails.new_threshold} / {changeSignersRequestDetails.new_participants.length}
+                                </Text>
+                              </div>
+                              <Text
+                                size="xs"
+                                variant="light-grey"
+                                className="mb-2"
+                              >
+                                New Participants ({changeSignersRequestDetails.new_participants.length})
+                              </Text>
+                              <div className="flex flex-col gap-2">
+                                {changeSignersRequestDetails.new_participants.map((participant, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2 rounded bg-black/20 flex items-center justify-between group"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <Text
+                                        size="xs"
+                                        className="font-mono text-[#3CA3FC]"
+                                      >
+                                        {participant}
+                                      </Text>
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(participant);
+                                          success({ label: "Address Copied" });
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded cursor-pointer"
+                                        title="Copy Address"
+                                      >
+                                        <Copy size={12} className="text-[#8B9DB6]" />
+                                      </button>
+                                    </div>
+                                    <Text
+                                      size="xs"
+                                      variant="light-grey"
+                                      className="font-mono"
+                                    >
+                                      {idx + 1}
+                                    </Text>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Sign Section */}
+                          {changeSignersRequestDetails.status.toLowerCase() === "pending" && (
+                            <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
+                              <Text weight="semibold" className="mb-3">
+                                Submit Your Signature
+                              </Text>
+
+                              {isConnected && address ? (
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-[#1FC16B]/10 border border-[#1FC16B]/30 mb-4">
+                                  <Wallet size={16} className="text-[#1FC16B]" />
+                                  <Text
+                                    size="sm"
+                                    className="text-[#1FC16B] font-mono"
+                                  >
+                                    {address.slice(0, 6)}...{address.slice(-4)}
+                                  </Text>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-[#E4A354]/10 border border-[#E4A354]/30 mb-4">
+                                  <Wallet size={16} className="text-[#E4A354]" />
+                                  <Text size="sm" className="text-[#E4A354]">
+                                    Connect your wallet to sign
+                                  </Text>
+                                </div>
+                              )}
+
+                              <Button
+                                onClick={() => handleSignRequest(changeSignersRequestDetails)}
+                                disabled={signRequestLoading}
+                                className="w-full flex items-center justify-center"
+                              >
+                                {signRequestLoading ? (
+                                  <LoaderCircle className="animate-spin" size={20} />
+                                ) : isConnected ? (
+                                  "Sign & Submit"
+                                ) : (
+                                  "Connect Wallet"
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex justify-center items-center min-h-[200px]">
+                          <Text variant="light-grey">
+                            Failed to load request details
+                          </Text>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <>
-                      {/* Table Header */}
-                      <div className="flex items-center px-3 py-2 border-b border-[#2B4761]">
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="w-[140px]"
-                        >
-                          Request ID
+                    // Request List View
+                    <div className="flex flex-col gap-4 h-full">
+                      <div className="flex justify-between items-center">
+                        <Text weight="semibold">
+                          Change Signers Requests ({changeSignersRequestsTotal})
                         </Text>
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="w-[100px]"
+                        <button
+                          onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset)}
+                          disabled={changeSignersRequestsLoading}
+                          className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-50"
                         >
-                          Status
-                        </Text>
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="w-[90px] text-center"
-                        >
-                          Threshold
-                        </Text>
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="w-[90px] text-center"
-                        >
-                          Participants
-                        </Text>
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="flex-1"
-                        >
-                          Created
-                        </Text>
-                        <Text
-                          size="xs"
-                          variant="light-grey"
-                          className="w-[80px]"
-                        >
-                          Action
-                        </Text>
+                          <RefreshCw
+                            size={16}
+                            className={cn(
+                              "text-[#8B9DB6]",
+                              changeSignersRequestsLoading && "animate-spin"
+                            )}
+                          />
+                        </button>
                       </div>
 
-                      {/* Table Body */}
-                      <div className="flex flex-col">
-                        {changeSignersRequests.map((request) => (
-                          <div
-                            key={request.id}
-                            className="flex items-center px-3 py-3 border-b border-[#2B4761]/50"
+                      {changeSignersRequestsLoading && changeSignersRequests.length === 0 ? (
+                        <div className="flex flex-1 justify-center items-center">
+                          <LoaderCircle
+                            className="animate-spin text-[#3CA3FC]"
+                            size={32}
+                          />
+                        </div>
+                      ) : changeSignersRequests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+                          <div className="w-16 h-16 rounded-full bg-[#2B4761]/40 flex items-center justify-center">
+                            <Key size={24} className="text-[#8B9DB6]" />
+                          </div>
+                          <Text variant="light-grey" size="lg">
+                            No change signers requests found
+                          </Text>
+                          <Text
+                            variant="light-grey"
+                            size="sm"
+                            className="text-center"
                           >
+                            Create a new request to get started
+                          </Text>
+                          <Button
+                            variant="secondary"
+                            className="mt-2 flex items-center justify-center"
+                            onClick={() => setActiveTab("change-signers")}
+                          >
+                            <Plus size={16} className="mr-2" />
+                            Create Request
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Table Header */}
+                          <div className="flex items-center px-3 py-2 border-b border-[#2B4761]">
                             <Text
-                              size="sm"
-                              className="w-[140px] font-mono"
+                              size="xs"
+                              variant="light-grey"
+                              className="w-[140px]"
                             >
-                              {request.id.slice(0, 8)}...
-                              {request.id.slice(-4)}
+                              Request ID
                             </Text>
-                            <div className="w-[100px]">
-                              {getStatusBadge(request.status)}
-                            </div>
                             <Text
-                              size="sm"
+                              size="xs"
+                              variant="light-grey"
+                              className="w-[100px]"
+                            >
+                              Status
+                            </Text>
+                            <Text
+                              size="xs"
+                              variant="light-grey"
                               className="w-[90px] text-center"
                             >
-                              {request.new_threshold}
+                              Threshold
                             </Text>
                             <Text
-                              size="sm"
+                              size="xs"
+                              variant="light-grey"
                               className="w-[90px] text-center"
                             >
-                              {request.new_participants.length}
+                              Participants
                             </Text>
                             <Text
                               size="xs"
                               variant="light-grey"
                               className="flex-1"
                             >
-                              {formatDate(request.created_at)}
+                              Created
                             </Text>
-                            <div className="w-[80px]">
-                              {request.status.toLowerCase() === "pending" && (
-                                <Button
-                                  variant="secondary"
-                                  className="text-xs py-1 px-2"
-                                  onClick={() => handleSignRequest(request)}
-                                  disabled={signRequestLoading}
-                                >
-                                  {signRequestLoading ? (
-                                    <LoaderCircle className="animate-spin" size={14} />
-                                  ) : (
-                                    "Sign"
-                                  )}
-                                </Button>
-                              )}
-                            </div>
+                            <Text
+                              size="xs"
+                              variant="light-grey"
+                              className="w-[80px]"
+                            >
+                              Action
+                            </Text>
                           </div>
-                        ))}
-                      </div>
 
-                      {/* Pagination */}
-                      {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE) > 1 && (
-                        <div className="flex items-center justify-center gap-3 mt-4">
-                          <button
-                            onClick={() =>
-                              fetchChangeSignersRequests(Math.max(0, changeSignersRequestsOffset - PAGE_SIZE))
-                            }
-                            disabled={changeSignersRequestsOffset === 0 || changeSignersRequestsLoading}
-                            className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
-                          >
-                            <ChevronLeft size={16} />
-                          </button>
-                          <Text size="sm" variant="light-grey">
-                            {Math.floor(changeSignersRequestsOffset / PAGE_SIZE) + 1} / {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE)}
-                          </Text>
-                          <button
-                            onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset + PAGE_SIZE)}
-                            disabled={
-                              changeSignersRequestsOffset + PAGE_SIZE >= changeSignersRequestsTotal || changeSignersRequestsLoading
-                            }
-                            className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
-                          >
-                            <ChevronRight size={16} />
-                          </button>
-                        </div>
+                          {/* Table Body */}
+                          <div className="flex flex-col">
+                            {changeSignersRequests.map((request) => (
+                              <div
+                                key={request.id}
+                                onClick={() => handleChangeRequestClick(request)}
+                                className="flex items-center px-3 py-3 border-b border-[#2B4761]/50 cursor-pointer hover:bg-[#2B4761]/20 transition-colors"
+                              >
+                                <Text
+                                  size="sm"
+                                  className="w-[140px] font-mono"
+                                >
+                                  {request.id.slice(0, 8)}...
+                                  {request.id.slice(-4)}
+                                </Text>
+                                <div className="w-[100px]">
+                                  {getStatusBadge(request.status)}
+                                </div>
+                                <Text
+                                  size="sm"
+                                  className="w-[90px] text-center"
+                                >
+                                  {request.new_threshold}
+                                </Text>
+                                <Text
+                                  size="sm"
+                                  className="w-[90px] text-center"
+                                >
+                                  {request.new_participants.length}
+                                </Text>
+                                <Text
+                                  size="xs"
+                                  variant="light-grey"
+                                  className="flex-1"
+                                >
+                                  {formatDate(request.created_at)}
+                                </Text>
+                                <div className="w-[80px]">
+                                  {request.status.toLowerCase() === "pending" && (
+                                    <Button
+                                      variant="secondary"
+                                      className="text-xs py-1 px-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // Prevent opening details
+                                        handleSignRequest(request);
+                                      }}
+                                      disabled={signRequestLoading}
+                                    >
+                                      {signRequestLoading ? (
+                                        <LoaderCircle className="animate-spin" size={14} />
+                                      ) : (
+                                        "Sign"
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Pagination */}
+                          {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE) > 1 && (
+                            <div className="flex items-center justify-center gap-3 mt-4">
+                              <button
+                                onClick={() =>
+                                  fetchChangeSignersRequests(Math.max(0, changeSignersRequestsOffset - PAGE_SIZE))
+                                }
+                                disabled={changeSignersRequestsOffset === 0 || changeSignersRequestsLoading}
+                                className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
+                              >
+                                <ChevronLeft size={16} />
+                              </button>
+                              <Text size="sm" variant="light-grey">
+                                {Math.floor(changeSignersRequestsOffset / PAGE_SIZE) + 1} / {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE)}
+                              </Text>
+                              <button
+                                onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset + PAGE_SIZE)}
+                                disabled={
+                                  changeSignersRequestsOffset + PAGE_SIZE >= changeSignersRequestsTotal || changeSignersRequestsLoading
+                                }
+                                className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
+                              >
+                                <ChevronRight size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
+                    </div>
                   )}
-                </div>
+                </>
               )}
 
             </div>
