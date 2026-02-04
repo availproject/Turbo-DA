@@ -136,7 +136,6 @@ pub struct ListDecryptRequestsResponse {
 // Change Signers Request types
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateChangeSignersRequest {
-    pub id: Uuid,
     pub turbo_da_app_id: String,
     pub new_participants: Vec<String>,
     pub new_threshold: i32,
@@ -144,7 +143,13 @@ pub struct CreateChangeSignersRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateChangeSignersResponse {
-    pub success: bool,
+    pub id: String,
+    pub turbo_da_app_id: String,
+    pub status: String,
+    pub signers: Vec<String>,
+    pub new_participants: Vec<String>,
+    pub new_threshold: i32,
+    pub created_at: i64,
 }
 
 // List Change Signers Query

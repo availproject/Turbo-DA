@@ -474,7 +474,7 @@ pub async fn create_change_signers(
 ) -> HttpResponse {
     tracing::info!("creating change signers request");
     match enigma.create_change_signers_request(request.into_inner()).await {
-        Ok(_) => HttpResponse::Created().json(json!({"success": true})),
+        Ok(response) => HttpResponse::Created().json(response),
         Err(e) => {
             tracing::error!(error = %e, "failed to create change signers request");
             HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))

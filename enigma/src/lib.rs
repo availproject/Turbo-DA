@@ -166,10 +166,10 @@ impl EnigmaEncryptionService {
     /// Creates a change signers request
     ///
     /// # Arguments
-    /// * `payload` - CreateChangeSignersRequest struct containing id, turbo_da_app_id, new_participants, and new_threshold
+    /// * `payload` - CreateChangeSignersRequest struct containing turbo_da_app_id, new_participants, and new_threshold
     ///
     /// # Returns
-    /// * `CreateChangeSignersResponse` - Response indicating success
+    /// * `CreateChangeSignersResponse` - Response containing the created request details
     pub async fn create_change_signers_request(
         &self,
         payload: CreateChangeSignersRequest,
@@ -189,11 +189,6 @@ impl EnigmaEncryptionService {
                 status: status.as_u16(),
                 message: body,
             });
-        }
-
-        // For 201 Created with empty body, return success
-        if body.is_empty() || status == 201 {
-            return Ok(CreateChangeSignersResponse { success: true });
         }
 
         let parsed: CreateChangeSignersResponse = serde_json::from_str(&body).map_err(|e| {
