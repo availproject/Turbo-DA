@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{get, post, web, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
@@ -552,8 +552,9 @@ pub async fn submit_change_signers_signature(
                     Ok(details) => details,
                     Err(e) => {
                         tracing::error!(error = %e, "failed to fetch change signers request details");
-                        return HttpResponse::InternalServerError()
-                            .json(json!({"error": format!("Failed to fetch request details: {}", e)}));
+                        return HttpResponse::InternalServerError().json(
+                            json!({"error": format!("Failed to fetch request details: {}", e)}),
+                        );
                     }
                 };
 
@@ -566,6 +567,15 @@ pub async fn submit_change_signers_signature(
                     }
                 };
 
+                let parsed: Vec<String> =
+                    match serde_json::from_str(&request_details.new_participants) {
+                        Ok(v) => v,
+                        Err(_) => {
+                            return HttpResponse::BadRequest()
+                                .json(json!({ "error": "Invalid list of participants" }));
+                        }
+                    };
+
                 let mut connection = match get_connection(&pool).await {
                     Ok(conn) => conn,
                     Err(e) => return e,
@@ -574,7 +584,7 @@ pub async fn submit_change_signers_signature(
                 match db::controllers::mpc_participants::change_signers(
                     &mut connection,
                     &app_uuid,
-                    request_details.new_participants,
+                    parsed,
                 )
                 .await
                 {
@@ -657,6 +667,67 @@ pub async fn get_participant_apps(
             tracing::error!(error = %e, "failed to fetch participant apps");
             HttpResponse::InternalServerError().json(json!({
                 "error": format!("Failed to fetch participant apps: {}", e)
+            }))
+        }
+    }
+}
+
+/// Get current signers for an app
+///
+/// # Description
+/// Returns the list of current MPC participants for a given app ID.
+///
+/// # Route
+/// `GET /v1/enigma/current_signers/{turbo_da_app_id}`
+///
+/// # Path Parameters
+/// * `turbo_da_app_id` - The UUID of the application
+///
+/// # Returns
+/// JSON response with list of participants
+#[tracing::instrument(
+    skip(pool),
+    fields(
+        turbo_da_app_id = %turbo_da_app_id,
+        endpoint = "enigma_current_signers"
+    )
+)]
+#[get("/current_signers/{turbo_da_app_id}")]
+pub async fn current_signers(
+    turbo_da_app_id: web::Path<String>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+) -> HttpResponse {
+    tracing::info!(
+        turbo_da_app_id = %turbo_da_app_id,
+        "fetching current signers for app"
+    );
+
+    let app_uuid = match Uuid::parse_str(&turbo_da_app_id) {
+        Ok(uuid) => uuid,
+        Err(e) => {
+            tracing::error!(error = %e, "invalid turbo_da_app_id format");
+            return HttpResponse::BadRequest().json(json!({
+                "error": format!("Invalid app_id format: {}", e)
+            }));
+        }
+    };
+
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match db::controllers::mpc_participants::get_participants_by_app_id(&mut connection, &app_uuid)
+        .await
+    {
+        Ok(participants) => {
+            tracing::info!(count = participants.len(), "successfully fetched participants");
+            HttpResponse::Ok().json(participants)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to fetch participants");
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to fetch participants: {}", e)
             }))
         }
     }

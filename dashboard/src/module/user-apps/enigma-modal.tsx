@@ -12,6 +12,7 @@ import { baseImageUrl, cn } from "@/lib/utils";
 import { useConfig } from "@/providers/ConfigProvider";
 import EnigmaService from "@/services/enigma";
 import {
+  ChangeSignersRequest,
   DecryptionRequestListItem,
   GetDecryptRequestResponse,
 } from "@/services/enigma/response";
@@ -78,7 +79,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
   const { signMessageAsync } = useSignMessage();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<"history" | "create">("history");
+  const [activeTab, setActiveTab] = useState<"current-signers" | "change-signers" | "requests" | "history" | "create">("current-signers");
 
   // Request History State
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -98,8 +99,25 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
   const [createLoading, setCreateLoading] = useState(false);
   const [submissionId, setSubmissionId] = useState("");
 
-  const turboAppId = appData.id;
-  const hasFetchedRef = useRef(false);
+  const [changeSignersLoading, setChangeSignersLoading] = useState(false);
+  const [participants, setParticipants] = useState("");
+  const [threshold, setThreshold] = useState("");
+
+  // Current Signers State
+  const [currentSigners, setCurrentSigners] = useState<{ participants: string[]; threshold: number } | null>(null);
+  const [currentSignersLoading, setCurrentSignersLoading] = useState(false);
+  const [currentSignersError, setCurrentSignersError] = useState<string | null>(null);
+
+  // Change Signers Requests State
+  const [changeSignersRequests, setChangeSignersRequests] = useState<ChangeSignersRequest[]>([]);
+  const [changeSignersRequestsLoading, setChangeSignersRequestsLoading] = useState(false);
+  const [changeSignersRequestsTotal, setChangeSignersRequestsTotal] = useState(0);
+  const [changeSignersRequestsOffset, setChangeSignersRequestsOffset] = useState(0);
+  const [signRequestLoading, setSignRequestLoading] = useState(false);
+
+   const turboAppId = appData.id;
+   const hasFetchedRef = useRef(false);
+   const hasFetchedSignersRef = useRef(false);
 
   // Fetch request history
   const fetchHistory = useCallback(
@@ -132,6 +150,29 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
     [token, turboAppId, skipAuth]
   );
 
+  // Fetch current signers
+  const fetchCurrentSigners = useCallback(async () => {
+    if (!token && !skipAuth) return;
+
+    try {
+      setCurrentSignersLoading(true);
+      setCurrentSignersError(null);
+      const response = await EnigmaService.getCurrentSigners({
+        token: token || undefined,
+        app_id: turboAppId,
+      });
+      console.log(response);
+      setCurrentSigners(response);
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to fetch current signers";
+      setCurrentSignersError(errorMessage);
+      errorToast({ label: errorMessage });
+      setCurrentSigners(null);
+    } finally {
+      setCurrentSignersLoading(false);
+    }
+  }, [token, turboAppId, skipAuth, errorToast]);
+
   // Load history when modal opens
   useEffect(() => {
     if (open === id && (token || skipAuth) && !hasFetchedRef.current) {
@@ -143,6 +184,25 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
       hasFetchedRef.current = false;
     }
   }, [open, id, token, fetchHistory, skipAuth]);
+
+   // Fetch current signers when tab becomes active
+   useEffect(() => {
+     if (activeTab === "current-signers" && (token || skipAuth) && !hasFetchedSignersRef.current) {
+       hasFetchedSignersRef.current = true;
+       fetchCurrentSigners();
+     }
+     // Reset ref when tab changes away
+     if (activeTab !== "current-signers") {
+       hasFetchedSignersRef.current = false;
+     }
+   }, [activeTab, token, skipAuth, fetchCurrentSigners]);
+
+  // Fetch change signers requests when tab becomes active
+  useEffect(() => {
+    if (activeTab === "requests" && (token || skipAuth)) {
+      fetchChangeSignersRequests(0);
+    }
+  }, [activeTab, token, skipAuth]);
 
   // Fetch request details
   const fetchRequestDetails = async (requestId: string) => {
@@ -245,6 +305,125 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
     }
   };
 
+  const handleChangeSigners = async () => {
+    if (!token && !skipAuth) return;
+
+    if (!participants || !threshold) {
+      errorToast({ label: "Please fill all fields" });
+      return;
+    }
+
+    const participantsList = participants
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p);
+
+    if (participantsList.length === 0) {
+      errorToast({ label: "Please enter at least one participant address" });
+      return;
+    }
+
+    const thresholdNum = parseInt(threshold, 10);
+    if (isNaN(thresholdNum) || thresholdNum <= 0 || thresholdNum > participantsList.length) {
+      errorToast({ label: "Threshold must be between 1 and the number of participants" });
+      return;
+    }
+
+    try {
+      setChangeSignersLoading(true);
+
+      await EnigmaService.createChangeSignersRequest({
+        token: token || "",
+        turbo_da_app_id: turboAppId,
+        new_participants: participantsList,
+        new_threshold: thresholdNum,
+      });
+
+      success({
+        label: "Change Signers Request Created",
+        description: "Your request has been created successfully.",
+      });
+
+      setParticipants("");
+      setThreshold("");
+    } catch (err: any) {
+      errorToast({ label: err.message || "Failed to create change signers request" });
+    } finally {
+      setChangeSignersLoading(false);
+    }
+  };
+
+  const fetchChangeSignersRequests = useCallback(
+    async (newOffset = 0) => {
+      if (!token && !skipAuth) return;
+
+      try {
+        setChangeSignersRequestsLoading(true);
+        const response = await EnigmaService.listChangeSignersRequests({
+          token: token || "",
+          turbo_da_app_id: turboAppId,
+          offset: newOffset,
+          limit: PAGE_SIZE,
+        });
+
+        setChangeSignersRequests(response.items);
+        setChangeSignersRequestsTotal(response.total);
+        setChangeSignersRequestsOffset(response.offset);
+      } catch (err: any) {
+        errorToast({
+          label: err.message || "Failed to fetch change signers requests",
+        });
+        setChangeSignersRequests([]);
+        setChangeSignersRequestsTotal(0);
+      } finally {
+        setChangeSignersRequestsLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [token, turboAppId, skipAuth]
+  );
+
+  const handleSignRequest = async (request: ChangeSignersRequest) => {
+    if (!token && !skipAuth) return;
+    if (!isConnected || !address) {
+      openConnectModal(true);
+      return;
+    }
+
+    try {
+      setSignRequestLoading(true);
+
+      const message = `${request.id}:${turboAppId}`;
+      const signature = await signMessageAsync({ message });
+
+      const response = await EnigmaService.submitChangeSignersSignature({
+        token: token || undefined,
+        request_id: request.id,
+        participant_address: address,
+        signature: signature,
+      });
+
+      success({
+        label: "Signature Submitted",
+        description: `Status: ${response.status}. Signatures: ${response.signatures_submitted}/${response.threshold}. Ready: ${response.ready_to_execute}`,
+      });
+
+      // Refresh list
+      fetchChangeSignersRequests(changeSignersRequestsOffset);
+    } catch (err: any) {
+      if (
+        err.name === "UserRejectedRequestError" ||
+        err.message?.includes("rejected")
+      ) {
+        errorToast({ label: "Signature rejected by user" });
+      } else {
+        errorToast({ label: err.message || "Failed to submit signature" });
+      }
+    } finally {
+      setSignRequestLoading(false);
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   };
@@ -341,6 +520,39 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
 
             {/* Tabs */}
             <div className="flex border-b border-[#2B4761]">
+              <button
+                className={cn(
+                  "px-6 py-3 text-sm font-medium transition-colors",
+                  activeTab === "current-signers"
+                    ? "border-b-2 border-[#3CA3FC] text-white"
+                    : "text-[#8B9DB6] hover:text-white"
+                )}
+                onClick={() => setActiveTab("current-signers")}
+              >
+                Current Signers
+              </button>
+              <button
+                className={cn(
+                  "px-6 py-3 text-sm font-medium transition-colors",
+                  activeTab === "change-signers"
+                    ? "border-b-2 border-[#3CA3FC] text-white"
+                    : "text-[#8B9DB6] hover:text-white"
+                )}
+                onClick={() => setActiveTab("change-signers")}
+              >
+                Change Signers
+              </button>
+              <button
+                className={cn(
+                  "px-6 py-3 text-sm font-medium transition-colors",
+                  activeTab === "requests"
+                    ? "border-b-2 border-[#3CA3FC] text-white"
+                    : "text-[#8B9DB6] hover:text-white"
+                )}
+                onClick={() => setActiveTab("requests")}
+              >
+                Requests
+              </button>
               <button
                 className={cn(
                   "px-6 py-3 text-sm font-medium transition-colors",
@@ -792,6 +1004,347 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
                       )}
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {/* Current Signers Tab */}
+              {activeTab === "current-signers" && (
+                <div className="flex flex-col gap-4">
+                  <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
+                    <div className="flex justify-between items-center mb-2">
+                      <Text size="lg" weight="semibold">
+                        Current Signers
+                      </Text>
+                      <button
+                        onClick={fetchCurrentSigners}
+                        disabled={currentSignersLoading}
+                        className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={cn(
+                            "text-[#8B9DB6]",
+                            currentSignersLoading && "animate-spin"
+                          )}
+                        />
+                      </button>
+                    </div>
+                    <Text variant="light-grey" size="sm">
+                      View the current authorized signers for this app.
+                    </Text>
+                  </div>
+
+                  {currentSignersLoading ? (
+                    <div className="flex flex-1 justify-center items-center min-h-[200px]">
+                      <LoaderCircle
+                        className="animate-spin text-[#3CA3FC]"
+                        size={32}
+                      />
+                    </div>
+                  ) : currentSignersError ? (
+                    <div className="flex flex-col items-center justify-center min-h-[200px] gap-3">
+                      <div className="w-16 h-16 rounded-full bg-[#CF6679]/20 flex items-center justify-center">
+                        <X size={24} className="text-[#CF6679]" />
+                      </div>
+                      <Text variant="light-grey" size="lg">
+                        Failed to load signers
+                      </Text>
+                      <Text
+                        variant="light-grey"
+                        size="sm"
+                        className="text-center"
+                      >
+                        {currentSignersError}
+                      </Text>
+                    </div>
+                  ) : currentSigners && currentSigners.participants.length > 0 ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
+                        <div className="flex items-center justify-between mb-4">
+                          <Text size="sm" variant="light-grey">
+                            Threshold
+                          </Text>
+                          <Text size="sm" weight="semibold">
+                            {currentSigners.threshold} / {currentSigners.participants.length}
+                          </Text>
+                        </div>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="mb-2"
+                        >
+                          Participants ({currentSigners.participants.length})
+                        </Text>
+                        <div className="flex flex-col gap-2">
+                          {currentSigners.participants.map((participant, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 rounded bg-black/20 flex items-center justify-between"
+                            >
+                              <Text
+                                size="xs"
+                                className="font-mono text-[#3CA3FC]"
+                              >
+                                {participant.slice(0, 6)}...{participant.slice(-4)}
+                              </Text>
+                              <Text
+                                size="xs"
+                                variant="light-grey"
+                                className="font-mono"
+                              >
+                                {idx + 1}
+                              </Text>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+                      <div className="w-16 h-16 rounded-full bg-[#2B4761]/40 flex items-center justify-center">
+                        <Key size={24} className="text-[#8B9DB6]" />
+                      </div>
+                      <Text variant="light-grey" size="lg">
+                        No signers configured
+                      </Text>
+                      <Text
+                        variant="light-grey"
+                        size="sm"
+                        className="text-center"
+                      >
+                        This app has no authorized signers yet
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Change Signers Tab */}
+              {activeTab === "change-signers" && (
+                <div className="flex flex-col gap-4">
+                  <div className="p-4 rounded-lg border border-[#2B4761] bg-[#2B4761]/24">
+                    <Text size="lg" weight="semibold" className="mb-2">
+                      Change Signers
+                    </Text>
+                    <Text variant="light-grey" size="sm" className="mb-6">
+                      Create a request to change the authorized signers for this app.
+                    </Text>
+
+                    <PrimaryInput
+                      label="New Participants (Comma separated addresses)"
+                      placeholder="e.g. 0x123..., 0x456..."
+                      value={participants}
+                      onChange={setParticipants}
+                    />
+
+                    <PrimaryInput
+                      label="New Threshold"
+                      placeholder="e.g. 2"
+                      value={threshold}
+                      onChange={setThreshold}
+                    />
+
+                    <Button
+                      className="mt-6 w-full flex items-center justify-center"
+                      onClick={handleChangeSigners}
+                      disabled={changeSignersLoading || !participants || !threshold}
+                      variant={!participants || !threshold ? "disabled" : "primary"}
+                    >
+                      {changeSignersLoading ? (
+                        <LoaderCircle className="animate-spin" size={20} />
+                      ) : (
+                        "Create Request"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Requests Tab */}
+              {activeTab === "requests" && (
+                <div className="flex flex-col gap-4 h-full">
+                  <div className="flex justify-between items-center">
+                    <Text weight="semibold">
+                      Change Signers Requests ({changeSignersRequestsTotal})
+                    </Text>
+                    <button
+                      onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset)}
+                      disabled={changeSignersRequestsLoading}
+                      className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        size={16}
+                        className={cn(
+                          "text-[#8B9DB6]",
+                          changeSignersRequestsLoading && "animate-spin"
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  {changeSignersRequestsLoading && changeSignersRequests.length === 0 ? (
+                    <div className="flex flex-1 justify-center items-center">
+                      <LoaderCircle
+                        className="animate-spin text-[#3CA3FC]"
+                        size={32}
+                      />
+                    </div>
+                  ) : changeSignersRequests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
+                      <div className="w-16 h-16 rounded-full bg-[#2B4761]/40 flex items-center justify-center">
+                        <Key size={24} className="text-[#8B9DB6]" />
+                      </div>
+                      <Text variant="light-grey" size="lg">
+                        No change signers requests found
+                      </Text>
+                      <Text
+                        variant="light-grey"
+                        size="sm"
+                        className="text-center"
+                      >
+                        Create a new request to get started
+                      </Text>
+                      <Button
+                        variant="secondary"
+                        className="mt-2 flex items-center justify-center"
+                        onClick={() => setActiveTab("change-signers")}
+                      >
+                        <Plus size={16} className="mr-2" />
+                        Create Request
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Table Header */}
+                      <div className="flex items-center px-3 py-2 border-b border-[#2B4761]">
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="w-[140px]"
+                        >
+                          Request ID
+                        </Text>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="w-[100px]"
+                        >
+                          Status
+                        </Text>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="w-[90px] text-center"
+                        >
+                          Threshold
+                        </Text>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="w-[90px] text-center"
+                        >
+                          Participants
+                        </Text>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="flex-1"
+                        >
+                          Created
+                        </Text>
+                        <Text
+                          size="xs"
+                          variant="light-grey"
+                          className="w-[80px]"
+                        >
+                          Action
+                        </Text>
+                      </div>
+
+                      {/* Table Body */}
+                      <div className="flex flex-col">
+                        {changeSignersRequests.map((request) => (
+                          <div
+                            key={request.id}
+                            className="flex items-center px-3 py-3 border-b border-[#2B4761]/50"
+                          >
+                            <Text
+                              size="sm"
+                              className="w-[140px] font-mono"
+                            >
+                              {request.id.slice(0, 8)}...
+                              {request.id.slice(-4)}
+                            </Text>
+                            <div className="w-[100px]">
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <Text
+                              size="sm"
+                              className="w-[90px] text-center"
+                            >
+                              {request.new_threshold}
+                            </Text>
+                            <Text
+                              size="sm"
+                              className="w-[90px] text-center"
+                            >
+                              {request.new_participants.length}
+                            </Text>
+                            <Text
+                              size="xs"
+                              variant="light-grey"
+                              className="flex-1"
+                            >
+                              {formatDate(request.created_at)}
+                            </Text>
+                            <div className="w-[80px]">
+                              {request.status.toLowerCase() === "pending" && (
+                                <Button
+                                  variant="secondary"
+                                  className="text-xs py-1 px-2"
+                                  onClick={() => handleSignRequest(request)}
+                                  disabled={signRequestLoading}
+                                >
+                                  {signRequestLoading ? (
+                                    <LoaderCircle className="animate-spin" size={14} />
+                                  ) : (
+                                    "Sign"
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pagination */}
+                      {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE) > 1 && (
+                        <div className="flex items-center justify-center gap-3 mt-4">
+                          <button
+                            onClick={() =>
+                              fetchChangeSignersRequests(Math.max(0, changeSignersRequestsOffset - PAGE_SIZE))
+                            }
+                            disabled={changeSignersRequestsOffset === 0 || changeSignersRequestsLoading}
+                            className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <Text size="sm" variant="light-grey">
+                            {Math.floor(changeSignersRequestsOffset / PAGE_SIZE) + 1} / {Math.ceil(changeSignersRequestsTotal / PAGE_SIZE)}
+                          </Text>
+                          <button
+                            onClick={() => fetchChangeSignersRequests(changeSignersRequestsOffset + PAGE_SIZE)}
+                            disabled={
+                              changeSignersRequestsOffset + PAGE_SIZE >= changeSignersRequestsTotal || changeSignersRequestsLoading
+                            }
+                            className="p-2 rounded-lg hover:bg-[#2B4761]/40 transition-colors disabled:opacity-30"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 

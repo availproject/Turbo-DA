@@ -94,3 +94,8 @@ export interface SubmitChangeSignersSignatureResponse {
   ready_to_execute: boolean;
   tee_attestation?: any;
 }
+
+export interface CurrentSignersResponse {
+  participants: string[];
+  threshold: number;
+}

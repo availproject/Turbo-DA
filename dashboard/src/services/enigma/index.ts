@@ -2,6 +2,7 @@ import {
   ChangeSignersRequest,
   CreateChangeSignersResponse,
   CreateDecryptRequestResponse,
+  CurrentSignersResponse,
   GetDecryptRequestResponse,
   ListChangeSignersResponse,
   ListDecryptRequestsResponse,
@@ -229,12 +230,19 @@ class EnigmaService {
     limit,
     offset,
   }: {
-    token: string;
+    token?: string;
     turbo_da_app_id: string;
     status?: string;
     limit?: number;
     offset?: number;
   }): Promise<ListChangeSignersResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const params = new URLSearchParams({ turbo_da_app_id });
     if (status !== undefined) params.append("status", status);
     if (limit !== undefined) params.append("limit", limit.toString());
@@ -244,10 +252,7 @@ class EnigmaService {
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/change_signers/list?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       }
     );
 
@@ -263,17 +268,21 @@ class EnigmaService {
     token,
     request_id,
   }: {
-    token: string;
+    token?: string;
     request_id: string;
   }): Promise<ChangeSignersRequest> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/change_signers/${request_id}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       }
     );
 
@@ -291,24 +300,58 @@ class EnigmaService {
     participant_address,
     signature,
   }: {
-    token: string;
+    token?: string;
     request_id: string;
     participant_address: string;
     signature: string;
   }): Promise<SubmitChangeSignersSignatureResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/change_signers/${request_id}/sign`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           request_id,
           participant_address,
           signature,
         }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  static async getCurrentSigners({
+    token,
+    app_id,
+  }: {
+    token?: string;
+    app_id: string;
+  }): Promise<CurrentSignersResponse> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/user/enigma/current_signers/${app_id}`,
+      {
+        method: "GET",
+        headers,
       }
     );
 

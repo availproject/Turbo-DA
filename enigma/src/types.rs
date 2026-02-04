@@ -166,12 +166,13 @@ pub struct ListChangeSignersQuery {
 pub struct ChangeSignersRequestRecord {
     pub id: String,
     pub turbo_da_app_id: String,
-    pub new_participants: Vec<String>,
-    pub new_threshold: i32,
+    pub new_participants: String,
+    pub new_threshold: i64,
+    pub submitted_signatures: String,
     pub status: String,
     pub created_at: i64,
-    pub updated_at: i64,
     pub completed_at: Option<i64>,
+    pub threshold: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -95,6 +95,16 @@ pub async fn get_apps_by_participant(
         .await
 }
 
+pub async fn get_participants_by_app_id(
+    conn: &mut AsyncPgConnection,
+    target_app_id: &Uuid,
+) -> Result<Vec<MpcParticipant>, diesel::result::Error> {
+    mpc_participants
+        .filter(app_id.eq(target_app_id))
+        .load::<MpcParticipant>(conn)
+        .await
+}
+
 /// Replace all MPC participants for an app with a new list
 ///
 /// This function atomically replaces all existing participants for an app
