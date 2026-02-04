@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
@@ -473,7 +473,10 @@ pub async fn create_change_signers(
     enigma: web::Data<EnigmaEncryptionService>,
 ) -> HttpResponse {
     tracing::info!("creating change signers request");
-    match enigma.create_change_signers_request(request.into_inner()).await {
+    match enigma
+        .create_change_signers_request(request.into_inner())
+        .await
+    {
         Ok(response) => HttpResponse::Created().json(response),
         Err(e) => {
             tracing::error!(error = %e, "failed to create change signers request");
@@ -513,7 +516,7 @@ pub async fn get_change_signers(
                 EnigmaError::Api { status, .. } if *status == 404 => {
                     HttpResponse::NotFound().json(json!({"error": "Request not found"}))
                 }
-                _ => HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+                _ => HttpResponse::InternalServerError().json(json!({"error": e.to_string()})),
             }
         }
     }
@@ -525,19 +528,70 @@ pub async fn submit_change_signers_signature(
     request_id: web::Path<String>,
     body: web::Json<serde_json::Value>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
-    let participant_address = body.get("participant_address").and_then(|v| v.as_str()).unwrap_or("");
+    let participant_address = body
+        .get("participant_address")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let signature = body.get("signature").and_then(|v| v.as_str()).unwrap_or("");
 
+    let request_id_str = request_id.into_inner();
     let payload = SubmitChangeSignersSignatureRequest {
-        request_id: request_id.into_inner(),
+        request_id: request_id_str.clone(),
         participant_address: participant_address.to_string(),
         signature: signature.to_string(),
     };
 
     tracing::info!("submitting change signers signature");
     match enigma.submit_change_signers_signature(payload).await {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => {
+            if response.status == "completed" {
+                let request_details = match enigma.get_change_signers_request(&request_id_str).await
+                {
+                    Ok(details) => details,
+                    Err(e) => {
+                        tracing::error!(error = %e, "failed to fetch change signers request details");
+                        return HttpResponse::InternalServerError()
+                            .json(json!({"error": format!("Failed to fetch request details: {}", e)}));
+                    }
+                };
+
+                let app_uuid = match Uuid::parse_str(&request_details.turbo_da_app_id) {
+                    Ok(uuid) => uuid,
+                    Err(e) => {
+                        tracing::error!(error = %e, "invalid turbo_da_app_id format");
+                        return HttpResponse::InternalServerError()
+                            .json(json!({"error": format!("Invalid app_id format: {}", e)}));
+                    }
+                };
+
+                let mut connection = match get_connection(&pool).await {
+                    Ok(conn) => conn,
+                    Err(e) => return e,
+                };
+
+                match db::controllers::mpc_participants::change_signers(
+                    &mut connection,
+                    &app_uuid,
+                    request_details.new_participants,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        tracing::info!("successfully updated MPC signers");
+                        HttpResponse::Ok().json(response)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "failed to update MPC signers");
+                        HttpResponse::InternalServerError()
+                            .json(json!({"error": format!("Failed to update signers: {}", e)}))
+                    }
+                }
+            } else {
+                HttpResponse::Ok().json(response)
+            }
+        }
         Err(e) => {
             tracing::error!(error = %e, "failed to submit change signers signature");
             HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
