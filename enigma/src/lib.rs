@@ -33,10 +33,13 @@ impl From<reqwest::Error> for EnigmaError {
 }
 
 use types::{
-    AddParticipantRequest, AddParticipantResponse, DecryptRequest, DecryptRequestData,
-    DecryptRequestResponse, DeleteParticipantRequest, DeleteParticipantResponse, EncryptRequest,
-    EncryptResponse, ListDecryptRequestsQuery, ListDecryptRequestsResponse, RegisterRequest,
-    RegisterResponse, SubmitSignatureRequest, SubmitSignatureResponse,
+    ChangeSignersRequestRecord, CreateChangeSignersRequest, CreateChangeSignersResponse,
+    DecryptRequest, DecryptRequestData,
+    DecryptRequestResponse, EncryptRequest,
+    EncryptResponse, ListChangeSignersQuery, ListChangeSignersResponse, ListDecryptRequestsQuery,
+    ListDecryptRequestsResponse, RegisterRequest,
+    RegisterResponse, SubmitChangeSignersSignatureRequest, SubmitChangeSignersSignatureResponse,
+    SubmitSignatureRequest, SubmitSignatureResponse,
 };
 
 use crate::types::{DecryptionRequestRecord, SubmitSignatureRequestEnigma};
@@ -160,25 +163,25 @@ impl EnigmaEncryptionService {
         Ok(parsed)
     }
 
-    /// Adds participants to an existing app
+    /// Creates a change signers request
     ///
     /// # Arguments
-    /// * `payload` - AddParticipantRequest struct containing turbo_da_app_id and participants
+    /// * `payload` - CreateChangeSignersRequest struct containing turbo_da_app_id, new_participants, and new_threshold
     ///
     /// # Returns
-    /// * `AddParticipantResponse` - Response containing turbo_da_app_id and participants_added count
-    pub async fn add_participant(
+    /// * `CreateChangeSignersResponse` - Response containing the created request details
+    pub async fn create_change_signers_request(
         &self,
-        payload: AddParticipantRequest,
-    ) -> Result<AddParticipantResponse, EnigmaError> {
-        let url = format!("{}/v1/add_participant", self.service_url.clone());
+        payload: CreateChangeSignersRequest,
+    ) -> Result<CreateChangeSignersResponse, EnigmaError> {
+        let url = format!("{}/v1/change_signers/create", self.service_url);
 
         let response = self.client.post(&url).json(&payload).send().await?;
 
         let status = response.status();
         let body = response.text().await?;
 
-        tracing::info!(%status, %body, "enigma add_participant response");
+        tracing::info!(%status, %body, "enigma create_change_signers_request response");
 
         if !status.is_success() {
             tracing::error!(%status, %body, "enigma returned error");
@@ -188,7 +191,7 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: AddParticipantResponse = serde_json::from_str(&body).map_err(|e| {
+        let parsed: CreateChangeSignersResponse = serde_json::from_str(&body).map_err(|e| {
             EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
@@ -198,25 +201,36 @@ impl EnigmaEncryptionService {
         Ok(parsed)
     }
 
-    /// Deletes participants from an existing app
+    /// Lists change signers requests
     ///
     /// # Arguments
-    /// * `payload` - DeleteParticipantRequest struct containing turbo_da_app_id and participants
+    /// * `query` - ListChangeSignersQuery struct containing turbo_da_app_id and optional filters
     ///
     /// # Returns
-    /// * `DeleteParticipantResponse` - Response containing turbo_da_app_id and participants_deleted count
-    pub async fn delete_participant(
+    /// * `ListChangeSignersResponse` - Paginated list of change signers requests
+    pub async fn list_change_signers(
         &self,
-        payload: DeleteParticipantRequest,
-    ) -> Result<DeleteParticipantResponse, EnigmaError> {
-        let url = format!("{}/v1/delete_participant", self.service_url.clone());
+        query: ListChangeSignersQuery,
+    ) -> Result<ListChangeSignersResponse, EnigmaError> {
+        let url = format!("{}/v1/change_signers/list", self.service_url);
 
-        let response = self.client.delete(&url).json(&payload).send().await?;
+        let mut params = vec![("turbo_da_app_id", query.turbo_da_app_id)];
+        if let Some(status) = query.status {
+            params.push(("status", status));
+        }
+        if let Some(offset) = query.offset {
+            params.push(("offset", offset.to_string()));
+        }
+        if let Some(limit) = query.limit {
+            params.push(("limit", limit.to_string()));
+        }
+
+        let response = self.client.get(&url).query(&params).send().await?;
 
         let status = response.status();
         let body = response.text().await?;
 
-        tracing::info!(%status, %body, "enigma delete_participant response");
+        tracing::info!(%status, %body, "enigma list_change_signers response");
 
         if !status.is_success() {
             tracing::error!(%status, %body, "enigma returned error");
@@ -226,7 +240,94 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: DeleteParticipantResponse = serde_json::from_str(&body).map_err(|e| {
+        let parsed: ListChangeSignersResponse = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
+    }
+
+    /// Gets a single change signers request
+    ///
+    /// # Arguments
+    /// * `request_id` - The unique identifier of the change signers request
+    ///
+    /// # Returns
+    /// * `ChangeSignersRequestRecord` - The change signers request details
+    pub async fn get_change_signers_request(
+        &self,
+        request_id: &str,
+    ) -> Result<ChangeSignersRequestRecord, EnigmaError> {
+        let url = format!("{}/v1/change_signers/{}", self.service_url, request_id);
+
+        let response = self.client.get(&url).send().await?;
+
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma get_change_signers_request response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: ChangeSignersRequestRecord = serde_json::from_str(&body).map_err(|e| {
+            EnigmaError::Parse {
+                body: body.clone(),
+                error: e.to_string(),
+            }
+        })?;
+
+        Ok(parsed)
+    }
+
+    /// Submits a signature for a change signers request
+    ///
+    /// # Arguments
+    /// * `payload` - SubmitChangeSignersSignatureRequest struct containing request_id, participant_address, and signature
+    ///
+    /// # Returns
+    /// * `SubmitChangeSignersSignatureResponse` - Response indicating if threshold is met and execution status
+    pub async fn submit_change_signers_signature(
+        &self,
+        payload: SubmitChangeSignersSignatureRequest,
+    ) -> Result<SubmitChangeSignersSignatureResponse, EnigmaError> {
+        let url = format!(
+            "{}/v1/change_signers/{}/sign",
+            self.service_url, payload.request_id
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&json!({
+                "participant_address": payload.participant_address,
+                "signature": payload.signature
+            }))
+            .send()
+            .await?;
+
+        let status = response.status();
+        let body = response.text().await?;
+
+        tracing::info!(%status, %body, "enigma submit_change_signers_signature response");
+
+        if !status.is_success() {
+            tracing::error!(%status, %body, "enigma returned error");
+            return Err(EnigmaError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let parsed: SubmitChangeSignersSignatureResponse = serde_json::from_str(&body).map_err(|e| {
             EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
