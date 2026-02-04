@@ -1,7 +1,7 @@
 "use client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import ManageParticipants from "./components/manage-participants";
+import ChangeSignersManager from "./components/manage-participants";
 import DecryptRequest from "./components/decrypt-request";
 import ListDecryptRequests from "./components/list-decrypt-requests";
 
@@ -12,10 +12,10 @@ const EnigmaWrapper = () => {
         <Card className="shadow-primary border-none bg-linear-[90deg] from-bg-primary from-[0%] to-bg-secondary rounded-2xl to-[100%] pt-0 gap-0 pb-0 block relative overflow-hidden">
           <div className="bg-[url('/apps-background-noise.png')] bg-repeat absolute inset-0 opacity-80 pointer-events-none" />
           <CardContent className="p-6 relative z-10">
-            <Tabs defaultValue="participants" className="w-full gap-y-6">
+            <Tabs defaultValue="change-signers" className="w-full gap-y-6">
               <TabsList className="bg-transparent p-0 h-auto border-b border-border-blue w-full justify-start rounded-none">
-                <TabsTrigger value="participants" variant="primary">
-                  Manage Participants
+                <TabsTrigger value="change-signers" variant="primary">
+                  Change Signers
                 </TabsTrigger>
                 <TabsTrigger value="decrypt" variant="primary">
                   Decrypt Requests
@@ -25,8 +25,8 @@ const EnigmaWrapper = () => {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="participants" className="mt-6">
-                <ManageParticipants />
+              <TabsContent value="change-signers" className="mt-6">
+                <ChangeSignersManager />
               </TabsContent>
               <TabsContent value="decrypt" className="mt-6">
                 <DecryptRequest />

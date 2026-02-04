@@ -3,7 +3,9 @@ use crate::{
     schema::mpc_participants::dsl::*,
 };
 use diesel::prelude::*;
-use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use diesel_async::{
+    scoped_futures::ScopedFutureExt, AsyncConnection, AsyncPgConnection, RunQueryDsl,
+};
 use uuid::Uuid;
 
 pub async fn add_participant(
@@ -91,4 +93,59 @@ pub async fn get_apps_by_participant(
         .select(crate::models::apps::Apps::as_select())
         .load::<crate::models::apps::Apps>(conn)
         .await
+}
+
+pub async fn get_participants_by_app_id(
+    conn: &mut AsyncPgConnection,
+    target_app_id: &Uuid,
+) -> Result<Vec<MpcParticipant>, diesel::result::Error> {
+    mpc_participants
+        .filter(app_id.eq(target_app_id))
+        .load::<MpcParticipant>(conn)
+        .await
+}
+
+/// Replace all MPC participants for an app with a new list
+///
+/// This function atomically replaces all existing participants for an app
+/// with the provided new list of participant addresses.
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `target_app_id` - The app UUID to update participants for
+/// * `new_participants_list` - The new list of participant addresses
+///
+/// # Returns
+/// * `Ok(Vec<MpcParticipant>)` - The newly created participants
+/// * `Err` - Database error if operation fails
+pub async fn change_signers(
+    conn: &mut AsyncPgConnection,
+    target_app_id: &Uuid,
+    new_participants_list: Vec<String>,
+) -> Result<Vec<MpcParticipant>, diesel::result::Error> {
+    let target_app_id = *target_app_id;
+
+    conn.transaction(|conn| {
+        async move {
+            diesel::delete(mpc_participants.filter(app_id.eq(&target_app_id)))
+                .execute(conn)
+                .await?;
+
+            let new_participants: Vec<MpcParticipantCreate> = new_participants_list
+                .into_iter()
+                .map(|addr| MpcParticipantCreate {
+                    id: Uuid::new_v4(),
+                    app_id: target_app_id,
+                    participant_address: addr,
+                })
+                .collect();
+
+            diesel::insert_into(mpc_participants)
+                .values(&new_participants)
+                .get_results(conn)
+                .await
+        }
+        .scope_boxed()
+    })
+    .await
 }

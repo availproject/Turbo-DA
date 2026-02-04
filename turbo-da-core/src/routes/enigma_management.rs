@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use enigma::{
     types::{
-        AddParticipantRequest, DecryptRequest, DeleteParticipantRequest, ListDecryptRequestsQuery,
-        RegisterRequest, SubmitSignatureRequest,
+        CreateChangeSignersRequest, DecryptRequest, ListChangeSignersQuery,
+        ListDecryptRequestsQuery, RegisterRequest, SubmitChangeSignersSignatureRequest,
+        SubmitSignatureRequest,
     },
     EnigmaEncryptionService, EnigmaError,
 };
@@ -103,199 +104,6 @@ pub async fn register(
             tracing::error!(error = %e, "failed to register app");
             HttpResponse::InternalServerError().json(json!({
                 "error": format!("Failed to register app: {}", e)
-            }))
-        }
-    }
-}
-
-/// Add participants to an existing application
-///
-/// # Description
-/// Adds new participants to an existing turbo_da_app_id that can participate
-/// in threshold decryption.
-///
-/// # Route
-/// `POST /v1/enigma/add_participant`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - Bearer token for authentication
-/// * `Content-Type: application/json`
-///
-/// # Request Body
-/// ```json
-/// {
-///   "turbo_da_app_id": "app-uuid",
-///   "participants": ["0xAddress4", "0xAddress5"]
-/// }
-/// ```
-#[tracing::instrument(
-    skip(enigma, pool),
-    fields(
-        turbo_da_app_id = %request.turbo_da_app_id,
-        participant_count = request.participants.len(),
-        endpoint = "enigma_add_participant"
-    )
-)]
-#[post("/add_participant")]
-pub async fn add_participant(
-    request: web::Json<AddParticipantRequest>,
-    enigma: web::Data<EnigmaEncryptionService>,
-    pool: web::Data<Pool<AsyncPgConnection>>,
-) -> HttpResponse {
-    tracing::info!(
-        turbo_da_app_id = %request.turbo_da_app_id,
-        participant_count = request.participants.len(),
-        "adding participants to app"
-    );
-
-    let mut connection = match get_connection(&pool).await {
-        Ok(conn) => conn,
-        Err(e) => return e,
-    };
-
-    let app_id = match Uuid::parse_str(&request.turbo_da_app_id) {
-        Ok(id) => id,
-        Err(e) => {
-            return HttpResponse::BadRequest().json(json!({
-                "error": format!("Invalid app UUID: {}", e)
-            }));
-        }
-    };
-
-    if !request.participants.is_empty() {
-        if let Err(e) = db::controllers::mpc_participants::add_participants(
-            &mut connection,
-            &app_id,
-            request.participants.clone(),
-        )
-        .await
-        {
-            tracing::error!(error = %e, "failed to add participants to db");
-            return HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to add participants to database: {}", e)
-            }));
-        }
-    }
-
-    match enigma.add_participant(request.clone()).await {
-        Ok(response) => {
-            tracing::info!(
-                turbo_da_app_id = %response.turbo_da_app_id,
-                participants_added = response.participants_added,
-                "successfully added participants"
-            );
-            HttpResponse::Ok().json(response)
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "failed to add participants to enigma, rolling back db");
-            if !request.participants.is_empty() {
-                if let Err(rollback_err) = db::controllers::mpc_participants::delete_participants(
-                    &mut connection,
-                    &app_id,
-                    request.participants.clone(),
-                )
-                .await
-                {
-                    tracing::error!(error = %rollback_err, "failed to rollback participants from db");
-                }
-            }
-
-            HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to add participants to Enigma: {}", e)
-            }))
-        }
-    }
-}
-
-/// Remove participants from an existing application
-///
-/// # Description
-/// Removes participants from an existing turbo_da_app_id.
-///
-/// # Route
-/// `DELETE /v1/enigma/delete_participant`
-///
-/// # Headers
-/// * `Authorization: Bearer <token>` - Bearer token for authentication
-/// * `Content-Type: application/json`
-///
-/// # Request Body
-/// ```json
-/// {
-///   "turbo_da_app_id": "app-uuid",
-///   "participants": ["0xAddress1", "0xAddress2"]
-/// }
-/// ```
-#[tracing::instrument(
-    skip(enigma, pool),
-    fields(
-        turbo_da_app_id = %request.turbo_da_app_id,
-        participant_count = request.participants.len(),
-        endpoint = "enigma_delete_participant"
-    )
-)]
-#[delete("/delete_participant")]
-pub async fn delete_participant(
-    request: web::Json<DeleteParticipantRequest>,
-    enigma: web::Data<EnigmaEncryptionService>,
-    pool: web::Data<Pool<AsyncPgConnection>>,
-) -> HttpResponse {
-    tracing::info!(
-        turbo_da_app_id = %request.turbo_da_app_id,
-        participant_count = request.participants.len(),
-        "deleting participants from app"
-    );
-
-    let mut connection = match get_connection(&pool).await {
-        Ok(conn) => conn,
-        Err(e) => return e,
-    };
-
-    let app_id = match Uuid::parse_str(&request.turbo_da_app_id) {
-        Ok(id) => id,
-        Err(e) => {
-            tracing::error!(error = %e, "failed to parse app_id");
-            return HttpResponse::BadRequest().json(json!({
-                "error": format!("Invalid app_id: {}", e)
-            }));
-        }
-    };
-
-    if let Err(e) = db::controllers::mpc_participants::delete_participants(
-        &mut connection,
-        &app_id,
-        request.participants.clone(),
-    )
-    .await
-    {
-        tracing::error!(error = %e, "failed to delete participants from db");
-        return HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to delete participants from db: {}", e)
-        }));
-    }
-
-    match enigma.delete_participant(request.clone()).await {
-        Ok(response) => {
-            tracing::info!(
-                turbo_da_app_id = %response.turbo_da_app_id,
-                participants_deleted = response.participants_deleted,
-                "successfully deleted participants"
-            );
-            HttpResponse::Ok().json(response)
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "failed to delete participants from enigma");
-            if let Err(rollback_err) = db::controllers::mpc_participants::add_participants(
-                &mut connection,
-                &app_id,
-                request.participants.clone(),
-            )
-            .await
-            {
-                tracing::error!(error = %rollback_err, "failed to rollback participants in db");
-            }
-            HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to delete participants from enigma: {}", e)
             }))
         }
     }
@@ -658,6 +466,141 @@ pub async fn list_decrypt_requests(
     }
 }
 
+/// Create a new change signers request
+#[post("/change_signers/create")]
+pub async fn create_change_signers(
+    request: web::Json<CreateChangeSignersRequest>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!("creating change signers request");
+    match enigma
+        .create_change_signers_request(request.into_inner())
+        .await
+    {
+        Ok(response) => HttpResponse::Created().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to create change signers request");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+        }
+    }
+}
+
+/// List change signers requests
+#[get("/change_signers/list")]
+pub async fn list_change_signers(
+    query: web::Query<ListChangeSignersQuery>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!("listing change signers requests");
+    match enigma.list_change_signers(query.into_inner()).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to list change signers requests");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+        }
+    }
+}
+
+/// Get a single change signers request
+#[get("/change_signers/{request_id}")]
+pub async fn get_change_signers(
+    request_id: web::Path<String>,
+    enigma: web::Data<EnigmaEncryptionService>,
+) -> HttpResponse {
+    tracing::info!(request_id = %request_id, "getting change signers request");
+    match enigma.get_change_signers_request(&request_id).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to get change signers request");
+            match &e {
+                EnigmaError::Api { status, .. } if *status == 404 => {
+                    HttpResponse::NotFound().json(json!({"error": "Request not found"}))
+                }
+                _ => HttpResponse::InternalServerError().json(json!({"error": e.to_string()})),
+            }
+        }
+    }
+}
+
+/// Submit a signature for a change signers request
+#[post("/change_signers/{request_id}/sign")]
+pub async fn submit_change_signers_signature(
+    request_id: web::Path<String>,
+    body: web::Json<serde_json::Value>,
+    enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+) -> HttpResponse {
+    let participant_address = body
+        .get("participant_address")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let signature = body.get("signature").and_then(|v| v.as_str()).unwrap_or("");
+
+    let request_id_str = request_id.into_inner();
+    let payload = SubmitChangeSignersSignatureRequest {
+        request_id: request_id_str.clone(),
+        participant_address: participant_address.to_string(),
+        signature: signature.to_string(),
+    };
+
+    tracing::info!("submitting change signers signature");
+    match enigma.submit_change_signers_signature(payload).await {
+        Ok(response) => {
+            if response.status == "completed" {
+                let request_details = match enigma.get_change_signers_request(&request_id_str).await
+                {
+                    Ok(details) => details,
+                    Err(e) => {
+                        tracing::error!(error = %e, "failed to fetch change signers request details");
+                        return HttpResponse::InternalServerError().json(
+                            json!({"error": format!("Failed to fetch request details: {}", e)}),
+                        );
+                    }
+                };
+
+                let app_uuid = match Uuid::parse_str(&request_details.turbo_da_app_id) {
+                    Ok(uuid) => uuid,
+                    Err(e) => {
+                        tracing::error!(error = %e, "invalid turbo_da_app_id format");
+                        return HttpResponse::InternalServerError()
+                            .json(json!({"error": format!("Invalid app_id format: {}", e)}));
+                    }
+                };
+
+              
+                let mut connection = match get_connection(&pool).await {
+                    Ok(conn) => conn,
+                    Err(e) => return e,
+                };
+
+                match db::controllers::mpc_participants::change_signers(
+                    &mut connection,
+                    &app_uuid,
+                    request_details.new_participants,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        tracing::info!("successfully updated MPC signers");
+                        HttpResponse::Ok().json(response)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "failed to update MPC signers");
+                        HttpResponse::InternalServerError()
+                            .json(json!({"error": format!("Failed to update signers: {}", e)}))
+                    }
+                }
+            } else {
+                HttpResponse::Ok().json(response)
+            }
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to submit change signers signature");
+            HttpResponse::InternalServerError().json(json!({"error": e.to_string()}))
+        }
+    }
+}
+
 use hex;
 
 fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
@@ -716,6 +659,67 @@ pub async fn get_participant_apps(
             tracing::error!(error = %e, "failed to fetch participant apps");
             HttpResponse::InternalServerError().json(json!({
                 "error": format!("Failed to fetch participant apps: {}", e)
+            }))
+        }
+    }
+}
+
+/// Get current signers for an app
+///
+/// # Description
+/// Returns the list of current MPC participants for a given app ID.
+///
+/// # Route
+/// `GET /v1/enigma/current_signers/{turbo_da_app_id}`
+///
+/// # Path Parameters
+/// * `turbo_da_app_id` - The UUID of the application
+///
+/// # Returns
+/// JSON response with list of participants
+#[tracing::instrument(
+    skip(pool),
+    fields(
+        turbo_da_app_id = %turbo_da_app_id,
+        endpoint = "enigma_current_signers"
+    )
+)]
+#[get("/current_signers/{turbo_da_app_id}")]
+pub async fn current_signers(
+    turbo_da_app_id: web::Path<String>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+) -> HttpResponse {
+    tracing::info!(
+        turbo_da_app_id = %turbo_da_app_id,
+        "fetching current signers for app"
+    );
+
+    let app_uuid = match Uuid::parse_str(&turbo_da_app_id) {
+        Ok(uuid) => uuid,
+        Err(e) => {
+            tracing::error!(error = %e, "invalid turbo_da_app_id format");
+            return HttpResponse::BadRequest().json(json!({
+                "error": format!("Invalid app_id format: {}", e)
+            }));
+        }
+    };
+
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    match db::controllers::mpc_participants::get_participants_by_app_id(&mut connection, &app_uuid)
+        .await
+    {
+        Ok(participants) => {
+            tracing::info!(count = participants.len(), "successfully fetched participants");
+            HttpResponse::Ok().json(participants)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to fetch participants");
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to fetch participants: {}", e)
             }))
         }
     }
