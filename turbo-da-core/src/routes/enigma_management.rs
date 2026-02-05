@@ -4,6 +4,7 @@ use actix_web::{get, post, web, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
+use db::controllers::public_keys::public_key_exists;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use enigma::{
     types::{
