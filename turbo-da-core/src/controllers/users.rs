@@ -16,6 +16,7 @@ use bigdecimal::BigDecimal;
 use db::{
     controllers::{
         apps::{create_account, delete_account_by_id},
+        public_keys::public_key_exists,
         users::user_exists,
     },
     models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
@@ -1202,6 +1203,27 @@ async fn toggle_encryption(
             }))
         }
     };
+
+    if let Some(participants) = &payload.participants {
+        for participant in participants {
+            match public_key_exists(&mut connection, participant).await {
+                Ok(exists) => {
+                    if !exists {
+                        return HttpResponse::BadRequest().json(json!({
+                            "state": "ERROR",
+                            "error": format!("Participant {} not found in public keys", participant),
+                        }));
+                    }
+                }
+                Err(e) => {
+                    return HttpResponse::InternalServerError().json(json!({
+                        "state": "ERROR",
+                        "error": e.to_string(),
+                    }));
+                }
+            }
+        }
+    }
 
     let register_request = RegisterRequest {
         turbo_da_app_id: payload.app_id.to_string(),
