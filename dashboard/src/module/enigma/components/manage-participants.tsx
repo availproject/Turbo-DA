@@ -431,6 +431,7 @@ const ChangeSignersDetail = ({ request, onBack }: ChangeSignersDetailProps) => {
   };
 
   const handleSign = async () => {
+    console.log("handleSign called with request:", request);
     if (!token) return;
     if (!isConnected || !address) {
       openConnectModal(true);
@@ -441,13 +442,28 @@ const ChangeSignersDetail = ({ request, onBack }: ChangeSignersDetailProps) => {
       setSubmitLoading(true);
 
       // Hash the participants array
-      const participantsString = JSON.stringify(request.new_participants);
+      let participantsString: string;
+      const participantsData = request.new_participants as unknown;
+      if (typeof participantsData === 'string') {
+        participantsString = participantsData;
+      } else {
+        participantsString = JSON.stringify(request.new_participants);
+      }
+
       const hash = keccak256(toBytes(participantsString));
       // Remove 0x prefix to match Rust's hex::encode
       const hashWithout0x = hash.slice(2);
 
+      console.log("Individual signing values:", {
+        requestId: request.id,
+        appId: request.turbo_da_app_id,
+        participantsHash: hashWithout0x,
+        newThreshold: request.new_threshold
+      });
+
       // Message format: {request_id}:{turbo_da_app_id}:{keccak256_hash}:{new_threshold}
       const message = `${request.id}:${request.turbo_da_app_id}:${hashWithout0x}:${request.new_threshold}`;
+      console.log("Signing message:", message);
 
       const signature = await signMessageAsync({ message });
 
@@ -458,11 +474,14 @@ const ChangeSignersDetail = ({ request, onBack }: ChangeSignersDetailProps) => {
         signature: signature,
       });
 
+      console.log("Submit signature response:", response);
+
       success({
         label: "Signature Submitted",
         description: `Status: ${response.status}. Signatures: ${response.signatures_submitted}/${response.threshold}. Ready: ${response.ready_to_execute}`,
       });
     } catch (err: any) {
+      console.error("Error in handleSign:", err);
       // User rejected signature or other error
       if (err.name === "UserRejectedRequestError" || err.message?.includes("rejected")) {
         errorToast({ label: "Signature rejected by user" });
