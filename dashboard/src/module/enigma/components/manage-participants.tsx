@@ -443,9 +443,11 @@ const ChangeSignersDetail = ({ request, onBack }: ChangeSignersDetailProps) => {
       // Hash the participants array
       const participantsString = JSON.stringify(request.new_participants);
       const hash = keccak256(toBytes(participantsString));
+      // Remove 0x prefix to match Rust's hex::encode
+      const hashWithout0x = hash.slice(2);
 
       // Message format: {request_id}:{turbo_da_app_id}:{keccak256_hash}:{new_threshold}
-      const message = `${request.id}:${request.turbo_da_app_id}:${hash}:${request.new_threshold}`;
+      const message = `${request.id}:${request.turbo_da_app_id}:${hashWithout0x}:${request.new_threshold}`;
 
       const signature = await signMessageAsync({ message });
 

@@ -429,7 +429,7 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
       // Remove 0x prefix to match Rust's hex::encode
       const hashWithout0x = hash.slice(2);
 
-      const message = `${request.id}:${turboAppId}:${hashWithout0x}:${request.new_threshold}`;
+      const message = `${request.id}:${request.turbo_da_app_id}:${hashWithout0x}:${request.new_threshold}`;
       const signature = await signMessageAsync({ message });
 
       const response = await EnigmaService.submitChangeSignersSignature({
