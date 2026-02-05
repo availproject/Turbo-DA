@@ -4,6 +4,7 @@ use actix_web::{get, post, web, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
+use db::controllers::public_keys::public_key_exists;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use enigma::{
     types::{
@@ -471,8 +472,32 @@ pub async fn list_decrypt_requests(
 pub async fn create_change_signers(
     request: web::Json<CreateChangeSignersRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
     tracing::info!("creating change signers request");
+
+    let mut connection = match get_connection(&pool).await {
+        Ok(conn) => conn,
+        Err(e) => return e,
+    };
+
+    for participant in &request.new_participants {
+        match public_key_exists(&mut connection, participant).await {
+            Ok(exists) => {
+                if !exists {
+                    return HttpResponse::BadRequest().json(json!({
+                        "error": format!("Participant {} not found in public keys", participant),
+                    }));
+                }
+            }
+            Err(e) => {
+                return HttpResponse::InternalServerError().json(json!({
+                    "error": e.to_string(),
+                }));
+            }
+        }
+    }
+
     match enigma
         .create_change_signers_request(request.into_inner())
         .await
