@@ -64,7 +64,7 @@ export default function CreateApp({
             .then((response) => {
               return response?.file;
             })
-            .catch((error) => {
+            .catch(() => {
               setLoading(false);
               return undefined;
             })
@@ -87,7 +87,7 @@ export default function CreateApp({
               appId: +appId!,
               appName,
               avatar: uploadAvatar,
-              id: appData?.id!,
+              id: appData!.id,
               creditSelection: creditSelectionToSend,
             })
           : await AppService.createApp({
@@ -122,7 +122,7 @@ export default function CreateApp({
       });
       resetFields();
       setOpen("");
-    } catch (error) {
+    } catch {
     } finally {
       setLoading(false);
     }

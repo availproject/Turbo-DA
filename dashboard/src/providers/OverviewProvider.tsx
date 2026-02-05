@@ -58,8 +58,6 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const [mainTabSelected, setMainTabSelected] = useState<APP_TABS>(
     APP_TABS.OVERVIEW,
   );
-  const [tokenList, setTokenList] =
-    useState<Record<string, Record<string, any>>>();
   const [transactionProgress, setTransactionProgress] = useState<
     TransactionProgress[]
   >([]);
@@ -67,14 +65,15 @@ export const OverviewProvider: React.FC<OverviewProviderProps> = ({
   const { token } = useConfig();
 
   useEffect(() => {
-    token &&
+    if (token) {
       AppService.getTokens({ token })
         .then((response) => {
           console.log(response);
         })
-        .catch((error) => {
-          console.log(error);
+        .catch((err) => {
+          console.log(err);
         });
+    }
   }, [token]);
 
   const filterAppList = useMemo(

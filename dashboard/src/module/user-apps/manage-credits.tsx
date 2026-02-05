@@ -5,7 +5,6 @@ import { avatarList } from "@/lib/constant";
 import {
   baseImageUrl,
   cn,
-  formatDataBytes,
   formatInBytes,
   formatInKB,
 } from "@/lib/utils";
@@ -16,8 +15,7 @@ import { AppDetails } from "@/services/app/response";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, X } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState, useEffect } from "react";
-import PrimaryProgress from "@/components/progress/primary-progress";
+import { useMemo, useState } from "react";
 import { DialogTitle } from "../../components/dialog";
 import { useDialog } from "../../components/dialog/provider";
 import PrimaryInput from "../../components/input/primary";

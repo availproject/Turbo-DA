@@ -16,6 +16,7 @@ use bigdecimal::BigDecimal;
 use db::{
     controllers::{
         apps::{create_account, delete_account_by_id},
+        public_keys::public_key_exists,
         users::user_exists,
     },
     models::{api::ApiKeyCreate, apps::AppsCreate, user_model::UserCreate},
@@ -24,6 +25,7 @@ use db::{
 use avail_utils::utils::check_app_id_validity;
 /// Database and async connection handling
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use enigma::{types::RegisterRequest, EnigmaEncryptionService};
 /// Redis caching functionality
 use redis::Commands;
 /// Serialization/deserialization
@@ -1145,6 +1147,8 @@ async fn update_app_id(
 #[derive(Deserialize, Serialize, Validate)]
 pub struct ToggleEncryption {
     pub app_id: Uuid,
+    pub participants: Option<Vec<String>>,
+    pub threshold: Option<u16>,
 }
 
 /// Toggle the encryption for a user account
@@ -1182,6 +1186,7 @@ pub struct ToggleEncryption {
 async fn toggle_encryption(
     payload: web::Json<ToggleEncryption>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+    enigma_service: web::Data<EnigmaEncryptionService>,
     http_request: HttpRequest,
 ) -> HttpResponse {
     let mut connection = match get_connection(&injected_dependency).await {
@@ -1199,8 +1204,52 @@ async fn toggle_encryption(
         }
     };
 
+    if let Some(participants) = &payload.participants {
+        for participant in participants {
+            match public_key_exists(&mut connection, participant).await {
+                Ok(exists) => {
+                    if !exists {
+                        return HttpResponse::BadRequest().json(json!({
+                            "state": "ERROR",
+                            "error": format!("Participant {} not found in public keys", participant),
+                        }));
+                    }
+                }
+                Err(e) => {
+                    return HttpResponse::InternalServerError().json(json!({
+                        "state": "ERROR",
+                        "error": e.to_string(),
+                    }));
+                }
+            }
+        }
+    }
+
+    let register_request = RegisterRequest {
+        turbo_da_app_id: payload.app_id.to_string(),
+        participants: payload.participants.clone().unwrap_or_default(),
+        threshold: payload.threshold.map(|t| t as i32).unwrap_or(0),
+    };
+
+    if let Err(e) = enigma_service.register(register_request).await {
+        tracing::error!(error = %e, "failed to register app");
+    } else if let Some(participants) = &payload.participants {
+        if !participants.is_empty() {
+            if let Err(e) = db::controllers::mpc_participants::add_participants(
+                &mut connection,
+                &payload.app_id,
+                participants.clone(),
+            )
+            .await
+            {
+                tracing::error!(error = %e, "failed to add participants to db");
+            }
+        }
+    }
+
     let query =
         db::controllers::apps::toggle_encryption(&mut connection, &user, &payload.app_id).await;
+
     match query {
         Ok(_) => HttpResponse::Ok().json(json!({
             "state": "SUCCESS",

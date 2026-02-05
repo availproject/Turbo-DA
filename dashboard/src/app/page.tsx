@@ -3,11 +3,13 @@ import DashboardWrapper from "@/components/dashboard-wrapper";
 import TurboOnWallet from "@/components/lottie-comp/turbo-on-wallet";
 import { TabsContent } from "@/components/tabs";
 import { Text } from "@/components/text";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { HISTORY_TYPES } from "@/lib/types";
 import { APP_TABS } from "@/lib/utils";
 import HistoryWrapper from "@/module/transactions-history";
 import { useAuthState } from "@/providers/AuthProvider";
+import { Key, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
@@ -46,6 +48,26 @@ export default function Page() {
         >
           <div className="flex gap-4">
             <div className="flex flex-col w-full gap-4">
+              <Link href="/mpc" className="block">
+                <Card className="border-border-blue/30 bg-bg-secondary/50 shadow-primary hover:bg-bg-secondary/70 transition-all cursor-pointer group">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue/30 to-blue/10 flex items-center justify-center border border-blue/20 group-hover:scale-105 transition-transform flex-shrink-0">
+                        <Key size={24} className="text-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Text weight="semibold" size="lg" className="text-white mb-1">
+                          MPC Participant Portal
+                        </Text>
+                        <Text variant="light-grey" className="text-sm opacity-70">
+                          Sign decryption requests without login
+                        </Text>
+                      </div>
+                      <ArrowRight size={20} className="text-light-grey opacity-50 group-hover:text-blue group-hover:translate-x-1 transition-all flex-shrink-0" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
               <CreditBalance />
               <AppsCard />
               {isLoggedOut && (

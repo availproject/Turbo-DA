@@ -54,6 +54,7 @@ confy = {version = "0.3.1"}
 db = {path = "../db" }
 observability = { path = "../observability" }
 avail-utils = {path = "../avail"}
+enigma = { path = "../enigma" }
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
 tracing = {workspace=true}

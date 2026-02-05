@@ -1,6 +1,6 @@
 "use client";
 import { getTokenBalance } from "@/module/purchase-credit/utils";
-import { Chain, ClickHandler } from "@/module/purchase-credit/utils/types";
+import { Chain } from "@/module/purchase-credit/utils/types";
 import { getSupportedTokensAndChains, SupportedTokensAndChains } from "@/lib/types";
 import { useAvailAccount, useAvailWallet } from "avail-wallet-sdk";
 import { useAuth } from "./AuthProvider";

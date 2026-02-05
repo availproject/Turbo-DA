@@ -33,6 +33,7 @@ use controllers::{
         fund_user, get_fund_list, purchase_cost, register_credit_request,
     },
     misc::indexer_status,
+    public_keys::{add_public_key, delete_public_key, get_public_keys},
     users::{
         allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
         generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
@@ -48,7 +49,13 @@ use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,
 };
+use enigma::EnigmaEncryptionService;
 use observability::init_tracer;
+use routes::enigma_management::{
+    create_change_signers, create_decrypt_request, current_signers, get_change_signers,
+    get_decrypt_request, get_participant_apps, list_change_signers, list_decrypt_requests,
+    submit_change_signers_signature, submit_signature,
+};
 use routes::health::health_check;
 
 #[actix_web::main]
@@ -68,6 +75,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     let shared_pool = web::Data::new(pool);
 
+    let enigma_service =
+        web::Data::new(EnigmaEncryptionService::new(app_config.enigma_url.clone()));
     let shared_config = web::Data::new(app_config);
 
     HttpServer::new(move || {
@@ -110,6 +119,7 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(Cors::permissive())
             .app_data(shared_config.clone())
             .app_data(shared_pool.clone())
+            .app_data(enigma_service.clone())
             .wrap(Logger::default())
             .service(
                 web::scope("/v1")
@@ -167,7 +177,23 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(add_inclusion_details)
                             .service(get_wallet_usage)
                             .service(generate_access_token)
-                            .service(toggle_encryption),
+                            .service(toggle_encryption)
+                            .service(add_public_key)
+                            .service(get_public_keys)
+                            .service(delete_public_key)
+                            .service(
+                                web::scope("/enigma")
+                                    .service(create_change_signers)
+                                    .service(list_change_signers)
+                                    .service(get_change_signers)
+                                    .service(submit_change_signers_signature)
+                                    .service(create_decrypt_request)
+                                    .service(get_decrypt_request)
+                                    .service(list_decrypt_requests)
+                                    .service(get_participant_apps)
+                                    .service(submit_signature)
+                                    .service(current_signers),
+                            ),
                     )
                     .service(
                         web::scope("/admin")

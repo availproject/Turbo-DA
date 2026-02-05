@@ -1,9 +1,7 @@
 "use client";
 import { APP_TABS } from "@/lib/utils";
 import { useOverview } from "@/providers/OverviewProvider";
-import useBalance from "@/hooks/useBalance";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import Image from "next/image";
 import { Close } from "@radix-ui/react-dialog";
 import { LoaderCircle, Minus, SquareArrowOutUpRight, X } from "lucide-react";
 import Link from "next/link";
@@ -18,17 +16,14 @@ import {
   TransactionDescription,
 } from "./transaction-progress/transaction-status-display";
 import { ProgressBar } from "./transaction-progress/progress-bar";
-import {
-  TRANSACTION_CONSTANTS,
-  TRANSACTION_ACTIONS,
-} from "@/constants/transaction";
+import { TRANSACTION_ACTIONS } from "@/constants/transaction";
 import { useDialog } from "./dialog/provider";
 import { getExplorerUrl } from "@/utils/explorer";
 
 const CreditsTransactionProgress = () => {
   const { setMainTabSelected } = useOverview();
   const account = useAccount();
-  const { open, setOpen } = useDialog();
+  const { open } = useDialog();
   const { showTransaction, minimizeTransaction } = useTransactionProgress();
 
   const status = showTransaction?.status;
