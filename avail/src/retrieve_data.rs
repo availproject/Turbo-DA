@@ -1,5 +1,5 @@
 use avail_rust::{
-    Client, H256, avail::data_availability::tx::SubmitData, block::BlockExtrinsicsQuery,
+    Client, H256, avail::data_availability::tx::SubmitData, ExtrinsicsQuery,
 };
 
 pub async fn retrieve_data(
@@ -7,7 +7,7 @@ pub async fn retrieve_data(
     block_hash: H256,
     tx_index: u32,
 ) -> Result<Vec<u8>, String> {
-    let block = BlockExtrinsicsQuery::new(client, block_hash.into());
+    let block = ExtrinsicsQuery::new(client, block_hash.into());
     let tx = block.get_as::<SubmitData>(tx_index).await;
     let tx = tx.map_err(|e| e.to_string())?;
 

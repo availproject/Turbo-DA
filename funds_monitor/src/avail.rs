@@ -1,8 +1,8 @@
 use avail_rust::avail::utility::tx::BatchAll;
 use avail_rust::avail::RuntimeCall;
 use avail_rust::avail_rust_core::Preamble;
-use avail_rust::block::BlockExtrinsicsQuery;
 use avail_rust::prelude::*;
+use avail_rust::ExtrinsicsQuery;
 use diesel::PgConnection;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -91,7 +91,7 @@ async fn process_block(
 ) -> Result<(), String> {
     tracing::debug!("filtering batch calls from block");
 
-    let block = BlockExtrinsicsQuery::new(client.clone(), block_hash.into());
+    let block = ExtrinsicsQuery::new(client.clone(), block_hash.into());
     let all = block.all_as::<BatchAll>(Default::default()).await;
     let all = all.map_err(|e| e.to_string())?;
 
