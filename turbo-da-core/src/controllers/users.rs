@@ -892,7 +892,7 @@ async fn generate_api_key(
     let tx = db::controllers::api_keys::create_api_key(
         &mut connection,
         &ApiKeyCreate {
-            api_key: hex::encode(hashed_password),
+            api_key: const_hex::encode(hashed_password),
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
             app_id: payload.app_id,

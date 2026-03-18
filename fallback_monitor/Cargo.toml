@@ -5,23 +5,23 @@ edition = "2021"
 
 [dependencies]
 diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
-bigdecimal = { version = "0.4.6", features = ["serde"] }
-dotenv = "0.15"
+bigdecimal = { workspace = true }
+dotenv = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-log = "0.4.22"
-env_logger = "0.10"
+log = { workspace = true }
+env_logger = { workspace = true }
 uuid.workspace = true
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features=["serde"] }
-lazy_static = "1.4"
+lazy_static = { workspace = true }
 diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
 futures = "0.3"
 cron = { version = "0.8" }
-toml = {version ="0.8.19"}
+toml = { workspace = true }
 avail-rust = { workspace = true }
 db = {path = "../db" }
-reqwest = "0.12.9"
+reqwest = { workspace = true }
 avail-utils = {path = "../avail"}
 observability = { path = "../observability" }
 turbo-da-core = {path= "../turbo-da-core"}

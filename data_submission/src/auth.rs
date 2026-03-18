@@ -82,7 +82,7 @@ where
 
         let mut hasher = Keccak256::new();
         hasher.update(x_api_key.as_bytes());
-        let api_key_hash = hex::encode(hasher.finalize());
+        let api_key_hash = const_hex::encode(hasher.finalize());
         let mut headers = req.headers_mut();
         // 1. Check if there is any entry in redis for the api key => don't make a call to db
         let redis_search = self.redis.get(api_key_hash.as_str());

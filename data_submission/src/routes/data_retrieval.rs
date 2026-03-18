@@ -157,12 +157,10 @@ pub async fn get_submission_info(
     }
 }
 
-use hex;
-
 fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
     let s = s.trim_start_matches("0x");
 
-    let bytes = hex::decode(s).map_err(|e| e.to_string())?;
+    let bytes = const_hex::decode(s).map_err(|e| e.to_string())?;
 
     bytes
         .try_into()

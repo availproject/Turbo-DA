@@ -39,7 +39,7 @@ fn generate_sumsub_signature(
     mac.update(message.as_bytes());
     let result = mac.finalize();
 
-    Ok(hex::encode(result.into_bytes()))
+    Ok(const_hex::encode(result.into_bytes()))
 }
 
 /// Generate access token for KYC verification

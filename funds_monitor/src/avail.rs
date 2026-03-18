@@ -1,8 +1,10 @@
 use avail_rust::avail::utility::tx::BatchAll;
 use avail_rust::avail::RuntimeCall;
+use avail_rust::avail_rust_core::Preamble;
 use avail_rust::block::BlockExtrinsicsQuery;
 use avail_rust::prelude::*;
 use diesel::PgConnection;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -11,7 +13,7 @@ use crate::utils::{Deposit, Utils};
 // Remark is the user id in hex format
 pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
     tracing::debug!("starting avail chain monitor");
-    let sdk = Client::new(cfg.avail_rpc_url.as_str()).await;
+    let sdk = Client::connect(&cfg.avail_rpc_url).await;
     let sdk = sdk.map_err(|e| e.to_string())?;
     let utils = Utils::new(
         cfg.coin_gecho_api_url.clone(),
@@ -28,10 +30,15 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
         tracing::error!(error = %e, "failed to sync database");
     }
 
-    let mut sub = Sub::new(sdk.clone());
+    let mut sub = sdk
+        .subscribe()
+        .blocks()
+        .build()
+        .await
+        .map_err(|e| e.to_string())?;
     loop {
-        let b_info = sub.next().await;
-        let b_info = match b_info {
+        let item = sub.next().await;
+        let item = match item {
             Ok(x) => x,
             Err(err) => {
                 tracing::error!(error = %err, "failed to stream next block");
@@ -39,11 +46,11 @@ pub async fn run(cfg: Arc<Config>) -> Result<(), String> {
             }
         };
 
-        tracing::info!(height = b_info.height, "fetched block height");
+        tracing::info!(height = item.block_height, "fetched block height");
         if let Err(e) = process_block(
             &sdk,
-            b_info.hash,
-            b_info.height,
+            item.block_hash,
+            item.block_height,
             &utils,
             &cfg.avail_deposit_address,
         )
@@ -85,22 +92,24 @@ async fn process_block(
     tracing::debug!("filtering batch calls from block");
 
     let block = BlockExtrinsicsQuery::new(client.clone(), block_hash.into());
-    let all = block.all::<BatchAll>(Default::default()).await;
+    let all = block.all_as::<BatchAll>(Default::default()).await;
     let all = all.map_err(|e| e.to_string())?;
 
-    let block_hash_hex = hex::encode(block_hash.0);
+    let block_hash_hex = const_hex::encode(block_hash.0);
     let mut connection = utils.establish_connection()?;
 
     for tx in all {
         let tx_hash = tx.ext_hash();
 
-        let Some(signature) = &tx.signature else {
-            continue;
+        let multi_address = match &tx.preamble {
+            Preamble::Bare(_) => continue,
+            Preamble::Signed(multi_address, ..) => multi_address,
+            Preamble::General(_, _) => continue,
         };
 
         tracing::info!(
             tx_hash = %tx_hash,
-            account = ?signature.address,
+            account = ?multi_address,
             block_height = block_height,
             block_hash = %block_hash,
             "found some batch call"
@@ -128,7 +137,7 @@ async fn process_block(
             continue;
         }
 
-        let MultiAddress::Id(account_id) = &signature.address else {
+        let MultiAddress::Id(account_id) = &multi_address else {
             tracing::info!(
                 block_hash = %block_hash,
                 tx_index = tx.ext_index(),
@@ -163,10 +172,10 @@ async fn process_block(
             );
             continue;
         }
-        let account_id_hex = hex::encode(account_id.0);
-        let tx_hash_hex = hex::encode(tx_hash.0);
+        let account_id_hex = const_hex::encode(account_id.0);
+        let tx_hash_hex = const_hex::encode(tx_hash.0);
 
-        let ascii_remark = hex::encode(remark_call.remark.clone());
+        let ascii_remark = const_hex::encode(remark_call.remark.clone());
         tracing::info!(
             tx_hash = %tx_hash_hex,
             account = %account_id_hex,

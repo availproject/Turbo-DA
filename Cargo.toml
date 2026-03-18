@@ -12,31 +12,33 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-actix-web = "4.8"
+avail-rust = { package = "avail-rust-client",  git = "https://github.com/availproject/avail-rust.git", rev = "999074c0639ba15de674fbc468be911ab03b281f", default-features = false, features = ["native"] }
+avail-fri = { git = "https://github.com/availproject/avail-core.git", rev = "931f7fe8cf28074ca2b290f2a8b3b121769f0cbb", default-features = false, features = ["parallel", "std"]}
+
+actix-web = "4.13"
 actix-cors = "0.7"
-anyhow = "1.0.97"
-hex = "0.4"
+anyhow = "1.0.102"
+const-hex = "1.18"
 dotenv = "0.15"
 sha3 = "0.10.8"
 redis = { version = "0.28.2", features = ["r2d2"]}
-bcrypt = "0.15.1"
+bcrypt = "0.19"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-log = "0.4.22"
+log = "0.4.29"
 rand = "0.8.5"
-env_logger = "0.10"
-avail-rust = { package = "avail-rust-client", version = "0.5.0", default-features = false, features = ["native", "reqwest"] }
+env_logger = "0.11"
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
 diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
 futures = "0.3"
-bigdecimal = { version = "0.4.6", features = ["serde"] }
+bigdecimal = { version = "0.4.10", features = ["serde"] }
 actix-extensible-rate-limit = {version = "0.4.0", features=["redis"]}
 diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
-toml = {version ="0.8.19"}
-password-hash = {version = "0.5.0"}
-thiserror = "1.0.61"
-tracing = "0.1.40"
+toml = {version ="0.9.8"}
+password-hash = {version = "0.6.0"}
+thiserror = "2.0"
+tracing = "0.1.44"
 tracing-subscriber = "0.3.18"
 console-subscriber = "0.4.0"
 tracing-appender = "0.2.2"
@@ -44,3 +46,5 @@ tracing-opentelemetry = "0.23.0"
 opentelemetry = "0.22.0"
 opentelemetry-otlp = "0.15.0"
 opentelemetry_sdk = "0.22.1"
+reqwest = { version = "0.12" }
+lazy_static = { version = "1.4" }

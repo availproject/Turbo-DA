@@ -1,6 +1,9 @@
 use avail::data_availability::events::DataSubmitted;
-use avail_rust::prelude::*;
-use hex::{self, ToHex};
+use avail_rust::{
+    avail::babe::storage::BabeRandomness, ext::sp_crypto_hashing::keccak_256, prelude::*,
+    submission::submitted::WaitOption,
+};
+use const_hex::{self, ToHexExt};
 
 #[derive(Debug)]
 pub struct TransactionInfo {
@@ -28,45 +31,35 @@ impl<'a> SubmitDataAvail<'a> {
         }
     }
     pub async fn submit_data(&self, data: &[u8]) -> Result<TransactionInfo, String> {
-        let options = Options::new(self.app_id as u32);
-        let submittable = self
-            .client
-            .tx()
-            .data_availability()
-            .submit_data(data.to_vec());
+        let randomness = BabeRandomness::fetch(&self.client.rpc_client, None)
+            .await
+            .map_err(|e| e.to_string())?;
+        let Some(randomness) = randomness else {
+            return Err(String::from(
+                "Cannot submit data if babe randomness is not available",
+            ));
+        };
 
-        let estimated_fees = submittable
-            .estimate_extrinsic_fees(&self.account, options, None)
+        let data_hash = keccak_256(data);
+        let commitment = avail_fri::BlobCommitment::compute(&randomness, data, &data_hash)
+            .map_err(|e| e.to_string())?;
+
+        self.client
+            .blob()
+            .submit_blob_and_blob_metadata(
+                self.app_id as u32,
+                data,
+                H256::from(data_hash),
+                commitment.commitment,
+                Some(commitment.seed),
+                Some(commitment.claim),
+                self.account,
+                Default::default(),
+            )
             .await
             .map_err(|e| e.to_string())?;
 
-        let submitted = submittable
-            .sign_and_submit(&self.account, options)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let receipt = submitted.receipt(false).await.map_err(|e| e.to_string())?;
-        let Some(receipt) = receipt else {
-            return Err("Transaction was dropped".into());
-        };
-
-        let events = receipt.events().await.map_err(|e| e.to_string())?;
-        if !events.is_extrinsic_success_present() {
-            return Err("Transaction was executed but execution failed.".into());
-        }
-
-        let Some(event) = events.first::<DataSubmitted>() else {
-            return Err("Failed to find DataSubmitted event. Something went horribly wrong".into());
-        };
-
-        Ok(TransactionInfo {
-            block_number: receipt.block_height,
-            tx_hash: hex::encode(receipt.ext_hash.0),
-            block_hash: hex::encode(receipt.block_hash.0),
-            extrinsic_index: receipt.ext_index,
-            gas_fee: estimated_fees.final_fee(),
-            to_address: self.account.public_key().encode_hex(),
-            data_hash: hex::encode(event.data_hash.0),
-        })
+        // TODO
+        todo!()
     }
 }

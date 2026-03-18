@@ -48,7 +48,7 @@ pub async fn generate_keygen_list(number_of_threads: i32, private_keys: &[String
 /// # Arguments
 /// * `private_key` - Private key as a hex string
 pub fn create_keypair(private_key: &String) -> Keypair {
-    let bytes = hex::decode(private_key).expect("Failed to decode hex string");
+    let bytes = const_hex::decode(private_key).expect("Failed to decode hex string");
     let byte_array: [u8; 32] = bytes.try_into().expect("Slice with incorrect length");
     Keypair::from_secret_key(byte_array)
         .unwrap_or_else(|_| panic!("Fatal: Couldn't parse the private key {:?}", private_key))
@@ -231,20 +231,8 @@ impl<'a> Convertor<'a> {
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        let tx = self.sdk.tx().data_availability().submit_data(data);
-
-        let options = Options::default();
-        let query_info = match tx
-            .estimate_extrinsic_fees(self.account, options, None)
-            .await
-        {
-            Ok(info) => info,
-            Err(e) => {
-                tracing::error!(error = ?e, "failed to get payment query info");
-                return BigDecimal::from(u128::MAX);
-            }
-        };
-        BigDecimal::from(query_info.final_fee())
+        // TODO
+        todo!()
     }
 
     pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {
@@ -382,7 +370,7 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
         }
         let endpoint = &endpoints[attempts];
         tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
-        match AvailClient::new(endpoint).await {
+        match AvailClient::connect(endpoint).await {
             Ok(sdk) => {
                 tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
@@ -495,7 +483,7 @@ pub async fn get_amount_to_be_credited(
     .await
     .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
 
-    let client = AvailClient::new(avail_rpc_url)
+    let client = AvailClient::connect(avail_rpc_url)
         .await
         .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
 

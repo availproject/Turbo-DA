@@ -104,7 +104,7 @@ async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> Client {
         }
         let endpoint = &endpoints[attempts];
         tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
-        match Client::new(endpoint).await {
+        match Client::connect(endpoint).await {
             Ok(sdk) => {
                 tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;

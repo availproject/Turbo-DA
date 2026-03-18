@@ -13,7 +13,7 @@ serde = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 thiserror = { workspace = true }
-hex = { workspace = true }
+const-hex = { workspace = true }
 dotenv = { workspace = true }
 tracing-subscriber = { version = "0.3", features = [ "json", "fmt", "registry", "env-filter" ] }
 tracing = { workspace = true }

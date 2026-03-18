@@ -592,7 +592,6 @@ pub async fn submit_change_signers_signature(
                     }
                 };
 
-              
                 let mut connection = match get_connection(&pool).await {
                     Ok(conn) => conn,
                     Err(e) => return e,
@@ -626,12 +625,10 @@ pub async fn submit_change_signers_signature(
     }
 }
 
-use hex;
-
 fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
     let s = s.trim_start_matches("0x");
 
-    let bytes = hex::decode(s).map_err(|e| e.to_string())?;
+    let bytes = const_hex::decode(s).map_err(|e| e.to_string())?;
 
     bytes
         .try_into()
@@ -738,7 +735,10 @@ pub async fn current_signers(
         .await
     {
         Ok(participants) => {
-            tracing::info!(count = participants.len(), "successfully fetched participants");
+            tracing::info!(
+                count = participants.len(),
+                "successfully fetched participants"
+            );
             HttpResponse::Ok().json(participants)
         }
         Err(e) => {

@@ -28,12 +28,12 @@ unicode-normalization = "=0.1.22"
 avail-rust = { workspace = true }
 tokio = { workspace = true , features=["fs"] }
 uuid = { workspace = true }
-validator = { version = "0.16", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 num-bigint = "0.4"
 jsonwebtoken = "9"
 chrono = { version = "0.4", features=["serde"] }
-thiserror = "1.0"
-lazy_static = "1.4"
+thiserror = { workspace = true }
+lazy_static = { workspace = true }
 bcrypt = { workspace = true }
 sha3 = {workspace = true}
 diesel-async = { workspace = true }
@@ -45,9 +45,9 @@ sha2 = "0.10"
 urlencoding = "2.1"
 worker = "0.3.3"
 redis = {workspace = true}
-rayon = "1.10.0"
-hex = { workspace = true }
-reqwest = { version = "0.12.9", features = ["blocking", "json"] }
+rayon = "1.11.0"
+const-hex = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "json"] }
 cron = { version = "0.8", optional = true }
 toml = { workspace = true }
 confy = {version = "0.3.1"}

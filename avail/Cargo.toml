@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 avail-rust.workspace = true
-hex.workspace = true
+const-hex.workspace = true
+avail-fri.workspace = true
