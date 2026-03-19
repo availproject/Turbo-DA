@@ -1738,7 +1738,7 @@ dependencies = [
 [[package]]
 name = "avail-rust-client"
 version = "0.6.0"
-source = "git+https://github.com/availproject/avail-rust.git?rev=40e576651e14e09ae39de749364e719f2c174d81#40e576651e14e09ae39de749364e719f2c174d81"
+source = "git+https://github.com/availproject/avail-rust.git?rev=9c50273397dd24aa303b7893b5d6d1fb7d179cc3#9c50273397dd24aa303b7893b5d6d1fb7d179cc3"
 dependencies = [
  "async-trait",
  "avail-rust-core",
@@ -1758,7 +1758,7 @@ dependencies = [
 [[package]]
 name = "avail-rust-core"
 version = "0.6.0"
-source = "git+https://github.com/availproject/avail-rust.git?rev=40e576651e14e09ae39de749364e719f2c174d81#40e576651e14e09ae39de749364e719f2c174d81"
+source = "git+https://github.com/availproject/avail-rust.git?rev=9c50273397dd24aa303b7893b5d6d1fb7d179cc3#9c50273397dd24aa303b7893b5d6d1fb7d179cc3"
 dependencies = [
  "base64 0.22.1",
  "const-hex",
@@ -9965,6 +9965,7 @@ dependencies = [
  "actix-multipart",
  "actix-web",
  "alloy",
+ "avail-fri",
  "avail-rust-client",
  "avail-utils",
  "aws-config",

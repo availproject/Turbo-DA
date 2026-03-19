@@ -7,9 +7,11 @@ use actix_web::{
 };
 use alloy::primitives::Address;
 use avail_rust::{
+    avail::babe::storage::BabeRandomness,
     avail_rust_core::rpc::{chain, system::chain},
     constants::dev_accounts,
-    Client as AvailClient, Keypair, Options,
+    ext::sp_crypto_hashing::keccak_256,
+    Client as AvailClient, Keypair, Options, StorageValue, H256,
 };
 
 use bigdecimal::BigDecimal;
@@ -231,8 +233,31 @@ impl<'a> Convertor<'a> {
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        // TODO
-        todo!()
+        let randomness = BabeRandomness::fetch(&self.sdk.rpc_client, None)
+            .await
+            .expect("TODO");
+        let Some(randomness) = randomness else {
+            todo!()
+        };
+
+        let data_hash = keccak_256(&data);
+        let commitment =
+            avail_fri::BlobCommitment::compute(&randomness, &data, &data_hash).expect("TODO");
+
+        let tx = self.sdk.blob().metadata_tx(
+            0,
+            H256::from(data_hash),
+            data.len() as u64,
+            commitment.commitment,
+            Some(commitment.seed),
+            Some(commitment.claim),
+        );
+        let estimate = tx
+            .estimate_extrinsic_fees(self.account, Default::default(), None)
+            .await
+            .expect("TODO");
+
+        estimate.final_fee().into()
     }
 
     pub async fn calculate_credit_utlisation(&self, data: Vec<u8>) -> BigDecimal {

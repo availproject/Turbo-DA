@@ -12,7 +12,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-avail-rust = { package = "avail-rust-client",  git = "https://github.com/availproject/avail-rust.git", rev = "40e576651e14e09ae39de749364e719f2c174d81", default-features = false, features = ["native"] }
+avail-rust = { package = "avail-rust-client",  git = "https://github.com/availproject/avail-rust.git", rev = "9c50273397dd24aa303b7893b5d6d1fb7d179cc3", default-features = false, features = ["native"] }
 avail-fri = { git = "https://github.com/availproject/avail-core.git", rev = "931f7fe8cf28074ca2b290f2a8b3b121769f0cbb", default-features = false, features = ["parallel", "std"]}
 
 actix-web = "4.13"

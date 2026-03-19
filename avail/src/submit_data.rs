@@ -1,9 +1,7 @@
-use avail::data_availability::events::DataSubmitted;
 use avail_rust::{
-    avail::babe::storage::BabeRandomness, ext::sp_crypto_hashing::keccak_256, prelude::*,
-    submission::submitted::WaitOption,
+    avail::babe::storage::BabeRandomness, blob::FindBlobTxSummaryOutcome,
+    ext::sp_crypto_hashing::keccak_256, prelude::*,
 };
-use const_hex::{self, ToHexExt};
 
 #[derive(Debug)]
 pub struct TransactionInfo {
@@ -44,9 +42,10 @@ impl<'a> SubmitDataAvail<'a> {
         let commitment = avail_fri::BlobCommitment::compute(&randomness, data, &data_hash)
             .map_err(|e| e.to_string())?;
 
-        self.client
+        let outcome = self
+            .client
             .blob()
-            .submit_blob_and_blob_metadata(
+            .submit_with_metadata_and_watch(
                 self.app_id as u32,
                 data,
                 H256::from(data_hash),
@@ -55,9 +54,24 @@ impl<'a> SubmitDataAvail<'a> {
                 Some(commitment.claim),
                 self.account,
                 Default::default(),
+                WaitOption::default(),
             )
             .await
             .map_err(|e| e.to_string())?;
+
+        let info = match outcome {
+            FindBlobTxSummaryOutcome::Found(x) => x,
+            FindBlobTxSummaryOutcome::NotFound => {
+                return Err(String::from(
+                    "Could not find submitted transaction. Reason: Not Found",
+                ));
+            }
+            FindBlobTxSummaryOutcome::TimedOut => {
+                return Err(String::from(
+                    "Could not find submitted transaction. Reason: TimeOut",
+                ));
+            }
+        };
 
         // TODO
         todo!()

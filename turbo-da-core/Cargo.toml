@@ -58,6 +58,7 @@ enigma = { path = "../enigma" }
 rand = {workspace = true}
 actix-extensible-rate-limit = { workspace = true }
 tracing = {workspace=true}
+avail-fri.workspace = true
 
 [dev-dependencies]
 actix-http = "3.9.0"
