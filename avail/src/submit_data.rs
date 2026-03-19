@@ -1,6 +1,5 @@
 use avail_rust::{
-    avail::babe::storage::BabeRandomness, blob::FindBlobTxSummaryOutcome,
-    ext::sp_crypto_hashing::keccak_256, prelude::*,
+    avail::babe::storage::BabeRandomness, ext::sp_crypto_hashing::keccak_256, prelude::*,
 };
 
 #[derive(Debug)]
@@ -59,14 +58,14 @@ impl<'a> SubmitDataAvail<'a> {
             .await
             .map_err(|e| e.to_string())?;
 
-        let info = match outcome {
-            FindBlobTxSummaryOutcome::Found(x) => x,
-            FindBlobTxSummaryOutcome::NotFound => {
+        let FoundBlobExt { receipt, summary } = match outcome {
+            FindBlobExtOutcome::Found(x) => x,
+            FindBlobExtOutcome::NotFound => {
                 return Err(String::from(
                     "Could not find submitted transaction. Reason: Not Found",
                 ));
             }
-            FindBlobTxSummaryOutcome::TimedOut => {
+            FindBlobExtOutcome::TimedOut => {
                 return Err(String::from(
                     "Could not find submitted transaction. Reason: TimeOut",
                 ));

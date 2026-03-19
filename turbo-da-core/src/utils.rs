@@ -244,7 +244,7 @@ impl<'a> Convertor<'a> {
         let commitment =
             avail_fri::BlobCommitment::compute(&randomness, &data, &data_hash).expect("TODO");
 
-        let tx = self.sdk.blob().metadata_tx(
+        let tx = self.sdk.blob().metadata_ext(
             0,
             H256::from(data_hash),
             data.len() as u64,
