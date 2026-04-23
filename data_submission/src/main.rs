@@ -25,7 +25,7 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
-use observability::init_tracer;
+use observability::{init_meter, init_tracer};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use turbo_da_core::utils::generate_keygen_list;
@@ -35,6 +35,7 @@ use workload_scheduler::consumer::Consumer;
 #[tracing::instrument(name = "data_submission_service")]
 async fn main() -> Result<(), std::io::Error> {
     let _guard = init_tracer("data_submission");
+    init_meter("data_submission");
 
     let app_config = AppConfig::default().load_config()?;
 
