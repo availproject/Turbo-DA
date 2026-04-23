@@ -5,7 +5,7 @@ use cron::Schedule;
 use data_submission::redis::Redis;
 use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
-use observability::init_tracer;
+use observability::{init_meter, init_tracer};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::{
@@ -33,7 +33,9 @@ const WAIT_TIME: u64 = 5;
 /// and attempt to process them using the Avail network.
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
     let _guard = init_tracer("fallback_service");
+    init_meter("fallback_service");
 
     let app_config: AppConfig = match AppConfig::default().load_config() {
         Ok(conf) => conf,
