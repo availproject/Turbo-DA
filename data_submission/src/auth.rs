@@ -78,7 +78,15 @@ where
             return Box::pin(async move { Err(actix_error::ErrorUnauthorized("Missing API key")) });
         }
 
-        let x_api_key = auth_header.unwrap().to_str().unwrap();
+        let x_api_key = match auth_header.unwrap().to_str() {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::warn!(error = %e, "X-API-KEY header is not valid ASCII");
+                return Box::pin(async move {
+                    Err(actix_error::ErrorBadRequest("Invalid API key header encoding"))
+                });
+            }
+        };
 
         let mut hasher = Keccak256::new();
         hasher.update(x_api_key.as_bytes());
