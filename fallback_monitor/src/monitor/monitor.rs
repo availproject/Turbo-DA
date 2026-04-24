@@ -150,6 +150,9 @@ async fn process_failed_transactions(
                     thread_id: 0,
                     app_id: account_details.id,
                     avail_app_id: account_details.app_id,
+                    otel_context: tracing_opentelemetry::OpenTelemetrySpanExt::context(
+                        &tracing::Span::current(),
+                    ),
                 };
 
                 let mut process_response = ProcessSubmitResponse::new(

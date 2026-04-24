@@ -141,6 +141,8 @@ pub async fn get_submission_info(
     request_payload: web::Query<GetSubmissionInfo>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
 ) -> HttpResponse {
+    tracing::info!("get_submission_info request received");
+
     let mut connection = match get_connection(&injected_dependency).await {
         Ok(conn) => conn,
         Err(response) => return response,
@@ -148,12 +150,19 @@ pub async fn get_submission_info(
     let submission_id = match Uuid::from_str(&request_payload.submission_id) {
         Ok(val) => val,
         Err(e) => {
+            tracing::warn!(error = %e, "invalid submission_id");
             return HttpResponse::NotAcceptable().json(json!({ "error": e.to_string() }));
         }
     };
     match handle_submission_info(&mut connection, submission_id).await {
-        Ok(response) => HttpResponse::Ok().json(response),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": e.to_string() })),
+        Ok(response) => {
+            tracing::info!("submission info returned");
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to fetch submission info");
+            HttpResponse::InternalServerError().json(json!({ "error": e.to_string() }))
+        }
     }
 }
 

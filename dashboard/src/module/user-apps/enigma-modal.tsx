@@ -455,6 +455,17 @@ export default function EnigmaModal({ id, appData, skipAuth }: EnigmaModalProps)
         signature: signature,
       });
 
+      const message = `${request.id}:${request.turbo_da_app_id}:${hashWithout0x}:${request.new_threshold}`;
+      console.log("Signing message:", message);
+      const signature = await signMessageAsync({ message });
+
+      const response = await EnigmaService.submitChangeSignersSignature({
+        token: token || undefined,
+        request_id: request.id,
+        participant_address: address,
+        signature: signature,
+      });
+
       console.log("Submit signature response:", response);
 
       success({
