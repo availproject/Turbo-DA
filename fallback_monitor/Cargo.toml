@@ -29,3 +29,4 @@ enigma = {path="../enigma"}
 data_submission = {path = "../data_submission"}
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-opentelemetry = { workspace = true }

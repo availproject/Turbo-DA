@@ -10,10 +10,10 @@ use crate::{
 };
 use actix_cors::Cors;
 use actix_web::{
-    middleware::Logger,
     web::{self},
     App, HttpServer,
 };
+use tracing_actix_web::TracingLogger;
 
 use crate::routes::{
     data_retrieval::{get_pre_image, get_submission_info},
@@ -25,16 +25,20 @@ use diesel_async::{
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
-use observability::init_tracer;
+use observability::{init_meter, init_tracer};
 use std::sync::Arc;
+use std::{env, error::Error};
 use tokio::sync::broadcast;
 use turbo_da_core::utils::generate_keygen_list;
 use workload_scheduler::consumer::Consumer;
 
-#[tokio::main]
+const MAX_STACK_SIZE: &str = "10000000";
+
 #[tracing::instrument(name = "data_submission_service")]
-async fn main() -> Result<(), std::io::Error> {
+async fn start_server() -> Result<(), Box<dyn Error>> {
+    dotenv::dotenv().ok();
     let _guard = init_tracer("data_submission");
+    init_meter("data_submission");
 
     let app_config = AppConfig::default().load_config()?;
 
@@ -88,7 +92,7 @@ async fn main() -> Result<(), std::io::Error> {
 
         App::new()
             .wrap(Cors::permissive())
-            .wrap(Logger::default())
+            .wrap(TracingLogger::default())
             .service(health_check)
             .service(
                 web::scope("/v1")
@@ -110,5 +114,22 @@ async fn main() -> Result<(), std::io::Error> {
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()
-    .await
+    .await?;
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let stack_size: usize = env::var("MAX_STACK_SIZE")
+        .unwrap_or(MAX_STACK_SIZE.to_string())
+        .parse()?;
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(stack_size)
+        .enable_io()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    runtime.block_on(start_server())
 }

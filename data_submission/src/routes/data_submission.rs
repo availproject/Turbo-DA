@@ -17,6 +17,8 @@ use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast::Sender;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use turbo_da_core::utils::{format_size, generate_submission_id, get_connection, retrieve_user_id};
 
 /// Request payload for submitting string data
@@ -181,22 +183,26 @@ async fn _submit_data(
         submission_id,
         app_id,
         avail_app_id,
+        otel_context: tracing::Span::current().context(),
     };
 
-    tokio::spawn(async move {
-        let mut connection = match get_connection(&injected_dependency).await {
-            Ok(conn) => conn,
-            Err(_) => {
-                tracing::error!(
-                    submission_id = %submission_id,
-                    "failed to connect to database for expenditure entry"
-                );
-                return;
-            }
-        };
+    tokio::spawn(
+        async move {
+            let mut connection = match get_connection(&injected_dependency).await {
+                Ok(conn) => conn,
+                Err(_) => {
+                    tracing::error!(
+                        submission_id = %submission_id,
+                        "failed to connect to database for expenditure entry"
+                    );
+                    return;
+                }
+            };
 
-        create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
-    });
+            create_customer_expenditure_entry(&mut connection, expenditure_entry).await;
+        }
+        .in_current_span(),
+    );
 
     let _ = sender.send(consumer_response);
 

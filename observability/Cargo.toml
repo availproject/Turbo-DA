@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = { workspace = true }
 tokio = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics"] }
-opentelemetry-otlp = { workspace = true, features = ["metrics"] }
+opentelemetry-otlp = { workspace = true, features = ["metrics", "http-proto", "reqwest-client", "reqwest-rustls"] }
 opentelemetry_sdk = { workspace = true, features = ["metrics", "rt-tokio"] }
 serde = { workspace = true }
 tracing-appender = { workspace = true }

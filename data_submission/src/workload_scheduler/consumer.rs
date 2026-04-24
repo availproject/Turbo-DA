@@ -28,6 +28,8 @@ use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
 };
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
 
 pub struct Consumer {
@@ -99,49 +101,56 @@ impl Consumer {
         let enigma = self.enigma.clone();
         let redis = self.redis.clone();
 
-        tokio::spawn(async move {
-            tracing::info!(thread_id = i, "spawning consumer thread");
+        let worker_span = tracing::info_span!("consumer_worker", thread_id = i);
+        tokio::spawn(
+            async move {
+                tracing::info!(thread_id = i, "spawning consumer thread");
 
-            let mut receiver = sender.subscribe();
+                let mut receiver = sender.subscribe();
 
-            tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(120));
-                loop {
-                    interval.tick().await;
-                    let _ = heartbeat_tx.send(i).await;
+                tokio::spawn(
+                    async move {
+                        let mut interval = tokio::time::interval(Duration::from_secs(120));
+                        loop {
+                            interval.tick().await;
+                            let _ = heartbeat_tx.send(i).await;
+                        }
+                    }
+                    .in_current_span(),
+                );
+
+                while let Ok(response) = receiver.recv().await {
+                    if response.thread_id != i {
+                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        continue;
+                    }
+
+                    let result = Self::response_handler(
+                        &response,
+                        &injected_dependency,
+                        &endpoints,
+                        &keygen,
+                        &enigma,
+                        Arc::clone(&redis),
+                        i,
+                    )
+                    .await;
+
+                    if let Err(e) = result {
+                        log_txn(&response.submission_id.to_string(), response.thread_id, &e);
+                        tracing::error!(
+                            error = %e,
+                            submission_id = %response.submission_id,
+                            thread_id = response.thread_id,
+                            "failed to process response"
+                        );
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 }
-            });
-
-            while let Ok(response) = receiver.recv().await {
-                if response.thread_id != i {
-                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-                    continue;
-                }
-
-                let result = Self::response_handler(
-                    &response,
-                    &injected_dependency,
-                    &endpoints,
-                    &keygen,
-                    &enigma,
-                    Arc::clone(&redis),
-                    i,
-                )
-                .await;
-
-                if let Err(e) = result {
-                    log_txn(&response.submission_id.to_string(), response.thread_id, &e);
-                    tracing::error!(
-                        error = %e,
-                        submission_id = %response.submission_id,
-                        thread_id = response.thread_id,
-                        "failed to process response"
-                    );
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
-        });
+            .instrument(worker_span),
+        );
     }
 
     #[tracing::instrument(
@@ -161,6 +170,8 @@ impl Consumer {
         redis: Arc<Redis>,
         i: i32,
     ) -> Result<(), String> {
+        tracing::Span::current().set_parent(response.otel_context.clone());
+
         let mut connection = get_connection(injected_dependency)
             .await
             .map_err(|_| "Failed to get connection".to_string())?;

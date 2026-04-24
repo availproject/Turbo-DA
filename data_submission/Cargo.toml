@@ -33,3 +33,6 @@ observability = { path = "../observability" }
 avail-utils = {path = "../avail"}
 tracing-subscriber = { workspace = true, features = ["json"] }
 tracing = { workspace = true }
+tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_22"] }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }

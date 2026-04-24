@@ -3,7 +3,7 @@ use opentelemetry::{
     trace::{SamplingDecision, SamplingResult, TraceContextExt},
     KeyValue, Value,
 };
-use opentelemetry_otlp::{new_exporter, new_pipeline, TonicExporterBuilder, WithExportConfig};
+use opentelemetry_otlp::{new_exporter, new_pipeline, HttpExporterBuilder, WithExportConfig};
 use opentelemetry_sdk::{
     runtime::Tokio,
     trace::{BatchConfigBuilder, Config, ShouldSample},
@@ -42,9 +42,9 @@ fn resource<T: Into<Value>>(service_name: T) -> Resource {
     Resource::new([KeyValue::new("service.name", service_name)])
 }
 
-fn otel_exporter() -> TonicExporterBuilder {
-    let endpoint = env::var("OTLP_RECEIVER_URL").unwrap_or("http://otc:4317".to_string());
-    new_exporter().tonic().with_endpoint(&endpoint)
+fn otel_exporter() -> HttpExporterBuilder {
+    let endpoint = env::var("OTLP_RECEIVER_URL").unwrap_or("http://otc:4318".to_string());
+    new_exporter().http().with_endpoint(&endpoint)
 }
 
 use tracing_appender::non_blocking::WorkerGuard;

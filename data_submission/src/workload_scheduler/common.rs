@@ -1,4 +1,5 @@
 use actix_web::web::Bytes;
+use opentelemetry::Context as OtelContext;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -8,4 +9,5 @@ pub struct Response {
     pub thread_id: i32,
     pub app_id: Uuid,
     pub avail_app_id: i32,
+    pub otel_context: OtelContext,
 }
