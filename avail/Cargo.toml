@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+avail-fri.workspace = true
 avail-rust.workspace = true
 hex.workspace = true

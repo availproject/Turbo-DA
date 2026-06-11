@@ -18,8 +18,12 @@ impl std::fmt::Display for EnigmaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EnigmaError::Request(e) => write!(f, "Request error: {}", e),
-            EnigmaError::Api { status, message } => write!(f, "API error ({}): {}", status, message),
-            EnigmaError::Parse { body, error } => write!(f, "Parse error: {} (body: {})", error, body),
+            EnigmaError::Api { status, message } => {
+                write!(f, "API error ({}): {}", status, message)
+            }
+            EnigmaError::Parse { body, error } => {
+                write!(f, "Parse error: {} (body: {})", error, body)
+            }
         }
     }
 }
@@ -34,11 +38,10 @@ impl From<reqwest::Error> for EnigmaError {
 
 use types::{
     ChangeSignersRequestRecord, CreateChangeSignersRequest, CreateChangeSignersResponse,
-    DecryptRequest, DecryptRequestData,
-    DecryptRequestResponse, EncryptRequest,
-    EncryptResponse, ListChangeSignersQuery, ListChangeSignersResponse, ListDecryptRequestsQuery,
-    ListDecryptRequestsResponse, RegisterRequest,
-    RegisterResponse, SubmitChangeSignersSignatureRequest, SubmitChangeSignersSignatureResponse,
+    DecryptRequest, DecryptRequestData, DecryptRequestResponse, EncryptRequest, EncryptResponse,
+    ListChangeSignersQuery, ListChangeSignersResponse, ListDecryptRequestsQuery,
+    ListDecryptRequestsResponse, RegisterRequest, RegisterResponse,
+    SubmitChangeSignersSignatureRequest, SubmitChangeSignersSignatureResponse,
     SubmitSignatureRequest, SubmitSignatureResponse,
 };
 
@@ -77,42 +80,29 @@ impl EnigmaEncryptionService {
     }
 
     fn create_tls_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
-        let cert_and_key = if let Ok(cert) = env::var("CLIENT_CRT") {
-            cert.as_bytes().to_vec()
-        } else {
-            tracing::warn!(
-                "failed to read CLIENT_CRT from environment variable, reading from file"
-            );
-            fs::read("client.crt")?
-        };
-
-        let key = if let Ok(key) = env::var("CLIENT_KEY") {
-            key.as_bytes().to_vec()
-        } else {
-            tracing::warn!(
-                "failed to read CLIENT_KEY from environment variable, reading from file"
-            );
-            fs::read("client.key")?
-        };
+        let cert_pem = Self::load_pem("CLIENT_CRT", "client.crt")
+            .map_err(|e| format!("CLIENT_CRT / client.crt: {}", e))?;
+        let key_pem = Self::load_pem("CLIENT_KEY", "client.key")
+            .map_err(|e| format!("CLIENT_KEY / client.key: {}", e))?;
+        let ca_pem =
+            Self::load_pem("CA_CRT", "ca.crt").map_err(|e| format!("CA_CRT / ca.crt: {}", e))?;
 
         let mut pem = Vec::new();
-
-        pem.extend_from_slice(&cert_and_key);
-
-        if !cert_and_key.ends_with(b"\n") {
+        pem.extend_from_slice(&cert_pem);
+        if !cert_pem.ends_with(b"\n") {
             pem.push(b'\n');
         }
-        pem.extend_from_slice(&key);
+        pem.extend_from_slice(&key_pem);
 
-        let identity = Identity::from_pem(&pem)?;
+        let identity = Identity::from_pem(&pem).map_err(|e| {
+            format!(
+                "Invalid client cert/key (check they match and key is not password-protected): {}",
+                e
+            )
+        })?;
 
-        let ca_cert = if let Ok(ca_cert) = env::var("CA_CRT") {
-            ca_cert.as_bytes().to_vec()
-        } else {
-            tracing::warn!("failed to read CA_CRT from environment variable, reading from file");
-            fs::read("ca.crt")?
-        };
-        let ca_certificate = Certificate::from_pem(&ca_cert)?;
+        let ca_certificate =
+            Certificate::from_pem(&ca_pem).map_err(|e| format!("Invalid CA certificate: {}", e))?;
 
         let client = reqwest::Client::builder()
             .use_rustls_tls()
@@ -123,6 +113,27 @@ impl EnigmaEncryptionService {
             .map_err(|e| format!("Failed to build reqwest client: {}", e))?;
 
         Ok(client)
+    }
+
+    fn load_pem(env_name: &str, file_name: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        if let Ok(val) = env::var(env_name) {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                if trimmed.starts_with("-----BEGIN") {
+                    return Ok(val.into_bytes());
+                }
+                let path = std::path::Path::new(trimmed);
+                if path.exists() {
+                    return Ok(fs::read(path)?);
+                }
+                return Err(format!(
+                    "Env var {} is set but is neither valid PEM nor an existing file path",
+                    env_name
+                )
+                .into());
+            }
+        }
+        Ok(fs::read(file_name)?)
     }
 
     /// Registers an app with participants and threshold
@@ -153,12 +164,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: RegisterResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: RegisterResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -191,12 +201,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: CreateChangeSignersResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: CreateChangeSignersResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -240,12 +249,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: ListChangeSignersResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: ListChangeSignersResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -278,12 +286,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: ChangeSignersRequestRecord = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: ChangeSignersRequestRecord =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -327,12 +334,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: SubmitChangeSignersSignatureResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: SubmitChangeSignersSignatureResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -344,10 +350,7 @@ impl EnigmaEncryptionService {
     ///
     /// # Returns
     /// * `EncryptResponse` - The encrypted data with signatures and keys
-    pub async fn encrypt(
-        &self,
-        payload: EncryptRequest,
-    ) -> Result<EncryptResponse, EnigmaError> {
+    pub async fn encrypt(&self, payload: EncryptRequest) -> Result<EncryptResponse, EnigmaError> {
         let url = format!("{}/v1/encrypt", self.service_url.clone());
 
         let response = self.client.post(&url).json(&payload).send().await?;
@@ -365,12 +368,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: EncryptResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: EncryptResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -409,12 +411,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: DecryptRequestResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: DecryptRequestResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -451,12 +452,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: DecryptionRequestRecord = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: DecryptionRequestRecord =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -498,12 +498,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: SubmitSignatureResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: SubmitSignatureResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -544,12 +543,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: ListDecryptRequestsResponse = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: ListDecryptRequestsResponse =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }
@@ -589,12 +587,11 @@ impl EnigmaEncryptionService {
             });
         }
 
-        let parsed: DecryptRequestData = serde_json::from_str(&body).map_err(|e| {
-            EnigmaError::Parse {
+        let parsed: DecryptRequestData =
+            serde_json::from_str(&body).map_err(|e| EnigmaError::Parse {
                 body: body.clone(),
                 error: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(parsed)
     }

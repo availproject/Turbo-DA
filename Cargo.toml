@@ -25,14 +25,15 @@ serde_json = "1.0"
 log = "0.4.22"
 rand = "0.8.5"
 env_logger = "0.10"
-avail-rust = { package = "avail-rust-client", version = "0.5.0", default-features = false, features = ["native", "reqwest"] }
+avail-rust = { package = "avail-rust-client", git = "https://github.com/availproject/avail-rust.git", rev = "b98212b9123d095e027ec00f067ff7a1350ab6c2", default-features = false, features = ["native"] }
+avail-fri = { git = "https://github.com/availproject/avail-core.git", rev = "ecc267c2b9dc3508066ddf879fde94b9599aa31d", default-features = false, features = ["parallel", "std"] }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
-diesel-async = { version = "0.5.2", features = ["postgres", "deadpool"] }
+diesel-async = { version = "0.9.1", features = ["postgres", "deadpool"] }
 futures = "0.3"
 bigdecimal = { version = "0.4.6", features = ["serde"] }
 actix-extensible-rate-limit = {version = "0.4.0", features=["redis"]}
-diesel = { version = "2.2.0", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
+diesel = { version = "2.3.10", features = ["serde_json", "postgres", "numeric", "uuid", "chrono"] }
 toml = {version ="0.8.19"}
 password-hash = {version = "0.5.0"}
 thiserror = "1.0.61"
@@ -40,7 +41,7 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 console-subscriber = "0.4.0"
 tracing-appender = "0.2.2"
-tracing-opentelemetry = "0.23.0"
-opentelemetry = "0.22.0"
-opentelemetry-otlp = "0.15.0"
-opentelemetry_sdk = "0.22.1"
+tracing-opentelemetry = "0.33.0"
+opentelemetry = "0.32.0"
+opentelemetry-otlp = "0.32.0"
+opentelemetry_sdk = "0.32.1"

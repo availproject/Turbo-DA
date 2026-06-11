@@ -12,10 +12,10 @@ permissioned=[]
 diesel = { workspace = true }
 bigdecimal = { workspace = true }
 dotenv = { workspace = true }
-aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
-aws-sdk-s3 = { version = "1.4.0", features = ["rt-tokio"] }
+aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "default-https-client", "rt-tokio", "sso"] }
+aws-sdk-s3 = { version = "1.4.0", default-features = false, features = ["behavior-version-latest", "default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
-alloy = { version = "0.7.2", features = ["full"] }
+alloy = { version = "1.0.38", features = ["full"] }
 clerk-rs = { version = "0.4.0", features = ["actix"] }
 actix-multipart = "0.6.1"
 actix-web = { workspace = true }
@@ -28,7 +28,7 @@ unicode-normalization = "=0.1.22"
 avail-rust = { workspace = true }
 tokio = { workspace = true , features=["fs"] }
 uuid = { workspace = true }
-validator = { version = "0.16", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 num-bigint = "0.4"
 jsonwebtoken = "9"
 chrono = { version = "0.4", features=["serde"] }
@@ -61,5 +61,4 @@ tracing = {workspace=true}
 
 [dev-dependencies]
 actix-http = "3.9.0"
-diesel_migrations = { version = "2.1.0", features = ["postgres"] }
-
+diesel_migrations = { version = "2.3.0", features = ["postgres"] }
