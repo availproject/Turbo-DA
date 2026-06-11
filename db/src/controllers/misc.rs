@@ -120,7 +120,6 @@ pub async fn get_unresolved_transactions(
                 "NOW() - INTERVAL '15 minutes'",
             )),
         ))
-        .filter(customer_expenditures::user_id.eq("infrastructure@aave.com"))
         .filter(customer_expenditures::retry_count.lt(retry))
         .filter(apps::barred.eq(false))
         .order(customer_expenditures::created_at.desc())
