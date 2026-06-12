@@ -3,9 +3,7 @@ use crate::{
     schema::mpc_participants::dsl::*,
 };
 use diesel::prelude::*;
-use diesel_async::{
-    scoped_futures::ScopedFutureExt, AsyncConnection, AsyncPgConnection, RunQueryDsl,
-};
+use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
 
 pub async fn add_participant(
@@ -125,27 +123,24 @@ pub async fn change_signers(
 ) -> Result<Vec<MpcParticipant>, diesel::result::Error> {
     let target_app_id = *target_app_id;
 
-    conn.transaction(|conn| {
-        async move {
-            diesel::delete(mpc_participants.filter(app_id.eq(&target_app_id)))
-                .execute(conn)
-                .await?;
+    conn.transaction(async |conn| {
+        diesel::delete(mpc_participants.filter(app_id.eq(&target_app_id)))
+            .execute(&mut *conn)
+            .await?;
 
-            let new_participants: Vec<MpcParticipantCreate> = new_participants_list
-                .into_iter()
-                .map(|addr| MpcParticipantCreate {
-                    id: Uuid::new_v4(),
-                    app_id: target_app_id,
-                    participant_address: addr,
-                })
-                .collect();
+        let new_participants: Vec<MpcParticipantCreate> = new_participants_list
+            .into_iter()
+            .map(|addr| MpcParticipantCreate {
+                id: Uuid::new_v4(),
+                app_id: target_app_id,
+                participant_address: addr,
+            })
+            .collect();
 
-            diesel::insert_into(mpc_participants)
-                .values(&new_participants)
-                .get_results(conn)
-                .await
-        }
-        .scope_boxed()
+        diesel::insert_into(mpc_participants)
+            .values(&new_participants)
+            .get_results(conn)
+            .await
     })
     .await
 }

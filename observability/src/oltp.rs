@@ -1,12 +1,15 @@
 use opentelemetry::{
     global,
-    trace::{SamplingDecision, SamplingResult, TraceContextExt},
+    trace::{TraceContextExt, TracerProvider as _},
     KeyValue, Value,
 };
-use opentelemetry_otlp::{new_exporter, new_pipeline, HttpExporterBuilder, WithExportConfig};
+use opentelemetry_otlp::{MetricExporter, Protocol, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{
-    runtime::Tokio,
-    trace::{BatchConfigBuilder, Config, ShouldSample},
+    metrics::SdkMeterProvider,
+    trace::{
+        BatchConfigBuilder, BatchSpanProcessor, SamplingDecision, SamplingResult,
+        SdkTracerProvider, ShouldSample,
+    },
     Resource,
 };
 use std::{env, time::Duration};
@@ -39,12 +42,13 @@ impl ShouldSample for TurboDASampler {
 }
 
 fn resource<T: Into<Value>>(service_name: T) -> Resource {
-    Resource::new([KeyValue::new("service.name", service_name)])
+    Resource::builder_empty()
+        .with_attributes([KeyValue::new("service.name", service_name)])
+        .build()
 }
 
-fn otel_exporter() -> HttpExporterBuilder {
-    let endpoint = env::var("OTLP_RECEIVER_URL").unwrap_or("http://otc:4318".to_string());
-    new_exporter().http().with_endpoint(&endpoint)
+fn otel_endpoint() -> String {
+    env::var("OTLP_RECEIVER_URL").unwrap_or("http://otc:4318".to_string())
 }
 
 use tracing_appender::non_blocking::WorkerGuard;
@@ -92,15 +96,22 @@ where
             .with_max_export_batch_size(256)
             .with_scheduled_delay(Duration::from_millis(2500))
             .build();
-        let config = Config::default()
+        let exporter = SpanExporter::builder()
+            .with_http()
+            .with_protocol(Protocol::HttpBinary)
+            .with_endpoint(otel_endpoint())
+            .build()
+            .unwrap();
+        let batch_processor = BatchSpanProcessor::builder(exporter)
+            .with_batch_config(batch_config)
+            .build();
+        let tracer_provider = SdkTracerProvider::builder()
             .with_resource(resource(service_name.clone()))
-            .with_sampler(TurboDASampler);
-        let pipeline = new_pipeline()
-            .tracing()
-            .with_exporter(otel_exporter())
-            .with_trace_config(config)
-            .with_batch_config(batch_config);
-        let tracer = pipeline.install_batch(Tokio).unwrap();
+            .with_sampler(TurboDASampler)
+            .with_span_processor(batch_processor)
+            .build();
+        let tracer = tracer_provider.tracer("turbo_da");
+        global::set_tracer_provider(tracer_provider);
         let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
         let subscriber = subscriber.with(otel_layer);
@@ -147,12 +158,16 @@ where
 
 pub fn init_meter<T: Into<Value>>(service_name: T) {
     if boolean_env("ENABLE_OTEL_METRICS") {
-        let meter_provider = new_pipeline()
-            .metrics(Tokio)
-            .with_exporter(otel_exporter())
-            .with_resource(resource(service_name))
+        let exporter = MetricExporter::builder()
+            .with_http()
+            .with_protocol(Protocol::HttpBinary)
+            .with_endpoint(otel_endpoint())
             .build()
             .unwrap();
+        let meter_provider = SdkMeterProvider::builder()
+            .with_resource(resource(service_name))
+            .with_periodic_exporter(exporter)
+            .build();
         global::set_meter_provider(meter_provider);
     }
 }
@@ -174,7 +189,7 @@ pub fn log_level_env(env_name: &'static str) -> Level {
 
 fn log(counter_name: String, attributes: Option<&[KeyValue]>) {
     let meter = global::meter("turbo_da");
-    let counter = meter.u64_counter(counter_name).init();
+    let counter = meter.u64_counter(counter_name).build();
     counter.add(1, attributes.unwrap_or_default());
 }
 

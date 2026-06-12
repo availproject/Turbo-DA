@@ -23,7 +23,7 @@ use enigma::{
 };
 use observability::log_txn;
 use redis::Commands;
-use std::{collections::HashMap, ops::Mul, str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
     sync::broadcast::Sender,
     time::{timeout, Duration},
@@ -170,7 +170,7 @@ impl Consumer {
         redis: Arc<Redis>,
         i: i32,
     ) -> Result<(), String> {
-        tracing::Span::current().set_parent(response.otel_context.clone());
+        let _ = tracing::Span::current().set_parent(response.otel_context.clone());
 
         let mut connection = get_connection(injected_dependency)
             .await
@@ -248,9 +248,10 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let (data, encrypted_data) = self.process_data(account.encryption).await?;
 
-        let convertor = Convertor::new(
+        let convertor = Convertor::new_with_app_id(
             self.submit_avail_class.client,
             self.submit_avail_class.account,
+            self.response.avail_app_id as u32,
         );
 
         let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await

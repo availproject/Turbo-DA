@@ -2,8 +2,7 @@ use std::str::FromStr;
 
 use alloy::{
     primitives::Address,
-    providers::{Provider, ProviderBuilder, RootProvider, WsConnect},
-    pubsub::PubSubFrontend,
+    providers::{DynProvider, Provider, ProviderBuilder, WsConnect},
     rpc::types::{Filter, Log},
     sol,
     sol_types::SolEvent,
@@ -28,7 +27,7 @@ sol! {
 }
 
 pub(crate) struct EVM {
-    provider: RootProvider<PubSubFrontend>,
+    provider: DynProvider,
     evm_chain_id: i32,
     contract_address: String,
     finalised_threshold: u64,
@@ -48,9 +47,10 @@ impl EVM {
         let ws = WsConnect::new(ws_url);
 
         let provider = ProviderBuilder::new()
-            .on_ws(ws)
+            .connect_ws(ws)
             .await
-            .map_err(|e| format!("Failed to connect to Turbo DA Contract: {:?}", e))?;
+            .map_err(|e| format!("Failed to connect to Turbo DA Contract: {:?}", e))?
+            .erased();
 
         Ok(Self {
             provider,
@@ -184,7 +184,7 @@ impl EVM {
     }
 
     fn process_deposit_event(&self, log: &Log) -> Result<Deposit, String> {
-        let event_receipt = Deposit::decode_log_data(&log.data(), true)
+        let event_receipt = Deposit::decode_log_data(&log.data())
             .map_err(|e| format!("Failed to decode log data: {}", e))?;
 
         Ok(event_receipt)

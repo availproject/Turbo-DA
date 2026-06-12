@@ -7,14 +7,12 @@ use actix_web::{
 };
 use alloy::primitives::Address;
 use avail_rust::{
-    avail_rust_core::rpc::{chain, system::chain},
     constants::dev_accounts,
     Client as AvailClient, Keypair, Options,
 };
 
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
-use db::schema::credit_requests::chain_id;
 use diesel_async::{
     pooled_connection::deadpool::{Object, Pool},
     AsyncPgConnection,
@@ -219,19 +217,29 @@ pub async fn get_prices(
 pub struct Convertor<'a> {
     pub sdk: &'a AvailClient,
     pub account: &'a Keypair,
+    pub app_id: u32,
     pub one_kb: Vec<u8>,
 }
 
 impl<'a> Convertor<'a> {
     pub fn new(sdk: &'a AvailClient, account: &'a Keypair) -> Self {
+        Self::new_with_app_id(sdk, account, 0)
+    }
+
+    pub fn new_with_app_id(sdk: &'a AvailClient, account: &'a Keypair, app_id: u32) -> Self {
         Convertor {
             sdk,
             account,
+            app_id,
             one_kb: vec![0u8; 1024],
         }
     }
     pub async fn get_gas_price_for_data(&self, data: Vec<u8>) -> BigDecimal {
-        let tx = self.sdk.tx().data_availability().submit_data(data);
+        let tx = self
+            .sdk
+            .tx()
+            .data_availability()
+            .submit_data(self.app_id, data);
 
         let options = Options::default();
         let query_info = match tx
@@ -382,7 +390,7 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
         }
         let endpoint = &endpoints[attempts];
         tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
-        match AvailClient::new(endpoint).await {
+        match AvailClient::connect(endpoint).await {
             Ok(sdk) => {
                 tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
@@ -495,7 +503,7 @@ pub async fn get_amount_to_be_credited(
     .await
     .map_err(|e| format!("Failed to get price for {}: {}", address, e))?;
 
-    let client = AvailClient::new(avail_rpc_url)
+    let client = AvailClient::connect(avail_rpc_url)
         .await
         .map_err(|e| format!("Failed to create SDK client: {:?}", e))?;
 
