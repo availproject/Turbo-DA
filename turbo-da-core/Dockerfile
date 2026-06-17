@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1.78.0-bookworm AS base
+FROM docker.io/library/rust:1.91-bookworm AS base
 
 FROM docker.io/library/debian:bookworm-slim AS runtime
 RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
