@@ -87,6 +87,21 @@ pub fn is_valid_ethereum_address(address: &str) -> Result<(), ValidationError> {
     }
 }
 
+/// Checks that a string is a `0x` prefixed, 40 character hex address
+///
+/// Unlike [`is_valid_ethereum_address`] this rejects the shorter forms
+/// `Address::from_str` tolerates, and is meant for values that are stored and
+/// later compared against a recovered signer.
+///
+/// # Arguments
+/// * `address` - Address string to validate
+pub fn is_valid_hex_address(address: &str) -> bool {
+    match address.strip_prefix("0x") {
+        Some(body) => body.len() == 40 && body.chars().all(|c| c.is_ascii_hexdigit()),
+        None => false,
+    }
+}
+
 /// Gets a database connection from the connection pool
 ///
 /// # Arguments

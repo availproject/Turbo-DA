@@ -1,6 +1,20 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    address_book (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        address -> Varchar,
+        #[max_length = 64]
+        name -> Varchar,
+        #[max_length = 64]
+        role -> Nullable<Varchar>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     api_keys (api_key) {
         #[max_length = 255]
         api_key -> Varchar,
@@ -10,6 +24,16 @@ diesel::table! {
         #[max_length = 255]
         identifier -> Varchar,
         app_id -> Uuid,
+        #[max_length = 64]
+        label -> Nullable<Varchar>,
+        last_used_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    app_allowed_avail_ids (app_id, avail_app_id) {
+        app_id -> Uuid,
+        avail_app_id -> Int4,
     }
 }
 
@@ -30,6 +54,7 @@ diesel::table! {
         credit_selection -> Nullable<Int2>,
         encryption -> Bool,
         barred -> Bool,
+        per_post_app_id -> Bool,
     }
 }
 
@@ -79,6 +104,7 @@ diesel::table! {
         signature_plaintext_hash -> Nullable<Bytea>,
         address -> Nullable<Bytea>,
         ephemeral_pub_key -> Nullable<Bytea>,
+        source -> Nullable<Varchar>,
     }
 }
 
@@ -107,6 +133,32 @@ diesel::table! {
         user_id -> Varchar,
         public_address -> Varchar,
         created_at -> Timestamp,
+        verified_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    signer_challenges (id) {
+        id -> Uuid,
+        user_id -> Varchar,
+        public_address -> Varchar,
+        nonce -> Uuid,
+        created_at -> Timestamp,
+        expires_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    user_alert_prefs (user_id) {
+        user_id -> Varchar,
+        low_balance_enabled -> Bool,
+        low_balance_credits -> Nullable<Numeric>,
+        runway_enabled -> Bool,
+        runway_days -> Nullable<Int4>,
+        failed_post_enabled -> Bool,
+        low_balance_alerted_at -> Nullable<Timestamp>,
+        runway_alerted_at -> Nullable<Timestamp>,
+        updated_at -> Timestamp,
     }
 }
 
@@ -121,8 +173,10 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(address_book -> users (user_id));
 diesel::joinable!(api_keys -> apps (app_id));
 diesel::joinable!(api_keys -> users (user_id));
+diesel::joinable!(app_allowed_avail_ids -> apps (app_id));
 diesel::joinable!(apps -> users (user_id));
 diesel::joinable!(credit_requests -> apps (app_id));
 diesel::joinable!(credit_requests -> users (user_id));
@@ -130,14 +184,20 @@ diesel::joinable!(customer_expenditures -> apps (app_id));
 diesel::joinable!(customer_expenditures -> users (user_id));
 diesel::joinable!(mpc_participants -> apps (app_id));
 diesel::joinable!(public_keys -> users (user_id));
+diesel::joinable!(signer_challenges -> users (user_id));
+diesel::joinable!(user_alert_prefs -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    address_book,
     api_keys,
+    app_allowed_avail_ids,
     apps,
     credit_requests,
     customer_expenditures,
     indexer_block_numbers,
     mpc_participants,
     public_keys,
+    signer_challenges,
+    user_alert_prefs,
     users,
 );

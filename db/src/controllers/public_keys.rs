@@ -57,7 +57,9 @@ pub async fn public_key_exists(
 ) -> Result<bool, diesel::result::Error> {
     use diesel::dsl::exists;
 
-    diesel::select(exists(public_keys.filter(public_address.eq(target_public_address))))
-        .get_result(conn)
-        .await
+    diesel::select(exists(
+        public_keys.filter(public_address.eq(target_public_address)),
+    ))
+    .get_result(conn)
+    .await
 }

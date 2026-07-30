@@ -70,6 +70,34 @@ pub async fn get_fund_list(
         .map_err(|e| format!("Error loading fund list: {}", e))
 }
 
+/// Paginated variant of [`get_fund_list`], newest request first.
+pub async fn get_fund_list_paged(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<CreditRequestInfo>, diesel::result::Error> {
+    credit_requests
+        .filter(user_id.eq(user))
+        .order(created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .select(CreditRequestInfo::as_select())
+        .load(&mut *connection)
+        .await
+}
+
+pub async fn count_fund_list(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+) -> Result<i64, diesel::result::Error> {
+    credit_requests
+        .filter(user_id.eq(user))
+        .count()
+        .get_result::<i64>(&mut *connection)
+        .await
+}
+
 pub async fn get_all_fund_requests(
     user: &Option<String>,
     app: &Option<Uuid>,

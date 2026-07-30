@@ -26,6 +26,11 @@ use actix_web::{
 };
 use config::AppConfig;
 use controllers::{
+    address_book::{
+        create_address_book_entry, delete_address_book_entry, list_address_book,
+        update_address_book_entry,
+    },
+    alert_prefs::{get_alert_prefs, update_alert_prefs},
     customer_expenditure::{get_expenditure_by_time_range, get_wallet_usage, reset_retry_count},
     file::{download_file, upload_file},
     fund::{
@@ -33,10 +38,17 @@ use controllers::{
         fund_user, get_fund_list, purchase_cost, register_credit_request,
     },
     misc::indexer_status,
-    public_keys::{add_public_key, delete_public_key, get_public_keys},
+    playground::playground_submit,
+    posting_policy::{get_app_posting_policy, set_app_posting_policy},
+    public_keys::{
+        add_public_key, create_signer_challenge, delete_public_key, get_public_keys,
+        verify_signer_challenge,
+    },
+    usage::{activity, usage_summary},
     users::{
         allocate_credit, delete_account, delete_api_key, edit_app_account, generate_api_key,
         generate_app_account, get_all_apps, get_api_keys, get_apps, reclaim_credits,
+        update_api_key,
     },
 };
 
@@ -178,6 +190,24 @@ async fn main() -> Result<(), std::io::Error> {
                             .service(get_wallet_usage)
                             .service(generate_access_token)
                             .service(toggle_encryption)
+                            .service(update_api_key)
+                            .service(set_app_posting_policy)
+                            .service(get_app_posting_policy)
+                            .service(get_alert_prefs)
+                            .service(update_alert_prefs)
+                            .service(list_address_book)
+                            .service(create_address_book_entry)
+                            .service(update_address_book_entry)
+                            .service(delete_address_book_entry)
+                            .service(usage_summary)
+                            .service(activity)
+                            .service(playground_submit)
+                            // The challenge and verify paths are distinct
+                            // literals, but they are registered ahead of the
+                            // bare /public_keys routes so matching order can
+                            // never shadow them.
+                            .service(create_signer_challenge)
+                            .service(verify_signer_challenge)
                             .service(add_public_key)
                             .service(get_public_keys)
                             .service(delete_public_key)
