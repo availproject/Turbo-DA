@@ -5,10 +5,12 @@ use crate::{
     schema::customer_expenditures::dsl::*,
 };
 use bigdecimal::BigDecimal;
-use diesel::{prelude::*, result::Error};
+use chrono::NaiveDate;
+use diesel::{prelude::*, result::Error, sql_types};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use enigma::types::EncryptResponse;
 use log::{error, info};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -201,6 +203,126 @@ pub async fn handle_get_all_expenditure(
         Ok(results) => Ok(json!({"results":results})),
         Err(_) => Err(Error::NotFound),
     }
+}
+
+/// Same listing as [`handle_get_all_expenditure`] but paginated and typed.
+/// Newest submissions first, so `offset` is stable for the dashboard.
+pub async fn handle_get_all_expenditure_paged(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    final_limit: i64,
+    offset: i64,
+) -> Result<Vec<CustomerExpenditureGet>, Error> {
+    customer_expenditures
+        .filter(user_id.eq(user))
+        .order(created_at.desc())
+        .limit(final_limit)
+        .offset(offset)
+        .select(CustomerExpenditureGet::as_select())
+        .load::<CustomerExpenditureGet>(connection)
+        .await
+}
+
+pub async fn count_all_expenditure(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+) -> Result<i64, Error> {
+    customer_expenditures
+        .filter(user_id.eq(user))
+        .count()
+        .get_result::<i64>(connection)
+        .await
+}
+
+/// Rows of the usage window, kept next to the SQL that produces them.
+const USAGE_WINDOW: &str =
+    "user_id = $1 AND created_at >= LOCALTIMESTAMP - make_interval(days => $2)";
+
+/// `QueryableByName` expands to bindings named after each column, which would
+/// clash with the `customer_expenditures::dsl` glob imported above.
+mod usage_rows {
+    use super::{BigDecimal, Deserialize, NaiveDate, Serialize, Uuid};
+    use diesel::{sql_types, QueryableByName};
+
+    #[derive(QueryableByName, Debug)]
+    pub struct PerDayRow {
+        #[diesel(sql_type = sql_types::Date)]
+        pub day: NaiveDate,
+        #[diesel(sql_type = sql_types::Numeric)]
+        pub credits: BigDecimal,
+    }
+
+    #[derive(QueryableByName, Serialize, Deserialize, Debug, Clone)]
+    pub struct PerAppUsage {
+        #[diesel(sql_type = sql_types::Uuid)]
+        pub app_id: Uuid,
+        #[diesel(sql_type = sql_types::Numeric)]
+        pub credits: BigDecimal,
+        #[diesel(sql_type = sql_types::Nullable<sql_types::Timestamp>)]
+        pub last_post_at: Option<chrono::NaiveDateTime>,
+        #[diesel(sql_type = sql_types::BigInt)]
+        pub failed_posts: i64,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct UsageSummary {
+        pub spent_credits: BigDecimal,
+        pub per_day: Vec<(NaiveDate, BigDecimal)>,
+        pub per_app: Vec<PerAppUsage>,
+    }
+}
+
+use usage_rows::PerDayRow;
+pub use usage_rows::{PerAppUsage, UsageSummary};
+
+/// Aggregates a user's spend over the trailing `days` days: total credits, a
+/// daily series for charting, and a per-app breakdown.
+///
+/// `created_at` is written by the database (`DEFAULT NOW()`), so the window is
+/// anchored with `LOCALTIMESTAMP` to stay in the same clock as the stored rows.
+///
+/// Credits come from `converted_fees`, which holds the billed byte-denominated
+/// amount; `fees` holds the Avail gas fee and is not what a user spends.
+pub async fn usage_summary(
+    connection: &mut AsyncPgConnection,
+    user: &String,
+    days: i32,
+) -> Result<UsageSummary, Error> {
+    let per_day_rows = diesel::sql_query(format!(
+        "SELECT date_trunc('day', created_at)::date AS day, \
+         COALESCE(SUM(converted_fees), 0) AS credits \
+         FROM customer_expenditures WHERE {USAGE_WINDOW} \
+         GROUP BY 1 ORDER BY 1"
+    ))
+    .bind::<sql_types::Text, _>(user)
+    .bind::<sql_types::Integer, _>(days)
+    .load::<PerDayRow>(&mut *connection)
+    .await?;
+
+    let per_app = diesel::sql_query(format!(
+        "SELECT app_id, COALESCE(SUM(converted_fees), 0) AS credits, \
+         MAX(created_at) AS last_post_at, \
+         COUNT(*) FILTER (WHERE error IS NOT NULL) AS failed_posts \
+         FROM customer_expenditures WHERE {USAGE_WINDOW} \
+         GROUP BY app_id ORDER BY credits DESC"
+    ))
+    .bind::<sql_types::Text, _>(user)
+    .bind::<sql_types::Integer, _>(days)
+    .load::<PerAppUsage>(&mut *connection)
+    .await?;
+
+    let spent_credits = per_day_rows
+        .iter()
+        .fold(BigDecimal::from(0), |total, row| total + &row.credits);
+
+    Ok(UsageSummary {
+        spent_credits,
+        per_day: per_day_rows
+            .into_iter()
+            .map(|row| (row.day, row.credits))
+            .collect(),
+        per_app,
+    })
 }
 
 pub async fn handle_get_expenditure_by_time_range(

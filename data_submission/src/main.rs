@@ -5,9 +5,7 @@ pub mod routes;
 pub mod utils;
 pub mod workload_scheduler;
 
-use crate::{
-    auth::Auth, config::AppConfig, redis::Redis, 
-};
+use crate::{auth::Auth, config::AppConfig, redis::Redis};
 use actix_cors::Cors;
 use actix_web::{
     middleware::Logger,
@@ -17,7 +15,7 @@ use actix_web::{
 
 use crate::routes::{
     data_retrieval::{get_pre_image, get_submission_info},
-    data_submission::{submit_data, submit_raw_data},
+    data_submission::{internal_submit_raw_data, submit_data, submit_raw_data},
     health::health_check,
 };
 use diesel_async::{
@@ -105,8 +103,21 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(submit_data)
                     .service(submit_raw_data)
                     .service(get_pre_image)
-                    .service(get_submission_info)
-           )
+                    .service(get_submission_info),
+            )
+            // Trusted internal callers (the dashboard playground) authenticate
+            // with a shared secret inside the handler rather than an API key,
+            // so this scope deliberately skips the Auth middleware.
+            .service(
+                web::scope("/internal/v1")
+                    .app_data(web::PayloadConfig::new(shared_config.payload_size))
+                    .app_data(shared_producer_send.clone())
+                    .app_data(shared_config.clone())
+                    .app_data(shared_pool.clone())
+                    .app_data(shared_keypair.clone())
+                    .app_data(enigma.clone())
+                    .service(internal_submit_raw_data),
+            )
     })
     .bind(format!("0.0.0.0:{}", port))?
     .run()

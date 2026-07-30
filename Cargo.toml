@@ -8,7 +8,8 @@ members = [
     "fallback_monitor", 
     "data_submission", 
     "avail",
-    "enigma"]
+    "enigma",
+    "notifier"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -16,6 +16,8 @@ aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = { version = "1.4.0", features = ["rt-tokio"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 alloy = { version = "0.7.2", features = ["full"] }
+alloy-primitives = { version = "1.1.2", features = ["k256"] }
+base64 = "0.22"
 clerk-rs = { version = "0.4.0", features = ["actix"] }
 actix-multipart = "0.6.1"
 actix-web = { workspace = true }

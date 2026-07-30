@@ -136,6 +136,15 @@ pub async fn add_inclusion_details(
     }
 }
 
+/// Query parameters for retrieving a user's fund requests
+#[derive(Deserialize, Serialize)]
+struct GetFundListParams {
+    limit: Option<i64>,
+    /// Opting into offset paging also adds a `total` to the response; leaving it
+    /// out keeps the original unpaged shape.
+    offset: Option<i64>,
+}
+
 /// Retrieve a list of all fund transactions for a user
 ///
 /// # Description
@@ -143,10 +152,15 @@ pub async fn add_inclusion_details(
 /// The transactions are fetched from the database and returned in a structured format.
 ///
 /// # Route
-/// `GET /v1/user/get_fund_list`
+/// `GET /v1/user/get_fund_list?limit={limit}&offset={offset}`
 ///
 /// # Headers
 /// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Query Parameters
+/// * `limit` - Optional page size, only honoured alongside `offset`
+/// * `offset` - Optional offset into the result set; when present the response
+///   also carries a `total` count of all the user's requests
 ///
 /// # Returns
 /// * 200 OK with a list of fund transactions if successful
@@ -173,8 +187,10 @@ pub async fn add_inclusion_details(
 /// ```
 #[get("/get_fund_list")]
 pub async fn get_fund_list(
+    request_payload: web::Query<GetFundListParams>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     http_request: HttpRequest,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
@@ -190,14 +206,45 @@ pub async fn get_fund_list(
         Err(response) => return response,
     };
 
-    let tx = db::controllers::fund::get_fund_list(user, &mut connection).await;
-    match tx {
-        Ok(tx) => HttpResponse::Ok().json(
-            json!({"state": "SUCCESS", "message": "Fund list retrieved successfully", "data": tx}),
-        ),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
+    let offset = match request_payload.offset {
+        Some(offset) => offset.max(0),
+        None => {
+            let tx = db::controllers::fund::get_fund_list(user, &mut connection).await;
+            return match tx {
+                Ok(tx) => HttpResponse::Ok().json(
+                    json!({"state": "SUCCESS", "message": "Fund list retrieved successfully", "data": tx}),
+                ),
+                Err(e) => {
+                    HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "message": e}))
+                }
+            };
         }
+    };
+
+    let limit = request_payload
+        .limit
+        .unwrap_or(config.total_users_query_limit);
+
+    let results =
+        match db::controllers::fund::get_fund_list_paged(&mut connection, &user, limit, offset)
+            .await
+        {
+            Ok(results) => results,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .json(json!({ "state": "ERROR", "error": e.to_string() }))
+            }
+        };
+
+    match db::controllers::fund::count_fund_list(&mut connection, &user).await {
+        Ok(total) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Fund list retrieved successfully",
+            "data": results,
+            "total": total,
+        })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "state": "ERROR", "error": e.to_string() })),
     }
 }
 

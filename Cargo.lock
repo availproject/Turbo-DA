@@ -2762,6 +2762,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
+ "notifier",
  "observability",
  "r2d2",
  "r2d2_redis",
@@ -3324,6 +3325,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
+ "notifier",
  "observability",
  "reqwest",
  "serde",
@@ -4890,6 +4892,18 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "notifier"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7985,10 +7999,12 @@ dependencies = [
  "actix-multipart",
  "actix-web",
  "alloy",
+ "alloy-primitives 1.4.1",
  "avail-rust-client",
  "avail-utils",
  "aws-config",
  "aws-sdk-s3",
+ "base64 0.22.1",
  "bcrypt",
  "bigdecimal",
  "chrono",

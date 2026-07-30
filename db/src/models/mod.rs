@@ -1,8 +1,12 @@
+pub mod address_book;
+pub mod alert_prefs;
 pub mod api;
+pub mod app_allowed_avail_ids;
 pub mod apps;
 pub mod credit_requests;
 pub mod customer_expenditure;
 pub mod indexer;
 pub mod mpc_participants;
 pub mod public_keys;
+pub mod signer_challenges;
 pub mod user_model;
