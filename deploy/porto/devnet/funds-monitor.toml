@@ -1,3 +1,5 @@
+image = "registry.digitalocean.com/availj/turboda-funds-monitor"
+
 [network]
 port = 8080
 
