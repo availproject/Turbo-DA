@@ -1,0 +1,43 @@
+image = "registry.digitalocean.com/availj/turboda-core-api"
+
+[network]
+port = 8000
+
+[deploy]
+health_path = "/health"
+chart_version = 131
+
+[resources]
+cpu_request = "20m"
+memory_request = "64Mi"
+memory_limit = "512Mi"
+
+[env]
+AWS_REGION = "us-east-1"
+S3_BUCKET_NAME = "avail-turbo-da"
+PORT = "8000"
+MAX_POOL_SIZE = "30"
+TOTAL_USERS_QUERY_LIMIT = "20"
+RATE_LIMIT_MAX_REQUESTS = "5000"
+RATE_LIMIT_WINDOW_SIZE = "60"
+
+[secrets]
+DATABASE_URL = "/turboda/devnet/shared/DATABASE_URL"
+DATABASE_CA_CERT = "/turboda/devnet/shared/DATABASE_CA_CERT"
+REDIS_URL = "/turboda/devnet/shared/REDIS_URL"
+AVAIL_RPC_ENDPOINT_1 = "/turboda/devnet/core-api/AVAIL_RPC_ENDPOINT_1"
+COINGECKO_API_URL = "/turboda/devnet/shared/COINGECKO_API_URL"
+COINGECKO_API_KEY = "/turboda/devnet/shared/COINGECKO_API_KEY"
+CLERK_SECRET_KEY = "/turboda/devnet/core-api/CLERK_SECRET_KEY"
+AWS_ACCESS_KEY_ID = "/turboda/devnet/core-api/AWS_ACCESS_KEY_ID"
+AWS_ENDPOINT_URL = "/turboda/devnet/core-api/AWS_ENDPOINT_URL"
+AWS_SECRET_ACCESS_KEY = "/turboda/devnet/core-api/AWS_SECRET_ACCESS_KEY"
+SUMSUB_APP_TOKEN = "/turboda/devnet/core-api/SUMSUB_APP_TOKEN"
+SUMSUB_SECRET_KEY = "/turboda/devnet/core-api/SUMSUB_SECRET_KEY"
+SUMSUB_BASE_URL = "/turboda/devnet/core-api/SUMSUB_BASE_URL"
+ENIGMA_URL = "/turboda/devnet/shared/ENIGMA_URL"
+ENIGMA_ENCRYPTION_SERVICE_URL = "/turboda/devnet/shared/ENIGMA_URL"
+CA_CRT = "/turboda/devnet/shared/CA_CRT"
+CLIENT_KEY = "/turboda/devnet/shared/CLIENT_KEY"
+CLIENT_CRT = "/turboda/devnet/shared/CLIENT_CRT"
+

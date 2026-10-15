@@ -1,0 +1,30 @@
+image = "registry.digitalocean.com/availj/turboda-fallback-monitor"
+
+[network]
+port = 8080
+
+[resources]
+cpu_request = "20m"
+memory_request = "64Mi"
+memory_limit = "512Mi"
+
+[env]
+OTLP_RECEIVER_URL = "http://unified-otel.avail.so:4317"
+ENABLE_OTEL_METRICS = "true"
+ENABLE_OTEL_TRACING = "false"
+ENIGMA_URL = "https://8cf1d54885e5c42735d3426baadb6031ace3add4-3000s.dstack-base-prod7.phala.network"
+RETRY_COUNT = "100"
+LIMIT = "1"
+
+[secrets]
+DATABASE_URL = "/turboda/devnet/shared/DATABASE_URL"
+DATABASE_CA_CERT = "/turboda/devnet/shared/DATABASE_CA_CERT"
+PRIVATE_KEY_0 = "/turboda/devnet/fallback-monitor/PRIVATE_KEY_0"
+AVAIL_RPC_ENDPOINT_1 = "/turboda/devnet/fallback-monitor/AVAIL_RPC_ENDPOINT_1"
+COINGECKO_API_URL = "/turboda/devnet/shared/COINGECKO_API_URL"
+COINGECKO_API_KEY = "/turboda/devnet/shared/COINGECKO_API_KEY"
+REDIS_URL = "/turboda/devnet/shared/REDIS_URL"
+CA_CRT = "/turboda/devnet/shared/CA_CRT"
+CLIENT_KEY = "/turboda/devnet/shared/CLIENT_KEY"
+CLIENT_CRT = "/turboda/devnet/shared/CLIENT_CRT"
+

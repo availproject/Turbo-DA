@@ -1,0 +1,27 @@
+image = "registry.digitalocean.com/availj/turboda-funds-monitor"
+
+[network]
+port = 8080
+
+[resources]
+cpu_request = "20m"
+memory_request = "64Mi"
+memory_limit = "512Mi"
+
+[env]
+OTLP_RECEIVER_URL = "http://unified-otel.avail.so:4317"
+ENABLE_OTEL_METRICS = "true"
+ENABLE_OTEL_TRACING = "false"
+NETWORK_BASE_CONTRACT_ADDRESS = "0x5f02ED27A20BbDbB90EEf98670fA36c36fc02D12"
+AVAIL_DEPOSIT_ADDRESS = "5EDAzYNAu561hN837GPZnfAjUh61vEJZFg3Sqyx9HzfHpccY"
+MAXIMUM_PENDING_REQUESTS = "100"
+NETWORK_BASE_CHAIN_ID = "84532"
+
+[secrets]
+DATABASE_URL = "/turboda/devnet/shared/DATABASE_URL"
+DATABASE_CA_CERT = "/turboda/devnet/shared/DATABASE_CA_CERT"
+COINGECKO_API_URL = "/turboda/devnet/shared/COINGECKO_API_URL"
+COINGECKO_API_KEY = "/turboda/devnet/shared/COINGECKO_API_KEY"
+AVAIL_RPC_URL = "/turboda/devnet/funds-monitor/AVAIL_RPC_URL"
+NETWORK_BASE_URL = "/turboda/devnet/funds-monitor/NETWORK_BASE_URL"
+NETWORK_BASE_WS_URL = "/turboda/devnet/funds-monitor/NETWORK_BASE_WS_URL"
