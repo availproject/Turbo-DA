@@ -3705,9 +3705,13 @@ dependencies = [
  "diesel-async",
  "dotenv",
  "enigma",
+ "futures",
  "log",
+ "native-tls",
+ "postgres-native-tls",
  "serde",
  "serde_json",
+ "tokio-postgres",
  "uuid",
 ]
 
@@ -6917,6 +6921,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a106d1259c23fac8e543272398ae0e3c0b8d33c88ed73d0cc71b0f1d902618"
 dependencies = [
  "portable-atomic",
+]
+
+[[package]]
+name = "postgres-native-tls"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fef4de47bb81477e0c3deaf153a1b10ae176484713ff1640969f4cb96b653ebc"
+dependencies = [
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tokio-postgres",
 ]
 
 [[package]]
