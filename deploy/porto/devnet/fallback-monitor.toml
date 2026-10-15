@@ -1,5 +1,3 @@
-image = "registry.digitalocean.com/availj/turboda-fallback-monitor"
-
 [network]
 port = 8080
 
