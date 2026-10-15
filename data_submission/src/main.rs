@@ -21,7 +21,7 @@ use crate::routes::{
     health::health_check,
 };
 use diesel_async::{
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    pooled_connection::deadpool::Pool,
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
@@ -49,8 +49,7 @@ async fn main() -> Result<(), std::io::Error> {
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
     let shared_keypair = web::Data::new(accounts);
 
-    let db_config =
-        AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
+    let db_config = db::pool_manager(&app_config.database_url);
 
     let pool: Pool<AsyncPgConnection> = Pool::builder(db_config)
         .max_size(app_config.max_pool_size)

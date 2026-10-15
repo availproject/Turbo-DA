@@ -14,8 +14,8 @@ use db::{
 
 use data_submission::redis::Redis;
 use diesel_async::{
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
-    AsyncConnection, AsyncPgConnection,
+    pooled_connection::deadpool::Pool,
+    AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
 use observability::{log_fallback_txn_error, log_retry_count};
@@ -40,7 +40,7 @@ pub async fn monitor_failed_transactions(
     limit: i64,
     enigma: &EnigmaEncryptionService,
 ) {
-    let mut connection_client = AsyncPgConnection::establish(connection)
+    let mut connection_client = db::establish(connection)
         .await
         .expect("Failed to connect to db");
     let unresolved_transactions =
@@ -92,7 +92,7 @@ async fn process_failed_transactions(
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
     enigma: &EnigmaEncryptionService,
 ) {
-    let db_config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(connection);
+    let db_config = db::pool_manager(connection);
 
     let pool: Pool<AsyncPgConnection> = Pool::builder(db_config)
         .max_size(failed_transactions_list.len())

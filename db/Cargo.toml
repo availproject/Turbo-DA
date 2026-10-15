@@ -13,5 +13,9 @@ dotenv = "0.15.0"
 diesel-async.workspace = true
 log.workspace = true
 serde_json.workspace = true
+futures.workspace = true
+tokio-postgres = "0.7"
+postgres-native-tls = "0.5"
+native-tls = "0.2"
 avail-utils = { path = "../avail"}
 enigma = { path = "../enigma" }
