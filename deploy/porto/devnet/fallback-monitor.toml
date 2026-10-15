@@ -9,7 +9,6 @@ memory_request = "64Mi"
 memory_limit = "512Mi"
 
 [env]
-OTLP_RECEIVER_URL = "http://unified-otel.avail.so:4317"
 ENABLE_OTEL_METRICS = "true"
 ENABLE_OTEL_TRACING = "false"
 ENIGMA_URL = "https://8cf1d54885e5c42735d3426baadb6031ace3add4-3000s.dstack-base-prod7.phala.network"

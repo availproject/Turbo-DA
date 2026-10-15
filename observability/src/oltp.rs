@@ -42,13 +42,16 @@ impl ShouldSample for TurboDASampler {
 }
 
 fn resource<T: Into<Value>>(service_name: T) -> Resource {
+    if env::var("OTEL_SERVICE_NAME").is_ok() {
+        return Resource::builder().build();
+    }
     Resource::builder_empty()
         .with_attributes([KeyValue::new("service.name", service_name)])
         .build()
 }
 
-fn otel_endpoint() -> String {
-    env::var("OTLP_RECEIVER_URL").unwrap_or("http://otc:4318".to_string())
+fn otel_endpoint() -> Option<String> {
+    env::var("OTLP_RECEIVER_URL").ok()
 }
 
 use tracing_appender::non_blocking::WorkerGuard;
@@ -96,12 +99,13 @@ where
             .with_max_export_batch_size(256)
             .with_scheduled_delay(Duration::from_millis(2500))
             .build();
-        let exporter = SpanExporter::builder()
+        let mut builder = SpanExporter::builder()
             .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(otel_endpoint())
-            .build()
-            .unwrap();
+            .with_protocol(Protocol::HttpBinary);
+        if let Some(endpoint) = otel_endpoint() {
+            builder = builder.with_endpoint(endpoint);
+        }
+        let exporter = builder.build().unwrap();
         let batch_processor = BatchSpanProcessor::builder(exporter)
             .with_batch_config(batch_config)
             .build();
@@ -158,12 +162,13 @@ where
 
 pub fn init_meter<T: Into<Value>>(service_name: T) {
     if boolean_env("ENABLE_OTEL_METRICS") {
-        let exporter = MetricExporter::builder()
+        let mut builder = MetricExporter::builder()
             .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(otel_endpoint())
-            .build()
-            .unwrap();
+            .with_protocol(Protocol::HttpBinary);
+        if let Some(endpoint) = otel_endpoint() {
+            builder = builder.with_endpoint(endpoint);
+        }
+        let exporter = builder.build().unwrap();
         let meter_provider = SdkMeterProvider::builder()
             .with_resource(resource(service_name))
             .with_periodic_exporter(exporter)

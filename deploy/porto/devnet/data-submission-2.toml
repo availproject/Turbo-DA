@@ -13,7 +13,6 @@ memory_request = "64Mi"
 memory_limit = "512Mi"
 
 [env]
-OTLP_RECEIVER_URL = "http://unified-otel.avail.so:4317"
 ENABLE_OTEL_METRICS = "true"
 ENABLE_OTEL_TRACING = "false"
 ENIGMA_ENCRYPTION_SERVICE_VERSION = "/enigma-encrypted-network/1.0.0"
