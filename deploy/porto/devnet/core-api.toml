@@ -1,3 +1,5 @@
+image = "registry.digitalocean.com/availj/turboda-core-api"
+
 [network]
 port = 8000
 
