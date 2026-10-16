@@ -73,6 +73,27 @@ where
     forward_ready!(service);
 
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
+        #[cfg(debug_assertions)]
+        if std::env::var("LOCAL_SUBMISSION_AUTH_BYPASS").as_deref() == Ok("true")
+            && req
+                .peer_addr()
+                .is_some_and(|address| address.ip().is_loopback())
+            && req.method() == actix_web::http::Method::POST
+            && matches!(req.path(), "/v1/submit_data" | "/v1/submit_raw_data")
+        {
+            if !req.headers().contains_key("user_id") || !req.headers().contains_key("app_id") {
+                return Box::pin(async move {
+                    Err(actix_error::ErrorBadRequest(
+                        "Local submission auth bypass requires user_id and app_id headers",
+                    ))
+                });
+            }
+
+            tracing::warn!("local submission API key authentication bypass enabled");
+            let future = self.service.call(req);
+            return Box::pin(future);
+        }
+
         let auth_header = req.headers().get("X-API-KEY");
         if auth_header.is_none() {
             return Box::pin(async move { Err(actix_error::ErrorUnauthorized("Missing API key")) });

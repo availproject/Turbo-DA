@@ -17,6 +17,29 @@ Key features:
 1. Configure environment variables in `.env` file (see `.env.example`)
 2. Start the service:
 
+### Local RPC smoke testing without an API key
+
+In a debug build, set `LOCAL_SUBMISSION_AUTH_BYPASS=true` to bypass API key
+authentication for loopback requests to `POST /v1/submit_data` and
+`POST /v1/submit_raw_data`. Supply `user_id` and `app_id` headers for an existing
+local database user and app. Database, encryption, and balance checks still apply.
+Release builds and all other routes retain normal authentication.
+
+Do not expose this mode through a reverse proxy or port forwarding: local callers
+can select any user and app. Leave the variable unset outside local testing.
+
+```bash
+LOCAL_SUBMISSION_AUTH_BYPASS=true cargo run -p data_submission
+```
+
+```bash
+curl http://127.0.0.1:8080/v1/submit_data \
+  -H 'Content-Type: application/json' \
+  -H 'user_id: <LOCAL_USER_ID>' \
+  -H 'app_id: <LOCAL_APP_UUID>' \
+  --data '{"data":"RPC smoke test"}'
+```
+
 ## API Reference
 
 ### 1. POST v1/submit_data

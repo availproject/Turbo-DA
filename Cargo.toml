@@ -25,7 +25,7 @@ serde_json = "1.0"
 log = "0.4.22"
 rand = "0.8.5"
 env_logger = "0.10"
-avail-rust = { package = "avail-rust-client", git = "https://github.com/availproject/avail-rust.git", rev = "b98212b9123d095e027ec00f067ff7a1350ab6c2", default-features = false, features = ["native"] }
+avail-rust = { package = "avail-rust-client", git = "https://github.com/availproject/avail-rust.git", rev = "77121322798fb6d5d9e38b7d403ac1b7c8c6ed5f", default-features = false, features = ["native"] }
 avail-fri = { git = "https://github.com/availproject/avail-core.git", rev = "ecc267c2b9dc3508066ddf879fde94b9599aa31d", default-features = false, features = ["parallel", "std"] }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}
