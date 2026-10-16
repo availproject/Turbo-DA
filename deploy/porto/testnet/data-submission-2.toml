@@ -1,0 +1,62 @@
+image = "registry.digitalocean.com/availj/turboda-data-submission"
+
+[network]
+port = 8080
+
+[deploy]
+health_path = "/health"
+chart_version = 131
+
+[resources]
+cpu_request = "500m"
+cpu_limit = "1500m"
+memory_request = "1800Mi"
+memory_limit = "2304Mi"
+
+[env]
+ENABLE_OTEL_METRICS = "true"
+ENABLE_OTEL_TRACING = "true"
+ENIGMA_ENCRYPTION_SERVICE_VERSION = "/enigma-encrypted-network/1.0.0"
+COINGECKO_API_URL = "https://pro-api.coingecko.com/api/v3/simple/price"
+PORT = "8080"
+NUMBER_OF_THREADS = "20"
+MAX_POOL_SIZE = "30"
+BROADCAST_CHANNEL_SIZE = "1000000"
+PAYLOAD_SIZE = "10000000"
+MAXIMUM_PENDING_REQUESTS = "50"
+RATE_LIMIT_MAX_REQUESTS = "5000"
+RATE_LIMIT_WINDOW_SIZE = "60"
+AVAIL_RPC_ENDPOINT_1 = "https://infinity-turing-rpc.avail.so/rpc"
+AVAIL_RPC_ENDPOINT_2 = "https://infinity-turing-rpc.avail.so/rpc"
+AVAIL_RPC_ENDPOINT_3 = "https://infinity-turing-rpc.avail.so/rpc"
+
+[secrets]
+DATABASE_URL = "/turboda/testnet/shared/DATABASE_URL"
+DATABASE_CA_CERT = "/turboda/testnet/shared/DATABASE_CA_CERT"
+REDIS_URL = "/turboda/testnet/shared/REDIS_URL"
+ENIGMA_URL = "/turboda/testnet/shared/ENIGMA_URL"
+ENIGMA_ENCRYPTION_SERVICE_URL = "/turboda/testnet/shared/ENIGMA_ENCRYPTION_SERVICE_URL"
+COINGECKO_API_KEY = "/turboda/testnet/shared/COINGECKO_API_KEY"
+CA_CRT = "/turboda/testnet/shared/CA_CRT"
+CLIENT_KEY = "/turboda/testnet/shared/CLIENT_KEY"
+CLIENT_CRT = "/turboda/testnet/shared/CLIENT_CRT"
+PRIVATE_KEY_0 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_0"
+PRIVATE_KEY_1 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_1"
+PRIVATE_KEY_2 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_2"
+PRIVATE_KEY_3 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_3"
+PRIVATE_KEY_4 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_4"
+PRIVATE_KEY_5 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_5"
+PRIVATE_KEY_6 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_6"
+PRIVATE_KEY_7 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_7"
+PRIVATE_KEY_8 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_8"
+PRIVATE_KEY_9 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_9"
+PRIVATE_KEY_10 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_10"
+PRIVATE_KEY_11 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_11"
+PRIVATE_KEY_12 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_12"
+PRIVATE_KEY_13 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_13"
+PRIVATE_KEY_14 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_14"
+PRIVATE_KEY_15 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_15"
+PRIVATE_KEY_16 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_16"
+PRIVATE_KEY_17 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_17"
+PRIVATE_KEY_18 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_18"
+PRIVATE_KEY_19 = "/turboda/testnet/data-submission-2/PRIVATE_KEY_19"
