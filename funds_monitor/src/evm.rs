@@ -35,6 +35,8 @@ pub(crate) struct EVM {
     utils: Utils,
 }
 
+
+const LOG_RANGE: u64 = 50_000;
 impl EVM {
     pub async fn new(
         contract_adress: String,
@@ -93,17 +95,25 @@ impl EVM {
     }
 
     async fn check_deposits(&mut self, number: u64) -> Result<(), String> {
+        while self.start_block <= number {
+            let to = number.min(self.start_block + LOG_RANGE - 1);
+            self.check_range(self.start_block, to).await?;
+            self.start_block = to + 1;
+        }
+        Ok(())
+    }
+
+    async fn check_range(&mut self, from: u64, number: u64) -> Result<(), String> {
         let filter = Filter::new()
             .address(Address::from_str(&self.contract_address).unwrap())
             .event("Deposit(bytes32,address,uint256,address)")
-            .from_block(self.start_block)
+            .from_block(from)
             .to_block(number);
         let logs = self
             .provider
             .get_logs(&filter)
             .await
             .map_err(|e| format!("Failed to get logs: {}", e))?;
-        self.start_block = number + 1;
         for log in logs {
             tracing::debug!(
                 message = "log from our contract",
