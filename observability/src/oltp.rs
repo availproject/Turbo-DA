@@ -57,6 +57,7 @@ fn otel_endpoint() -> Option<String> {
 use tracing_appender::non_blocking::WorkerGuard;
 
 pub fn init_tracer<T: Into<Value>>(service_name: T) -> WorkerGuard {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let service_name = service_name.into();
     let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
 
