@@ -14,7 +14,6 @@ memory_request = "1800Mi"
 memory_limit = "2304Mi"
 
 [env]
-OTLP_RECEIVER_URL = "http://otel2.avail.so"
 ENABLE_OTEL_METRICS = "true"
 ENABLE_OTEL_TRACING = "true"
 ENIGMA_ENCRYPTION_SERVICE_VERSION = "/enigma-encrypted-network/1.0.0"
