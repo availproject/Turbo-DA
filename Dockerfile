@@ -6,7 +6,7 @@ FROM docker.io/library/debian:bookworm-slim AS runtime
 RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
 
 FROM foundry-builder AS chef
-RUN cargo install --locked cargo-chef
+RUN cargo install --locked cargo-chef@0.1.73
 
 FROM chef AS planner
 COPY . .

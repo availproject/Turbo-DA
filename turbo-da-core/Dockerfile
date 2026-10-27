@@ -4,7 +4,7 @@ FROM docker.io/library/debian:bookworm-slim AS runtime
 RUN apt update && apt install -y libssl-dev libpq-dev ca-certificates
 
 FROM base AS chef
-RUN cargo install --locked cargo-chef
+RUN cargo install --locked cargo-chef@0.1.73
 RUN apt update && apt install -y cmake
 
 FROM chef AS planner

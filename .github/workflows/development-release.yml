@@ -71,6 +71,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to DOCR
+        if: steps.should_build.outputs.build == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       
       - name: Extract metadata and set version
         if: steps.should_build.outputs.build == 'true'
@@ -87,6 +95,8 @@ jobs:
           echo "network=$NETWORK" >> $GITHUB_OUTPUT
           echo "stage=$STAGE" >> $GITHUB_OUTPUT
           echo "service=${{ matrix.service }}" >> $GITHUB_OUTPUT
+          case "${{ matrix.service }}" in turbo-da-core) NAME=core-api ;; *) NAME=$(echo "${{ matrix.service }}" | tr _ -) ;; esac
+          echo "docr=registry.digitalocean.com/availj/turboda-$NAME" >> $GITHUB_OUTPUT
       
       - name: Build and push
         if: steps.should_build.outputs.build == 'true'
@@ -96,7 +106,9 @@ jobs:
           file: ./Dockerfile
           target: ${{ matrix.service }}
           push: true
-          tags: ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ matrix.service }}-${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.docr }}:${{ steps.meta.outputs.network }}-${{ steps.meta.outputs.version }}
           build-args: |
             NETWORK=${{ steps.meta.outputs.network }}
             STAGE=${{ steps.meta.outputs.stage }}
@@ -108,3 +120,18 @@ jobs:
           echo "Network: ${{ steps.meta.outputs.network }}"
           echo "Stage: ${{ steps.meta.outputs.stage }}"
           echo "Service: ${{ matrix.service }}"
+
+  tag-commit:
+    name: Tag built commit for Porto
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      - run: |
+          TAG="${{ github.event.inputs.network }}-${{ github.event.inputs.version }}"
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"

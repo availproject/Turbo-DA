@@ -19,7 +19,7 @@ use crate::controllers::{
 };
 use actix_cors::Cors;
 use actix_web::{
-    dev::Service,
+    dev::{Service, ServiceRequest},
     middleware::Logger,
     web::{self},
     App, HttpMessage, HttpServer,
@@ -46,7 +46,7 @@ use clerk_rs::{
     ClerkConfiguration,
 };
 use diesel_async::{
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    pooled_connection::deadpool::Pool,
     AsyncPgConnection,
 };
 use enigma::EnigmaEncryptionService;
@@ -58,6 +58,18 @@ use routes::enigma_management::{
 };
 use routes::health::health_check;
 
+/// Rejects the request unless its Clerk JWT carries `role`. Must be evaluated before the inner
+/// service is called, otherwise the handler (and its DB writes) runs for unauthorized callers.
+fn require_role(req: &ServiceRequest, role: &str) -> Result<(), actix_web::Error> {
+    match req.extensions().get::<ClerkJwt>() {
+        Some(jwt) if jwt.other.get("role").map_or(false, |r| r == role) => Ok(()),
+        Some(_) => Err(actix_web::error::ErrorUnauthorized("Unauthorized")),
+        None => Err(actix_web::error::ErrorUnauthorized(
+            "Invalid Authorization header",
+        )),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     let app_config = AppConfig::default().load_config()?;
@@ -65,8 +77,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     tracing::info!("Starting api server");
     let port = app_config.port;
-    let db_config =
-        AsyncDieselConnectionManager::<AsyncPgConnection>::new(&app_config.database_url);
+    let db_config = db::pool_manager(&app_config.database_url);
 
     let pool: Pool<AsyncPgConnection> = Pool::builder(db_config)
         .max_size(app_config.max_pool_size)
@@ -127,23 +138,8 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(
                         web::scope("/user")
                             .wrap_fn(|req, srv| {
-                                let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
-                                let fut = srv.call(req);
-                                async move {
-                                    let res = fut.await?;
-                                    if let Some(jwt) = jwt {
-                                        if !jwt.other.get("role").map_or(false, |r| r == "member") {
-                                            return Err(actix_web::error::ErrorUnauthorized(
-                                                "Unauthorized",
-                                            ));
-                                        }
-                                    } else {
-                                        return Err(actix_web::error::ErrorUnauthorized(
-                                            "Invalid Authorization header",
-                                        ));
-                                    }
-                                    Ok(res)
-                                }
+                                let fut = require_role(&req, "member").map(|()| srv.call(req));
+                                async move { fut?.await }
                             })
                             .wrap(ClerkMiddleware::new(
                                 MemoryCacheJwksProvider::new(clerk.clone()),
@@ -198,23 +194,8 @@ async fn main() -> Result<(), std::io::Error> {
                     .service(
                         web::scope("/admin")
                             .wrap_fn(|req, srv| {
-                                let jwt = req.extensions_mut().get::<ClerkJwt>().cloned();
-                                let fut = srv.call(req);
-                                async move {
-                                    let res = fut.await?;
-                                    if let Some(jwt) = jwt {
-                                        if !jwt.other.get("role").map_or(false, |r| r == "admin") {
-                                            return Err(actix_web::error::ErrorUnauthorized(
-                                                "Unauthorized",
-                                            ));
-                                        }
-                                    } else {
-                                        return Err(actix_web::error::ErrorUnauthorized(
-                                            "Invalid Authorization header",
-                                        ));
-                                    }
-                                    Ok(res)
-                                }
+                                let fut = require_role(&req, "admin").map(|()| srv.call(req));
+                                async move { fut?.await }
                             })
                             .wrap(ClerkMiddleware::new(
                                 MemoryCacheJwksProvider::new(clerk.clone()),

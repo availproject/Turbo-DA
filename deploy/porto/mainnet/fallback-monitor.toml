@@ -1,0 +1,38 @@
+image = "registry.digitalocean.com/availj/turboda-fallback-monitor"
+
+[network]
+port = 8080
+
+[resources]
+cpu_request = "25m"
+cpu_limit = "50m"
+memory_request = "32Mi"
+memory_limit = "64Mi"
+
+[env]
+ENABLE_OTEL_METRICS = "true"
+ENABLE_OTEL_TRACING = "false"
+ENIGMA_ENCRYPTION_SERVICE_VERSION = "/enigma-encrypted-network/1.0.0"
+RETRY_COUNT = "10"
+LIMIT = "6"
+AVAIL_RPC_ENDPOINT_1 = "https://mainnet-rpc.avail.so/rpc"
+AVAIL_RPC_ENDPOINT_2 = "https://mainnet-rpc.avail.so/rpc"
+AVAIL_RPC_ENDPOINT_3 = "https://mainnet-rpc.avail.so/rpc"
+
+[secrets]
+DATABASE_URL = "/turboda/mainnet/shared/DATABASE_URL"
+DATABASE_CA_CERT = "/turboda/mainnet/shared/DATABASE_CA_CERT"
+REDIS_URL = "/turboda/mainnet/shared/REDIS_URL"
+COINGECKO_API_URL = "/turboda/mainnet/shared/COINGECKO_API_URL"
+COINGECKO_API_KEY = "/turboda/mainnet/shared/COINGECKO_API_KEY"
+ENIGMA_URL = "/turboda/mainnet/shared/ENIGMA_URL"
+ENIGMA_ENCRYPTION_SERVICE_URL = "/turboda/mainnet/shared/ENIGMA_ENCRYPTION_SERVICE_URL"
+CA_CRT = "/turboda/mainnet/shared/CA_CRT"
+CLIENT_KEY = "/turboda/mainnet/shared/CLIENT_KEY"
+CLIENT_CRT = "/turboda/mainnet/shared/CLIENT_CRT"
+PRIVATE_KEY_0 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_0"
+PRIVATE_KEY_1 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_1"
+PRIVATE_KEY_2 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_2"
+PRIVATE_KEY_3 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_3"
+PRIVATE_KEY_4 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_4"
+PRIVATE_KEY_5 = "/turboda/mainnet/fallback-monitor/PRIVATE_KEY_5"
