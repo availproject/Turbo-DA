@@ -1,13 +1,11 @@
 use crate::{
     models::apps::{Apps, AppsCreate},
-    schema::apps::dsl::*,
+    schema::{apps::dsl::*, users::dsl as users},
 };
 use bigdecimal::BigDecimal;
 use diesel::{dsl, ExpressionMethods, QueryDsl, SelectableHelper};
-use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use uuid::Uuid;
-
-use super::users::allocate_global_credit_balance;
 
 pub async fn create_account(
     connection: &mut AsyncPgConnection,
@@ -41,19 +39,35 @@ pub async fn delete_account_by_id(
     user_identifier: String,
     account_id: Uuid,
 ) -> Result<(), String> {
-    let account = get_account_by_user_id(connection, &user_identifier, account_id).await?;
-    // check if there are allocated credits to this account. If so unlock on the main account.
-    if account.credit_used > BigDecimal::from(0) {
-        allocate_global_credit_balance(connection, &account.user_id, &account.credit_used).await?;
-    }
-    diesel::delete(
-        apps.filter(id.eq(account_id))
-            .filter(user_id.eq(user_identifier)),
-    )
-    .execute(connection)
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    connection
+        .transaction(async |conn| {
+            // Lock the row so a concurrent submission can't spend credits between read and delete.
+            let account = apps
+                .filter(id.eq(account_id))
+                .filter(user_id.eq(&user_identifier))
+                .select(Apps::as_select())
+                .for_update()
+                .first::<Apps>(&mut *conn)
+                .await?;
+            // Return the unspent allocation to the main account. `credit_used` has already been
+            // paid out on Avail and must not be refunded.
+            if account.credit_balance > BigDecimal::from(0) {
+                diesel::update(users::users.filter(users::id.eq(&account.user_id)))
+                    .set((
+                        users::credit_balance.eq(users::credit_balance + &account.credit_balance),
+                        users::allocated_credit_balance
+                            .eq(users::allocated_credit_balance - &account.credit_balance),
+                    ))
+                    .execute(&mut *conn)
+                    .await?;
+            }
+            diesel::delete(apps.filter(id.eq(account_id)))
+                .execute(conn)
+                .await?;
+            Ok::<(), diesel::result::Error>(())
+        })
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub async fn update_app_id(
