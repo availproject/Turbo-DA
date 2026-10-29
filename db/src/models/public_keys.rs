@@ -12,6 +12,7 @@ pub struct PublicKey {
     pub user_id: String,
     pub public_address: String,
     pub created_at: NaiveDateTime,
+    pub verified_at: Option<NaiveDateTime>,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone)]

@@ -19,6 +19,7 @@ pub struct Apps {
     pub fallback_credit_used: BigDecimal,
     pub encryption: bool,
     pub barred: bool,
+    pub per_post_app_id: bool,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug)]

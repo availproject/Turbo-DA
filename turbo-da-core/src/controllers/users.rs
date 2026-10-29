@@ -830,9 +830,39 @@ pub async fn reclaim_credits(
     }
 }
 
+/// Longest human readable name accepted for an API key.
+const MAX_API_KEY_LABEL_LEN: usize = 64;
+
+/// Normalises a caller supplied API key label: surrounding whitespace is
+/// dropped and a blank label is treated the same as an absent one.
+fn validate_api_key_label(label: Option<String>) -> Result<Option<String>, HttpResponse> {
+    let trimmed = label.map(|value| value.trim().to_string());
+
+    match trimmed {
+        Some(value) if value.chars().count() > MAX_API_KEY_LABEL_LEN => {
+            Err(HttpResponse::BadRequest().json(json!({
+                "state": "ERROR",
+                "error": format!("label must be at most {} characters", MAX_API_KEY_LABEL_LEN),
+            })))
+        }
+        Some(value) if value.is_empty() => Ok(None),
+        other => Ok(other),
+    }
+}
+
 #[derive(Deserialize, Serialize, Validate)]
 pub struct GenerateApiKey {
     pub app_id: Uuid,
+    /// Optional human readable name shown on the dashboard.
+    pub label: Option<String>,
+}
+
+/// Request payload for renaming an API key
+#[derive(Deserialize, Serialize, Validate)]
+pub struct UpdateApiKey {
+    pub identifier: String,
+    /// `null` clears the existing label.
+    pub label: Option<String>,
 }
 
 /// Generate a new API key for the authenticated user
@@ -849,12 +879,14 @@ pub struct GenerateApiKey {
 /// # Request Body
 /// ```json
 /// {
-///   "app_id": "uuid-string"
+///   "app_id": "uuid-string",
+///   "label": "optional name, max 64 chars"
 /// }
 /// ```
 ///
 /// # Returns
 /// * 200 OK with the new API key if generation succeeds
+/// * 400 Bad Request if the label is longer than 64 characters
 /// * 500 Internal Server Error if generation fails
 ///
 /// # Example Response
@@ -868,6 +900,10 @@ pub struct GenerateApiKey {
 /// }
 /// ```
 
+#[tracing::instrument(
+    skip(payload, http_request, injected_dependency),
+    fields(app_id = %payload.app_id, endpoint = "generate_api_key")
+)]
 #[post("/generate_api_key")]
 async fn generate_api_key(
     payload: web::Json<GenerateApiKey>,
@@ -877,6 +913,11 @@ async fn generate_api_key(
     let user = match retrieve_user_id_from_jwt(&http_request) {
         Some(val) => val,
         None => return HttpResponse::InternalServerError().body("User Id not retrieved"),
+    };
+
+    let label = match validate_api_key_label(payload.label.clone()) {
+        Ok(label) => label,
+        Err(response) => return response,
     };
 
     let key = Uuid::new_v4().to_string().replace("-", "");
@@ -896,6 +937,7 @@ async fn generate_api_key(
             user_id: user,
             identifier: key[key.len() - 5..].to_string(),
             app_id: payload.app_id,
+            label,
         },
     )
     .await;
@@ -937,16 +979,20 @@ async fn generate_api_key(
 ///   "message": "API key retrieved successfully",
 ///   "data": [
 ///     {
-///       "api_key": "***********abc12",
+///       "app_id": "uuid-string",
 ///       "identifier": "abc12",
+///       "label": "production",
 ///       "created_at": "2023-01-01T12:00:00Z",
-///       "user_id": "user-id-string",
-///       "app_id": "uuid-string"
+///       "last_used_at": "2023-01-02T09:30:00Z"
 ///     }
 ///   ]
 /// }
 /// ```
 
+#[tracing::instrument(
+    skip(http_request, injected_dependency),
+    fields(endpoint = "get_api_keys")
+)]
 #[get("/get_api_keys")]
 pub async fn get_api_keys(
     http_request: HttpRequest,
@@ -967,13 +1013,91 @@ pub async fn get_api_keys(
         Err(response) => return response,
     };
 
-    let query = db::controllers::api_keys::get_api_keys(&mut connection, &user).await;
+    let query = db::controllers::api_keys::get_api_keys_meta(&mut connection, &user).await;
 
     match query {
         Ok(key) => HttpResponse::Ok().json(json!({
             "state": "SUCCESS",
             "message": "API key retrieved successfully",
             "data": key
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "state": "ERROR",
+            "error": e.to_string(),
+        })),
+    }
+}
+
+/// Rename an API key belonging to the authenticated user
+///
+/// # Description
+/// Updates only the human readable label; the key material itself is untouched.
+/// Passing `null` for `label` clears the current name.
+///
+/// # Route
+/// `PUT /v1/user/update_api_key`
+///
+/// # Headers
+/// * `Authorization: Bearer <token>` - JWT token for authentication
+///
+/// # Request Body
+/// ```json
+/// {
+///   "identifier": "abc12",
+///   "label": "staging"
+/// }
+/// ```
+///
+/// # Returns
+/// * 200 OK if the key was renamed
+/// * 400 Bad Request if the label is longer than 64 characters
+/// * 404 Not Found if the identifier does not belong to the user
+/// * 500 Internal Server Error if the update fails
+#[tracing::instrument(
+    skip(payload, http_request, injected_dependency),
+    fields(identifier = %payload.identifier, endpoint = "update_api_key")
+)]
+#[put("/update_api_key")]
+pub async fn update_api_key(
+    payload: web::Json<UpdateApiKey>,
+    http_request: HttpRequest,
+    injected_dependency: web::Data<Pool<AsyncPgConnection>>,
+) -> impl Responder {
+    let user = match retrieve_user_id_from_jwt(&http_request) {
+        Some(val) => val,
+        None => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": "User Id not retrieved",
+            }))
+        }
+    };
+
+    let label = match validate_api_key_label(payload.label.clone()) {
+        Ok(label) => label,
+        Err(response) => return response,
+    };
+
+    let mut connection = match get_connection(&injected_dependency).await {
+        Ok(conn) => conn,
+        Err(response) => return response,
+    };
+
+    match db::controllers::api_keys::update_api_key_label(
+        &mut connection,
+        &user,
+        &payload.identifier,
+        label,
+    )
+    .await
+    {
+        Ok(count) if count > 0 => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "API key updated successfully",
+        })),
+        Ok(_) => HttpResponse::NotFound().json(json!({
+            "state": "ERROR",
+            "error": "API key not found",
         })),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "state": "ERROR",

@@ -9,9 +9,10 @@ use avail_utils::submit_data::SubmitDataAvail;
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
+        alert_prefs::{get_prefs, mark_low_balance_alerted},
         customer_expenditure::{add_error_entry, get_did_fallback_resolved},
         misc::{get_account_by_id, update_database_on_submission},
-        users::TxParams,
+        users::{get_user, TxParams},
     },
     errors::*,
     models::apps::Apps,
@@ -29,6 +30,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
+use uuid::Uuid;
 
 pub struct Consumer {
     sender: Arc<Sender<Response>>,
@@ -177,6 +179,8 @@ impl Consumer {
         let submit_data_class =
             SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
 
+        let alert_redis = Arc::clone(&redis);
+
         let mut process_response =
             ProcessSubmitResponse::new(response, &mut connection, submit_data_class, enigma, redis);
 
@@ -189,7 +193,7 @@ impl Consumer {
             Ok(result) => {
                 if result.is_err() {
                     let err = result.err().unwrap().to_string();
-                    update_error_entry(response, &mut connection, err.clone()).await;
+                    update_error_entry(response, &mut connection, err.clone(), &alert_redis).await;
                     return Err(err);
                 } else {
                     tracing::info!(
@@ -200,7 +204,13 @@ impl Consumer {
                 }
             }
             Err(_) => {
-                update_error_entry(response, &mut connection, TIMEOUT_ERROR.to_string()).await;
+                update_error_entry(
+                    response,
+                    &mut connection,
+                    TIMEOUT_ERROR.to_string(),
+                    &alert_redis,
+                )
+                .await;
                 Err(TIMEOUT_ERROR.to_string())
             }
         }
@@ -273,6 +283,8 @@ impl<'a> ProcessSubmitResponse<'a> {
             encrypted_data,
         )
         .await?;
+
+        maybe_alert_low_balance(self.connection, &account.user_id).await;
 
         Ok(())
     }
@@ -399,6 +411,129 @@ async fn update_error_entry(
     response_clone: &Response,
     injected_dependency: &mut AsyncPgConnection,
     err: String,
+    redis: &Redis,
 ) {
-    add_error_entry(&response_clone.submission_id, err, injected_dependency).await;
+    add_error_entry(
+        &response_clone.submission_id,
+        err.clone(),
+        injected_dependency,
+    )
+    .await;
+    maybe_alert_failed_post(injected_dependency, redis, &response_clone.app_id, &err).await;
+}
+
+/// Emails the account owner once their balance crosses the threshold they set.
+///
+/// Runs after the submission has already been billed, so every failure here is
+/// logged and swallowed: a post that succeeded must never be reported as
+/// failed because an email could not be sent.
+async fn maybe_alert_low_balance(connection: &mut AsyncPgConnection, user_id: &String) {
+    let notifier = notifier::shared();
+    if !notifier.enabled() {
+        return;
+    }
+
+    let prefs = match get_prefs(connection, user_id).await {
+        Ok(Some(prefs)) => prefs,
+        Ok(None) => return,
+        Err(e) => {
+            tracing::warn!(error = %e, user_id = %user_id, "couldn't load alert preferences");
+            return;
+        }
+    };
+
+    // The latch is cleared by funds_monitor on the next deposit, so the user is
+    // warned once per drawdown rather than on every submission below threshold.
+    if !prefs.low_balance_enabled || prefs.low_balance_alerted_at.is_some() {
+        return;
+    }
+
+    let Some(threshold) = prefs.low_balance_credits else {
+        return;
+    };
+
+    // Re-read the user: the balance carried into process_response predates the
+    // debit this submission just applied.
+    let user = match get_user(connection, user_id).await {
+        Ok(user) => user,
+        Err(e) => {
+            tracing::warn!(error = %e, user_id = %user_id, "couldn't load user for low balance alert");
+            return;
+        }
+    };
+
+    if user.credit_balance >= threshold {
+        return;
+    }
+
+    match notifier
+        .send_low_balance_alert(
+            user_id,
+            &notifier::format_credits(&user.credit_balance),
+            &notifier::format_credits(&threshold),
+        )
+        .await
+    {
+        Ok(()) => {
+            if let Err(e) = mark_low_balance_alerted(connection, user_id).await {
+                tracing::warn!(error = %e, user_id = %user_id, "couldn't record low balance alert");
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, user_id = %user_id, "couldn't send low balance alert");
+        }
+    }
+}
+
+/// Emails the account owner when one of their apps fails to post.
+///
+/// Failures arrive in bursts, so the mute window is claimed in Redis before the
+/// message goes out: one email per app per hour, and none at all if Redis is
+/// unreachable, which is preferable to one per failed submission.
+///
+/// Shared with fallback_monitor, which fires it once a submission has burned
+/// through its retries.
+pub async fn maybe_alert_failed_post(
+    connection: &mut AsyncPgConnection,
+    redis: &Redis,
+    app_id: &Uuid,
+    error: &str,
+) {
+    let notifier = notifier::shared();
+    if !notifier.enabled() {
+        return;
+    }
+
+    let account = match get_account_by_id(connection, app_id).await {
+        Ok((account, _)) => account,
+        Err(e) => {
+            tracing::warn!(error = %e, app_id = %app_id, "couldn't load app for failed post alert");
+            return;
+        }
+    };
+
+    match get_prefs(connection, &account.user_id).await {
+        Ok(Some(prefs)) if prefs.failed_post_enabled => {}
+        Ok(_) => return,
+        Err(e) => {
+            tracing::warn!(error = %e, user_id = %account.user_id, "couldn't load alert preferences");
+            return;
+        }
+    }
+
+    let key = format!("failed_post:{}:{}", account.user_id, app_id);
+    if redis.get(&key).is_ok() {
+        return;
+    }
+    if let Err(e) = redis.set_ex(&key, "1", 3600) {
+        tracing::warn!(error = %e, user_id = %account.user_id, "couldn't claim failed post alert window");
+        return;
+    }
+
+    if let Err(e) = notifier
+        .send_failed_post_alert(&account.user_id, &app_id.to_string(), error)
+        .await
+    {
+        tracing::warn!(error = %e, user_id = %account.user_id, "couldn't send failed post alert");
+    }
 }

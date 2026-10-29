@@ -5,8 +5,8 @@ use crate::{
 use actix_web::{get, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Datelike, NaiveDateTime};
 use db::controllers::customer_expenditure::{
-    handle_get_all_expenditure, handle_get_expenditure_by_time_range, handle_get_wallet_usage,
-    handle_reset_retry_count,
+    count_all_expenditure, handle_get_all_expenditure, handle_get_all_expenditure_paged,
+    handle_get_expenditure_by_time_range, handle_get_wallet_usage, handle_reset_retry_count,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,9 @@ use validator::Validate;
 #[derive(Deserialize, Serialize)]
 struct GetAllExpenditures {
     limit: Option<i64>,
+    /// Opting into offset paging also adds a `total` to the response; leaving it
+    /// out keeps the original unpaged shape.
+    offset: Option<i64>,
 }
 
 /// Request payload for retrieving detailed token expenditure information
@@ -42,6 +45,8 @@ struct GetTokenExpenditure {
 ///
 /// # Query Parameters
 /// * `limit` - Optional parameter to limit the number of records returned
+/// * `offset` - Optional offset into the result set; when present the response
+///   also carries a `total` count of all the user's records
 ///
 /// # Returns
 /// * Success: JSON response with a list of expenditure records
@@ -100,9 +105,34 @@ pub async fn get_all_expenditure(
         None => config.total_users_query_limit,
     };
 
-    match handle_get_all_expenditure(&mut connection, user, final_limit).await {
-        Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
+    let offset = match request_payload.offset {
+        Some(offset) => offset.max(0),
+        None => {
+            return match handle_get_all_expenditure(&mut connection, user, final_limit).await {
+                Ok(response) => HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Expenditure retrieved successfully", "data": response})),
+                Err(e) => HttpResponse::InternalServerError().json(json!({ "state": "ERROR", "error": e.to_string() })),
+            }
+        }
+    };
+
+    let results =
+        match handle_get_all_expenditure_paged(&mut connection, &user, final_limit, offset).await {
+            Ok(results) => results,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .json(json!({ "state": "ERROR", "error": e.to_string() }))
+            }
+        };
+
+    match count_all_expenditure(&mut connection, &user).await {
+        Ok(total) => HttpResponse::Ok().json(json!({
+            "state": "SUCCESS",
+            "message": "Expenditure retrieved successfully",
+            "data": results,
+            "total": total,
+        })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "state": "ERROR", "error": e.to_string() })),
     }
 }
 

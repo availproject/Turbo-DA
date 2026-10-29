@@ -32,6 +32,7 @@ pub struct CustomerExpenditureGet {
     pub app_id: Uuid,
     pub wallet: Option<Vec<u8>>,
     pub ciphertext_hash: Option<Vec<u8>>,
+    pub source: Option<String>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug)]
@@ -69,6 +70,7 @@ pub struct CustomerExpenditureGetWithPayload {
     pub signature_ciphertext_hash: Option<Vec<u8>>,
     pub signature_plaintext_hash: Option<Vec<u8>>,
     pub address: Option<Vec<u8>>,
+    pub source: Option<String>,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize, Debug)]
@@ -81,4 +83,5 @@ pub struct CreateCustomerExpenditure {
     pub error: Option<String>,
     pub payload: Option<Vec<u8>>,
     pub app_id: Uuid,
+    pub source: Option<String>,
 }

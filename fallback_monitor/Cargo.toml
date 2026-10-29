@@ -27,5 +27,6 @@ observability = { path = "../observability" }
 turbo-da-core = {path= "../turbo-da-core"}
 enigma = {path="../enigma"}
 data_submission = {path = "../data_submission"}
+notifier = {path = "../notifier"}
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

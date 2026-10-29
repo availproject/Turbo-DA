@@ -105,6 +105,22 @@ where
                 if let Err(e) = insert_headers(&mut headers, "app_id", &account) {
                     return e;
                 }
+
+                // Cache hit means no sync connection is open on this path, so the
+                // stamp is pushed off the request thread entirely.
+                if should_stamp_last_used(&self.redis, &api_key_hash) {
+                    let database_url = self.database_url.clone();
+                    let hash = api_key_hash.clone();
+                    actix_web::rt::task::spawn_blocking(move || {
+                        match PgConnection::establish(&database_url) {
+                            Ok(mut conn) => stamp_last_used(&mut conn, &hash),
+                            Err(e) => tracing::warn!(
+                                error = %e,
+                                "failed to connect to database to stamp last_used_at"
+                            ),
+                        }
+                    });
+                }
             }
             Err(_) => {
                 let mut conn = match PgConnection::establish(&self.database_url) {
@@ -174,6 +190,12 @@ where
                                 );
                             }
                         }
+
+                        // This path already holds a sync connection, so reuse it
+                        // rather than paying for a second one.
+                        if should_stamp_last_used(&self.redis, &api_key_hash) {
+                            stamp_last_used(&mut conn, &api_key_hash);
+                        }
                     }
                 }
             }
@@ -185,6 +207,52 @@ where
             let res = fut.await?;
             Ok(res)
         })
+    }
+}
+
+/// How long a stamped api key is left alone before its `last_used_at` is written again.
+const LAST_USED_THROTTLE_SECS: u64 = 60;
+
+/// Reports whether `last_used_at` should be written for this key, claiming the
+/// throttle window when it says yes. Stamping is best effort: a Redis failure
+/// means the request proceeds unstamped rather than failing.
+fn should_stamp_last_used(redis: &Redis, api_key_hash: &str) -> bool {
+    let throttle_key = format!("last_used:{}", api_key_hash);
+    if redis.get(&throttle_key).is_ok() {
+        return false;
+    }
+
+    match redis.set_ex(&throttle_key, "1", LAST_USED_THROTTLE_SECS) {
+        Ok(_) => true,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                api_key_prefix = %Sanitized::api_key(api_key_hash),
+                "failed to claim last_used throttle window; skipping stamp"
+            );
+            false
+        }
+    }
+}
+
+fn stamp_last_used(conn: &mut PgConnection, api_key_hash: &str) {
+    match diesel::update(api_keys.filter(api_keys::api_key.eq(api_key_hash)))
+        .set(api_keys::last_used_at.eq(diesel::dsl::now))
+        .execute(conn)
+    {
+        Ok(_) => {
+            tracing::debug!(
+                api_key_prefix = %Sanitized::api_key(api_key_hash),
+                "stamped api key last_used_at"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                api_key_prefix = %Sanitized::api_key(api_key_hash),
+                "failed to stamp api key last_used_at"
+            );
+        }
     }
 }
 

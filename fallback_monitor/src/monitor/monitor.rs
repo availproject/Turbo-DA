@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use avail_rust::{Client, Keypair};
 use avail_utils::submit_data::SubmitDataAvail;
-use data_submission::{ProcessSubmitResponse, Response};
+use data_submission::{
+    workload_scheduler::consumer::maybe_alert_failed_post, ProcessSubmitResponse, Response,
+};
 use db::models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User};
 /// This file contains logic to monitor the failing transactions.
 /// If there are failed transactions it picks them and tries to resubmit it
@@ -130,6 +132,15 @@ async fn process_failed_transactions(
                         &customer_expenditure_details.id.to_string(),
                         "Retry count exceeded",
                     );
+                    // Terminal: the submission will not be retried again, so
+                    // this is the last point at which the owner can be told.
+                    maybe_alert_failed_post(
+                        &mut connection,
+                        &redis,
+                        &account_details.id,
+                        "Retry count exceeded",
+                    )
+                    .await;
                     return;
                 }
 

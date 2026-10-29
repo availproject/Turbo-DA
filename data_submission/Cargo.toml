@@ -30,6 +30,7 @@ db = { path = "../db" }
 enigma = {path = "../enigma"}
 turbo-da-core = {path = "../turbo-da-core"}
 observability = { path = "../observability" }
+notifier = { path = "../notifier" }
 avail-utils = {path = "../avail"}
 tracing-subscriber = { workspace = true, features = ["json"] }
 tracing = { workspace = true }

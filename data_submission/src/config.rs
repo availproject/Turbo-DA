@@ -21,6 +21,9 @@ pub struct AppConfig {
     pub rate_limit_window_size: u64,
     pub rate_limit_max_requests: u64,
     pub enigma_url: String,
+    /// Shared secret for the internal playground endpoint. Empty disables the endpoint.
+    #[serde(default)]
+    pub internal_api_key: String,
 }
 
 impl Default for AppConfig {
@@ -39,6 +42,7 @@ impl Default for AppConfig {
             rate_limit_window_size: 60,
             rate_limit_max_requests: 100,
             enigma_url: String::new(),
+            internal_api_key: String::new(),
         }
     }
 }
@@ -227,6 +231,9 @@ impl AppConfig {
 
         let enigma_url = env::var("ENIGMA_URL")?;
 
+        // Optional: an unset or empty key disables the internal playground endpoint.
+        let internal_api_key = env::var("INTERNAL_API_KEY").unwrap_or_default();
+
         Ok(AppConfig {
             port,
             database_url,
@@ -241,6 +248,7 @@ impl AppConfig {
             rate_limit_window_size,
             rate_limit_max_requests,
             enigma_url,
+            internal_api_key,
         })
     }
 }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bigdecimal::BigDecimal;
 use db::{
     models::credit_requests::CreditRequestsGet,
-    schema::{credit_requests, indexer_block_numbers::dsl::*, users},
+    schema::{credit_requests, indexer_block_numbers::dsl::*, user_alert_prefs, users},
 };
 use diesel::prelude::*;
 
@@ -97,26 +97,72 @@ impl Utils {
     ) {
         let updated_rows_query = diesel::update(users::table.filter(users::id.eq(user_id)))
             .set(users::credit_balance.eq(users::credit_balance + amount))
-            .execute(connection);
+            .returning(users::credit_balance)
+            .get_results::<BigDecimal>(connection);
 
-        let updated_rows = updated_rows_query.unwrap_or_else(|_| {
+        let updated_balances = updated_rows_query.unwrap_or_else(|_| {
             tracing::error!("update token balances query failed");
-            0
+            Vec::new()
         });
 
-        if updated_rows > 0 {
+        if let Some(new_balance) = updated_balances.first() {
             tracing::debug!(
                 message = "successfully updated token balances",
                 user_id = %user_id,
                 amount = %amount,
                 level = "debug"
             );
+            self.rearm_low_balance_alert(user_id, new_balance, connection);
         } else {
             tracing::error!(
                 message = "no rows updated for user id",
                 user_id = %user_id,
                 level = "error"
             );
+        }
+    }
+
+    /// Re-arms the low balance alert once a deposit puts the account back above
+    /// the user's threshold.
+    ///
+    /// data_submission latches `low_balance_alerted_at` when it warns, so
+    /// without this the user would only ever be told once. Best effort: a
+    /// deposit must still be credited if this fails.
+    fn rearm_low_balance_alert(
+        &self,
+        user_id: &String,
+        new_balance: &BigDecimal,
+        connection: &mut PgConnection,
+    ) {
+        let cleared = diesel::update(
+            user_alert_prefs::table
+                .filter(user_alert_prefs::user_id.eq(user_id))
+                .filter(user_alert_prefs::low_balance_alerted_at.is_not_null())
+                .filter(
+                    user_alert_prefs::low_balance_credits
+                        .is_null()
+                        .or(user_alert_prefs::low_balance_credits.le(new_balance)),
+                ),
+        )
+        .set(user_alert_prefs::low_balance_alerted_at.eq(None::<chrono::NaiveDateTime>))
+        .execute(connection);
+
+        match cleared {
+            Ok(rows) if rows > 0 => {
+                tracing::info!(
+                    user_id = %user_id,
+                    new_balance = %new_balance,
+                    "re-armed low balance alert after deposit"
+                );
+            }
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    user_id = %user_id,
+                    "couldn't re-arm low balance alert"
+                );
+            }
         }
     }
 

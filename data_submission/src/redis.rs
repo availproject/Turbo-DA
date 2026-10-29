@@ -29,6 +29,15 @@ impl Redis {
         Ok(conn.set(key, value).map_err(|e| e.to_string())?)
     }
 
+    /// Sets a key that expires on its own after `ttl_secs` seconds.
+    pub fn set_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<String, String> {
+        let mut conn = match self.redis_pool.get() {
+            Ok(conn) => conn,
+            Err(e) => return Err(e.to_string()),
+        };
+        conn.set_ex(key, value, ttl_secs).map_err(|e| e.to_string())
+    }
+
     pub fn get(&self, key: &str) -> Result<String, String> {
         let mut conn = match self.redis_pool.get() {
             Ok(conn) => conn,

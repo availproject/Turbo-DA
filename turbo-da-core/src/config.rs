@@ -6,6 +6,12 @@ use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io, vec::Vec};
 use toml;
 
+/// Kept in sync with `AppConfig::default`; a pre-existing `config.toml` predates
+/// these keys, so both the TOML and env paths fall back to the local service.
+fn default_data_submission_url() -> String {
+    "http://localhost:8080".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub database_url: String,
@@ -28,6 +34,13 @@ pub struct AppConfig {
     pub sumsub_secret_key: String,
     pub sumsub_base_url: String,
     pub enigma_url: String,
+    /// Base URL of the data_submission service, used by the playground forwarder.
+    #[serde(default = "default_data_submission_url")]
+    pub data_submission_url: String,
+    /// Shared secret presented to data_submission's internal routes. An empty
+    /// value disables playground submission.
+    #[serde(default)]
+    pub internal_api_key: String,
 }
 
 impl Default for AppConfig {
@@ -53,6 +66,8 @@ impl Default for AppConfig {
             sumsub_secret_key: String::new(),
             sumsub_base_url: String::new(),
             enigma_url: String::new(),
+            data_submission_url: "http://localhost:8080".to_string(),
+            internal_api_key: String::new(),
         }
     }
 }
@@ -204,6 +219,10 @@ impl AppConfig {
         let s3_bucket_name = env::var("S3_BUCKET_NAME")?;
         let aws_secret_access_key = env::var("AWS_SECRET_ACCESS_KEY")?;
 
+        let data_submission_url =
+            env::var("DATA_SUBMISSION_URL").unwrap_or_else(|_| default_data_submission_url());
+        let internal_api_key = env::var("INTERNAL_API_KEY").unwrap_or_default();
+
         Ok(AppConfig {
             port,
             database_url,
@@ -225,6 +244,8 @@ impl AppConfig {
             sumsub_secret_key,
             sumsub_base_url,
             enigma_url,
+            data_submission_url,
+            internal_api_key,
         })
     }
 }

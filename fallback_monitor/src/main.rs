@@ -5,6 +5,7 @@ use cron::Schedule;
 use data_submission::redis::Redis;
 use enigma::EnigmaEncryptionService;
 use monitor::monitor::monitor_failed_transactions;
+use monitor::runway::check_runway_alerts;
 use observability::init_tracer;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -45,9 +46,16 @@ async fn main() {
     let expression = "0/10 * * * * * *"; // Every 10 seconds
     let schedule = Schedule::from_str(expression).unwrap();
 
+    // Runway alerts are a projection over a 7 day window, so a daily sweep is
+    // enough; it rides the retry tick rather than owning a task of its own.
+    let runway_expression = "0 0 9 * * * *"; // Daily at 09:00 UTC
+    let runway_schedule = Schedule::from_str(runway_expression).unwrap();
+
     tracing::info!("cron is starting...");
 
     let mut interval = schedule.upcoming(Utc);
+    let mut runway_interval = runway_schedule.upcoming(Utc);
+    let mut next_runway_check = runway_interval.next();
 
     let keypair = generate_keygen_list(app_config.limit as i32, &app_config.private_keys).await;
 
@@ -77,6 +85,11 @@ async fn main() {
             &enigma,
         )
         .await;
+
+        if next_runway_check.is_some_and(|due| Utc::now() >= due) {
+            check_runway_alerts(&app_config.database_url).await;
+            next_runway_check = runway_interval.next();
+        }
     }
 }
 
