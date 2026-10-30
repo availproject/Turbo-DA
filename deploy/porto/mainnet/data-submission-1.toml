@@ -5,7 +5,7 @@ port = 8080
 
 [deploy]
 health_path = "/health"
-chart_version = 131
+chart_version = 132
 
 [resources]
 cpu_request = "500m"
