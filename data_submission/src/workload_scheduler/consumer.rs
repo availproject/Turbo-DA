@@ -32,6 +32,42 @@ use tokio::{
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
+use uuid::Uuid;
+
+/// Backstop for entries left by a crashed worker; longer than a worker's 120 second timeout.
+const IN_FLIGHT_EXPIRY_SECS: i64 = 600;
+
+/// Names the pool being spent: only assigned-only apps stay off the shared main balance.
+fn in_flight_key(credit_selection: Option<i16>, user: &str, app: &Uuid) -> String {
+    match credit_selection {
+        Some(0) => format!("credits_in_flight:app:{app}"),
+        _ => format!("credits_in_flight:user:{user}"),
+    }
+}
+
+/// Counts a submission's cost as spent until dropped, which covers success, errors and timeouts.
+struct InFlightCost {
+    redis: Arc<Redis>,
+    key: String,
+    member: String,
+}
+
+impl Drop for InFlightCost {
+    fn drop(&mut self) {
+        let removed = self
+            .redis
+            .redis_pool
+            .get()
+            .map_err(|e| e.to_string())
+            .and_then(|mut conn| {
+                conn.lrem::<_, _, i64>(&self.key, 0, &self.member)
+                    .map_err(|e| e.to_string())
+            });
+        if let Err(e) = removed {
+            tracing::error!(error = %e, key = %self.key, "failed to clear in-flight credits");
+        }
+    }
+}
 
 /// Lagging only means jobs were skipped, and `fallback_monitor` retries those, so keep receiving.
 async fn next_response(receiver: &mut Receiver<Response>, thread_id: i32) -> Option<Response> {
@@ -294,7 +330,9 @@ impl<'a> ProcessSubmitResponse<'a> {
         )
         .await?;
 
-        self.validate_race_condition(&account, &credits_used, &user.credit_balance)
+        // Held until after the deduction below, so the cost is always counted one way or the other.
+        let _in_flight = self
+            .validate_race_condition(&account, &credits_used)
             .await?;
 
         let result = self.submit_avail_class.submit_data(&data).await?;
@@ -380,16 +418,16 @@ impl<'a> ProcessSubmitResponse<'a> {
     }
 
     async fn validate_race_condition(
-        &self,
+        &mut self,
         account: &Apps,
         credits_used: &BigDecimal,
-        user_credit_balance: &BigDecimal,
-    ) -> Result<(), String> {
+    ) -> Result<InFlightCost, String> {
         let mut queue = self.redis.redis_pool.get().map_err(|e| e.to_string())?;
 
-        let key = format!(
-            "user:{}_main_balance:{}_app_balance:{}",
-            account.user_id, account.credit_balance, user_credit_balance
+        let key = in_flight_key(
+            account.credit_selection,
+            &account.user_id,
+            &self.response.app_id,
         );
 
         let member = format!("{}:{}", self.response.submission_id, credits_used);
@@ -397,9 +435,23 @@ impl<'a> ProcessSubmitResponse<'a> {
         let _ = queue
             .rpush::<&str, &str, i64>(&key, &member)
             .map_err(|e| e.to_string())?;
+        let in_flight = InFlightCost {
+            redis: Arc::clone(&self.redis),
+            key: key.clone(),
+            member,
+        };
+        let _ = queue
+            .expire::<&str, i64>(&key, IN_FLIGHT_EXPIRY_SECS)
+            .map_err(|e| e.to_string())?;
 
         // Get all items from the list to check cumulative cost
         let all_items: Vec<String> = queue.lrange(&key, 0, -1).map_err(|e| e.to_string())?;
+        drop(queue);
+
+        // Read after the list: a finished submission deducts before it leaves the list, so its
+        // cost is seen in one or the other.
+        let (fresh_account, user) =
+            get_account_by_id(self.connection, &self.response.app_id).await?;
 
         tracing::debug!(
             items_count = all_items.len(),
@@ -421,10 +473,10 @@ impl<'a> ProcessSubmitResponse<'a> {
             // Check if this is our submission - if so, validate the cumulative cost
             if submission_id == self.response.submission_id.to_string() {
                 self.validate_balance(
-                    account.credit_selection,
+                    fresh_account.credit_selection,
                     &cumulative_cost,
-                    &account.credit_balance,
-                    user_credit_balance,
+                    &fresh_account.credit_balance,
+                    &user.credit_balance,
                 )
                 .await?;
 
@@ -432,7 +484,7 @@ impl<'a> ProcessSubmitResponse<'a> {
             }
         }
 
-        Ok(())
+        Ok(in_flight)
     }
 }
 
@@ -450,7 +502,26 @@ mod tests {
     use actix_web::web::Bytes;
     use opentelemetry::Context;
     use tokio::sync::broadcast;
-    use uuid::Uuid;
+
+    #[test]
+    fn apps_drawing_on_the_main_balance_share_an_in_flight_key() {
+        let (first, second) = (Uuid::new_v4(), Uuid::new_v4());
+
+        let on_main = in_flight_key(Some(1), "user", &first);
+
+        assert_eq!(on_main, in_flight_key(Some(1), "user", &second));
+        assert_eq!(on_main, in_flight_key(Some(2), "user", &second));
+    }
+
+    #[test]
+    fn assigned_only_apps_keep_separate_in_flight_keys() {
+        let (first, second) = (Uuid::new_v4(), Uuid::new_v4());
+
+        assert_ne!(
+            in_flight_key(Some(0), "user", &first),
+            in_flight_key(Some(0), "user", &second)
+        );
+    }
 
     fn job(thread_id: i32) -> Response {
         Response {
