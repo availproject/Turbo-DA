@@ -1,3 +1,4 @@
+use super::misc::ensure_no_submission_in_progress;
 use crate::{
     models::apps::{Apps, AppsCreate},
     schema::{apps::dsl::*, users::dsl as users},
@@ -39,6 +40,8 @@ pub async fn delete_account_by_id(
     user_identifier: String,
     account_id: Uuid,
 ) -> Result<(), String> {
+    ensure_no_submission_in_progress(connection, &user_identifier).await?;
+
     connection
         .transaction(async |conn| {
             // Lock the row so a concurrent submission can't spend credits between read and delete.

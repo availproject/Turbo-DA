@@ -452,6 +452,122 @@ pub mod test {
         }
     }
 
+    async fn seed_submission(db: &TestDB, user: &str, app: &uuid::Uuid) -> uuid::Uuid {
+        use db::{
+            controllers::customer_expenditure::create_customer_expenditure_entry,
+            models::customer_expenditure::CreateCustomerExpenditure,
+        };
+
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let id = uuid::Uuid::new_v4();
+        create_customer_expenditure_entry(
+            &mut conn,
+            CreateCustomerExpenditure {
+                id,
+                user_id: user.to_string(),
+                amount_data: "1 KB".to_string(),
+                error: None,
+                payload: Some(vec![1]),
+                app_id: *app,
+            },
+        )
+        .await;
+        id
+    }
+
+    async fn reclaim_one(db: &TestDB, user: &str, app: &uuid::Uuid) -> Result<(), String> {
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let amount = bigdecimal::BigDecimal::from(1);
+        db::controllers::misc::reclaim_credits(&mut conn, app, &user.to_string(), &amount).await
+    }
+
+    async fn allocate_one(db: &TestDB, user: &str, app: &uuid::Uuid) -> Result<(), String> {
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let amount = bigdecimal::BigDecimal::from(1);
+        db::controllers::misc::allocate_credit_balance(&mut conn, app, &user.to_string(), &amount)
+            .await
+    }
+
+    #[test]
+    async fn test_credit_moves_are_refused_while_a_submission_is_in_progress() {
+        use db::controllers::apps as apps_ctrl;
+
+        let db = TestDB::init();
+        let user = "in-progress@example.com";
+        let app = seed_user_with_app(&db, user, 1000, 1000).await;
+        seed_submission(&db, user, &app).await;
+
+        assert!(reclaim_one(&db, user, &app).await.is_err());
+        assert!(allocate_one(&db, user, &app).await.is_err());
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        assert!(
+            apps_ctrl::delete_account_by_id(&mut conn, user.to_string(), app)
+                .await
+                .is_err()
+        );
+        drop(conn);
+
+        assert_eq!(credit_balances(&db, user, &app).await, (1000, 1000));
+    }
+
+    #[test]
+    async fn test_credit_moves_are_allowed_once_a_submission_is_finished() {
+        use db::schema::customer_expenditures::dsl as rows;
+        use diesel::{ExpressionMethods, QueryDsl};
+        use diesel_async::RunQueryDsl;
+
+        let db = TestDB::init();
+        for (index, finished_by) in ["posted", "failed", "too_old"].iter().enumerate() {
+            let user = format!("finished-{index}@example.com");
+            let app = seed_user_with_app(&db, &user, 1000, 1000).await;
+            let submission = seed_submission(&db, &user, &app).await;
+            let row = rows::customer_expenditures.filter(rows::id.eq(submission));
+
+            let mut conn = db.dbc.postgres.get().await.unwrap();
+            match *finished_by {
+                "posted" => diesel::update(row)
+                    .set(rows::tx_hash.eq(Some("0xabc")))
+                    .execute(&mut conn)
+                    .await
+                    .unwrap(),
+                "failed" => diesel::update(row)
+                    .set(rows::error.eq(Some("failed")))
+                    .execute(&mut conn)
+                    .await
+                    .unwrap(),
+                _ => diesel::update(row)
+                    .set(
+                        rows::created_at.eq(chrono::Utc::now().naive_utc()
+                            - chrono::Duration::minutes(24 * 60)),
+                    )
+                    .execute(&mut conn)
+                    .await
+                    .unwrap(),
+            };
+            drop(conn);
+
+            reclaim_one(&db, &user, &app)
+                .await
+                .unwrap_or_else(|e| panic!("{finished_by}: {e}"));
+            allocate_one(&db, &user, &app)
+                .await
+                .unwrap_or_else(|e| panic!("{finished_by}: {e}"));
+        }
+    }
+
+    #[test]
+    async fn test_another_users_submission_does_not_block_credit_moves() {
+        let db = TestDB::init();
+        let user = "not-submitting@example.com";
+        let other = "submitting@example.com";
+        let app = seed_user_with_app(&db, user, 1000, 1000).await;
+        let other_app = seed_user_with_app(&db, other, 1000, 1000).await;
+        seed_submission(&db, other, &other_app).await;
+
+        reclaim_one(&db, user, &app).await.unwrap();
+        allocate_one(&db, user, &app).await.unwrap();
+    }
+
     #[test]
     async fn test_concurrent_reclaims_cannot_duplicate_credits() {
         let db = TestDB::init();

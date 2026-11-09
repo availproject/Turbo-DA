@@ -25,12 +25,38 @@ use observability::log_txn;
 use redis::Commands;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::{
-    sync::broadcast::Sender,
+    sync::broadcast::{error::RecvError, Receiver, Sender},
+    task::AbortHandle,
     time::{timeout, Duration},
 };
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
+
+/// Lagging only means jobs were skipped, and `fallback_monitor` retries those, so keep receiving.
+async fn next_response(receiver: &mut Receiver<Response>, thread_id: i32) -> Option<Response> {
+    loop {
+        match receiver.recv().await {
+            Ok(response) => return Some(response),
+            Err(RecvError::Lagged(skipped)) => {
+                tracing::warn!(thread_id, skipped, "worker fell behind, skipped jobs");
+            }
+            Err(RecvError::Closed) => {
+                tracing::error!(thread_id, "submission channel closed, stopping worker");
+                return None;
+            }
+        }
+    }
+}
+
+/// Stops the heartbeat when its worker exits or panics, so the supervisor can restart the worker.
+struct AbortOnDrop(AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
 
 pub struct Consumer {
     sender: Arc<Sender<Response>>,
@@ -108,18 +134,21 @@ impl Consumer {
 
                 let mut receiver = sender.subscribe();
 
-                tokio::spawn(
-                    async move {
-                        let mut interval = tokio::time::interval(Duration::from_secs(120));
-                        loop {
-                            interval.tick().await;
-                            let _ = heartbeat_tx.send(i).await;
+                let _heartbeat = AbortOnDrop(
+                    tokio::spawn(
+                        async move {
+                            let mut interval = tokio::time::interval(Duration::from_secs(120));
+                            loop {
+                                interval.tick().await;
+                                let _ = heartbeat_tx.send(i).await;
+                            }
                         }
-                    }
-                    .in_current_span(),
+                        .in_current_span(),
+                    )
+                    .abort_handle(),
                 );
 
-                while let Ok(response) = receiver.recv().await {
+                while let Some(response) = next_response(&mut receiver, i).await {
                     if response.thread_id != i {
                         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                         continue;
@@ -413,4 +442,60 @@ async fn update_error_entry(
     err: String,
 ) {
     add_error_entry(&response_clone.submission_id, err, injected_dependency).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::web::Bytes;
+    use opentelemetry::Context;
+    use tokio::sync::broadcast;
+    use uuid::Uuid;
+
+    fn job(thread_id: i32) -> Response {
+        Response {
+            raw_payload: Bytes::new(),
+            submission_id: Uuid::new_v4(),
+            thread_id,
+            app_id: Uuid::new_v4(),
+            avail_app_id: 1,
+            otel_context: Context::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_keeps_receiving_after_falling_behind() {
+        let (sender, mut receiver) = broadcast::channel(2);
+        for id in 0..5 {
+            sender.send(job(id)).unwrap();
+        }
+
+        let next = next_response(&mut receiver, 0)
+            .await
+            .expect("lagging must not stop the worker");
+
+        // Capacity 2 keeps the last two jobs; the oldest of those comes next.
+        assert_eq!(next.thread_id, 3);
+    }
+
+    #[tokio::test]
+    async fn worker_stops_when_channel_closes() {
+        let (sender, mut receiver) = broadcast::channel::<Response>(2);
+        drop(sender);
+
+        assert!(next_response(&mut receiver, 0).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn dropping_guard_stops_heartbeat_task() {
+        let heartbeat = tokio::spawn(std::future::pending::<()>());
+        let guard = AbortOnDrop(heartbeat.abort_handle());
+
+        drop(guard);
+
+        let result = timeout(Duration::from_secs(1), heartbeat)
+            .await
+            .expect("heartbeat must stop with its worker");
+        assert!(result.unwrap_err().is_cancelled());
+    }
 }

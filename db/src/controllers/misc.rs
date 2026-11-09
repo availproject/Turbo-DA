@@ -158,6 +158,7 @@ pub async fn allocate_credit_balance(
     if amount < &BigDecimal::from(0) {
         return Err("Cannot allocate negative credits".to_string());
     }
+    ensure_no_submission_in_progress(connection, user).await?;
     let user_obj = get_user(connection, user).await?;
     if amount > &BigDecimal::from(0) && user_obj.credit_balance < *amount {
         return Err("Insufficient balance".to_string());
@@ -209,6 +210,7 @@ pub async fn reclaim_credits(
     if amount < &BigDecimal::from(0) {
         return Err("Cannot reclaim negative credits".to_string());
     }
+    ensure_no_submission_in_progress(connection, user).await?;
 
     let app_obj = get_app_by_id(connection, user, account_id).await?;
     if app_obj.credit_balance < *amount {
@@ -243,6 +245,31 @@ pub async fn reclaim_credits(
         })
         .await
         .map_err(credit_move_error)
+}
+
+/// Credits are deducted only after data lands on Avail, so moving them while a submission is
+/// posting would get that submission for free. The time limit stops a stuck row locking a user out.
+pub(crate) async fn ensure_no_submission_in_progress(
+    connection: &mut AsyncPgConnection,
+    user: &str,
+) -> Result<(), String> {
+    let in_progress = diesel::select(diesel::dsl::exists(
+        customer_expenditures::customer_expenditures
+            .filter(customer_expenditures::user_id.eq(user))
+            .filter(customer_expenditures::tx_hash.is_null())
+            .filter(customer_expenditures::error.is_null())
+            .filter(customer_expenditures::created_at.gt(
+                diesel::dsl::sql::<diesel::sql_types::Timestamp>("NOW() - INTERVAL '15 minutes'"),
+            )),
+    ))
+    .get_result::<bool>(connection)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if in_progress {
+        return Err("Cannot move credits while a submission is in progress".to_string());
+    }
+    Ok(())
 }
 
 /// A rollback here always means the balance condition matched no row.
