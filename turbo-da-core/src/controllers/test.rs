@@ -423,6 +423,35 @@ pub mod test {
             .count()
     }
 
+    /// No RPC endpoints are configured, so a request that passes the size check would panic.
+    #[test]
+    async fn test_estimate_against_size_rejects_oversized_request_before_connecting() {
+        use crate::controllers::fund::estimate_credits_against_size;
+
+        let config = AppConfig {
+            payload_size: 100,
+            ..AppConfig::default()
+        };
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(config))
+                .service(estimate_credits_against_size),
+        )
+        .await;
+
+        for size in [101, 1u64 << 62, u64::MAX] {
+            let request = test::TestRequest::get()
+                .uri(&format!("/estimate_credits_against_size?size={size}"))
+                .to_request();
+            let response = test::call_service(&app, request).await;
+            assert_eq!(
+                response.status(),
+                actix_web::http::StatusCode::BAD_REQUEST,
+                "size {size}"
+            );
+        }
+    }
+
     #[test]
     async fn test_concurrent_reclaims_cannot_duplicate_credits() {
         let db = TestDB::init();
