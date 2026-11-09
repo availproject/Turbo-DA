@@ -9,5 +9,6 @@ pub struct Response {
     pub thread_id: i32,
     pub app_id: Uuid,
     pub avail_app_id: i32,
+    pub infinity: bool,
     pub otel_context: OtelContext,
 }

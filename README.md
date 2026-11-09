@@ -112,6 +112,7 @@ PRIVATE_KEY=          # The private key to use for the fallback monitor.
 COINGECKO_API_URL=    # The Coingecko API URL to use for the fallback monitor.
 COINGECKO_API_KEY=    # The Coingecko API key to use for the fallback monitor.
 AVAIL_RPC_ENDPOINT_1= # The first Avail RPC endpoint to use for the fallback monitor.
+AVAIL_INFINITY_RPC_ENDPOINT_1= # The first infinity network RPC endpoint, used to retry infinity submissions. AVAIL_RPC_ENDPOINT_* is the normal network.
 RETRY_COUNT=          # The retry count to try a particular transaction before giving up.
 
 ```
@@ -131,6 +132,7 @@ MAX_POOL_SIZE=        # MAX_POOL_SIZE is the maximum number of connections in th
 AVAIL_RPC_ENDPOINT_1= # AVAIL_RPC_ENDPOINT_1 is the first RPC endpoint of the Avail chain
 AVAIL_RPC_ENDPOINT_2= # AVAIL_RPC_ENDPOINT_2 is the second RPC endpoint of the Avail chain
 AVAIL_RPC_ENDPOINT_3= # AVAIL_RPC_ENDPOINT_3 is the third RPC endpoint of the Avail chain
+AVAIL_INFINITY_RPC_ENDPOINT_1= # AVAIL_INFINITY_RPC_ENDPOINT_1 is the first RPC endpoint of the infinity network, used for requests with infinity=true. Numbered like AVAIL_RPC_ENDPOINT_*, which is the normal network
 PRIVATE_KEY_0=        # PRIVATE_KEY_0 is the private key of the first signer. One private key is used per thread defined by NUMBER_OF_THREADS. So thread 0 will use PRIVATE_KEY_0, thread 1 will use PRIVATE_KEY_1, and so on.
 PRIVATE_KEY_1=
 PRIVATE_KEY_2=

@@ -79,6 +79,7 @@ diesel::table! {
         signature_plaintext_hash -> Nullable<Bytea>,
         address -> Nullable<Bytea>,
         ephemeral_pub_key -> Nullable<Bytea>,
+        infinity -> Bool,
     }
 }
 

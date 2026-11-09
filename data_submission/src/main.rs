@@ -29,8 +29,8 @@ use observability::{init_meter, init_tracer};
 use std::sync::Arc;
 use std::{env, error::Error};
 use tokio::sync::broadcast;
-use turbo_da_core::utils::generate_keygen_list;
-use workload_scheduler::consumer::Consumer;
+use turbo_da_core::utils::{generate_keygen_list, generate_normal_keygen_list};
+use workload_scheduler::consumer::{Consumer, Networks};
 
 const MAX_STACK_SIZE: &str = "10000000";
 
@@ -52,6 +52,14 @@ async fn start_server() -> Result<(), Box<dyn Error>> {
     let accounts =
         generate_keygen_list(app_config.number_of_threads, &app_config.private_keys).await;
     let shared_keypair = web::Data::new(accounts);
+    let networks = Networks {
+        normal_endpoints: Arc::new(app_config.avail_rpc_endpoint.clone()),
+        infinity_endpoints: Arc::new(app_config.avail_infinity_rpc_endpoint.clone()),
+        normal_keypairs: generate_normal_keygen_list(
+            app_config.number_of_threads,
+            &app_config.private_keys,
+        ),
+    };
 
     let db_config = db::pool_manager(&app_config.database_url);
 
@@ -72,7 +80,7 @@ async fn start_server() -> Result<(), Box<dyn Error>> {
         Arc::new(sender.clone()),
         Arc::new(shared_keypair.clone()),
         Arc::new(shared_pool.clone()),
-        Arc::new(app_config.avail_rpc_endpoint.clone()),
+        Arc::new(networks),
         Arc::new(enigma.clone()),
         Arc::new(shared_redis.clone()),
         app_config.number_of_threads,

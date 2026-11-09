@@ -12,6 +12,8 @@ pub struct AppConfig {
     pub private_keys: Vec<String>,
     pub retry_count: i32,
     pub avail_rpc_endpoint: Vec<String>,
+    #[serde(default)]
+    pub avail_infinity_rpc_endpoint: Vec<String>,
     pub coingecko_api_url: String,
     pub coingecko_api_key: String,
     pub limit: i64,
@@ -26,6 +28,7 @@ impl Default for AppConfig {
             private_keys: Vec::new(),
             retry_count: 0,
             avail_rpc_endpoint: vec![],
+            avail_infinity_rpc_endpoint: vec![],
             coingecko_api_url: String::new(),
             coingecko_api_key: String::new(),
             limit: 10,
@@ -89,6 +92,13 @@ impl AppConfig {
             avail_rpc_endpoint.push(endpoint);
             index += 1;
         }
+
+        let mut avail_infinity_rpc_endpoint = Vec::new();
+        let mut index = 1;
+        while let Ok(endpoint) = env::var(format!("AVAIL_INFINITY_RPC_ENDPOINT_{}", index)) {
+            avail_infinity_rpc_endpoint.push(endpoint);
+            index += 1;
+        }
         let retry_count = env::var("RETRY_COUNT")?;
         let coingecko_api_url = env::var("COINGECKO_API_URL")?;
         let coingecko_api_key = env::var("COINGECKO_API_KEY")?;
@@ -108,6 +118,7 @@ impl AppConfig {
             private_keys,
             retry_count: retry_count.parse::<i32>().unwrap(),
             avail_rpc_endpoint,
+            avail_infinity_rpc_endpoint,
             coingecko_api_url,
             coingecko_api_key,
             limit,

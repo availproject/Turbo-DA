@@ -11,6 +11,7 @@ use avail_rust::{
     Client as AvailClient, Keypair, Options,
 };
 
+use avail_utils::{normal, submit_data::SubmitDataAvail};
 use bigdecimal::BigDecimal;
 use clerk_rs::validators::authorizer::ClerkJwt;
 use diesel_async::{
@@ -21,7 +22,7 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, future::Future, str::FromStr, sync::Arc};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 use validator::ValidationError;
@@ -46,10 +47,28 @@ pub async fn generate_keygen_list(number_of_threads: i32, private_keys: &[String
 /// # Arguments
 /// * `private_key` - Private key as a hex string
 pub fn create_keypair(private_key: &String) -> Keypair {
-    let bytes = hex::decode(private_key).expect("Failed to decode hex string");
-    let byte_array: [u8; 32] = bytes.try_into().expect("Slice with incorrect length");
-    Keypair::from_secret_key(byte_array)
+    Keypair::from_secret_key(decode_secret_key(private_key))
         .unwrap_or_else(|_| panic!("Fatal: Couldn't parse the private key {:?}", private_key))
+}
+
+/// Generates keypairs for signing on the normal network, one per private key used
+pub fn generate_normal_keygen_list(
+    number_of_threads: i32,
+    private_keys: &[String],
+) -> Vec<normal::Keypair> {
+    private_keys[..number_of_threads as usize]
+        .iter()
+        .map(|private_key| {
+            normal::Keypair::from_secret_key(decode_secret_key(private_key)).unwrap_or_else(|_| {
+                panic!("Fatal: Couldn't parse the private key {:?}", private_key)
+            })
+        })
+        .collect()
+}
+
+fn decode_secret_key(private_key: &str) -> [u8; 32] {
+    let bytes = hex::decode(private_key).expect("Failed to decode hex string");
+    bytes.try_into().expect("Slice with incorrect length")
 }
 
 /// Formats a byte size into a human readable string with appropriate units
@@ -262,11 +281,46 @@ impl<'a> Convertor<'a> {
             return BigDecimal::from(self.one_kb.len() as u128);
         }
 
-        // (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
         let one_kb_fee = self.get_gas_price_for_data(self.one_kb.clone()).await;
         let data_posted_fee = self.get_gas_price_for_data(data).await;
 
-        one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount as u128)
+        credits_for_fees(one_kb_fee, data_posted_fee, data_posted_amount)
+    }
+}
+
+/// (1KB_fee / data_posted_fee) * data_posted_amount = data_billed
+fn credits_for_fees(
+    one_kb_fee: BigDecimal,
+    data_posted_fee: BigDecimal,
+    data_posted_amount: u128,
+) -> BigDecimal {
+    one_kb_fee / data_posted_fee * BigDecimal::from(data_posted_amount)
+}
+
+/// Credits a submission costs, priced on the network it is going to.
+pub async fn calculate_submission_credits(
+    submitter: &SubmitDataAvail<'_>,
+    data: &[u8],
+) -> BigDecimal {
+    const ONE_KB: usize = 1024;
+
+    if data.len() < ONE_KB {
+        return BigDecimal::from(ONE_KB as u128);
+    }
+
+    let one_kb_fee = submission_fee(submitter, vec![0u8; ONE_KB]).await;
+    let data_posted_fee = submission_fee(submitter, data.to_vec()).await;
+
+    credits_for_fees(one_kb_fee, data_posted_fee, data.len() as u128)
+}
+
+async fn submission_fee(submitter: &SubmitDataAvail<'_>, data: Vec<u8>) -> BigDecimal {
+    match submitter.estimate_fee(data).await {
+        Ok(fee) => BigDecimal::from(fee),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to get payment query info");
+            BigDecimal::from(u128::MAX)
+        }
     }
 }
 
@@ -382,6 +436,25 @@ lazy_static! {
 
 const WAIT_TIME: u64 = 5;
 pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
+    connect_with_retry(endpoints, |endpoint| async move {
+        AvailClient::connect(&endpoint).await
+    })
+    .await
+}
+
+/// Connects to the normal network using the SDK release it runs on
+pub async fn generate_normal_avail_sdk(endpoints: &Arc<Vec<String>>) -> normal::Client {
+    connect_with_retry(endpoints, |endpoint| async move {
+        normal::Client::new(&endpoint).await
+    })
+    .await
+}
+
+async fn connect_with_retry<C, E, F>(endpoints: &[String], connect: impl Fn(String) -> F) -> C
+where
+    E: Debug,
+    F: Future<Output = Result<C, E>>,
+{
     let mut attempts = 0;
 
     loop {
@@ -390,7 +463,7 @@ pub async fn generate_avail_sdk(endpoints: &Arc<Vec<String>>) -> AvailClient {
         }
         let endpoint = &endpoints[attempts];
         tracing::info!(endpoint = ?endpoint, "attempting to connect endpoint");
-        match AvailClient::connect(endpoint).await {
+        match connect(endpoint.clone()).await {
             Ok(sdk) => {
                 tracing::info!(endpoint = %endpoint, "connected successfully to endpoint");
                 return sdk;
@@ -514,4 +587,19 @@ pub async fn get_amount_to_be_credited(
         .await;
 
     Ok((price / price_per_kb * BigDecimal::from(converter.one_kb.len() as u128)).round(3))
+}
+
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+
+    #[test]
+    fn a_private_key_is_the_same_account_on_both_networks() {
+        let private_key = hex::encode([7u8; 32]);
+
+        let infinity = create_keypair(&private_key);
+        let normal = generate_normal_keygen_list(1, &[private_key]);
+
+        assert_eq!(infinity.public_key().0, normal[0].public_key().0);
+    }
 }

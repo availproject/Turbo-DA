@@ -5,7 +5,7 @@ use super::common::Response;
 use crate::redis::Redis;
 use actix_web::web;
 use avail_rust::Keypair;
-use avail_utils::submit_data::SubmitDataAvail;
+use avail_utils::{normal, submit_data::SubmitDataAvail};
 use bigdecimal::BigDecimal;
 use db::{
     controllers::{
@@ -31,7 +31,10 @@ use tokio::{
 };
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use turbo_da_core::utils::{format_size, generate_avail_sdk, get_connection, Convertor};
+use turbo_da_core::utils::{
+    calculate_submission_credits, format_size, generate_avail_sdk, generate_normal_avail_sdk,
+    get_connection,
+};
 use uuid::Uuid;
 
 /// Backstop for entries left by a crashed worker; longer than a worker's 120 second timeout.
@@ -94,11 +97,18 @@ impl Drop for AbortOnDrop {
     }
 }
 
+/// Connection details for the networks a submission can target.
+pub struct Networks {
+    pub normal_endpoints: Arc<Vec<String>>,
+    pub infinity_endpoints: Arc<Vec<String>>,
+    pub normal_keypairs: Vec<normal::Keypair>,
+}
+
 pub struct Consumer {
     sender: Arc<Sender<Response>>,
     keypair: Arc<web::Data<Vec<Keypair>>>,
     injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
-    endpoints: Arc<Vec<String>>,
+    networks: Arc<Networks>,
     enigma: Arc<web::Data<EnigmaEncryptionService>>,
     redis: Arc<Redis>,
     number_of_threads: i32,
@@ -109,7 +119,7 @@ impl Consumer {
         sender: Arc<Sender<Response>>,
         keypair: Arc<web::Data<Vec<Keypair>>>,
         injected_dependency: Arc<web::Data<Pool<AsyncPgConnection>>>,
-        endpoints: Arc<Vec<String>>,
+        networks: Arc<Networks>,
         enigma: Arc<web::Data<EnigmaEncryptionService>>,
         redis: Arc<Redis>,
         number_of_threads: i32,
@@ -118,7 +128,7 @@ impl Consumer {
             sender,
             keypair,
             injected_dependency,
-            endpoints,
+            networks,
             enigma,
             redis,
             number_of_threads,
@@ -159,7 +169,7 @@ impl Consumer {
         let injected_dependency = self.injected_dependency.clone();
         let keygen = self.keypair.clone();
         let sender = self.sender.clone();
-        let endpoints = self.endpoints.clone();
+        let networks = self.networks.clone();
         let enigma = self.enigma.clone();
         let redis = self.redis.clone();
 
@@ -193,7 +203,7 @@ impl Consumer {
                     let result = Self::response_handler(
                         &response,
                         &injected_dependency,
-                        &endpoints,
+                        &networks,
                         &keygen,
                         &enigma,
                         Arc::clone(&redis),
@@ -219,9 +229,10 @@ impl Consumer {
     }
 
     #[tracing::instrument(
-        skip(response, injected_dependency, endpoints, keygen, enigma, redis),
+        skip(response, injected_dependency, networks, keygen, enigma, redis),
         fields(
             submission_id = %response.submission_id,
+            infinity = response.infinity,
             thread_id = i,
             app_id = %response.app_id
         )
@@ -229,7 +240,7 @@ impl Consumer {
     async fn response_handler(
         response: &Response,
         injected_dependency: &web::Data<Pool<AsyncPgConnection>>,
-        endpoints: &Arc<Vec<String>>,
+        networks: &Networks,
         keygen: &[Keypair],
         enigma: &EnigmaEncryptionService,
         redis: Arc<Redis>,
@@ -248,10 +259,20 @@ impl Consumer {
             return Err("Fallback resolved transaction".to_string());
         }
 
-        let sdk = generate_avail_sdk(endpoints).await;
-
-        let submit_data_class =
-            SubmitDataAvail::new(&sdk, &keygen[i as usize], response.avail_app_id);
+        let normal_sdk;
+        let infinity_sdk;
+        let index = i as usize;
+        let submit_data_class = if response.infinity {
+            infinity_sdk = generate_avail_sdk(&networks.infinity_endpoints).await;
+            SubmitDataAvail::infinity(&infinity_sdk, &keygen[index], response.avail_app_id)
+        } else {
+            normal_sdk = generate_normal_avail_sdk(&networks.normal_endpoints).await;
+            SubmitDataAvail::normal(
+                &normal_sdk,
+                &networks.normal_keypairs[index],
+                response.avail_app_id,
+            )
+        };
 
         let mut process_response =
             ProcessSubmitResponse::new(response, &mut connection, submit_data_class, enigma, redis);
@@ -313,13 +334,7 @@ impl<'a> ProcessSubmitResponse<'a> {
 
         let (data, encrypted_data) = self.process_data(account.encryption).await?;
 
-        let convertor = Convertor::new_with_app_id(
-            self.submit_avail_class.client,
-            self.submit_avail_class.account,
-            self.response.avail_app_id as u32,
-        );
-
-        let credits_used = convertor.calculate_credit_utlisation(data.to_vec()).await
+        let credits_used = calculate_submission_credits(&self.submit_avail_class, &data).await
             * BigDecimal::from(1 + account.encryption as i32);
 
         self.validate_balance(
@@ -530,6 +545,7 @@ mod tests {
             thread_id,
             app_id: Uuid::new_v4(),
             avail_app_id: 1,
+            infinity: false,
             otel_context: Context::new(),
         }
     }

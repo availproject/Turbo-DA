@@ -15,7 +15,8 @@ ENABLE_OTEL_TRACING = "false"
 ENIGMA_URL = "https://8f724c6e23ead7514d0ee022d61170e5c9c15ab5-3000s.dstack-base-prod7.phala.network"
 RETRY_COUNT = "10"
 LIMIT = "6"
-AVAIL_RPC_ENDPOINT_1 = "https://infinity-turing-rpc.avail.so/rpc"
+AVAIL_RPC_ENDPOINT_1 = "https://turing-rpc.avail.so/rpc"
+AVAIL_INFINITY_RPC_ENDPOINT_1 = "https://infinity-turing-rpc.avail.so/rpc"
 
 [secrets]
 DATABASE_URL = "/turboda/testnet/shared/DATABASE_URL"

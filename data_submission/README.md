@@ -47,6 +47,8 @@ curl http://127.0.0.1:8080/v1/submit_data \
 Submit data to avail using JSON payload.
 
 - **URL**: `/submit_data`
+- **Query Parameters**:
+  - `infinity` (optional, default `false`): set to `true` to submit to the infinity network. Otherwise the data goes to the normal Avail network.
 - **Method**: `POST`
 - **Headers**:
   - `x-api-key <API-KEY>`
@@ -71,6 +73,8 @@ curl -X POST "https://api.example.com/v1/submit_data
 Submit data to avail using JSON payload.
 
 - **URL**: `/submit_raw_data`
+- **Query Parameters**:
+  - `infinity` (optional, default `false`): set to `true` to submit to the infinity network. Otherwise the data goes to the normal Avail network.
 - **Method**: `POST`
 - **Headers**:
   - `x-api-key <API-KEY>`

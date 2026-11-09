@@ -14,6 +14,8 @@ pub struct AppConfig {
     pub number_of_threads: i32,
     pub max_pool_size: usize,
     pub avail_rpc_endpoint: Vec<String>,
+    #[serde(default)]
+    pub avail_infinity_rpc_endpoint: Vec<String>,
     pub private_keys: Vec<String>,
     pub broadcast_channel_size: usize,
     pub payload_size: usize,
@@ -32,6 +34,7 @@ impl Default for AppConfig {
             number_of_threads: 3,
             max_pool_size: 10,
             avail_rpc_endpoint: vec![],
+            avail_infinity_rpc_endpoint: vec![],
             broadcast_channel_size: 100000,
             private_keys: vec![],
             payload_size: 1024 * 1024, // in bytes
@@ -218,6 +221,13 @@ impl AppConfig {
             index += 1;
         }
 
+        let mut avail_infinity_rpc_endpoint = Vec::new();
+        let mut index = 1;
+        while let Ok(endpoint) = env::var(format!("AVAIL_INFINITY_RPC_ENDPOINT_{}", index)) {
+            avail_infinity_rpc_endpoint.push(endpoint);
+            index += 1;
+        }
+
         let mut private_keys = Vec::new();
         let mut index = 0;
         while let Ok(key) = env::var(format!("PRIVATE_KEY_{}", index)) {
@@ -234,6 +244,7 @@ impl AppConfig {
             number_of_threads,
             max_pool_size,
             avail_rpc_endpoint,
+            avail_infinity_rpc_endpoint,
             private_keys,
             broadcast_channel_size,
             payload_size,
