@@ -568,6 +568,141 @@ pub mod test {
         allocate_one(&db, user, &app).await.unwrap();
     }
 
+    /// Answers every Enigma lookup with a completed record owned by `app`.
+    fn spawn_enigma_record_stub(app: uuid::Uuid) -> String {
+        let record = serde_json::json!({
+            "id": "request", "turbo_da_app_id": app.to_string(), "status": "completed",
+            "ciphertext": [1], "submitted_signatures": "[]", "decrypted_data": [7],
+            "signers": [], "new_participants": [], "new_threshold": 1, "created_at": 0,
+        });
+        let server = actix_web::HttpServer::new(move || {
+            let record = record.clone();
+            App::new().route(
+                "/v1/{kind}/{id}",
+                web::get().to(move || {
+                    let record = record.clone();
+                    async move { actix_web::HttpResponse::Ok().json(record) }
+                }),
+            )
+        })
+        .workers(1)
+        .disable_signals()
+        .bind(("127.0.0.1", 0))
+        .unwrap();
+        let port = server.addrs()[0].port();
+        actix_web::rt::spawn(server.run());
+        format!("http://127.0.0.1:{port}")
+    }
+
+    async fn call_enigma(
+        db: &TestDB,
+        enigma_url: &str,
+        user: &str,
+        request: test::TestRequest,
+    ) -> (u16, serde_json::Value) {
+        use crate::routes::enigma_management::*;
+        use enigma::EnigmaEncryptionService;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(db.dbc.postgres.clone()))
+                .app_data(web::Data::new(EnigmaEncryptionService::new(
+                    enigma_url.to_string(),
+                )))
+                .app_data(web::Data::new(AppConfig::default()))
+                .service(create_change_signers)
+                .service(list_change_signers)
+                .service(get_change_signers)
+                .service(create_decrypt_request)
+                .service(get_decrypt_request)
+                .service(list_decrypt_requests)
+                .service(get_participant_apps)
+                .service(current_signers),
+        )
+        .await;
+        let response = test::call_service(&app, authenticate_as(request.to_request(), user)).await;
+        let status = response.status().as_u16();
+        let body = test::read_body(response).await;
+        (status, serde_json::from_slice(&body).unwrap_or_default())
+    }
+
+    /// Seeds an owner's app with a signer, plus a stranger with their own app.
+    async fn seed_enigma_tenants(db: &TestDB) -> (uuid::Uuid, uuid::Uuid) {
+        use db::controllers::{mpc_participants, public_keys};
+
+        let app = seed_user_with_app(db, "owner@example.com", 0, 0).await;
+        seed_user_with_app(db, "signer@example.com", 0, 0).await;
+        let stranger_app = seed_user_with_app(db, "stranger@example.com", 0, 0).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        public_keys::add_public_key(&mut conn, "signer@example.com", "0xsigner")
+            .await
+            .unwrap();
+        mpc_participants::add_participants(&mut conn, &app, vec!["0xsigner".to_string()])
+            .await
+            .unwrap();
+        (app, stranger_app)
+    }
+
+    #[test]
+    async fn test_stranger_cannot_reach_another_apps_enigma_data() {
+        let db = TestDB::init();
+        let (app, stranger_app) = seed_enigma_tenants(&db).await;
+        let stub = spawn_enigma_record_stub(app);
+        let submission = seed_submission(&db, "owner@example.com", &app).await;
+        let get = |uri: String| test::TestRequest::get().uri(&uri);
+
+        for (index, request) in [
+            get(format!("/current_signers/{app}")),
+            get(format!("/decrypt_requests?turbo_da_app_id={app}")),
+            get(format!("/get_decrypt_request?submission_id={submission}")),
+            get(format!("/change_signers/list?turbo_da_app_id={app}")),
+            get("/change_signers/some-request".to_string()),
+            test::TestRequest::post().uri("/change_signers/create").set_json(
+                serde_json::json!({ "turbo_da_app_id": app.to_string(), "new_participants": [], "new_threshold": 1 }),
+            ),
+            test::TestRequest::post().uri("/create_decrypt_request").set_json(
+                serde_json::json!({ "turbo_da_app_id": stranger_app, "id": submission }),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (status, body) = call_enigma(&db, &stub, "stranger@example.com", request).await;
+            assert_eq!(status, 404, "request {index}: {body}");
+        }
+
+        let (_, body) = call_enigma(
+            &db,
+            &stub,
+            "stranger@example.com",
+            get("/participant_apps/0xsigner".to_string()),
+        )
+        .await;
+        assert_eq!(body, serde_json::json!([]));
+    }
+
+    #[test]
+    async fn test_owner_and_signer_keep_enigma_access() {
+        let db = TestDB::init();
+        let (app, _) = seed_enigma_tenants(&db).await;
+        let stub = spawn_enigma_record_stub(app);
+        let submission = uuid::Uuid::new_v4();
+        let uri = format!("/get_decrypt_request?submission_id={submission}");
+
+        for user in ["owner@example.com", "signer@example.com"] {
+            let request = test::TestRequest::get().uri(&uri);
+            let (status, body) = call_enigma(&db, &stub, user, request).await;
+            assert_eq!(status, 200, "{user}: {body}");
+            assert_eq!(body["decrypted_data"], serde_json::json!([7]));
+        }
+
+        let request = test::TestRequest::get().uri("/participant_apps/0xsigner");
+        let (_, body) = call_enigma(&db, &stub, "signer@example.com", request).await;
+        assert_eq!(body[0]["id"], serde_json::json!(app));
+        assert!(body[0].get("credit_balance").is_none(), "{body}");
+        assert!(body[0].get("user_id").is_none(), "{body}");
+    }
+
     #[test]
     async fn test_concurrent_reclaims_cannot_duplicate_credits() {
         let db = TestDB::init();
