@@ -568,6 +568,38 @@ pub mod test {
         allocate_one(&db, user, &app).await.unwrap();
     }
 
+    async fn move_credits(db: &TestDB, user: &str, app: &uuid::Uuid, amount: &str, reclaim: bool) {
+        use db::controllers::misc;
+        use std::str::FromStr;
+
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let amount = bigdecimal::BigDecimal::from_str(amount).unwrap();
+        let user = user.to_string();
+        if reclaim {
+            misc::reclaim_credits(&mut conn, app, &user, &amount).await
+        } else {
+            misc::allocate_credit_balance(&mut conn, app, &user, &amount).await
+        }
+        .unwrap();
+    }
+
+    #[test]
+    async fn test_fractional_credit_moves_round_down_and_mint_nothing() {
+        let db = TestDB::init();
+        let user = "fractional@example.com";
+        let app = seed_user_with_app(&db, user, 10, 10).await;
+
+        move_credits(&db, user, &app, "0.5", false).await;
+        move_credits(&db, user, &app, "0.5", true).await;
+        assert_eq!(credit_balances(&db, user, &app).await, (10, 10));
+
+        move_credits(&db, user, &app, "4.75", false).await;
+        assert_eq!(credit_balances(&db, user, &app).await, (6, 14));
+
+        move_credits(&db, user, &app, "1.9", true).await;
+        assert_eq!(credit_balances(&db, user, &app).await, (7, 13));
+    }
+
     /// Answers every Enigma lookup with a completed record owned by `app`.
     fn spawn_enigma_record_stub(app: uuid::Uuid) -> String {
         let record = serde_json::json!({

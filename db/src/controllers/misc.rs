@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use avail_utils::submit_data::TransactionInfo;
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, RoundingMode};
 use diesel::{prelude::*, result::Error};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use enigma::types::EncryptResponse;
@@ -158,6 +158,8 @@ pub async fn allocate_credit_balance(
     if amount < &BigDecimal::from(0) {
         return Err("Cannot allocate negative credits".to_string());
     }
+    // Balances are whole numbers, and Postgres would round both sides of a fractional move up.
+    let amount = &amount.with_scale_round(0, RoundingMode::Down);
     ensure_no_submission_in_progress(connection, user).await?;
     let user_obj = get_user(connection, user).await?;
     if amount > &BigDecimal::from(0) && user_obj.credit_balance < *amount {
@@ -210,6 +212,7 @@ pub async fn reclaim_credits(
     if amount < &BigDecimal::from(0) {
         return Err("Cannot reclaim negative credits".to_string());
     }
+    let amount = &amount.with_scale_round(0, RoundingMode::Down);
     ensure_no_submission_in_progress(connection, user).await?;
 
     let app_obj = get_app_by_id(connection, user, account_id).await?;
