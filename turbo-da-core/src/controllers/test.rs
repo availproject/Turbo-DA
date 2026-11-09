@@ -231,14 +231,11 @@ pub mod test {
         assert_eq!(row.request_status, "PROCESSED");
     }
 
-    fn inclusion_request(user: &str, order_id: i32, tx_hash: &str) -> Request {
+    /// Authenticates a request as `user` the way the Clerk middleware does.
+    fn authenticate_as(req: Request, user: &str) -> Request {
         use actix_web::HttpMessage;
         use clerk_rs::validators::authorizer::ClerkJwt;
 
-        let req = test::TestRequest::post()
-            .uri("/add_inclusion_details")
-            .set_json(serde_json::json!({ "order_id": order_id, "tx_hash": tx_hash }))
-            .to_request();
         req.extensions_mut().insert(ClerkJwt {
             azp: None,
             exp: 0,
@@ -255,6 +252,14 @@ pub mod test {
             )]),
         });
         req
+    }
+
+    fn inclusion_request(user: &str, order_id: i32, tx_hash: &str) -> Request {
+        let req = test::TestRequest::post()
+            .uri("/add_inclusion_details")
+            .set_json(serde_json::json!({ "order_id": order_id, "tx_hash": tx_hash }))
+            .to_request();
+        authenticate_as(req, user)
     }
 
     #[test]
@@ -480,6 +485,152 @@ pub mod test {
 
         assert!(result.is_err());
         assert_eq!(credit_balances(&db, user, &app).await, (0, -10));
+    }
+
+    /// Starts a stub Enigma server, returning its URL and a count of register calls.
+    fn spawn_enigma_stub() -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let registrations = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = registrations.clone();
+        let server = actix_web::HttpServer::new(move || {
+            let counter = counter.clone();
+            App::new().route(
+                "/v1/register",
+                web::post().to(move || {
+                    let counter = counter.clone();
+                    async move {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                        actix_web::HttpResponse::Ok().json(serde_json::json!({
+                            "turbo_da_app_id": "app",
+                            "participants_added": 1,
+                        }))
+                    }
+                }),
+            )
+        })
+        .workers(1)
+        .disable_signals()
+        .bind(("127.0.0.1", 0))
+        .unwrap();
+        let port = server.addrs()[0].port();
+        actix_web::rt::spawn(server.run());
+        (format!("http://127.0.0.1:{port}"), registrations)
+    }
+
+    fn toggle_encryption_request(user: &str, app: uuid::Uuid, signer: &str) -> Request {
+        let req = test::TestRequest::put()
+            .uri("/toggle_encryption")
+            .set_json(serde_json::json!({
+                "app_id": app,
+                "participants": [signer],
+                "threshold": 1,
+            }))
+            .to_request();
+        authenticate_as(req, user)
+    }
+
+    #[test]
+    async fn test_toggle_encryption_on_another_users_app_changes_nothing() {
+        use crate::controllers::users::toggle_encryption;
+        use db::controllers::{
+            apps as apps_ctrl, mpc_participants as mpc_ctrl, public_keys as keys_ctrl,
+        };
+        use enigma::EnigmaEncryptionService;
+        use std::sync::atomic::Ordering;
+
+        let db = TestDB::init();
+        let (attacker, victim) = ("attacker@example.com", "victim@example.com");
+        seed_user_with_app(&db, attacker, 0, 0).await;
+        let victim_app = seed_user_with_app(&db, victim, 0, 0).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        keys_ctrl::add_public_key(&mut conn, attacker, "0xattacker")
+            .await
+            .unwrap();
+        let (enigma_url, registrations) = spawn_enigma_stub();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(db.dbc.postgres.clone()))
+                .app_data(web::Data::new(EnigmaEncryptionService::new(enigma_url)))
+                .service(toggle_encryption),
+        )
+        .await;
+
+        let response = test::call_service(
+            &app,
+            toggle_encryption_request(attacker, victim_app, "0xattacker"),
+        )
+        .await;
+
+        assert_eq!(response.status().as_u16(), 404);
+        assert_eq!(registrations.load(Ordering::SeqCst), 0);
+        let signers = mpc_ctrl::get_participants_by_app_id(&mut conn, &victim_app)
+            .await
+            .unwrap();
+        assert!(signers.is_empty());
+        let row = apps_ctrl::get_app_by_id(&mut conn, &victim.to_string(), &victim_app)
+            .await
+            .unwrap();
+        assert!(!row.encryption);
+    }
+
+    #[test]
+    async fn test_toggle_encryption_by_owner_registers_signers_and_enables_encryption() {
+        use crate::controllers::users::toggle_encryption;
+        use db::controllers::{
+            apps as apps_ctrl, mpc_participants as mpc_ctrl, public_keys as keys_ctrl,
+        };
+        use enigma::EnigmaEncryptionService;
+        use std::sync::atomic::Ordering;
+
+        let db = TestDB::init();
+        let owner = "owner@example.com";
+        let owned_app = seed_user_with_app(&db, owner, 0, 0).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        keys_ctrl::add_public_key(&mut conn, owner, "0xowner")
+            .await
+            .unwrap();
+        let (enigma_url, registrations) = spawn_enigma_stub();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(db.dbc.postgres.clone()))
+                .app_data(web::Data::new(EnigmaEncryptionService::new(enigma_url)))
+                .service(toggle_encryption),
+        )
+        .await;
+
+        let response =
+            test::call_service(&app, toggle_encryption_request(owner, owned_app, "0xowner")).await;
+
+        assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(registrations.load(Ordering::SeqCst), 1);
+        let signers = mpc_ctrl::get_participants_by_app_id(&mut conn, &owned_app)
+            .await
+            .unwrap();
+        assert_eq!(signers.len(), 1);
+        let row = apps_ctrl::get_app_by_id(&mut conn, &owner.to_string(), &owned_app)
+            .await
+            .unwrap();
+        assert!(row.encryption);
+    }
+
+    #[test]
+    async fn test_db_toggle_encryption_rejects_app_not_owned_by_user() {
+        use db::controllers::apps as apps_ctrl;
+
+        let db = TestDB::init();
+        seed_user_with_app(&db, "attacker@example.com", 0, 0).await;
+        let victim_app = seed_user_with_app(&db, "victim@example.com", 0, 0).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+
+        let result = apps_ctrl::toggle_encryption(
+            &mut conn,
+            &"attacker@example.com".to_string(),
+            &victim_app,
+        )
+        .await;
+
+        assert!(result.is_err());
     }
 
     #[test]

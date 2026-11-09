@@ -167,10 +167,27 @@ pub async fn toggle_encryption(
     user: &String,
     app: &Uuid,
 ) -> Result<(), String> {
-    diesel::update(apps.filter(id.eq(app)).filter(user_id.eq(user)))
+    let updated = diesel::update(apps.filter(id.eq(app)).filter(user_id.eq(user)))
         .set(encryption.eq(dsl::not(encryption)))
         .execute(connection)
         .await
         .map_err(|e| e.to_string())?;
+    if updated != 1 {
+        return Err("App not found".to_string());
+    }
     Ok(())
+}
+
+/// Returns whether `app` exists and belongs to `user`.
+pub async fn app_belongs_to_user(
+    connection: &mut AsyncPgConnection,
+    user: &str,
+    app: &Uuid,
+) -> Result<bool, String> {
+    diesel::select(dsl::exists(
+        apps.filter(id.eq(app)).filter(user_id.eq(user)),
+    ))
+    .get_result::<bool>(connection)
+    .await
+    .map_err(|e| e.to_string())
 }
