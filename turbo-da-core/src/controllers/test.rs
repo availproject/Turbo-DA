@@ -319,6 +319,169 @@ pub mod test {
         assert_eq!(status[0].tx_hash, Some("0xvictim".to_string()));
     }
 
+    /// Registers a user holding `main` credits and one app holding `allocated` credits.
+    async fn seed_user_with_app(db: &TestDB, user: &str, main: i32, allocated: i32) -> uuid::Uuid {
+        use bigdecimal::BigDecimal;
+        use db::{
+            controllers::{apps as apps_ctrl, users as users_ctrl},
+            models::{apps::AppsCreate, user_model::UserCreate},
+            schema::users::dsl as users_dsl,
+        };
+        use diesel::{ExpressionMethods, QueryDsl};
+        use diesel_async::RunQueryDsl;
+
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        users_ctrl::register_new_user(
+            &mut conn,
+            UserCreate {
+                id: user.to_string(),
+                name: user.to_string(),
+                sumsub_timestamp: None,
+            },
+        )
+        .await
+        .unwrap();
+        diesel::update(users_dsl::users.filter(users_dsl::id.eq(user)))
+            .set(users_dsl::credit_balance.eq(BigDecimal::from(main)))
+            .execute(&mut conn)
+            .await
+            .unwrap();
+        let app = uuid::Uuid::new_v4();
+        apps_ctrl::create_account(
+            &mut conn,
+            &AppsCreate {
+                id: app,
+                user_id: user.to_string(),
+                app_id: 2,
+                credit_balance: BigDecimal::from(allocated),
+                credit_used: BigDecimal::from(0),
+                credit_selection: Some(0),
+                app_name: Some("app".to_string()),
+                app_description: None,
+                app_logo: None,
+            },
+        )
+        .await
+        .unwrap();
+        app
+    }
+
+    async fn credit_balances(db: &TestDB, user: &str, app: &uuid::Uuid) -> (i64, i64) {
+        use bigdecimal::ToPrimitive;
+        use db::controllers::{apps as apps_ctrl, users as users_ctrl};
+
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let user_row = users_ctrl::get_user(&mut conn, &user.to_string())
+            .await
+            .unwrap();
+        let app_row = apps_ctrl::get_app_by_id(&mut conn, &user.to_string(), app)
+            .await
+            .unwrap();
+        (
+            user_row.credit_balance.to_i64().unwrap(),
+            app_row.credit_balance.to_i64().unwrap(),
+        )
+    }
+
+    /// Runs `count` copies of a credit move at once, each on its own pooled connection.
+    async fn race_credit_moves(
+        db: &TestDB,
+        user: &str,
+        app: uuid::Uuid,
+        count: usize,
+        reclaim: bool,
+    ) -> usize {
+        use bigdecimal::BigDecimal;
+        use db::controllers::misc;
+
+        let ready = std::sync::Arc::new(tokio::sync::Barrier::new(count));
+        let moves = (0..count).map(|_| {
+            let pool = db.dbc.postgres.clone();
+            let user = user.to_string();
+            let ready = ready.clone();
+            tokio::spawn(async move {
+                let mut conn = pool.get().await.unwrap();
+                let amount = BigDecimal::from(10);
+                // Start together, otherwise the first task finishes before the rest connect.
+                ready.wait().await;
+                if reclaim {
+                    misc::reclaim_credits(&mut conn, &app, &user, &amount).await
+                } else {
+                    misc::allocate_credit_balance(&mut conn, &app, &user, &amount).await
+                }
+            })
+        });
+        futures::future::join_all(moves)
+            .await
+            .into_iter()
+            .filter(|result| matches!(result, Ok(Ok(()))))
+            .count()
+    }
+
+    #[test]
+    async fn test_concurrent_reclaims_cannot_duplicate_credits() {
+        let db = TestDB::init();
+        let user = "reclaim@example.com";
+        let app = seed_user_with_app(&db, user, 0, 10).await;
+
+        let succeeded = race_credit_moves(&db, user, app, 8, true).await;
+
+        assert_eq!(succeeded, 1);
+        assert_eq!(credit_balances(&db, user, &app).await, (10, 0));
+    }
+
+    #[test]
+    async fn test_concurrent_allocations_cannot_overdraw_main_balance() {
+        let db = TestDB::init();
+        let user = "allocate@example.com";
+        let app = seed_user_with_app(&db, user, 10, 0).await;
+
+        let succeeded = race_credit_moves(&db, user, app, 8, false).await;
+
+        assert_eq!(succeeded, 1);
+        assert_eq!(credit_balances(&db, user, &app).await, (0, 10));
+    }
+
+    #[test]
+    async fn test_allocating_to_another_users_app_leaves_balances_unchanged() {
+        use bigdecimal::BigDecimal;
+        use db::controllers::misc;
+
+        let db = TestDB::init();
+        let own_app = seed_user_with_app(&db, "owner@example.com", 10, 0).await;
+        let foreign_app = seed_user_with_app(&db, "other@example.com", 0, 0).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+
+        let result = misc::allocate_credit_balance(
+            &mut conn,
+            &foreign_app,
+            &"owner@example.com".to_string(),
+            &BigDecimal::from(10),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            credit_balances(&db, "owner@example.com", &own_app).await,
+            (10, 0)
+        );
+    }
+
+    #[test]
+    async fn test_app_with_negative_balance_cannot_be_deleted() {
+        use db::controllers::apps as apps_ctrl;
+
+        let db = TestDB::init();
+        let user = "debt@example.com";
+        let app = seed_user_with_app(&db, user, 0, -10).await;
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+
+        let result = apps_ctrl::delete_account_by_id(&mut conn, user.to_string(), app).await;
+
+        assert!(result.is_err());
+        assert_eq!(credit_balances(&db, user, &app).await, (0, -10));
+    }
+
     #[test]
     async fn test_get_user() {
         let db = TestDB::init();

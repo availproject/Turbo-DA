@@ -15,8 +15,8 @@ use crate::{
 };
 use avail_utils::submit_data::TransactionInfo;
 use bigdecimal::BigDecimal;
-use diesel::prelude::*;
-use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use diesel::{prelude::*, result::Error};
+use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
 use enigma::types::EncryptResponse;
 use uuid::Uuid;
 
@@ -163,25 +163,41 @@ pub async fn allocate_credit_balance(
         return Err("Insufficient balance".to_string());
     }
 
-    diesel::update(
-        apps::apps
-            .filter(apps::id.eq(account_id))
-            .filter(apps::user_id.eq(user)),
-    )
-    .set((apps::credit_balance.eq(apps::credit_balance + amount),))
-    .execute(connection)
-    .await
-    .map_err(|e| e.to_string())?;
+    connection
+        .transaction(async |conn| {
+            // Update apps before users, as every credit move does, so concurrent moves can't deadlock.
+            let updated = diesel::update(
+                apps::apps
+                    .filter(apps::id.eq(account_id))
+                    .filter(apps::user_id.eq(user)),
+            )
+            .set((apps::credit_balance.eq(apps::credit_balance + amount),))
+            .execute(&mut *conn)
+            .await?;
+            if updated != 1 {
+                return Err(Error::NotFound);
+            }
 
-    diesel::update(users::users.filter(users::id.eq(user)))
-        .set((
-            users::allocated_credit_balance.eq(users::allocated_credit_balance + amount),
-            users::credit_balance.eq(users::credit_balance - amount),
-        ))
-        .execute(connection)
+            // The balance condition, not the earlier read, is what stops concurrent overdrafts.
+            let updated = diesel::update(
+                users::users
+                    .filter(users::id.eq(user))
+                    .filter(users::credit_balance.ge(amount)),
+            )
+            .set((
+                users::allocated_credit_balance.eq(users::allocated_credit_balance + amount),
+                users::credit_balance.eq(users::credit_balance - amount),
+            ))
+            .execute(conn)
+            .await?;
+            if updated != 1 {
+                return Err(Error::RollbackTransaction);
+            }
+
+            Ok::<(), Error>(())
+        })
         .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
+        .map_err(credit_move_error)
 }
 
 pub async fn reclaim_credits(
@@ -199,25 +215,42 @@ pub async fn reclaim_credits(
         return Err("Insufficient balance".to_string());
     }
 
-    diesel::update(
-        apps::apps
-            .filter(apps::id.eq(account_id))
-            .filter(apps::user_id.eq(user)),
-    )
-    .set(apps::credit_balance.eq(apps::credit_balance - amount))
-    .execute(connection)
-    .await
-    .map_err(|e| e.to_string())?;
+    connection
+        .transaction(async |conn| {
+            // The balance condition, not the earlier read, is what stops concurrent overdrafts.
+            let updated = diesel::update(
+                apps::apps
+                    .filter(apps::id.eq(account_id))
+                    .filter(apps::user_id.eq(user))
+                    .filter(apps::credit_balance.ge(amount)),
+            )
+            .set(apps::credit_balance.eq(apps::credit_balance - amount))
+            .execute(&mut *conn)
+            .await?;
+            if updated != 1 {
+                return Err(Error::RollbackTransaction);
+            }
 
-    diesel::update(users::users.filter(users::id.eq(user)))
-        .set((
-            users::allocated_credit_balance.eq(users::allocated_credit_balance - amount),
-            users::credit_balance.eq(users::credit_balance + amount),
-        ))
-        .execute(connection)
+            diesel::update(users::users.filter(users::id.eq(user)))
+                .set((
+                    users::allocated_credit_balance.eq(users::allocated_credit_balance - amount),
+                    users::credit_balance.eq(users::credit_balance + amount),
+                ))
+                .execute(conn)
+                .await?;
+
+            Ok::<(), Error>(())
+        })
         .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
+        .map_err(credit_move_error)
+}
+
+/// A rollback here always means the balance condition matched no row.
+fn credit_move_error(error: Error) -> String {
+    match error {
+        Error::RollbackTransaction => "Insufficient balance".to_string(),
+        error => error.to_string(),
+    }
 }
 
 pub async fn indexer_status(

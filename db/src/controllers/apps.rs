@@ -49,6 +49,10 @@ pub async fn delete_account_by_id(
                 .for_update()
                 .first::<Apps>(&mut *conn)
                 .await?;
+            // Deleting the row would erase a debt the user still owes.
+            if account.credit_balance < BigDecimal::from(0) {
+                return Err(diesel::result::Error::RollbackTransaction);
+            }
             // Return the unspent allocation to the main account. `credit_used` has already been
             // paid out on Avail and must not be refunded.
             if account.credit_balance > BigDecimal::from(0) {
@@ -67,7 +71,12 @@ pub async fn delete_account_by_id(
             Ok::<(), diesel::result::Error>(())
         })
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| match e {
+            diesel::result::Error::RollbackTransaction => {
+                "Cannot delete an app with a negative credit balance".to_string()
+            }
+            e => e.to_string(),
+        })
 }
 
 pub async fn update_app_id(
