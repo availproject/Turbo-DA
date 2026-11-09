@@ -149,19 +149,6 @@ impl EVM {
                 continue;
             };
 
-            if let Err(e) = self
-                .utils
-                .update_finalised_block_number(
-                    number as i32,
-                    hash.to_string(),
-                    &mut connection,
-                    self.evm_chain_id,
-                )
-                .await
-            {
-                tracing::error!(error = %e, "failed to update finalised block number");
-            }
-
             let tx_hash = match log.transaction_hash {
                 Some(tx_hash) => tx_hash.to_string(),
                 None => {
@@ -188,6 +175,19 @@ impl EVM {
                 .await;
             if let Err(e) = result {
                 tracing::error!(error = %e, "failed to update database");
+            }
+
+            if let Err(e) = self
+                .utils
+                .update_finalised_block_number(
+                    number as i32,
+                    hash.to_string(),
+                    &mut connection,
+                    self.evm_chain_id,
+                )
+                .await
+            {
+                tracing::error!(error = %e, "failed to update finalised block number");
             }
         }
         Ok(())

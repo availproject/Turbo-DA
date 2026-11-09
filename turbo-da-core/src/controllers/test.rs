@@ -187,6 +187,139 @@ pub mod test {
         assert_eq!(body_str, "Success: Jane Doe".to_string());
     }
     #[test]
+    async fn test_inclusion_details_are_ignored_once_order_is_credited() {
+        use bigdecimal::BigDecimal;
+        use db::{
+            controllers::{fund, users as users_ctrl},
+            models::user_model::UserCreate,
+            schema::credit_requests::dsl as credit_requests,
+        };
+        use diesel::{ExpressionMethods, QueryDsl};
+        use diesel_async::RunQueryDsl;
+
+        let db = TestDB::init();
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        let user = "user@example.com".to_string();
+        users_ctrl::register_new_user(
+            &mut conn,
+            UserCreate {
+                id: user.clone(),
+                name: "User".to_string(),
+                sumsub_timestamp: None,
+            },
+        )
+        .await
+        .unwrap();
+        let order = fund::create_credit_request(user.clone(), 1, &mut conn)
+            .await
+            .unwrap();
+        diesel::update(credit_requests::credit_requests.filter(credit_requests::id.eq(order.id)))
+            .set((
+                credit_requests::amount_credit.eq(Some(BigDecimal::from(1000))),
+                credit_requests::request_status.eq("PROCESSED"),
+                credit_requests::tx_hash.eq(Some("0xverified")),
+            ))
+            .execute(&mut conn)
+            .await
+            .unwrap();
+
+        let row = fund::update_inclusion_details(user, order.id, "0xother".to_string(), &mut conn)
+            .await
+            .expect("reporting a hash on a credited order should not fail");
+
+        assert_eq!(row.tx_hash, Some("0xverified".to_string()));
+        assert_eq!(row.request_status, "PROCESSED");
+    }
+
+    fn inclusion_request(user: &str, order_id: i32, tx_hash: &str) -> Request {
+        use actix_web::HttpMessage;
+        use clerk_rs::validators::authorizer::ClerkJwt;
+
+        let req = test::TestRequest::post()
+            .uri("/add_inclusion_details")
+            .set_json(serde_json::json!({ "order_id": order_id, "tx_hash": tx_hash }))
+            .to_request();
+        req.extensions_mut().insert(ClerkJwt {
+            azp: None,
+            exp: 0,
+            iat: 0,
+            iss: String::new(),
+            nbf: 0,
+            sid: None,
+            sub: String::new(),
+            act: None,
+            org: None,
+            other: serde_json::Map::from_iter([(
+                "user_email".to_string(),
+                serde_json::json!(user),
+            )]),
+        });
+        req
+    }
+
+    #[test]
+    async fn test_add_inclusion_details_endpoint_cannot_squat_or_touch_other_orders() {
+        use crate::controllers::fund::add_inclusion_details;
+        use db::{
+            controllers::{fund, users as users_ctrl},
+            models::user_model::UserCreate,
+        };
+
+        let db = TestDB::init();
+        let mut conn = db.dbc.postgres.get().await.unwrap();
+        for user in ["attacker@example.com", "victim@example.com"] {
+            users_ctrl::register_new_user(
+                &mut conn,
+                UserCreate {
+                    id: user.to_string(),
+                    name: user.to_string(),
+                    sumsub_timestamp: None,
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let attacker_order =
+            fund::create_credit_request("attacker@example.com".to_string(), 1, &mut conn)
+                .await
+                .unwrap();
+        let victim_order =
+            fund::create_credit_request("victim@example.com".to_string(), 1, &mut conn)
+                .await
+                .unwrap();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(db.dbc.postgres.clone()))
+                .service(add_inclusion_details),
+        )
+        .await;
+
+        let squat = inclusion_request("attacker@example.com", attacker_order.id, "0xvictim");
+        let squat = test::call_service(&app, squat).await;
+        let own = inclusion_request("victim@example.com", victim_order.id, "0xvictim");
+        let own = test::call_service(&app, own).await;
+        let foreign = inclusion_request("attacker@example.com", victim_order.id, "0xforged");
+        let foreign = test::call_service(&app, foreign).await;
+
+        assert_eq!(squat.status().as_u16(), 200);
+        assert_eq!(
+            own.status().as_u16(),
+            200,
+            "squatted hash must not block the owner"
+        );
+        assert_ne!(
+            foreign.status().as_u16(),
+            200,
+            "order of another user must be rejected"
+        );
+        let status =
+            fund::get_fund_status("victim@example.com".to_string(), victim_order.id, &mut conn)
+                .await
+                .unwrap();
+        assert_eq!(status[0].tx_hash, Some("0xvictim".to_string()));
+    }
+
+    #[test]
     async fn test_get_user() {
         let db = TestDB::init();
         let mut app_config = AppConfig::default();

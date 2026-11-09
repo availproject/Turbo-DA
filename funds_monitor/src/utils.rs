@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
-use bigdecimal::BigDecimal;
-use db::{
-    models::credit_requests::CreditRequestsGet,
-    schema::{credit_requests, indexer_block_numbers::dsl::*, users},
-};
+use bigdecimal::{BigDecimal, Signed};
+use db::schema::{credit_requests, indexer_block_numbers::dsl::*, users};
 use diesel::prelude::*;
 
 use turbo_da_core::utils::get_amount_to_be_credited;
@@ -26,17 +23,20 @@ struct DepositCredit<'a> {
     status: &'a str,
 }
 
-/// Records a deposit against its order and credits the user in one transaction.
+/// Records a deposit against its order and credits the order's owner in one transaction.
 ///
-/// The `amount_credit IS NULL` filter is the idempotency guard: the update holds the row lock, so
-/// a concurrent or replayed credit matches no row. Rolling back on failure leaves the order
-/// uncredited, so a failed deposit can be retried.
-fn credit_deposit(connection: &mut PgConnection, credit: &DepositCredit<'_>) -> QueryResult<()> {
-    connection.transaction(|connection| {
-        let row = diesel::update(credit_requests::table)
-            .filter(credit_requests::id.eq(credit.order_id))
-            .filter(credit_requests::amount_credit.is_null())
-            .set((
+/// Anyone can send a deposit naming any order id, so an order that is already credited must not
+/// swallow a later deposit: that deposit gets its own row and is credited to the same owner.
+/// A unique index on credited `(chain_id, tx_hash)` rejects replays, and rolling back on failure
+/// leaves the deposit retryable.
+fn credit_deposit(connection: &mut PgConnection, credit: &DepositCredit<'_>) -> Result<(), String> {
+    if !credit.amount.is_positive() {
+        return Err("Deposit is worth no credits".to_string());
+    }
+
+    connection
+        .transaction::<_, diesel::result::Error, _>(|connection| {
+            let values = (
                 credit_requests::amount_credit.eq(Some(credit.amount.clone())),
                 credit_requests::request_status.eq(credit.status.to_string()),
                 credit_requests::chain_id.eq(Some(credit.chain_identifier)),
@@ -44,17 +44,38 @@ fn credit_deposit(connection: &mut PgConnection, credit: &DepositCredit<'_>) -> 
                 credit_requests::request_type.eq("DEPOSIT".to_string()),
                 credit_requests::token_address.eq(Some(credit.token_address.to_string())),
                 credit_requests::amount_paid.eq(Some(credit.amount_paid.clone())),
-            ))
-            .returning(CreditRequestsGet::as_returning())
-            .get_result::<CreditRequestsGet>(connection)?;
+            );
 
-        diesel::update(users::table.filter(users::id.eq(&row.user_id)))
-            .set(users::credit_balance.eq(users::credit_balance + credit.amount))
-            .returning(users::id)
-            .get_result::<String>(connection)?;
+            let claimed_by = diesel::update(credit_requests::table)
+                .filter(credit_requests::id.eq(credit.order_id))
+                .filter(credit_requests::amount_credit.is_null())
+                .set(values.clone())
+                .returning(credit_requests::user_id)
+                .get_result::<String>(connection)
+                .optional()?;
 
-        Ok(())
-    })
+            let owner = match claimed_by {
+                Some(owner) => owner,
+                None => {
+                    let owner = credit_requests::table
+                        .filter(credit_requests::id.eq(credit.order_id))
+                        .select(credit_requests::user_id)
+                        .first::<String>(connection)?;
+                    diesel::insert_into(credit_requests::table)
+                        .values((credit_requests::user_id.eq(&owner), values))
+                        .execute(connection)?;
+                    owner
+                }
+            };
+
+            diesel::update(users::table.filter(users::id.eq(&owner)))
+                .set(users::credit_balance.eq(users::credit_balance + credit.amount))
+                .returning(users::id)
+                .get_result::<String>(connection)?;
+
+            Ok(())
+        })
+        .map_err(|e| e.to_string())
 }
 
 pub struct Utils {
@@ -167,6 +188,8 @@ impl Utils {
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
 
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
@@ -174,6 +197,7 @@ mod tests {
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../db/migrations");
     const USER_ID: &str = "depositor@example.com";
+    const TX_HASH: &str = "0xabc";
     static NEXT_DATABASE: AtomicU32 = AtomicU32::new(0);
 
     /// Disposable migrated database, following the convention of `TestDB` in turbo-da-core.
@@ -210,16 +234,18 @@ mod tests {
             }
         }
 
-        /// Inserts a user with no credit and one pending order, returning the order id.
-        fn seed_pending_order(&mut self) -> i32 {
+        fn add_user(&mut self, user_id: &str) {
             diesel::insert_into(users::table)
-                .values((users::id.eq(USER_ID), users::name.eq("Depositor")))
+                .values((users::id.eq(user_id), users::name.eq(user_id)))
                 .execute(&mut self.connection)
                 .expect("insert user");
+        }
 
+        fn add_order(&mut self, user_id: &str) -> i32 {
             diesel::insert_into(credit_requests::table)
                 .values((
-                    credit_requests::user_id.eq(USER_ID),
+                    credit_requests::user_id.eq(user_id),
+                    credit_requests::chain_id.eq(Some(0)),
                     credit_requests::request_status.eq("PENDING"),
                     credit_requests::request_type.eq("DEPOSIT"),
                 ))
@@ -228,20 +254,93 @@ mod tests {
                 .expect("insert credit request")
         }
 
-        fn credit(&mut self, order_id: i32) -> QueryResult<()> {
-            let amount = BigDecimal::from(1000);
+        /// Inserts a user with no credit and one pending order, returning the order id.
+        fn seed_pending_order(&mut self) -> i32 {
+            self.add_user(USER_ID);
+            self.add_order(USER_ID)
+        }
+
+        /// Stores a client-reported hash the way `add_inclusion_details` does.
+        fn report_tx_hash(&mut self, order_id: i32, tx_hash: &str) {
+            diesel::update(credit_requests::table.filter(credit_requests::id.eq(order_id)))
+                .set((
+                    credit_requests::tx_hash.eq(Some(tx_hash)),
+                    credit_requests::request_status.eq("INCLUDED"),
+                ))
+                .execute(&mut self.connection)
+                .expect("store reported hash");
+        }
+
+        fn credit(&mut self, order_id: i32) -> Result<(), String> {
+            self.credit_deposit_of(order_id, TX_HASH, 1000)
+        }
+
+        fn credit_deposit_of(
+            &mut self,
+            order_id: i32,
+            tx_hash: &str,
+            amount: i32,
+        ) -> Result<(), String> {
+            let amount = BigDecimal::from(amount);
             credit_deposit(
                 &mut self.connection,
                 &DepositCredit {
                     order_id,
                     amount: &amount,
                     amount_paid: &amount,
-                    transaction_hash: "0xabc",
+                    transaction_hash: tx_hash,
                     token_address: "0x0000000000000000000000000000000000000000",
                     chain_identifier: 0,
                     status: "PROCESSED",
                 },
             )
+        }
+
+        /// Credits each hash on its own connection, released together to race on the row lock.
+        fn credit_concurrently(
+            &self,
+            order_id: i32,
+            hashes: Vec<String>,
+        ) -> Vec<Result<(), String>> {
+            let url = format!("{}/{}", self.admin_url, self.name);
+            let barrier = Arc::new(Barrier::new(hashes.len()));
+            let workers: Vec<_> = hashes
+                .into_iter()
+                .map(|hash| {
+                    let (url, barrier) = (url.clone(), barrier.clone());
+                    thread::spawn(move || {
+                        let mut connection =
+                            PgConnection::establish(&url).expect("connect to test database");
+                        let amount = BigDecimal::from(1000);
+                        barrier.wait();
+                        credit_deposit(
+                            &mut connection,
+                            &DepositCredit {
+                                order_id,
+                                amount: &amount,
+                                amount_paid: &amount,
+                                transaction_hash: &hash,
+                                token_address: "0x0000000000000000000000000000000000000000",
+                                chain_identifier: 0,
+                                status: "PROCESSED",
+                            },
+                        )
+                    })
+                })
+                .collect();
+
+            workers
+                .into_iter()
+                .map(|worker| worker.join().expect("worker should not panic"))
+                .collect()
+        }
+
+        fn credited_row_count(&mut self) -> i64 {
+            credit_requests::table
+                .filter(credit_requests::amount_credit.is_not_null())
+                .count()
+                .get_result(&mut self.connection)
+                .expect("count credited rows")
         }
 
         fn order_state(&mut self, order_id: i32) -> (Option<BigDecimal>, String) {
@@ -343,5 +442,84 @@ mod tests {
         assert!(db.credit(order_id + 1).is_err());
 
         assert_eq!(db.balance(), BigDecimal::from(0));
+    }
+
+    #[test]
+    fn credit_deposit_ignores_hash_squatted_by_unverified_order() {
+        let mut db = TestDatabase::new();
+        let order_id = db.seed_pending_order();
+        db.add_user("attacker");
+        let squatting_order = db.add_order("attacker");
+        db.report_tx_hash(squatting_order, TX_HASH);
+
+        db.credit(order_id)
+            .expect("squatted hash must not block the deposit");
+
+        assert_eq!(db.balance(), BigDecimal::from(1000));
+    }
+
+    #[test]
+    fn credit_deposit_credits_real_deposit_after_dust_consumed_the_order() {
+        let mut db = TestDatabase::new();
+        let order_id = db.seed_pending_order();
+        db.credit_deposit_of(order_id, "0xdust", 1)
+            .expect("dust deposit is credited to the order owner");
+
+        db.credit_deposit_of(order_id, "0xreal", 1000)
+            .expect("real deposit must still be credited");
+
+        assert_eq!(db.balance(), BigDecimal::from(1001));
+        assert_eq!(db.credited_row_count(), 2);
+    }
+
+    #[test]
+    fn credit_deposit_does_not_credit_one_transaction_on_two_orders() {
+        let mut db = TestDatabase::new();
+        let first_order = db.seed_pending_order();
+        let second_order = db.add_order(USER_ID);
+        db.credit(first_order).expect("first credit should succeed");
+
+        assert!(
+            db.credit(second_order).is_err(),
+            "reused hash must be rejected"
+        );
+
+        assert_eq!(db.balance(), BigDecimal::from(1000));
+        assert_eq!(db.order_state(second_order), (None, "PENDING".to_string()));
+    }
+
+    #[test]
+    fn credit_deposit_rejects_zero_credit_without_consuming_the_order() {
+        let mut db = TestDatabase::new();
+        let order_id = db.seed_pending_order();
+
+        assert!(db.credit_deposit_of(order_id, TX_HASH, 0).is_err());
+
+        assert_eq!(db.order_state(order_id), (None, "PENDING".to_string()));
+    }
+
+    #[test]
+    fn concurrent_replays_of_one_transaction_credit_once() {
+        let mut db = TestDatabase::new();
+        let order_id = db.seed_pending_order();
+
+        let results = db.credit_concurrently(order_id, vec![TX_HASH.to_string(); 8]);
+
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert_eq!(db.balance(), BigDecimal::from(1000));
+        assert_eq!(db.credited_row_count(), 1);
+    }
+
+    #[test]
+    fn concurrent_deposits_on_one_order_are_all_credited() {
+        let mut db = TestDatabase::new();
+        let order_id = db.seed_pending_order();
+        let hashes = (0..8).map(|i| format!("0x{i}")).collect();
+
+        let results = db.credit_concurrently(order_id, hashes);
+
+        assert!(results.iter().all(|r| r.is_ok()), "{results:?}");
+        assert_eq!(db.balance(), BigDecimal::from(8000));
+        assert_eq!(db.credited_row_count(), 8);
     }
 }

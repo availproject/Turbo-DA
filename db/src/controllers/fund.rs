@@ -39,23 +39,39 @@ pub async fn create_credit_request(
     Ok(res)
 }
 
+/// Stores the client-reported transaction hash on an order that has not been credited yet.
+///
+/// A credited order holds the hash verified by the indexer, so it is returned unchanged.
 pub async fn update_inclusion_details(
     user: String,
     order_id: i32,
     tx: String,
     connection: &mut AsyncPgConnection,
 ) -> Result<CreditRequestsGet, String> {
-    let res = diesel::update(
+    let updated = diesel::update(
         credit_requests
             .filter(id.eq(order_id))
-            .filter(user_id.eq(user)),
+            .filter(user_id.eq(&user))
+            .filter(amount_credit.is_null()),
     )
     .set((tx_hash.eq(tx), request_status.eq("INCLUDED")))
     .returning(CreditRequestsGet::as_returning())
     .get_result::<CreditRequestsGet>(connection)
     .await
-    .map_err(|e| format!("Error creating credit request: {}", e))?;
-    Ok(res)
+    .optional()
+    .map_err(|e| format!("Error updating credit request: {}", e))?;
+
+    if let Some(row) = updated {
+        return Ok(row);
+    }
+
+    credit_requests
+        .filter(id.eq(order_id))
+        .filter(user_id.eq(user))
+        .select(CreditRequestsGet::as_select())
+        .first::<CreditRequestsGet>(connection)
+        .await
+        .map_err(|e| format!("Error loading credit request: {}", e))
 }
 
 pub async fn get_fund_list(
