@@ -1,3 +1,4 @@
+use avail_rust::avail::balances::events::Transfer;
 use avail_rust::avail::utility::tx::BatchAll;
 use avail_rust::avail::RuntimeCall;
 use avail_rust::avail_rust_core::Preamble;
@@ -172,6 +173,31 @@ async fn process_block(
         let account_id_hex = hex::encode(account_id.0);
         let tx_hash_hex = hex::encode(tx_hash.0);
 
+        let events = match tx.events(client.clone()).await {
+            Ok(events) => events,
+            Err(e) => {
+                tracing::error!(error = %e, tx_hash = %tx_hash_hex, "failed to fetch extrinsic events");
+                continue;
+            }
+        };
+        let transfers = match events.all::<Transfer>() {
+            Ok(transfers) => transfers,
+            Err(e) => {
+                tracing::error!(error = %e, tx_hash = %tx_hash_hex, "failed to decode transfer events");
+                continue;
+            }
+        };
+        if !is_deposit_confirmed(
+            events.is_extrinsic_success_present(),
+            &transfers,
+            account_id,
+            dest,
+            balances_call.value,
+        ) {
+            tracing::warn!(tx_hash = %tx_hash_hex, "deposit extrinsic did not transfer funds, skipping");
+            continue;
+        }
+
         let ascii_remark = hex::encode(remark_call.remark.clone());
         tracing::info!(
             tx_hash = %tx_hash_hex,
@@ -188,7 +214,8 @@ async fn process_block(
             _from: account_id_hex,
         };
 
-        utils
+        // One bad deposit (invalid remark, replayed order) must not block the rest of the block.
+        if let Err(e) = utils
             .update_database_on_deposit(
                 &ascii_remark,
                 &receipt,
@@ -198,10 +225,14 @@ async fn process_block(
                 &"PROCESSED".to_string(),
             )
             .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "failed to update database on deposit");
-                format!("Failed to update database on deposit: {}", e)
-            })?;
+        {
+            tracing::error!(
+                error = %e,
+                tx_hash = %tx_hash_hex,
+                ascii_remark = %ascii_remark,
+                "failed to update database on deposit"
+            );
+        }
     }
 
     utils
@@ -210,4 +241,77 @@ async fn process_block(
         .map_err(|e| format!("Failed to update finalised block number: {}", e))?;
 
     Ok(())
+}
+
+/// A decoded call only shows what was requested; a reverted `batch_all` stays in the block body.
+/// Credit a deposit only if the extrinsic succeeded and emitted the matching transfer.
+fn is_deposit_confirmed(
+    extrinsic_succeeded: bool,
+    transfers: &[Transfer],
+    from: &AccountId,
+    to: &AccountId,
+    amount: u128,
+) -> bool {
+    extrinsic_succeeded
+        && transfers
+            .iter()
+            .any(|t| t.from == *from && t.to == *to && t.amount == amount)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
+
+    fn sender() -> AccountId {
+        AccountId::from([1u8; 32])
+    }
+
+    fn deposit_address() -> AccountId {
+        AccountId::from([2u8; 32])
+    }
+
+    fn transfer(from: AccountId, to: AccountId, amount: u128) -> Transfer {
+        Transfer { from, to, amount }
+    }
+
+    fn confirmed(succeeded: bool, transfers: &[Transfer]) -> bool {
+        is_deposit_confirmed(succeeded, transfers, &sender(), &deposit_address(), AMOUNT)
+    }
+
+    #[test]
+    fn deposit_is_confirmed_when_extrinsic_succeeded_with_matching_transfer() {
+        assert!(confirmed(
+            true,
+            &[transfer(sender(), deposit_address(), AMOUNT)]
+        ));
+    }
+
+    #[test]
+    fn deposit_is_rejected_when_extrinsic_failed() {
+        assert!(!confirmed(false, &[]));
+        assert!(!confirmed(
+            false,
+            &[transfer(sender(), deposit_address(), AMOUNT)]
+        ));
+    }
+
+    #[test]
+    fn deposit_is_rejected_without_transfer_event() {
+        assert!(!confirmed(true, &[]));
+    }
+
+    #[test]
+    fn deposit_is_rejected_when_transfer_does_not_match() {
+        assert!(!confirmed(
+            true,
+            &[transfer(sender(), deposit_address(), AMOUNT - 1)]
+        ));
+        assert!(!confirmed(true, &[transfer(sender(), sender(), AMOUNT)]));
+        assert!(!confirmed(
+            true,
+            &[transfer(deposit_address(), deposit_address(), AMOUNT)]
+        ));
+    }
 }

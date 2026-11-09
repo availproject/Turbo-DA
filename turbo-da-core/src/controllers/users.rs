@@ -1171,6 +1171,7 @@ pub struct ToggleEncryption {
 ///
 /// # Returns
 /// * 200 OK with success message if toggle succeeds
+/// * 404 Not Found if the app does not exist or belongs to another user
 /// * 500 Internal Server Error if toggle fails
 ///
 /// # Example Response
@@ -1203,6 +1204,24 @@ async fn toggle_encryption(
             }))
         }
     };
+
+    // Must stay ahead of the Enigma registration and participant writes below.
+    match db::controllers::apps::app_belongs_to_user(&mut connection, &user, &payload.app_id).await
+    {
+        Ok(true) => {}
+        Ok(false) => {
+            return HttpResponse::NotFound().json(json!({
+                "state": "ERROR",
+                "error": "App not found",
+            }))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "state": "ERROR",
+                "error": e,
+            }))
+        }
+    }
 
     if let Some(participants) = &payload.participants {
         for participant in participants {

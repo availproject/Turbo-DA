@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use avail_rust::H256;
 use avail_utils::retrieve_data::retrieve_data;
+use db::controllers::apps::app_belongs_to_user;
 use db::controllers::customer_expenditure::get_customer_expenditure_by_submission_id;
-use db::controllers::public_keys::public_key_exists;
+use db::controllers::mpc_participants::get_participants_by_app_id;
+use db::controllers::public_keys::{get_public_keys_by_user, public_key_exists};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use enigma::{
     types::{
@@ -18,8 +20,40 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::utils::get_connection;
+use crate::utils::{get_connection, retrieve_user_id_from_jwt};
 use crate::{config::AppConfig, utils::generate_avail_sdk};
+
+/// The caller must own the app or hold one of its signer keys. Fails closed with a 404.
+async fn require_app_access(
+    http_request: &HttpRequest,
+    pool: &web::Data<Pool<AsyncPgConnection>>,
+    app_id: &str,
+) -> Result<(), HttpResponse> {
+    let user = retrieve_user_id_from_jwt(http_request).unwrap_or_default();
+    let app = Uuid::parse_str(app_id).unwrap_or_default();
+    let mut conn = get_connection(pool).await?;
+
+    let is_owner = app_belongs_to_user(&mut conn, &user, &app)
+        .await
+        .unwrap_or(false);
+    let signers = get_participants_by_app_id(&mut conn, &app)
+        .await
+        .unwrap_or_default();
+    let keys = get_public_keys_by_user(&mut conn, &user)
+        .await
+        .unwrap_or_default();
+    let is_signer = keys.iter().any(|key| {
+        signers
+            .iter()
+            .any(|s| s.participant_address == key.public_address)
+    });
+
+    if is_owner || is_signer {
+        Ok(())
+    } else {
+        Err(HttpResponse::NotFound().json(json!({ "error": "App not found" })))
+    }
+}
 
 /// Register a new application with participants for threshold encryption
 ///
@@ -134,7 +168,7 @@ pub async fn register(
 /// # Returns
 /// JSON response with request_id, signers list, and status
 #[tracing::instrument(
-    skip(enigma, pool),
+    skip(enigma, pool, app_config, http_request),
     fields(
         turbo_da_app_id = %request.turbo_da_app_id,
         id = %request.id,
@@ -147,7 +181,13 @@ pub async fn create_decrypt_request(
     request: web::Json<DecryptRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
     pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
+    let app_id = request.turbo_da_app_id.to_string();
+    if let Err(denied) = require_app_access(&http_request, &pool, &app_id).await {
+        return denied;
+    }
+
     let mut connection = match get_connection(&pool).await {
         Ok(conn) => conn,
         Err(e) => return e,
@@ -159,6 +199,11 @@ pub async fn create_decrypt_request(
                 id = %request.id,
                 "found expenditure for submission"
             );
+            if sub.app_id != request.turbo_da_app_id {
+                return HttpResponse::NotFound().json(json!({
+                    "error": format!("Customer expenditure not found for id: {}", request.id)
+                }));
+            }
             if sub.payload.is_some() {
                 let pre_image = sub.payload.unwrap();
                 match enigma
@@ -263,7 +308,7 @@ struct GetDecryptRequest {
 /// # Returns
 /// JSON response with request status, signers, and plaintext (if completed)
 #[tracing::instrument(
-    skip(enigma),
+    skip(enigma, pool, http_request),
     fields(
         submission_id = %payload.submission_id,
         endpoint = "enigma_get_decrypt_request"
@@ -273,6 +318,8 @@ struct GetDecryptRequest {
 pub async fn get_decrypt_request(
     payload: web::Query<GetDecryptRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!(
         submission_id = %payload.submission_id,
@@ -284,6 +331,12 @@ pub async fn get_decrypt_request(
         .await
     {
         Ok(response) => {
+            if let Err(denied) =
+                require_app_access(&http_request, &pool, &response.turbo_da_app_id).await
+            {
+                return denied;
+            }
+
             tracing::info!(
                 request_id = %response.id,
                 status = %response.status,
@@ -416,7 +469,7 @@ pub async fn submit_signature(
 /// # Returns
 /// JSON response with paginated list of decryption requests
 #[tracing::instrument(
-    skip(enigma),
+    skip(enigma, pool, http_request),
     fields(
         turbo_da_app_id = %query.turbo_da_app_id,
         offset = ?query.offset,
@@ -428,6 +481,8 @@ pub async fn submit_signature(
 pub async fn list_decrypt_requests(
     query: web::Query<ListDecryptRequestsQuery>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!(
         turbo_da_app_id = %query.turbo_da_app_id,
@@ -435,6 +490,10 @@ pub async fn list_decrypt_requests(
         limit = ?query.limit,
         "listing decrypt requests"
     );
+
+    if let Err(denied) = require_app_access(&http_request, &pool, &query.turbo_da_app_id).await {
+        return denied;
+    }
 
     match enigma.list_decrypt_requests(query.into_inner()).await {
         Ok(response) => {
@@ -473,8 +532,13 @@ pub async fn create_change_signers(
     request: web::Json<CreateChangeSignersRequest>,
     enigma: web::Data<EnigmaEncryptionService>,
     pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!("creating change signers request");
+
+    if let Err(denied) = require_app_access(&http_request, &pool, &request.turbo_da_app_id).await {
+        return denied;
+    }
 
     let mut connection = match get_connection(&pool).await {
         Ok(conn) => conn,
@@ -515,8 +579,14 @@ pub async fn create_change_signers(
 pub async fn list_change_signers(
     query: web::Query<ListChangeSignersQuery>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!("listing change signers requests");
+
+    if let Err(denied) = require_app_access(&http_request, &pool, &query.turbo_da_app_id).await {
+        return denied;
+    }
     match enigma.list_change_signers(query.into_inner()).await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => {
@@ -531,10 +601,19 @@ pub async fn list_change_signers(
 pub async fn get_change_signers(
     request_id: web::Path<String>,
     enigma: web::Data<EnigmaEncryptionService>,
+    pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!(request_id = %request_id, "getting change signers request");
     match enigma.get_change_signers_request(&request_id).await {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => {
+            if let Err(denied) =
+                require_app_access(&http_request, &pool, &response.turbo_da_app_id).await
+            {
+                return denied;
+            }
+            HttpResponse::Ok().json(response)
+        }
         Err(e) => {
             tracing::error!(error = %e, "failed to get change signers request");
             match &e {
@@ -652,7 +731,7 @@ fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
 /// # Returns
 /// JSON response with list of apps
 #[tracing::instrument(
-    skip(pool),
+    skip(pool, http_request),
     fields(
         address = %address,
         endpoint = "enigma_get_participant_apps"
@@ -662,6 +741,7 @@ fn hex_string_to_fixed_bytes(s: &str) -> Result<[u8; 32], String> {
 pub async fn get_participant_apps(
     address: web::Path<String>,
     pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!(
         address = %address,
@@ -673,11 +753,24 @@ pub async fn get_participant_apps(
         Err(e) => return e,
     };
 
+    let user = retrieve_user_id_from_jwt(&http_request).unwrap_or_default();
+    let keys = get_public_keys_by_user(&mut connection, &user)
+        .await
+        .unwrap_or_default();
+    if !keys.iter().any(|key| key.public_address == *address) {
+        return HttpResponse::Ok().json(json!([]));
+    }
+
     match db::controllers::mpc_participants::get_apps_by_participant(&mut connection, &address)
         .await
     {
         Ok(apps) => {
             tracing::info!(count = apps.len(), "successfully fetched participant apps");
+            // Balances and the owner's identity stay private.
+            let apps: Vec<_> = apps
+                .iter()
+                .map(|a| json!({ "id": a.id, "app_id": a.app_id, "app_name": a.app_name, "app_logo": a.app_logo }))
+                .collect();
             HttpResponse::Ok().json(apps)
         }
         Err(e) => {
@@ -703,7 +796,7 @@ pub async fn get_participant_apps(
 /// # Returns
 /// JSON response with list of participants
 #[tracing::instrument(
-    skip(pool),
+    skip(pool, http_request),
     fields(
         turbo_da_app_id = %turbo_da_app_id,
         endpoint = "enigma_current_signers"
@@ -713,6 +806,7 @@ pub async fn get_participant_apps(
 pub async fn current_signers(
     turbo_da_app_id: web::Path<String>,
     pool: web::Data<Pool<AsyncPgConnection>>,
+    http_request: HttpRequest,
 ) -> HttpResponse {
     tracing::info!(
         turbo_da_app_id = %turbo_da_app_id,
@@ -733,6 +827,10 @@ pub async fn current_signers(
         Ok(conn) => conn,
         Err(e) => return e,
     };
+
+    if let Err(denied) = require_app_access(&http_request, &pool, &turbo_da_app_id).await {
+        return denied;
+    }
 
     match db::controllers::mpc_participants::get_participants_by_app_id(&mut connection, &app_uuid)
         .await

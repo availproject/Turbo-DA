@@ -1,3 +1,4 @@
+use super::misc::ensure_no_submission_in_progress;
 use crate::{
     models::apps::{Apps, AppsCreate},
     schema::{apps::dsl::*, users::dsl as users},
@@ -39,6 +40,8 @@ pub async fn delete_account_by_id(
     user_identifier: String,
     account_id: Uuid,
 ) -> Result<(), String> {
+    ensure_no_submission_in_progress(connection, &user_identifier).await?;
+
     connection
         .transaction(async |conn| {
             // Lock the row so a concurrent submission can't spend credits between read and delete.
@@ -49,6 +52,10 @@ pub async fn delete_account_by_id(
                 .for_update()
                 .first::<Apps>(&mut *conn)
                 .await?;
+            // Deleting the row would erase a debt the user still owes.
+            if account.credit_balance < BigDecimal::from(0) {
+                return Err(diesel::result::Error::RollbackTransaction);
+            }
             // Return the unspent allocation to the main account. `credit_used` has already been
             // paid out on Avail and must not be refunded.
             if account.credit_balance > BigDecimal::from(0) {
@@ -67,7 +74,12 @@ pub async fn delete_account_by_id(
             Ok::<(), diesel::result::Error>(())
         })
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| match e {
+            diesel::result::Error::RollbackTransaction => {
+                "Cannot delete an app with a negative credit balance".to_string()
+            }
+            e => e.to_string(),
+        })
 }
 
 pub async fn update_app_id(
@@ -158,10 +170,27 @@ pub async fn toggle_encryption(
     user: &String,
     app: &Uuid,
 ) -> Result<(), String> {
-    diesel::update(apps.filter(id.eq(app)).filter(user_id.eq(user)))
+    let updated = diesel::update(apps.filter(id.eq(app)).filter(user_id.eq(user)))
         .set(encryption.eq(dsl::not(encryption)))
         .execute(connection)
         .await
         .map_err(|e| e.to_string())?;
+    if updated != 1 {
+        return Err("App not found".to_string());
+    }
     Ok(())
+}
+
+/// Returns whether `app` exists and belongs to `user`.
+pub async fn app_belongs_to_user(
+    connection: &mut AsyncPgConnection,
+    user: &str,
+    app: &Uuid,
+) -> Result<bool, String> {
+    diesel::select(dsl::exists(
+        apps.filter(id.eq(app)).filter(user_id.eq(user)),
+    ))
+    .get_result::<bool>(connection)
+    .await
+    .map_err(|e| e.to_string())
 }

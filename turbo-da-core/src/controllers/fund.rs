@@ -554,6 +554,11 @@ pub async fn estimate_credits_for_bytes(
 
     HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Credit cost calculated successfully", "data": credits_cost}))
 }
+/// `size` comes from the caller and is allocated, so an unchecked huge value aborts the process.
+fn checked_estimate_size(size: u64, max: usize) -> Option<usize> {
+    usize::try_from(size).ok().filter(|size| *size <= max)
+}
+
 /// Structure for estimating credits based on data size
 ///
 /// # Fields
@@ -591,12 +596,19 @@ pub async fn estimate_credits_against_size(
     query: web::Query<EstimateCreditsSize>,
     config: web::Data<AppConfig>,
 ) -> impl Responder {
+    let Some(size) = checked_estimate_size(query.0.size, config.payload_size) else {
+        return HttpResponse::BadRequest().json(json!({
+            "state": "ERROR",
+            "message": format!("Size must be at most {} bytes", config.payload_size),
+        }));
+    };
+
     let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
     let account = dev_accounts::alice();
 
     let convertor = Convertor::new(&sdk, &account);
 
-    let vec = vec![0; query.0.size as usize];
+    let vec = vec![0; size];
 
     let credits_cost = convertor.calculate_credit_utlisation(vec).await;
 
@@ -705,4 +717,22 @@ pub async fn estimate_credits_against_token(
 #[get("/token_map")]
 pub async fn get_token_map() -> impl Responder {
     HttpResponse::Ok().json(json!({"state": "SUCCESS", "message": "Token map retrieved successfully", "data": &*TOKEN_MAP}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn estimate_size_allows_up_to_the_limit() {
+        assert_eq!(checked_estimate_size(0, 100), Some(0));
+        assert_eq!(checked_estimate_size(100, 100), Some(100));
+    }
+
+    #[test]
+    fn estimate_size_rejects_above_the_limit() {
+        assert_eq!(checked_estimate_size(101, 100), None);
+        assert_eq!(checked_estimate_size(1 << 62, 100), None);
+        assert_eq!(checked_estimate_size(u64::MAX, 100), None);
+    }
 }

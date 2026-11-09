@@ -6,8 +6,22 @@ use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, io, vec::Vec};
 use toml;
 
+const DEFAULT_PAYLOAD_SIZE: usize = 10 * 1024 * 1024;
+
+fn default_payload_size() -> usize {
+    DEFAULT_PAYLOAD_SIZE
+}
+
+fn parse_payload_size(value: Option<&str>) -> Result<usize, String> {
+    value.map_or(Ok(DEFAULT_PAYLOAD_SIZE), |value| {
+        value.parse::<usize>().map_err(|e| e.to_string())
+    })
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
+    #[serde(default = "default_payload_size")]
+    pub payload_size: usize,
     pub database_url: String,
     pub port: u16,
     pub redis_url: String,
@@ -33,6 +47,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            payload_size: DEFAULT_PAYLOAD_SIZE,
             port: 8000,
             database_url: String::new(),
             redis_url: String::new(),
@@ -182,6 +197,12 @@ impl AppConfig {
                 e.to_string()
             })?;
 
+        let payload_size =
+            parse_payload_size(env::var("PAYLOAD_SIZE").ok().as_deref()).map_err(|e| {
+                tracing::error!(error = %e, "invalid PAYLOAD_SIZE value");
+                e
+            })?;
+
         let enigma_url = env::var("ENIGMA_ENCRYPTION_SERVICE_URL")?;
 
         let sumsub_app_token = env::var("SUMSUB_APP_TOKEN")?;
@@ -205,6 +226,7 @@ impl AppConfig {
         let aws_secret_access_key = env::var("AWS_SECRET_ACCESS_KEY")?;
 
         Ok(AppConfig {
+            payload_size,
             port,
             database_url,
             redis_url,
@@ -226,5 +248,25 @@ impl AppConfig {
             sumsub_base_url,
             enigma_url,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn payload_size_uses_configured_value() {
+        assert_eq!(parse_payload_size(Some("2048")), Ok(2048));
+    }
+
+    #[test]
+    fn payload_size_defaults_when_unset() {
+        assert_eq!(parse_payload_size(None), Ok(DEFAULT_PAYLOAD_SIZE));
+    }
+
+    #[test]
+    fn payload_size_rejects_invalid_value() {
+        assert!(parse_payload_size(Some("ten megabytes")).is_err());
     }
 }

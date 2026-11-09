@@ -442,7 +442,8 @@ impl EnigmaEncryptionService {
         let status = response.status();
         let body = response.text().await?;
 
-        tracing::info!(%status, %body, "enigma get_decrypt_request response");
+        // The body can hold decrypted customer data, so it must not be logged.
+        tracing::info!(%status, "enigma get_decrypt_request response");
 
         if !status.is_success() {
             tracing::error!(%status, %body, "enigma returned error");
@@ -577,7 +578,7 @@ impl EnigmaEncryptionService {
         let status = response.status();
         let body = response.text().await?;
 
-        tracing::info!(%status, %body, "enigma decrypt response");
+        tracing::info!(%status, "enigma decrypt response");
 
         if !status.is_success() {
             tracing::error!(%status, %body, "enigma returned error");
