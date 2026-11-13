@@ -1,0 +1,1 @@
+ALTER TABLE customer_expenditures ADD COLUMN infinity BOOLEAN NOT NULL DEFAULT FALSE;

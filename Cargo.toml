@@ -26,6 +26,7 @@ log = "0.4.22"
 rand = "0.8.5"
 env_logger = "0.10"
 avail-rust = { package = "avail-rust-client", git = "https://github.com/availproject/avail-rust.git", rev = "77121322798fb6d5d9e38b7d403ac1b7c8c6ed5f", default-features = false, features = ["native"] }
+avail-rust-legacy = { package = "avail-rust-client", version = "=0.5.0", default-features = false, features = ["native", "reqwest"] }
 avail-fri = { git = "https://github.com/availproject/avail-core.git", rev = "ecc267c2b9dc3508066ddf879fde94b9599aa31d", default-features = false, features = ["parallel", "std"] }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "=1.8.0" , features = ["v4","fast-rng","macro-diagnostics", "serde"]}

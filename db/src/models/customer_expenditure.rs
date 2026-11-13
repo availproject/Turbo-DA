@@ -69,6 +69,7 @@ pub struct CustomerExpenditureGetWithPayload {
     pub signature_ciphertext_hash: Option<Vec<u8>>,
     pub signature_plaintext_hash: Option<Vec<u8>>,
     pub address: Option<Vec<u8>>,
+    pub infinity: bool,
 }
 
 #[derive(Insertable, Selectable, Serialize, Deserialize, Debug)]
@@ -81,4 +82,5 @@ pub struct CreateCustomerExpenditure {
     pub error: Option<String>,
     pub payload: Option<Vec<u8>>,
     pub app_id: Uuid,
+    pub infinity: bool,
 }

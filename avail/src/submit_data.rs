@@ -5,6 +5,8 @@ use avail_rust::prelude::*;
 use avail_rust::FindBlobExtOutcome;
 use hex::{self, ToHex};
 
+use crate::normal::{self, SubmitDataNormal};
+
 #[derive(Debug)]
 pub struct TransactionInfo {
     pub to_address: String,
@@ -16,20 +18,66 @@ pub struct TransactionInfo {
     pub block_number: u32,
 }
 
-pub struct SubmitDataAvail<'a> {
+/// Posts data to the network a submission was requested for.
+pub enum SubmitDataAvail<'a> {
+    Normal(SubmitDataNormal<'a>),
+    Infinity(SubmitDataInfinity<'a>),
+}
+
+impl<'a> SubmitDataAvail<'a> {
+    pub fn normal(client: &'a normal::Client, account: &'a normal::Keypair, app_id: i32) -> Self {
+        Self::Normal(SubmitDataNormal {
+            client,
+            account,
+            app_id,
+        })
+    }
+
+    pub fn infinity(client: &'a Client, account: &'a Keypair, app_id: i32) -> Self {
+        Self::Infinity(SubmitDataInfinity {
+            client,
+            account,
+            app_id,
+        })
+    }
+
+    pub async fn submit_data(&self, data: &[u8]) -> Result<TransactionInfo, String> {
+        match self {
+            Self::Normal(submitter) => submitter.submit_data(data).await,
+            Self::Infinity(submitter) => submitter.submit_data(data).await,
+        }
+    }
+
+    /// Fee for posting `data`, which billing compares against the fee for 1 KB.
+    pub async fn estimate_fee(&self, data: Vec<u8>) -> Result<u128, String> {
+        match self {
+            Self::Normal(submitter) => submitter.estimate_fee(data).await,
+            Self::Infinity(submitter) => submitter.estimate_fee(data).await,
+        }
+    }
+}
+
+/// Posts data to the infinity network as blob metadata plus the blob itself.
+pub struct SubmitDataInfinity<'a> {
     pub client: &'a Client,
     pub account: &'a Keypair,
     pub app_id: i32,
 }
 
-impl<'a> SubmitDataAvail<'a> {
-    pub fn new(client: &'a Client, account: &'a Keypair, app_id: i32) -> Self {
-        SubmitDataAvail {
-            client,
-            account,
-            app_id,
-        }
+impl SubmitDataInfinity<'_> {
+    pub async fn estimate_fee(&self, data: Vec<u8>) -> Result<u128, String> {
+        let fees = self
+            .client
+            .tx()
+            .data_availability()
+            .submit_data(self.app_id as u32, data)
+            .estimate_extrinsic_fees(self.account, Options::default(), None)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(fees.final_fee())
     }
+
     pub async fn submit_data(&self, data: &[u8]) -> Result<TransactionInfo, String> {
         let options = Options::new();
         let data_hash = H256::from(keccak_256(data));

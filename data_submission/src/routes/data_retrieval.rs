@@ -1,7 +1,7 @@
 use crate::config::AppConfig;
 use actix_web::{get, web, HttpResponse};
 use avail_rust::H256;
-use avail_utils::retrieve_data::retrieve_data;
+use avail_utils::{normal, retrieve_data::retrieve_data};
 use db::controllers::customer_expenditure::{
     get_customer_expenditure_by_submission_id, handle_submission_info,
 };
@@ -10,7 +10,7 @@ use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
-use turbo_da_core::utils::{generate_avail_sdk, get_connection};
+use turbo_da_core::utils::{generate_avail_sdk, generate_normal_avail_sdk, get_connection};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -90,7 +90,16 @@ pub async fn get_pre_image(
                 return HttpResponse::NotImplemented()
                     .body("Customer Expenditure found but tx isn't finalised yet.");
             }
-            let sdk = generate_avail_sdk(&Arc::new(config.avail_rpc_endpoint.clone())).await;
+            let endpoints = if sub.infinity {
+                &config.avail_infinity_rpc_endpoint
+            } else {
+                &config.avail_rpc_endpoint
+            };
+            if endpoints.is_empty() {
+                return HttpResponse::ServiceUnavailable()
+                    .json(json!({ "error": "Submission's network is not configured" }));
+            }
+            let endpoints = Arc::new(endpoints.clone());
             let b_hash = match hex_string_to_fixed_bytes(sub.block_hash.unwrap().as_str()) {
                 Ok(hash) => hash,
                 Err(e) => {
@@ -98,8 +107,16 @@ pub async fn get_pre_image(
                 }
             };
 
-            match retrieve_data(sdk, H256::from(b_hash), sub.extrinsic_index.unwrap() as u32).await
-            {
+            let tx_index = sub.extrinsic_index.unwrap() as u32;
+            let retrieved = if sub.infinity {
+                let sdk = generate_avail_sdk(&endpoints).await;
+                retrieve_data(sdk, H256::from(b_hash), tx_index).await
+            } else {
+                let sdk = generate_normal_avail_sdk(&endpoints).await;
+                normal::retrieve_data(sdk, b_hash, tx_index).await
+            };
+
+            match retrieved {
                 Ok(pre_image) => HttpResponse::Ok().body(pre_image),
                 Err(e) => HttpResponse::InternalServerError()
                     .json(json!(format!("Failed to retrieve data. Error {:?}", e))),

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use avail_rust::{Client, Keypair};
-use avail_utils::submit_data::SubmitDataAvail;
+use avail_rust::Keypair;
+use avail_utils::{normal, submit_data::SubmitDataAvail};
 use data_submission::{ProcessSubmitResponse, Response};
 use db::models::{customer_expenditure::CustomerExpenditureGetWithPayload, user_model::User};
 /// This file contains logic to monitor the failing transactions.
@@ -19,22 +19,39 @@ use diesel_async::{
 };
 use enigma::EnigmaEncryptionService;
 use observability::{log_fallback_txn_error, log_retry_count};
+use turbo_da_core::utils::{generate_avail_sdk, generate_normal_avail_sdk};
+
+/// Connection details for the networks a failed submission can be retried on.
+pub struct Networks {
+    pub normal_endpoints: Arc<Vec<String>>,
+    pub infinity_endpoints: Arc<Vec<String>>,
+    pub normal_keypairs: Vec<normal::Keypair>,
+    pub infinity_keypairs: Vec<Keypair>,
+}
+
+impl Networks {
+    fn is_configured(&self, infinity: bool) -> bool {
+        if infinity {
+            !self.infinity_endpoints.is_empty()
+        } else {
+            !self.normal_endpoints.is_empty()
+        }
+    }
+}
 
 /// Monitors and processes failed transactions from the database
 ///
 /// # Arguments
 /// * `connection` - Database connection handle
 /// * `config` - Application configuration
-/// * `client` - Avail SDK client instance
-/// * `account` - Keypair for transaction signing
+/// * `networks` - Endpoints and keypairs for each network
 ///
 /// # Description
 /// Fetches unresolved transactions from the database and processes them
 /// by attempting to resubmit them to the Avail network
 pub async fn monitor_failed_transactions(
     connection: &String,
-    client: &Client,
-    account: &Vec<Keypair>,
+    networks: &Networks,
     redis: Arc<Redis>,
     retry_count: i32,
     limit: i64,
@@ -47,16 +64,23 @@ pub async fn monitor_failed_transactions(
         get_unresolved_transactions(&mut connection_client, retry_count, limit).await;
 
     match unresolved_transactions {
-        Ok(failed_transactions_list) => {
+        Ok(mut failed_transactions_list) => {
+            failed_transactions_list.retain(|(transaction, _, _)| {
+                let configured = networks.is_configured(transaction.infinity);
+                if !configured {
+                    log_error(&transaction.id.to_string(), "Network is not configured");
+                }
+                configured
+            });
+
             if failed_transactions_list.is_empty() {
                 tracing::info!("no unresolved transactions found");
                 return;
             }
             process_failed_transactions(
                 connection,
-                client,
+                networks,
                 redis,
-                account,
                 retry_count,
                 failed_transactions_list,
                 enigma,
@@ -74,8 +98,7 @@ pub async fn monitor_failed_transactions(
 /// # Arguments
 /// * `connection` - Database connection handle
 /// * `config` - Application configuration
-/// * `client` - Avail SDK client instance
-/// * `account` - Keypair for transaction signing
+/// * `networks` - Endpoints and keypairs for each network
 /// * `failed_transactions_list` - List of failed transactions to process
 ///
 /// # Description
@@ -85,9 +108,8 @@ pub async fn monitor_failed_transactions(
 /// 3. If successful, calculates fees and updates the transaction status
 async fn process_failed_transactions(
     connection: &String,
-    client: &Client,
+    networks: &Networks,
     redis: Arc<Redis>,
-    account: &Vec<Keypair>,
     retry_count: i32,
     failed_transactions_list: Vec<(CustomerExpenditureGetWithPayload, Apps, User)>,
     enigma: &EnigmaEncryptionService,
@@ -100,6 +122,26 @@ async fn process_failed_transactions(
         .expect("Failed to create pool");
 
     let pool_ref = &pool;
+
+    // Connect only to networks with work, so an idle network's outage can't block retries.
+    let normal_sdk = if failed_transactions_list
+        .iter()
+        .any(|(tx, _, _)| !tx.infinity)
+    {
+        Some(generate_normal_avail_sdk(&networks.normal_endpoints).await)
+    } else {
+        None
+    };
+    let infinity_sdk = if failed_transactions_list
+        .iter()
+        .any(|(tx, _, _)| tx.infinity)
+    {
+        Some(generate_avail_sdk(&networks.infinity_endpoints).await)
+    } else {
+        None
+    };
+    let normal_sdk = normal_sdk.as_ref();
+    let infinity_sdk = infinity_sdk.as_ref();
 
     let futures = failed_transactions_list.into_iter().enumerate().map(
         |(index, (customer_expenditure_details, account_details, _))| {
@@ -141,15 +183,33 @@ async fn process_failed_transactions(
                     return;
                 };
 
-                let submit_data_class =
-                    SubmitDataAvail::new(&client, &account[index], account_details.app_id);
+                let infinity = customer_expenditure_details.infinity;
+                let avail_app_id = account_details.app_id;
+                let submit_data_class = match (infinity, normal_sdk, infinity_sdk) {
+                    (false, Some(sdk), _) => {
+                        SubmitDataAvail::normal(sdk, &networks.normal_keypairs[index], avail_app_id)
+                    }
+                    (true, _, Some(sdk)) => SubmitDataAvail::infinity(
+                        sdk,
+                        &networks.infinity_keypairs[index],
+                        avail_app_id,
+                    ),
+                    _ => {
+                        log_error(
+                            &customer_expenditure_details.id.to_string(),
+                            "No client for the transaction's network",
+                        );
+                        return;
+                    }
+                };
 
                 let response = Response {
                     raw_payload: data.into(),
                     submission_id: customer_expenditure_details.id,
                     thread_id: 0,
                     app_id: account_details.id,
-                    avail_app_id: account_details.app_id,
+                    avail_app_id,
+                    infinity,
                     otel_context: tracing_opentelemetry::OpenTelemetrySpanExt::context(
                         &tracing::Span::current(),
                     ),

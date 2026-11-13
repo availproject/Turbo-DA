@@ -463,6 +463,7 @@ pub mod test {
         create_customer_expenditure_entry(
             &mut conn,
             CreateCustomerExpenditure {
+                infinity: false,
                 id,
                 user_id: user.to_string(),
                 amount_data: "1 KB".to_string(),

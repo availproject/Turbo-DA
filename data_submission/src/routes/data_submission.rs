@@ -27,6 +27,14 @@ pub struct SubmitData {
     pub data: String,
 }
 
+/// Query parameters shared by the submission routes
+#[derive(Deserialize)]
+pub struct SubmitParams {
+    /// Submits to the infinity network instead of the normal network.
+    #[serde(default)]
+    pub infinity: bool,
+}
+
 /// Handles submission of string data
 ///
 /// # Arguments
@@ -40,17 +48,19 @@ pub struct SubmitData {
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
 #[tracing::instrument(
-    skip(request_payload, sender, injected_dependency, config, http_request),
+    skip(request_payload, params, sender, injected_dependency, config, http_request),
     fields(
         submission_id = tracing::field::Empty,
         user_id = tracing::field::Empty,
         app_id = tracing::field::Empty,
+        infinity = params.infinity,
         data_size = request_payload.data.len()
     )
 )]
 #[post("/submit_data")]
 pub async fn submit_data(
     request_payload: web::Json<SubmitData>,
+    params: web::Query<SubmitParams>,
     sender: web::Data<Sender<Response>>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
@@ -64,6 +74,7 @@ pub async fn submit_data(
 
     _submit_data(
         request_payload.data.as_bytes().to_vec(),
+        params.infinity,
         sender,
         injected_dependency,
         config,
@@ -85,17 +96,19 @@ pub async fn submit_data(
 /// * JSON response with submission ID on success
 /// * Error response if user validation or database operations fail
 #[tracing::instrument(
-    skip(request_payload, sender, injected_dependency, config, http_request),
+    skip(request_payload, params, sender, injected_dependency, config, http_request),
     fields(
         submission_id = tracing::field::Empty,
         user_id = tracing::field::Empty,
         app_id = tracing::field::Empty,
+        infinity = params.infinity,
         data_size = request_payload.len()
     )
 )]
 #[post("/submit_raw_data")]
 pub async fn submit_raw_data(
     request_payload: Bytes,
+    params: web::Query<SubmitParams>,
     sender: web::Data<Sender<Response>>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
@@ -109,6 +122,7 @@ pub async fn submit_raw_data(
 
     _submit_data(
         request_payload.to_vec(),
+        params.infinity,
         sender,
         injected_dependency,
         config,
@@ -119,11 +133,22 @@ pub async fn submit_raw_data(
 
 async fn _submit_data(
     request_payload: Vec<u8>,
+    infinity: bool,
     sender: web::Data<Sender<Response>>,
     injected_dependency: web::Data<Pool<AsyncPgConnection>>,
     config: web::Data<AppConfig>,
     http_request: HttpRequest,
 ) -> HttpResponse {
+    let endpoints = if infinity {
+        &config.avail_infinity_rpc_endpoint
+    } else {
+        &config.avail_rpc_endpoint
+    };
+    if endpoints.is_empty() {
+        return HttpResponse::ServiceUnavailable()
+            .json(json!({ "error": "Requested network is not configured" }));
+    }
+
     let app_id = match retrieve_app_id(&http_request) {
         Some(val) => val,
         None => {
@@ -175,6 +200,7 @@ async fn _submit_data(
         id: submission_id,
         error: None,
         payload: Some(request_payload.to_vec()),
+        infinity,
     };
 
     let consumer_response = Response {
@@ -183,6 +209,7 @@ async fn _submit_data(
         submission_id,
         app_id,
         avail_app_id,
+        infinity,
         otel_context: tracing::Span::current().context(),
     };
 
@@ -209,4 +236,29 @@ async fn _submit_data(
     tracing::info!("submission accepted and queued for processing");
 
     HttpResponse::Ok().json(json!({ "submission_id": submission_id }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(query: &str) -> Result<bool, actix_web::error::QueryPayloadError> {
+        web::Query::<SubmitParams>::from_query(query).map(|params| params.infinity)
+    }
+
+    #[test]
+    fn submissions_default_to_the_normal_network() {
+        assert!(!parse("").unwrap());
+        assert!(!parse("infinity=false").unwrap());
+    }
+
+    #[test]
+    fn infinity_param_selects_the_infinity_network() {
+        assert!(parse("infinity=true").unwrap());
+    }
+
+    #[test]
+    fn invalid_infinity_value_is_rejected() {
+        assert!(parse("infinity=maybe").is_err());
+    }
 }

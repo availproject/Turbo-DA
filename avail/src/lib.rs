@@ -1,3 +1,4 @@
+pub mod normal;
 pub mod retrieve_data;
 pub mod submit_data;
 
